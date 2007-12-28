@@ -5,7 +5,7 @@ pdf: dp.pdf
 ps: dp.ps
 bib: dp.bbl
 
-dp.dvi: dp.tex
+dp.tex: dp.bbl
 
 %.bbl: %.bib
 	bibtex $(subst .bib$,,$<)
