@@ -1,7 +1,7 @@
-format 48
+format 49
 "sze2"
-  revision 28
-  modified_by 113 "xslaby"
+  revision 29
+  modified_by 115 "xslaby"
 
 
   
@@ -76,7 +76,7 @@ format 48
       idl_decl ""
       explicit_switch_type ""
       
-      attribute 128111 "tail_ptr"
+      attribute 128111 "rx_tail_ptr"
 	protected explicit_type "ulong"
 	multiplicity "1..*"
 	init_value "0"
@@ -84,7 +84,8 @@ format 48
 	java_decl ""
 	php_decl ""
 	idl_decl ""
-	comment "per application tail pointers to the ring buffers, the \"minimal\" one (from all these) affects hw tail pointer"
+	comment "tail pointers to the ring buffers for each subscribed interface.
+The \"minimal\" one from all applications affects hw tail pointer of each interface."
       end
 
       attribute 128079 "ifaces"
@@ -169,14 +170,14 @@ ${members}};
       comment "1. the module's device node is opened
 2. per application descriptor allocation is done
 3. if (not allocate_on_modpobe and refcount was 0) then call alloc_rings
-4. get_ring_param ioctl is called with interface number and type (either rx or tx)
-5. size and offset of the selected (key: number, type) ring buffer is returned
-6. node is mmap(2)-ed with values from get_ring_param ioctl
-7. subscribe_interface ioctl is called with interfaces bitmap and poll_thresh
-8. APP poll_thresh and interfaces are set
-9. APP rx_tail_ptr is set to current HW rx_tail_ptr (pay attention on refcount is 0 here)
-10. APP tx_tail_ptr is set to current HW tx_head_ptr
-11. start ioctl is called
+4. get_rings_param ioctl is called with type (either rx or tx)
+5. size and offset of the selected ring buffers is returned -- note that all buffers are visible as a virtual contiguos memory. The only difference between TX and RX mmio space is read/write protection
+6. node is mmap(2)-ed with values from get_rings_param ioctl (rx, tx spaces)
+7. node is mmap(2)-ed with static values -- status, locked packets
+8. subscribe_interface ioctl is called with interfaces bitmap and poll_thresh
+9. APP poll_thresh and interfaces are set
+10. start ioctl is called
+11. each APP rx_tail_ptr is set to the current corresponding HW rx_tail_ptr
 12. if (refcount was 0) then the device is started -- enabling of interrupts, capture start ..."
       simplerelation 128522
 	-_->
@@ -203,9 +204,8 @@ ${members}};
 Node must be opened yet and close need not to be in progress
 
 Normal flow
-1. lock_data ioctl is invoked
-2. while (APP rx_tail_ptr = HW rx_head_ptr) do the proccess is slept
-3. current HW rx_head_ptr is passed as the return value
+1. lock_data ioctl is invoked with requested count
+2. locked count (might be lesser than the requested one, even 0) is returned
 
 Alternative flow
 * signal is catched while sleeping -> interrupt waiting and return"
@@ -231,7 +231,7 @@ Node must be opened yet and close need not to be in progress
 lock_data was invoked before this call and tail_ptr is correct
 
 Normal flow
-1. unlock_data ioctl was invoked with filled updated rx_tail_ptr
+1. unlock_data ioctl was invoked
 2. APP rx_tail_ptr is updated with this new value
 3. HW rx_tail_ptr is updated to the min(others' rx_tail_ptrs > rx_head_ptr), if there is no such value, then use min(others' rx_tail_ptr). This is needed to catch pointers actually higher than others, but still belonging to the slowest readers (head usually wraps around and continues from the entry number 0)."
     end
@@ -439,6 +439,30 @@ Note: 'allocate on modpobe' is set to true by default, but might be overriden by
     sequencediagram 128114 "TX_SQD"
       show_full_operations_definition default write_horizontally default class_drawing_mode default drawing_language default draw_all_relations default shadow default
       size A4
+    end
+
+    usecase 128115 "wait_for_data"
+      //use case diagram settings
+      package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
+      //sequence diagram settings
+      show_full_operations_definition default write_horizontally default class_drawing_mode default drawing_language default draw_all_relations default shadow default
+      //collaboration diagram settings
+      show_full_operations_definition default show_hierarchical_rank default write_horizontally default drawing_language default package_name_in_tab default show_context default draw_all_relations default shadow default
+      //object diagram settings
+       write_horizontally default package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
+      //state diagram settings
+      package_name_in_tab default show_context default auto_label_position default write_trans_label_horizontally default show_trans_definition default draw_all_relations default shadow default
+      show_activities default region_horizontally default drawing_language default
+      //activity diagram settings
+      package_name_in_tab default show_context default show_opaque_action_definition default auto_label_position default write_flow_label_horizontally default draw_all_relations default shadow default
+      show_infonote default drawing_language default
+      comment "Precondition
+Node must be opened yet and close need not to be in progress
+
+Normal flow
+1. poll is invoked
+2. while (for all requested interfaces: (APP rx_tail_ptr = HW rx_head_ptr)) do the proccess is slept
+3. return status to the application"
     end
   end
 end
