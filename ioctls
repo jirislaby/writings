@@ -3,26 +3,32 @@
 mmap offset 0:
 #define SZE2_MMIO_RX		0
 #define SZE2_MMIO_TX		1
-#define SZE2_MMIO_RXDESC	2
 #define SZE2_MMIO_MAX		10
 struct sze2_instance_info {
-	__u64 reserved;
+	__u64 reserved;			/**< for future/testing purposes */
 	__u64 offsets[SZE2_MMIO_MAX];	/**< offset of each mmio space */
 	__u64 sizes[SZE2_MMIO_MAX];	/**< size of each mmio space */
-	__u32 interfaces;		/**< subscribed interfaces */
+	__u32 rx_areas, tx_areas;	/**< subscribed areas */
+	__u64 reserved[5];		/**< reserved for future purpose */
+	struct {
+		__u64 offset;		/**< offset of locked data */
+		__u32 size;		/**< size of locked data */
+	} adesc[2][0];			/**< for each area and direction */
 };
 
 === ioctls ===
 
 * init
 
-subscribe interface
- struct sze2_subscribe_iface {
-	__u32 interface;	/**< bitmap of interfaces to be subscribed
-				     ~0U = all avaliable, corrected value is in
-				     mmio space after this ioctl */
-	__u32 poll_thresh;	/**< minimal count which will wake the
+subscribe area
+ struct sze2_subscribe_area {
+	__u32 rx_areas;		/**< bitmap of areas to be subscribed
+				     ~0U = all avaliable, corrected value
+				     is in mmio space after this ioctl */
+	__u32 tx_areas;		/**< see above */
+	__u32 rx_poll_thresh;	/**< minimal count which will wake the
 				     application from poll sleep */
+	__u32 tx_poll_thresh;	/**< see above */
  };
 
 start
@@ -31,7 +37,7 @@ start
 * RX
 
 lock data
- __u32 size;
+ __u32 size_area;	/**< IN: size, OUT: area */
 
 unlock data
  [no parameter]
@@ -39,16 +45,16 @@ unlock data
 * TX
 
 request space
- struct sze2_request_spc {
-	__u32 size;
-	__u8 area;	/**< which interface to write to */
+ struct sze2_request_space {
+	__u32 size;	/**< how many bytes should be reserved */
+	__u8 area;	/**< which area to involve */
  };
 
 put data
  struct sze2_put_data {
-	__u32 size;
-	__u8 area;
- }
+	__u32 size;	/**< how many bytes were really written */
+	__u8 area;	/**< to which area, must be the same */
+ };
 
 * deinit
 
@@ -60,10 +66,11 @@ stop
 #define SZE2_IOC_BASE		0xc0
 
 #define SZE2_IOC_SUBSCRIBE_IFACE _IOW(SZE2_IOC_BASE, 0, \
-		struct sze2_subscribe_iface)
+		struct sze2_subscribe_area)
 #define SZE2_IOC_START		_IO  (SZE2_IOC_BASE, 1)
-#define SZE2_IOC_LOCKDATA	_IOW (SZE2_IOC_BASE, 2, __u64)
+#define SZE2_IOC_LOCKDATA	_IORW(SZE2_IOC_BASE, 2, __u32)
 #define SZE2_IOC_UNLOCKDATA	_IO  (SZE2_IOC_BASE, 3)
-#define SZE2_IOC_REQUEST_SPC	_IORW(SZE2_IOC_BASE, 4, struct sze2_request_spc)
+#define SZE2_IOC_REQUEST_SPC	_IORW(SZE2_IOC_BASE, 4, \
+		struct sze2_request_space)
 #define SZE2_IOC_PUTDATA	_IORW(SZE2_IOC_BASE, 5, struct sze2_put_data)
 #define SZE2_IOC_STOP		_IO  (SZE2_IOC_BASE, 6)

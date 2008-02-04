@@ -1,7 +1,7 @@
 format 50
 "sze2"
-  revision 30
-  modified_by 53 "xslaby"
+  revision 32
+  modified_by 77 "xslaby"
 
 
   
@@ -38,7 +38,7 @@ format 50
   
   ncouples 11
   key "html dir" value "/home/xslaby/sze2/"
-  key "gxmi path" value "bubak.xmi"
+  key "gxmi path" value "abc.xmi"
   key "gxmi gen views" value "no"
   key "gxmi encoding" value "UTF-8"
   key "gxmi uml2.0" value "no"
@@ -76,6 +76,18 @@ format 50
       idl_decl ""
       explicit_switch_type ""
       
+      attribute 128136 "rx_head_ptr"
+	protected explicit_type "ulong"
+	multiplicity "1..*"
+	init_value "0"
+	cpp_decl ""
+	java_decl ""
+	php_decl ""
+	idl_decl ""
+	comment "tail pointers to the ring buffers for each subscribed area.
+The \"minimal\" one from all applications affects hw tail pointer of each area."
+      end
+
       attribute 128111 "rx_tail_ptr"
 	protected explicit_type "ulong"
 	multiplicity "1..*"
@@ -84,21 +96,11 @@ format 50
 	java_decl ""
 	php_decl ""
 	idl_decl ""
-	comment "tail pointers to the ring buffers for each subscribed interface.
-The \"minimal\" one from all applications affects hw tail pointer of each interface."
+	comment "tail pointers to the ring buffers for each subscribed area.
+The \"minimal\" one from all applications affects hw tail pointer of each area."
       end
 
-      attribute 128079 "ifaces"
-	protected explicit_type "uint"
-	init_value "0"
-	cpp_decl ""
-	java_decl ""
-	php_decl ""
-	idl_decl ""
-	comment "bitmap of subscribed interfaces. this is probably needed only for poll."
-      end
-
-      attribute 128054 "poll_thresh"
+      attribute 128054 "rx_poll_thresh"
 	protected explicit_type "uint"
 	multiplicity "1"
 	cpp_decl ""
@@ -107,6 +109,25 @@ The \"minimal\" one from all applications affects hw tail pointer of each interf
 	idl_decl ""
       end
 
+      attribute 128008 "tx_poll_thresh"
+	protected explicit_type "uint"
+	multiplicity "1"
+	cpp_decl ""
+	java_decl ""
+	php_decl ""
+	idl_decl ""
+      end
+
+      attribute 128079 "areas"
+	protected explicit_type "uint"
+	multiplicity "2"
+	init_value "0"
+	cpp_decl ""
+	java_decl ""
+	php_decl ""
+	idl_decl ""
+	comment "Bitmap of subscribed areas for each direction. This is probably needed only for poll."
+      end
     end
 
     class 128010 "OS"
@@ -173,15 +194,45 @@ ${members}};
 3. if (not allocate_on_modpobe and refcount was 0) then call alloc_rings
 4. node is mmap-ed (offset 0) -- status
 5. node is mmap-ed with values from previously mapped memory (rx, tx spaces) -- note that all buffers are visible as a virtual contiguos memory. The only difference between TX and RX mmio space is read/write protection
-6. subscribe_interface ioctl is called with interfaces bitmap and poll_thresh
-7. APP poll_thresh and interfaces are set
+6. subscribe_area ioctl is called with areas bitmap and poll_thresh; both for each direction
+7. APP poll_thresh and areas are set to the status page
 8. start ioctl is called
-9. each APP rx_tail_ptr is set to the current corresponding global rx_tail_ptr
+9. each APP rx_tail_ptr and APP rx_head_ptr is set to the current corresponding HW rx_tail_ptr
 10. if (refcount was 0) then the device is started -- enabling of interrupts, capture start ..."
       simplerelation 128522
 	-_->
 	  on usecase_ref 128266 // alloc_rings
       end
+    end
+
+    usecase 128115 "wait_for_data"
+      //use case diagram settings
+      package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
+      //sequence diagram settings
+      show_full_operations_definition default write_horizontally default class_drawing_mode default drawing_language default draw_all_relations default shadow default
+      //collaboration diagram settings
+      show_full_operations_definition default show_hierarchical_rank default write_horizontally default drawing_language default package_name_in_tab default show_context default draw_all_relations default shadow default
+      //object diagram settings
+       write_horizontally default package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
+      //state diagram settings
+      package_name_in_tab default show_context default auto_label_position default write_trans_label_horizontally default show_trans_definition default draw_all_relations default shadow default
+      show_activities default region_horizontally default drawing_language default
+      //activity diagram settings
+      package_name_in_tab default show_context default show_opaque_action_definition default auto_label_position default write_flow_label_horizontally default draw_all_relations default shadow default
+      show_infonote default drawing_language default
+      comment "Precondition
+Node must be opened yet and close need not to be in progress
+
+Normal flow
+1. poll is invoked
+2. while:
+a) for all requested rx areas: difference(HW rx_head_ptr, APP rx_tail_ptr) < APP rx_poll_thresh and
+b) for all requested tx areas: (tx_ring_size - difference(HW tx_head_ptr, HW tx_tail_ptr)) < APP tx_poll_thresh
+do: the proccess is slept and interrupt scheduled
+3. return status to the application
+
+Alternative flow
+* signal is catched while sleeping -> interrupt waiting and return"
     end
 
     usecase 128062 "get_data"
@@ -203,10 +254,13 @@ ${members}};
 Node must be opened yet and close need not to be in progress
 
 Normal flow
-1. lock_data ioctl is invoked with requested count
-2. up to count data offsets are put into locked packets mmap-ed space
-3. locked count (might be lesser than the requested one, even 0) is returned
-"
+1. lock_data ioctl is invoked with requested size
+2. size is computed as min(max_rx_request_count, requested size, difference(APP rx_tail_ptr, HW rx_head_ptr))
+3. the size (even 0 is valid) is stored into the status page along with offset obtained from APP rx_tail_ptr
+4. offset + size is stored into the right APP rx_head_ptr 
+
+Alternative flow
+* no data in any of subscribed areas for rx -- return 0"
     end
 
     usecase 128096 "release_data"
@@ -229,8 +283,8 @@ Node must be opened yet and close need not to be in progress
 
 Normal flow
 1. unlock_data ioctl was invoked
-2. corresponding APP rx_tail_ptr is updated according to unlocked data
-3. global rx_tail_ptr is updated to the min(APP rx_tail_ptrs > global rx_head_ptr), if there is no such value, then use min(APP rx_tail_ptrs) of corresponding interface pointers. This is needed to catch pointers actually higher than others, but still belonging to the slowest readers (head usually wraps around and continues from the entry number 0)."
+2. corresponding APP rx_tail_ptr is set to the APP rx_head_ptr previously stored in get_data
+3. HW rx_tail_ptr is updated to the min(APP rx_tail_ptrs > HW rx_head_ptr), if there is no such value, then use min(APP rx_tail_ptrs) of corresponding area pointers. This is needed to catch pointers actually higher than others, but still belonging to the slowest readers (head usually wraps around and continues from the entry number 0)."
     end
 
     usecase 128113 "request_space"
@@ -250,11 +304,13 @@ Normal flow
       show_infonote default drawing_language default
       comment "Precondition
 Node must be opened yet and close need not to be in progress.
-TX for requested interface is not in progress (only one writer at a time).
+Application must have this area subscribed for tx.
+TX for requested area is not in progress (only one writer at a time).
 
 Normal flow
-1. request_space ioctl is called with count/size and area parameters
-2. min(requested size, free space available in the ring buffer, some reliable constant -- to not allow one application transmit for a long time) is returned"
+1. request_space ioctl is called with size and area parameters
+2. size is computed as min(max_tx_request_count, requested size, tx_size - difference(HW tx_head_ptr, HW tx_tail ptr))
+3. the size and HW tx_head_ptr as offset is stored into APP status_page"
     end
 
     usecase 128054 "put_data"
@@ -277,9 +333,8 @@ Node must be opened yet and close need not to be in progress.
 request_space was called by this application for area in parameter.
 
 Normal flow
-1. put_data ioctl is invoked with filled count and area where the data was filled to
-2. add to the HW.tx_head_ptr min(free space, requested count, the constant) -- compute again, application may cheat
-3. successfully written count is returned"
+1. put_data ioctl is invoked with filled size and area where the data was filled to
+2. min(size computed in request_space, supplied size) is added to the HW.tx_head_ptr"
     end
 
     usecase 128170 "close_node"
@@ -315,7 +370,7 @@ b) if (allocation on modprobe) then null HW ptrs else call dealloc_rings
       end
     end
 
-    usecase 128099 "data_ready"
+    usecase 128099 "interrupt"
       //use case diagram settings
       package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
       //sequence diagram settings
@@ -334,8 +389,8 @@ b) if (allocation on modprobe) then null HW ptrs else call dealloc_rings
 Hardware was started and expected to run (i.e. refcount > 0)
 
 Normal flow
-1. interrupt (timeout or ring buffer pointer reached) is raised -- data ready in the ring buffer
-2. wake applications, which are waiting for this data up
+1. interrupt (timeout or ring buffer pointer reached) is raised -- ring buffer is in state we requested
+2. wake applications, which are waiting for this info up
 
 Alternative flow
 * missed interrupt -- set up timer (watchdog) to cope with this"
@@ -433,36 +488,9 @@ Note: 'allocate on modpobe' is set to true by default, but might be overriden by
       size A4
     end
 
-    sequencediagram 128114 "TX_SQD"
+    sequencediagram 128008 "TX_SQD"
       show_full_operations_definition default write_horizontally default class_drawing_mode default drawing_language default draw_all_relations default shadow default
       size A4
-    end
-
-    usecase 128115 "wait_for_data"
-      //use case diagram settings
-      package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
-      //sequence diagram settings
-      show_full_operations_definition default write_horizontally default class_drawing_mode default drawing_language default draw_all_relations default shadow default
-      //collaboration diagram settings
-      show_full_operations_definition default show_hierarchical_rank default write_horizontally default drawing_language default package_name_in_tab default show_context default draw_all_relations default shadow default
-      //object diagram settings
-       write_horizontally default package_name_in_tab default show_context default auto_label_position default draw_all_relations default shadow default
-      //state diagram settings
-      package_name_in_tab default show_context default auto_label_position default write_trans_label_horizontally default show_trans_definition default draw_all_relations default shadow default
-      show_activities default region_horizontally default drawing_language default
-      //activity diagram settings
-      package_name_in_tab default show_context default show_opaque_action_definition default auto_label_position default write_flow_label_horizontally default draw_all_relations default shadow default
-      show_infonote default drawing_language default
-      comment "Precondition
-Node must be opened yet and close need not to be in progress
-
-Normal flow
-1. poll is invoked
-2. while (for all requested interfaces: (difference(HW rx_head_ptr, APP rx_tail_ptr) < APP poll_thresh)) do the proccess is slept
-3. return status to the application
-
-Alternative flow
-* signal is catched while sleeping -> interrupt waiting and return"
     end
   end
 end
