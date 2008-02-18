@@ -1,7 +1,7 @@
 format 50
 "sze2"
-  revision 32
-  modified_by 77 "xslaby"
+  revision 35
+  modified_by 34 "xslaby"
 
 
   
@@ -254,13 +254,15 @@ Alternative flow
 Node must be opened yet and close need not to be in progress
 
 Normal flow
-1. lock_data ioctl is invoked with requested size
-2. size is computed as min(max_rx_request_count, requested size, difference(APP rx_tail_ptr, HW rx_head_ptr))
-3. the size (even 0 is valid) is stored into the status page along with offset obtained from APP rx_tail_ptr
-4. offset + size is stored into the right APP rx_head_ptr 
+1. rx_lock_data ioctl is invoked with requested areas bitmap
+2. the requested bitmap is logically ANDed with the subscribed bitmap
+3. size is computed as difference(APP rx_tail_ptr, HW rx_head_ptr) for each area until size is zero and this area number is stored
+4. the size (even 0 is valid) is stored into the status page along with offset obtained from APP rx_tail_ptr
+5. offset + size sum is stored into the right APP rx_head_ptr
+6. stored area is returned
 
 Alternative flow
-* no data in any of subscribed areas for rx -- return 0"
+* size is zero -- invalid area is returned"
     end
 
     usecase 128096 "release_data"
@@ -282,9 +284,10 @@ Alternative flow
 Node must be opened yet and close need not to be in progress
 
 Normal flow
-1. unlock_data ioctl was invoked
-2. corresponding APP rx_tail_ptr is set to the APP rx_head_ptr previously stored in get_data
-3. HW rx_tail_ptr is updated to the min(APP rx_tail_ptrs > HW rx_head_ptr), if there is no such value, then use min(APP rx_tail_ptrs) of corresponding area pointers. This is needed to catch pointers actually higher than others, but still belonging to the slowest readers (head usually wraps around and continues from the entry number 0)."
+1. rx_unlock_data ioctl was invoked
+2. foreach area do
+a) corresponding APP rx_tail_ptr is set to the APP rx_head_ptr value previously stored in get_data
+b) HW rx_tail_ptr is updated to the min(APP rx_tail_ptrs > HW rx_tail_ptr), if there is no such value, then use min(APP rx_tail_ptrs) of corresponding area pointers. This is needed to catch pointers actually higher than others, but still belonging to the slowest readers (head usually wraps around and continues from the entry number 0)."
     end
 
     usecase 128113 "request_space"
@@ -309,7 +312,7 @@ TX for requested area is not in progress (only one writer at a time).
 
 Normal flow
 1. request_space ioctl is called with size and area parameters
-2. size is computed as min(max_tx_request_count, requested size, tx_size - difference(HW tx_head_ptr, HW tx_tail ptr))
+2. size is computed as min(max_tx_request_count, requested size, tx_ring_buffer_size - difference(HW tx_head_ptr, HW tx_tail ptr))
 3. the size and HW tx_head_ptr as offset is stored into APP status_page"
     end
 
