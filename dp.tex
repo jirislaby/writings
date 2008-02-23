@@ -1,6 +1,6 @@
 % vim: textwidth=78 ai
 
-\documentclass[draft,11pt]{fithesis}
+\documentclass[final,11pt]{fithesis}
 
 %\usepackage{cmap}
 \usepackage[utf8x]{inputenc}
@@ -25,9 +25,9 @@
 \newcommand{\lbr}{\emph{Liberouter}}
 \newcommand{\com}{\emph{COMBO6}}
 \newcommand{\comx}{\emph{COMBO6x}}
-\newcommand{\nflow}{\emph{NetFlow}}
 \newcommand{\fpga}{\emph{FPGA}}
 \newcommand{\dma}{\emph{DMA}}
+\newcommand{\sze}{\emph{szedata2}}
 
 \begin{document}
 \FrontMatter
@@ -55,52 +55,145 @@
   
 \end{ThesisAbstract}
 \begin{ThesisKeyWords}
-  Linux, Driver, ring buffer, mmap, DMA, COMBO6x, FlowMon, Liberouter
+  Linux, Driver, ring buffer, mmap, DMA, COMBO6x, NetCOPE, Liberouter
 \end{ThesisKeyWords}
 
 \MainMatter
 \tableofcontents
 
 \chapter{Introduction}
-  To even boot a computer, it's necessary to process many transfers inside the
+  To even boot a computer, it's necessary to proceed many transfers inside the
   hardware among its components. It's a basic function which must work,
-  however there are several methods of how it can be achieved. Especially
-  the fast ones are very important in computer science.
+  however there are several methods of how to achieved that. Especially
+  the fast ones are very important in computer science which results in higher
+  overall throughput of the system. As fast as possible transfers between
+  network and application are the scope of this thesis.
 
-% Many improvements have been done in this area in the past.
+  Many improvements have been done in this area in the past. We will introduce
+  nowadays mainly used techniques, above all we enlight in more details
+  \emph{direct memory access} which we then use in the implementation.
 
+  We will also discuss ring buffer as a data structure, its advantages,
+  caveats and a way how is it possible to store it in the memory. Hence we'll
+  go through paging, memory management, the need of virtual memory and how it
+  can be used in the implementation.
+
+  Other subsystems needed for the modules will also be discussed, their
+  linkage to userspace (e.g. creating a device node, file operations) sorted
+  out.
+
+  Hardware design description, operations which it performs, data structures
+  which it operates with, a way, how the ring buffer is processed and registers
+  in the card's address space and their meaning will be placed in the next
+  section.
+
+  Finally we put all those information together and create a kernelspace
+  module supported even on older kernels -- we'll take care of this in
+  a separate chapter -- and userspace library along with documentation of
+  both and comparison to the older version of the design.
+
+\chapter{Basic terms}
+  This chapter contains enlightment of some basic terms used later. Also it
+  makes clear why we made some decisions in naming or licensing for instance.
   \section{Linux}
-  1992, Torvalds, fast development nowadays, well evolved API, licensing.
+  Linux is an operating system based on kernel which was established in the
+  early nineties of the 20th century by Linus Torvalds. There is over 3
+  hundreds variants called distributions shipped by either communities or
+  software giants.
+  
+  Linux kernel in its version 2.6 has no stable api inside the
+  kernel, but still the api is well-evolved and easy to use, because the
+  development is ridden and checked by a linux kernel community. We will
+  see consequences of such development method in detailed description of some
+  subsystems in detail later and in compatible layer implementation too.
+
+  Major part of linux kernel is licensed under GPL version 2 \cite{gplv2}, but
+  BSD and ISC code is not a rarity. Chosen license which will be the
+  implementation distributed under is GPL version 2 like other drivers
+  majority.
 
   \section{Liberouter project}
-  Also in Liberouter project a new generation of the \comx\ card has evolved
+  Liberouter is a project supported by \emph{CESNET} (Czech academic network)
+  and \emph{6NET} (European internet project). There were raised many projects
+  under Liberouter mainly to transfer and scan high traffic on backbones.
+  All those work on cards called \com\ or \comx\ (PCI-X and PCI express version)
+  respectively. One of such card is for illustration depicted on figure
+  \ref{fig.combo6}.
 
-  \section{NetCOPE project}
-  why, how, szedata2
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=11cm]{images/combo6x}
+      \caption{\comx\ card}
+      \label{fig.combo6}
+    \end{center}
+  \end{figure}
+ 
+  Some projects are available for some of BSD versions, but currently main
+  supported operating system is linux. And even later described implementation
+  will be available only for this system.
 
+  \section{NetCOPE project and szedata2}
+  One of Liberouter projects is \emph{NetCOPE}. The goal is to develop a
+  \com\ cards based platform which is immutable against fast evolution of
+  networking. \emph{NetCOPE} data flow might be seen in schematic on
+  figure \ref{fig.netcope_schema}. As can one see there, this universal
+  solution allows involving it in multiple areas
+  such as network traffic filtering, routing packets, intrusion detection and
+  others.
+
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=11cm]{images/netcope_color}
+      \caption{NetCope schematic}
+      \label{fig.netcope_schema}
+    \end{center}
+  \end{figure}
+
+  We'll develop the software on the top of the \emph{NetCOPE} platform.
+  \sze\ is chosen as a name after its predecessing first generation
+  driver based on pre-\emph{NetCOPE} hardware. It stands for \emph{straight
+  zero copy data} in the meaning of avoid copying data from memory to the
+  application and vice versa by remapping it as we'll later.
+
+\chapter{Hardware basics}
+  Before we can start coding, many hardware questions must be answered.
+  Hardware-software communication might not come as easy as it seems
+  too, some basics of handling particular situations in linux kernel are
+  located in further sections.
   \section{Devices interconnection}
+  The first thing to exlpain is how data flows from devices to processor
   device -- transparent bus -- pci bus -- northbridge -- southbridge -- cpu
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=8cm]{images/data_flow}
+      \caption{Devices interconnection}
+      \label{fig.dev_inter}
+    \end{center}
+  \end{figure}
+
 
   \section{Bus Mastering and DMA}
   dma controllers, position in interconnection, purpose, how do they work\ldots
-
-  \section{Data from kernelspace to userspace}
-  mmio in short, pcap in short
-
 % http://en.wikipedia.org/wiki/Bus\_mastering
 % http://www.quatech.com/support/comm-over-pci.php
 
-  \section{udev}
-  userspace dev of whatever it stands for\ldots
+  \section{Memory management}
+  mmio
 
-  how does it work, what is it for, very fast comparison with the past devfs
+  \section{Other subsystems}
+  \subsection{PCI in short}
+  ids, we'll use them in udev, DMA interface
+
+  \subsection{Character device}
+  \subsubsection{udev}
+  userspace dev, successor of kernel's devfs
+
+  how does it work, what is it for, very fast comparison with devfs
 
   The way, how is it used in the \lbr is described in next chapter.
 
-\chapter{Device nodes naming}
+  \subsubsection{Device nodes naming}
   2 kind of nodes -- combo x szedata, consistent naming needs
-
-  udev\ldots
 
   The script (figure \ref{fig.udevscript}) and the rules (figure
   \ref{fig.udevrules}) file contents come here.
@@ -123,12 +216,13 @@ KERNEL=="szedata*", ...
   \label{fig.udevscript}
   \end{figure}
 
+  \subsection{NetCOPE hardware}
+  Organisation of ring buffer in the card memory. Regs, functions\ldots
+
 \chapter{szedata2}
   What is it good for? Why is it arising? Diff betwwen szedata and version 2.
 
   \section{Introduction}
-  \subsection{Ring buffer processing}
-  Organistaion of data in the card memory.
 
   \subsection{Data path}
   card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
@@ -140,7 +234,7 @@ KERNEL=="szedata*", ...
 % --
   \section{Development cycle}
   \subsection{Models and design}
-  Bouml et al.
+  (bo)uml et al.
 
   \subsection{Code templates}
   + design patterns if any applies
