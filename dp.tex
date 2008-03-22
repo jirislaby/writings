@@ -84,7 +84,7 @@
   cooperation with ringbuffer data structure and memory mapping (so-called
   \emph{mmap}) might move big chunks of data without even processor
   assistance from network adapter towards application in userspace and vice
-  versa without any real data copying. This results in very short transaction
+  versa without any real data copying. This results in short transaction
   times.
   
   \subsubsection{Thesis structure} TB-reD
@@ -145,14 +145,14 @@
   \end{figure}
  
   Some projects are available for some of BSD versions, but currently main
-  supported operating system is linux. And even later described implementation
+  supported operating system is Linux. And even later described implementation
   will be available only for this system.
 
   \section{NetCOPE project and szedata2}
   One of Liberouter projects is \emph{NetCOPE}. The goal is to develop a
   \com\ cards based platform which is immutable against fast evolution of
   networking. \emph{NetCOPE} data flow might be seen in schematic on
-  figure \ref{fig.netcope_schema}. As can one see there, this universal
+  figure \ref{fig.netcope_schema}. As one can see there, this universal
   solution allows involving it in multiple areas
   such as network traffic filtering, routing packets, intrusion detection and
   others.
@@ -169,7 +169,7 @@
   \sze\ is chosen as a name after its predecessing first generation
   driver based on pre-\emph{NetCOPE} hardware. It stands for \emph{straight
   zero copy data} in the meaning of avoid copying data from memory to the
-  application and vice versa by remapping it as we'll later.
+  application and vice versa by remapping it as we'll show later.
 
 \chapter{Hardware basics}
   Before we can start coding, many hardware questions must be answered.
@@ -177,7 +177,7 @@
   too, some basics of handling particular situations in linux kernel are
   located in further sections.
   \section{Devices interconnection}
-  The first thing to exlpain is how data flows from devices to processor
+  The first thing to explain is how data flows from devices to processor
   device -- transparent bus -- pci bus -- northbridge -- southbridge -- cpu
   \begin{figure}[h]
     \begin{center}
@@ -195,22 +195,53 @@
 
   \section{Memory management}
   This chapter is a short introduction into memory management as used not
-  only in linux.
+  only in linux. Memory management in details on Intel processors is described
+  in \cite{ia1} and also in \cite{gorman}.
   mmio
   \subsection{Physical memory}
   In the usual meaning we call main \emph{random access memory} as physical
-  memory. Althought it is possible to not have a this kind of memory by a
+  memory. Althought it is possible to not have this kind of memory by a
   processor in special computers like \emph{NUMA}, we usually have one or more
   memories plugged in motherboard. There are several addressing methods how
   processor can access data on it.
-  
-  When early booting the operating system, only the first 64 kilobytes are
-  available, we use a term \emph{real mode} for such approach. Addressing in
-  this case is as simply as possible. It's
-  called segmenting and 
-  \subsection{}
+
+  \subsubsection{Real-address mode}
+  In the early Intel 8086 processsors, this mode was used. For the
+  compatibility reasons, this mode is available on todays CPUs too, and is
+  used mostly only in the early booting stage.
+
+  Physical memory is divided into 16 64-kilobyte sized segments, so that up to $2^{20}$
+  bytes might be addressed. The rest of memory is unused.
+
+  \subsubsection{Segmentation mode}
+  Similar to previous model, but it allows segments to be up to $2^{32}$ in size
+  and their maximal count is 16383 on 32-bit. Application sees them as indepentent
+  address spaces potentially of different types. This might be
+  used to avoid stack or heap overflows and code or data damage, because each of them
+  can reside in separate segment.
+
+  \subsubsection{Flat mode}
+  Each byte of memory is simply addressed by \emph{linear address}. First memory byte
+  has address 0, on 32-bit without any extensions the last possible byte (if
+  there is that much physical memory) has address $2^{32}-1$.
+
   \subsection{Virtual memory}
-  With having only these\cite{gorman} Some problems occured during computers evolve As it is impossible to allocate contiguos physical memory after some
+  With only physical memory addressing problems arised early. Applications needed
+  continuous big chunks of memory, but it was impossible to find such long
+  block after a while system was running. It was caused by process called
+  fragmentation. Other tasks held memory blocks and there wasn't enough space
+  in between them to return. See figure \ref{fig.fragmentation} for
+  illustration.
+
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=8cm]{images/fragmentation}
+      \caption{Memory fragmentation}
+      \label{fig.fragmentation_schema}
+    \end{center}
+  \end{figure}
+
+  Some problems occured during computers evolve As it is impossible to allocate contiguos physical memory after some
   uptime due to fragmentation
   \subsubsection{paging}
 
