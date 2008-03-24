@@ -8,6 +8,7 @@
 \usepackage[IL2]{fontenc}
 \usepackage{hyperref}
 \usepackage{graphicx}
+\usepackage[final]{listings}
 
 \thesislang{en}
 
@@ -28,6 +29,9 @@
 \newcommand{\fpga}{\emph{FPGA}}
 \newcommand{\dma}{\emph{DMA}}
 \newcommand{\sze}{\emph{szedata2}}
+
+\lstset{tabsize=2,numbers=left,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},frame=l}
 
 \begin{document}
 \FrontMatter
@@ -81,13 +85,14 @@
   through well-known interfaces, but there exist several methods which are
   not so common, but might provide yet another significant improvement. For
   instance nowadays mainly used technique of \emph{direct memory access} in
-  cooperation with ringbuffer data structure and memory mapping (so-called
+  cooperation with ring buffer data structure and memory mapping (so-called
   \emph{mmap}) might move big chunks of data without even processor
   assistance from network adapter towards application in userspace and vice
   versa without any real data copying. This results in short transaction
   times.
   
-  \subsubsection{Thesis structure} TB-reD
+  \subsubsection{Thesis structure} TB-reD XXX
+
   We will see how ring buffer might be used as a data structure, its
   advantages,
   caveats and a way how is it possible to store it in the memory. Hence we'll
@@ -117,20 +122,21 @@
   hundreds variants called distributions shipped by either communities or
   software giants.
   
-  Linux kernel in its version 2.6 has no stable api inside the
-  kernel, but still the api is well-evolved and easy to use, because the
-  development is ridden and checked by a linux kernel community. We will
+  Linux kernel in its version 2.6 has no stable application programming
+  interface (API) inside the kernel, but still the API is well-evolved and
+  easy to use, because the
+  development is ridden and checked by a Linux kernel community. We will
   see consequences of such development method in detailed description of some
   subsystems in detail later and in compatible layer implementation too.
 
-  Major part of linux kernel is licensed under GPL version 2 \cite{gplv2}, but
+  Major part of Linux kernel is licensed under GPL version 2 \cite{gplv2}, but
   BSD and ISC code is not a rarity. Chosen license which will be the
   implementation distributed under is GPL version 2 like other drivers
   majority.
 
   \section{Liberouter project}
   Liberouter is a project supported by \emph{CESNET} (Czech academic network)
-  and \emph{6NET} (European internet project). There were raised many projects
+  and \emph{6NET} (European Internet project). There were raised many projects
   under Liberouter mainly to transfer and scan high traffic on backbones.
   All those work on cards called \com\ or \comx\ (PCI-X and PCI express version)
   respectively. One of such card is for illustration depicted on figure
@@ -166,20 +172,27 @@
   \end{figure}
 
   We'll develop the software on the top of the \emph{NetCOPE} platform.
-  \sze\ is chosen as a name after its predecessing first generation
+  \sze\ is chosen as a name after its ancestral first generation
   driver based on pre-\emph{NetCOPE} hardware. It stands for \emph{straight
   zero copy data} in the meaning of avoid copying data from memory to the
-  application and vice versa by remapping it as we'll show later.
+  application and vice versa by remapping it as we'll show in section
+  \ref{chap.mmio}.
 
 \chapter{Hardware basics}
-  Before we can start coding, many hardware questions must be answered.
+  Before we can start coding, many hardware questions must be answered to know
+  under which circumstances we can achieve some goals and what constraints
+  kernel driver implementation.
   Hardware-software communication might not come as easy as it seems
-  too, some basics of handling particular situations in linux kernel are
+  too, some basics of handling particular situations in Linux kernel are
   located in further sections.
+
   \section{Devices interconnection}
-  The first thing to explain is how data flows from devices to processor
-  device -- transparent bus -- pci bus -- northbridge -- southbridge -- cpu
-  \begin{figure}[h]
+  \label{chap.inter}
+  The first thing to explain is how data flows from devices to processor and
+  particularly which types of buses are on the route from the CPU to a device.
+  Data path may be seen on figure \ref{fig.dev_inter}.
+
+  \begin{figure}[ht]
     \begin{center}
       \includegraphics[width=8cm]{images/data_flow}
       \caption{Devices interconnection}
@@ -187,106 +200,325 @@
     \end{center}
   \end{figure}
 
+  Each PCI device is physically connected to any PCI bus via PCI slot. Other
+  buses (might be another PCI) can be connected through PCI-to-$<$the
+  bus$>$ bridge. PCI bus is attached to southbridge (called ICH\footnote{I/O
+  controller hub} by Intel), it communicates with northbridge
+  (MCH\footnote{memory controller hub}) over internal bus and it's finally
+  wired with processor via front-side bus (FSB). Sometimes all southbridge,
+  northbridge and memory controller are implemented as a proper PCI devices
+  directly connected to main PCI bus.
 
-  \section{Bus Mastering and DMA}
-  dma controllers, position in interconnection, purpose, how do they work\ldots
-% http://en.wikipedia.org/wiki/Bus\_mastering
-% http://www.quatech.com/support/comm-over-pci.php
+  Usually 3 main group of signals are on each bus:
+  \begin{list}{*}{}
+    \item \textbf{control bus} -- it's supposed to send signals and synchronize
+      object which is connected to
+    \item \textbf{address bus} -- that is address of memory which is requested
+      to read from or write to
+    \item \textbf{data bus} -- data itself which flows from/to address
+      specified on address bus
+  \end{list}
+
+  PCI has data and address bus multiplexed, so that it minimizes signals
+  count. Also it's important to know, that while FSB has 64-bits wide address
+  bus,
+  standard PCI buses are 32-bit only. We must take this in account if we want
+  to send 64-bit numbers over PCI to older \com\ cards. PCI-X and PCI-express
+  buses are natively 64-bit long, so this is not a problem for some newer
+  \comx\ cards.
+
+  \section{DMA and Bus Mastering}
+  Direct memory access known as abbreviation DMA is a method widely used to
+  speed up transfers in computer engineering. It's based on technique called
+  bus mastering. A device which wants to move data from/to memory becomes bus
+  master and no other device or even processor can't touch address and data
+  bus described in section \ref{chap.inter}. While being a master, it sets
+  address on an address bus and sends or latches data on a data bus.
+  
+  On older machines, there was only one such device called DMA controller
+  (DMAC). Nowadays each PCI device (see also Section \ref{chap.pci}) may
+  become a master, so that it can access memory directly by its own DMAC.
+  Note that there is no common PCI DMAC, so if the device doesn't have one, it
+  doesn't support DMA either. DMAC count is not bounded to only
+  one as we will see in chapter \ref{chap.netcope}. Unit which takes care of
+  honest bus accesses if there is more than one bus master is called
+  \emph{Arbiter}.
 
   \section{Memory management}
   This chapter is a short introduction into memory management as used not
-  only in linux. Memory management in details on Intel processors is described
+  only in Linux. Memory management in details on Intel processors is described
   in \cite{ia1} and also in \cite{gorman}.
-  mmio
   \subsection{Physical memory}
   In the usual meaning we call main \emph{random access memory} as physical
-  memory. Althought it is possible to not have this kind of memory by a
-  processor in special computers like \emph{NUMA}, we usually have one or more
+  memory. Although it is possible to not have this kind of memory by a
+  processor in special computers like \emph{NUMA} (non-uniform memory access),
+  we usually have one or more
   memories plugged in motherboard. There are several addressing methods how
   processor can access data on it.
 
   \subsubsection{Real-address mode}
-  In the early Intel 8086 processsors, this mode was used. For the
+  In the early Intel 8086 processors, this mode was used. For the
   compatibility reasons, this mode is available on todays CPUs too, and is
   used mostly only in the early booting stage.
 
-  Physical memory is divided into 16 64-kilobyte sized segments, so that up to $2^{20}$
-  bytes might be addressed. The rest of memory is unused.
+  Physical memory is divided into 16 64-kilobyte sized segments, so that up
+  to $2^{20}$ bytes might be addressed. The rest of memory is unused.
 
   \subsubsection{Segmentation mode}
-  Similar to previous model, but it allows segments to be up to $2^{32}$ in size
-  and their maximal count is 16383 on 32-bit. Application sees them as indepentent
-  address spaces potentially of different types. This might be
-  used to avoid stack or heap overflows and code or data damage, because each of them
-  can reside in separate segment.
+  Similar to previous model, but it allows segments to be up to $2^{32}$ in
+  size and their maximal count is 16383 on 32-bit. Application sees them as
+  independent address spaces potentially of different types. This might be
+  used to avoid stack or heap overflows and code or data damage, because
+  each of them can reside in separate segment.
 
   \subsubsection{Flat mode}
-  Each byte of memory is simply addressed by \emph{linear address}. First memory byte
-  has address 0, on 32-bit without any extensions the last possible byte (if
-  there is that much physical memory) has address $2^{32}-1$.
+  Each byte of memory is simply addressed by \emph{linear address}. First
+  memory byte has address 0, on 32-bit without any extensions the last
+  possible byte (if there is that much physical memory) has address
+  $2^{32}-1$.
 
   \subsection{Virtual memory}
-  With only physical memory addressing problems arised early. Applications needed
+  With only physical memory addressing problems arose early. Applications
+  needed
   continuous big chunks of memory, but it was impossible to find such long
   block after a while system was running. It was caused by process called
-  fragmentation. Other tasks held memory blocks and there wasn't enough space
-  in between them to return. See figure \ref{fig.fragmentation} for
-  illustration.
+  (external) fragmentation. Other tasks held memory blocks and there wasn't
+  enough space in between them to return. See figure \ref{fig.fragmentation}
+  for illustration.
+  
+  Task 1 holds two memory blocks of size 2 units. Task 2
+  allocated one block three units wide. Now, if any of the two wants to
+  allocate block of size 4, allocation will fail, although there is
+  enough free space in sum.
 
   \begin{figure}[h]
     \begin{center}
       \includegraphics[width=8cm]{images/fragmentation}
-      \caption{Memory fragmentation}
-      \label{fig.fragmentation_schema}
+      \caption{Memory fragmentation illustration}
+      \label{fig.fragmentation}
     \end{center}
   \end{figure}
 
-  Some problems occured during computers evolve As it is impossible to allocate contiguos physical memory after some
-  uptime due to fragmentation
-  \subsubsection{paging}
+  Many algorithms were introduced to avoid this behavior, some of them are
+  described in Knuth\cite{knuth_art} including buddy system used in Linux
+  kernel for in-kernel allocations. We will see consequences of this
+  constraints later in chapter \ref{chap.netcope}.
 
+  \subsubsection{Paging}
+  To solve the situation with external fragmentation, method named
+  \emph{paging} was introduced. Linear address space is divided into pages
+  of fixed size\footnote{4096 bytes on Intel with page size extension (PSE)
+  disabled} that might be mapped to physical memory or disks as swap.
+
+  CPU addresses physical memory by virtual addresses. This is not possible
+  without translating virtual address into the physical (either in segmented
+  or flat mode) one. Transparent translation is done in \emph{memory
+  management unit} (MMU).
+
+  Virtual address is usually divided into several parts and each of them is
+  offset in some table. On Intel 32-bit with \emph{page address extension}
+  (PAE) and PSE disabled, 3 such tables exist and each table contains
+  entries/pointers to next table or
+  to physical page in the last table respectively. If the entry in either
+  table is marked as non-present, page fault, which is exception handled by
+  operating system, is thrown. OS must either put (map) the requested page in
+  or kill the program which references illegal address.
+
+  On figure \ref{fig.vaddr} is shown, how is logical address split on 32-bit
+  Intel with extensions disabled. CR3 is register in these processors
+  containing location of global page directory depicted on the left side.
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=10cm]{images/vaddr}
+      \caption{Virtual address format}
+      \label{fig.vaddr}
+    \end{center}
+  \end{figure}
+
+  This schema allows us to allocate huge contiguous memory blocks without a
+  need of having contiguous physical memory. In fact there is no need to have
+  as same physical memory as requested. Some memory may be, as written above,
+  backed by a page stored on disk (swapped out) or even have no "physical"
+  page mapped to it -- Linux uses demand paging, so that page is physically
+  backed up even after accessing it (page fault handler takes care of this).
+
+  On 32-bit, we are able to use up
+  to 3 gibibytes\footnote{SI unit for $2^{30}$} of virtual memory per process.
+  This limit comes from 1:3 of kernelspace to userspace split of process
+  virtual address space. On 64-bit, 48-bit virtual addresses are supported by
+  most current processors, up to $2^{47}$ may be used in userspace, kernel is
+  mapped in top $2^{47}$ bytes due to 64-bit sign extension (see \cite{ia3a}
+  for reference) and the space between them is an unused memory hole, which
+  might be addressed even by newer processors.
+
+  We will consider these facts while deciding how much memory we should
+  allocate for the hardware at maximum.
+%  Note that there are strict constraints
+%  on 32-bit on how much physical memory might be used too. Even when PAE is
+%  used (and not PSE) which allows addressing up to 64 gibibytes of
+%  physical memory, practically it's told that the upper boundary is about 8
+%  gibibytes. This comes from how and where the pages descriptors are stored
+%  -- they must be in low memory which is 1 gibibyte (remember 3:1 split)
+%  minus mapped area on the top of that space (see \cite{gorman} for details).
+
+  \subsection{Memory mapped I/O, memory map}
+  XXX TODO
 
   \section{Other subsystems}
   \subsection{PCI in short}
+  \label{chap.pci}
   ids, we'll use them in udev, DMA interface
 
+  latency, arbitration, burst trasfers
+  
+%  Unlike in past, todays DMA transfers are done in blocks (block mode as
+%  opposed to cycle stealing and burst mode XXX TODO citation needed) todays and after
+%  a processor sets up the transfer, it does its own work.
+
   \subsection{Character device}
-  \subsubsection{udev}
-  userspace dev, successor of kernel's devfs
-
-  how does it work, what is it for, very fast comparison with devfs
-
-  The way, how is it used in the \lbr is described in next chapter.
-
+  XXX What's this and what's it about\ldots
   \subsubsection{Device nodes naming}
   3 kind of nodes -- combo x szedata x szedataII, consistent naming needs
 
-  The script (figure \ref{fig.udevscript}) and the rules (figure
-  \ref{fig.udevrules}) file contents come here.
+  \subsubsection{udev}
+  userspace dev, successor of kernel's devfs
 
-  Also the description of each entry in the lines.
+  How does it work, what is it for, very fast comparison with devfs
 
-  \begin{figure}
-  \begin{verbatim}
-KERNEL=="szedata*", ...
-  \end{verbatim}
-  \caption{.rules}
-  \label{fig.udevrules}
-  \end{figure}
+  The way, how is it used in the \lbr is described in next chapter.
 
-  \begin{figure}
-  \begin{verbatim}
-#!/bin/bash
-  \end{verbatim}
-  \caption{script}
-  \label{fig.udevscript}
-  \end{figure}
+  \paragraph{udev rules file} a
+\begin{lstlisting}[language={},label=lst.udevrules,name=lst.udevrules]
+KERNEL!="combosix*", GOTO="cesnet_generator_end"(*@\label{lstl.udevrules_1}@*)
+ACTION!="add", GOTO="cesnet_generator_end"(*@\label{lstl.udevrules_2}@*)
+NAME=="?*", GOTO="cesnet_generator_end"(*@\label{lstl.udevrules_3}@*)
+\end{lstlisting}
+  Since we want to match only additions of combosix devices, rules at line
+  \ref{lstl.udevrules_1} and \ref{lstl.udevrules_2} are needed. To ignore
+  cases where the stored name was set yet, the skip rule at line
+  \ref{lstl.udevrules_3} is there.
+\begin{lstlisting}[name=lst.udevrules]
+ENV{CS}="$kernel"
+ENV{MATCHPATH}="$devpath"
+\end{lstlisting}
+  Set up environment variables used in shell script later. These variables are
+  filled in directly by \emph{udev} and corresponds to the name suggested by
+  kernel or device path (i.e. bus, slot\ldots) respectively.
+\begin{lstlisting}[name=lst.udevrules]
+IMPORT{PROGRAM}="csdevname" (*@\label{lstl.udevrules_11}@*)
 
-  \subsection{NetCOPE hardware}
-  Organisation of ring buffer in the card memory. Regs, functions\ldots
+ENV{CS_NEW}=="?*", NAME="$env{CS_NEW}"
+
+LABEL="cesnet_generator_end" (*@\label{lstl.udevrules_12}@*)
+\end{lstlisting}
+  And finally invoke the script and set up the new name if the script changed
+  it. The last step (line \ref{lstl.udevrules_12}) is to define a label where
+  the first 3 rules jump to.
+
+  \paragraph{csdevname script}
+  Shell script \textbf{csdevname} called from line \ref{lstl.udevrules_11}
+  above follows:
+\lstset{language=bash}
+\begin{lstlisting}[label=lst.udevscript,name=lst.udevscript]
+RULES_FILE='/etc/udev/rules.d/70-cesnet.rules'
+
+. /lib/udev/rule_generator.functions(*@\label{lstl.udevscript_1}@*)
+\end{lstlisting}
+  This loads udev predefined functions used later. RULES\_FILE is the
+  name of file, where we store our persistent naming. Variable name is
+  predefined (and used in the script sourced at line \ref{lstl.udevscript_1})
+  and must not be changed.
+\begin{lstlisting}[name=lst.udevscript]
+cs_name_taken() {
+	local value="$(find_all_rules 'NAME=' $CS)"
+	if [ "$value" ]; then return 0; else return 1; fi
+}
+
+find_next_available() {
+	raw_find_next_available "$(find_all_rules 'NAME=' "$1")"
+}
+\end{lstlisting}
+  Functions \textbf{cs\_name\_taken} and \textbf{find\_next\_available} are
+  for finding available names for new coming device. Both uses functions
+  defined in the sourced script from line \ref{lstl.udevscript_1}, that allows
+  be them as compact as possible.
+\begin{lstlisting}[name=lst.udevscript]
+write_rule() {
+	local match="$1"
+	local name="$2"
+	local comment="$3"
+	{
+		[ "$comment" ] && echo "# $comment"
+		echo "SUBSYSTEM==\"combosix\", ACTION==\"add\"$match, NAME=\"$name\""
+	} >> $RULES_FILE
+}
+\end{lstlisting}
+  \textbf{write\_rule} takes 3 parameters -- under which condition this rule
+  is triggered, static node name and potentially a comment to this rule. The
+  result is written to previously defined \textbf{RULES\_FILE}.
+\begin{lstlisting}[name=lst.udevscript]
+lock_rules_file(*@\label{lstl.udevscript_27}@*)
+choose_rules_file(*@\label{lstl.udevscript_29}@*)
+\end{lstlisting}
+  At lines \ref{lstl.udevscript_27} and \ref{lstl.udevscript_29} we lock up
+  the rules file to prevent race
+  conditions (if two writers occurred, it would result in unpredictable
+  behavior) and decide in which file will be the new rules written (since
+  usual location might be still read-only while booting -- \emph{udev} will
+  then move the temporary file to the proper directory after it becomes
+  writable).
+\begin{lstlisting}[name=lst.udevscript]
+MATCHPATH=${MATCHPATH%/*/*}
+if [ "$MATCHPATH" ]; then
+	match="$match, DEVPATH==\"$MATCHPATH/*\""
+fi
+
+if [ -z "$match" ]; then
+	echo "missing valid match" >&2
+	unlock_rules_file
+	exit 1
+fi
+\end{lstlisting}
+  Now we define matching rule passed to \textbf{write\_rule} later (line
+  \ref{lstl.udevscript_49}). Sanity check of the value is done here and if it
+  fails we return error.
+\begin{lstlisting}[name=lst.udevscript]
+if [ "$CS_NAME" ]; then
+	COMMENT="$COMMENT (custom name)"
+	if [ "$CS_NAME" != "$CS" ]; then
+		CS=$CS_NAME;
+		echo "CS_NEW=$CS"
+	fi
+else
+	base=${CS%%[0-9]*}
+	if cs_name_taken; then
+		CS="$base$(find_next_available "$base[0-9]*")"
+		echo "CS_NEW=$CS"
+	fi
+fi
+\end{lstlisting}
+  Here the name, which is returned to rules (\textbf{CS\_NEW}), is set. Logic
+  is simple, either the one passed by external application is used or a new
+  one is found (first unused).
+\begin{lstlisting}[name=lst.udevscript]
+write_rule "$match" "$CS" "$COMMENT"(*@\label{lstl.udevscript_49}@*)
+
+unlock_rules_file
+\end{lstlisting}
+  Finally the file with static naming is augmented and unlocked.
+
+  Since this moment, if the device come in the system again later, even in
+  other order, system will ever create a node with the same name stored in
+  the rules file.
+
+  \section{NetCOPE hardware}
+  \label{chap.netcope}
+  Organization of ring buffer in the card memory. Regs, functions\ldots
+
+  Physical memory constraints
 
 \chapter{szedata2}
-  What is it good for? Why is it arising? Diff betwwen szedata and version 2.
+  What is it good for? Why is it arising? Diff between szedata and version 2.
 
   \section{Introduction}
 
@@ -307,16 +539,21 @@ KERNEL=="szedata*", ...
 
   \subsection{Code development}
   combo6x driver as a base, new szedata2 module
-    \subsubsection{Mmio space structure}
+    \subsubsection{Mmap space structure}
+    \label{chap.mmio}
     locked : desc : rx ring : tx ring
 
-  \subsection{Backporting to older kernels}
+  \subsection{Back-porting to older kernels}
   Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
   remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
   vs. 2.6.16).
 
   \subsection{Final code}
-  Nice, working, debugged kernel module as a result. License (\cite{gplv2}).
+  Nice, working, debugged kernel module as a result. Documentation.
+  License (\cite{gplv2}).
+
+\chapter{Future work}
+  DMA DAC, standard network adapter mode (kernel network stack usage).
 
 \chapter{Conclusion}
   XXX\cite{ldd}, \cite{ulk}
