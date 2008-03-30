@@ -91,27 +91,28 @@
   versa without any real data copying. This results in short transaction
   times.
   
-  \subsubsection{Thesis structure} TB-reD XXX
-
-  We will see how ring buffer might be used as a data structure, its
-  advantages,
-  caveats and a way how is it possible to store it in the memory. Hence we'll
-  go through paging, memory management, the need of virtual memory and how it
-  can be used in the implementation.
-
-  Other subsystems needed for the modules will also be discussed, their
-  linkage to userspace (e.g. creating a device node, file operations) sorted
-  out.
-
-  Hardware design description, operations which it performs, data structures
-  which it operates with, a way, how the ring buffer is processed and registers
-  in the card's address space and their meaning will be placed in the next
-  section.
-
-  Finally we put all those information together and create a kernelspace
-  module supported even on older kernels -- we'll take care of this in
-  a separate chapter -- and userspace library along with documentation of
-  both and comparison to the older version of the design.
+  \subsubsection{Thesis structure}
+  is commented out and will be probably wiped out completely
+%
+%  We will see how ring buffer might be used as a data structure, its
+%  advantages,
+%  caveats and a way how is it possible to store it in the memory. Hence we'll
+%  go through paging, memory management, the need of virtual memory and how it
+%  can be used in the implementation.
+%
+%  Other subsystems needed for the modules will also be discussed, their
+%  linkage to userspace (e.g. creating a device node, file operations) sorted
+%  out.
+%
+%  Hardware design description, operations which it performs, data structures
+%  which it operates with, a way, how the ring buffer is processed and registers
+%  in the card's address space and their meaning will be placed in the next
+%  section.
+%
+%  Finally we put all those information together and create a kernelspace
+%  module supported even on older kernels -- we'll take care of this in
+%  a separate chapter -- and userspace library along with documentation of
+%  both and comparison to the older version of the design.
 
 \chapter{Basic terms}
   This chapter contains enlightment of some basic terms used later. Also it
@@ -138,9 +139,9 @@
   Liberouter is a project supported by \emph{CESNET} (Czech academic network)
   and \emph{6NET} (European Internet project). There were raised many projects
   under Liberouter mainly to transfer and scan high traffic on backbones.
-  All those work on cards called \com\ or \comx\ (PCI-X and PCI express version)
-  respectively. One of such card is for illustration depicted on figure
-  \ref{fig.combo6}.
+  All those work on cards called \com\ or \comx\ (newer, PCI-X and PCI express
+  version) respectively. One of such card is for illustration depicted on
+  figure \ref{fig.combo6}.
 
   \begin{figure}[h]
     \begin{center}
@@ -180,16 +181,17 @@
 
 \chapter{Hardware basics}
   Before we can start coding, many hardware questions must be answered to know
-  under which circumstances we can achieve some goals and what constraints
-  kernel driver implementation.
-  Hardware-software communication might not come as easy as it seems
-  too, some basics of handling particular situations in Linux kernel are
-  located in further sections.
+  under which circumstances we can achieve concrete goals and what constraints
+  kernel driver implementation has. Understanding hardware-software
+  communication will guide us towards complete implementation.
+  
+  After each section, we consult what exactly does that particular part
+  means for the final code.
 
   \section{Devices interconnection}
   \label{chap.inter}
   The first thing to explain is how data flows from devices to processor and
-  particularly which types of buses are on the route from the CPU to a device.
+  particularly which types of buses are on the route from a CPU to a device.
   Data path may be seen on figure \ref{fig.dev_inter}.
 
   \begin{figure}[ht]
@@ -200,56 +202,63 @@
     \end{center}
   \end{figure}
 
-  Each PCI device is physically connected to any PCI bus via PCI slot. Other
-  buses (might be another PCI) can be connected through PCI-to-$<$the
-  bus$>$ bridge. PCI bus is attached to southbridge (called ICH\footnote{I/O
-  controller hub} by Intel), it communicates with northbridge
-  (MCH\footnote{memory controller hub}) over internal bus and it's finally
-  wired with processor via front-side bus (FSB). Sometimes all southbridge,
-  northbridge and memory controller are implemented as a proper PCI devices
-  directly connected to main PCI bus.
+  We are concerned especially in peripheral component interconnect (PCI)
+  devices, because both \com\ card families are PCI based. Each such device
+  is physically connected to any PCI bus via PCI slot (bottom left).
+% Other buses (might be another PCI) can be connected through PCI-to-$<$the
+% bus$>$ bridge.
+  PCI bus is attached to southbridge (called ICH\footnote{I/O
+  controller hub} by Intel, bottom center), it communicates with northbridge
+  (MCH\footnote{memory controller hub}, middle) over internal bus and it's
+  finally wired with processor via front-side bus (FSB, top center). Nowadays
+  it's still more common, that all southbridge, northbridge and memory
+  controller are implemented as proper PCI devices directly connected to main
+  PCI bus.
 
-  Usually 3 main group of signals are on each bus:
-  \begin{list}{*}{}
-    \item \textbf{control bus} -- it's supposed to send signals and synchronize
-      object which is connected to
+  3 main signal groups are usually on each bus:
+  \begin{list}{-}{}
+    \item \textbf{control bus} -- it's supposed to send controlling signals
+      and synchronize objects which are connected to it
     \item \textbf{address bus} -- that is address of memory which is requested
       to read from or write to
     \item \textbf{data bus} -- data itself which flows from/to address
-      specified on address bus
+      specified on the address bus
   \end{list}
 
-  PCI has data and address bus multiplexed, so that it minimizes signals
-  count. Also it's important to know, that while FSB has 64-bits wide address
-  bus,
-  standard PCI buses are 32-bit only. We must take this in account if we want
-  to send 64-bit numbers over PCI to older \com\ cards. PCI-X and PCI-express
-  buses are natively 64-bit long, so this is not a problem for some newer
-  \comx\ cards.
+  While FSB and later PCI-X and PCI express has 64-bits wide
+  address and data buses (PCI minimizes signal count by multiplexing these two
+  into one by first sending address and then data), standard PCI ones are
+  32-bit only. This shortcoming is important when we want to
+  (we'll in section \ref{chap.hwsetup}) send
+  64-bit numbers over PCI to older \com\ cards. Further detailed PCI
+  information are in \cite{pcispec} and \cite{pciespec}.
 
   \section{DMA and Bus Mastering}
-  Direct memory access known as abbreviation DMA is a method widely used to
+  \label{chap.dma}
+  \emph{Direct memory access} known as DMA is a method widely used to
   speed up transfers in computer engineering. It's based on technique called
-  bus mastering. A device which wants to move data from/to memory becomes bus
-  master and no other device or even processor can't touch address and data
-  bus described in section \ref{chap.inter}. While being a master, it sets
-  address on an address bus and sends or latches data on a data bus.
+  \emph{bus mastering}. A device which wants to move data from/to memory
+  becomes a bus master and no other device or even processor can't touch
+  address and data bus. While being a master, it sets address on an address
+  bus and sends or latches data on a data bus. When there are more than one
+  data phases after address phase on multiplexed bus, the transfer is done in
+  so-called \emph{burst mode}.
   
-  On older machines, there was only one such device called DMA controller
-  (DMAC). Nowadays each PCI device (see also Section \ref{chap.pci}) may
-  become a master, so that it can access memory directly by its own DMAC.
-  Note that there is no common PCI DMAC, so if the device doesn't have one, it
-  doesn't support DMA either. DMAC count is not bounded to only
-  one as we will see in chapter \ref{chap.netcope}. Unit which takes care of
-  honest bus accesses if there is more than one bus master is called
-  \emph{Arbiter}.
+  On older machines, there was only one device called DMA controller (DMAC),
+  which could become a master. Nowadays each PCI device (see also Section
+  \ref{chap.pci}) may become a master, so that it can access memory directly
+  by its own DMAC\footnote{Note that there is no common PCI DMAC, so if the
+  device doesn't have one, it doesn't support DMA either.}. DMAC count is not
+  bounded to only one per device as we will see in chapter \ref{chap.netcope}.
+  Unit which takes care of honest bus accesses by more than one bus master
+  is called \emph{Arbiter}.
 
   \section{Memory management}
   This chapter is a short introduction into memory management as used not
   only in Linux. Memory management in details on Intel processors is described
   in \cite{ia1} and also in \cite{gorman}.
   \subsection{Physical memory}
-  In the usual meaning we call main \emph{random access memory} as physical
+  In the usual meaning we call main \emph{random access memory} as a physical
   memory. Although it is possible to not have this kind of memory by a
   processor in special computers like \emph{NUMA} (non-uniform memory access),
   we usually have one or more
@@ -277,6 +286,12 @@
   possible byte (if there is that much physical memory) has address
   $2^{32}-1$.
 
+  This mode is implemented in Linux\footnote{In fact, on processors such as
+  x86, where segmentation can't be disabled, segment registers are set to 0
+  and segment limits to highest possible value depending if it is 32 or
+  64-bit which causes overlap each by each other resulting in a flat mode.}
+  and \com\ cards address main memory in DMA transfers this way.
+
   \subsection{Virtual memory}
   With only physical memory addressing problems arose early. Applications
   needed
@@ -300,10 +315,9 @@
   \end{figure}
 
   Many algorithms were introduced to avoid this behavior, some of them are
-  described in Knuth\cite{knuth_art} including buddy system used in Linux
-  kernel for in-kernel allocations. We will see consequences of this
-  constraints later in chapter \ref{chap.netcope}.
-
+  described in \cite{knuth_art} including buddy system used in Linux
+  kernel for in-kernel allocations.
+  
   \subsubsection{Paging}
   To solve the situation with external fragmentation, method named
   \emph{paging} was introduced. Linear address space is divided into pages
@@ -316,16 +330,16 @@
   management unit} (MMU).
 
   Virtual address is usually divided into several parts and each of them is
-  offset in some table. On Intel 32-bit with \emph{page address extension}
+  offset in some page table. On Intel 32-bit with \emph{page address extension}
   (PAE) and PSE disabled, 3 such tables exist and each table contains
   entries/pointers to next table or
   to physical page in the last table respectively. If the entry in either
-  table is marked as non-present, page fault, which is exception handled by
-  operating system, is thrown. OS must either put (map) the requested page in
+  table is marked as non-present, \emph{page fault} (exception handled by
+  operating system) is thrown. OS must either put (map) the requested page in
   or kill the program which references illegal address.
 
   On figure \ref{fig.vaddr} is shown, how is logical address split on 32-bit
-  Intel with extensions disabled. CR3 is register in these processors
+  x86 with extensions disabled. CR3 is register in these processors
   containing location of global page directory depicted on the left side.
   \begin{figure}[h]
     \begin{center}
@@ -337,10 +351,10 @@
 
   This schema allows us to allocate huge contiguous memory blocks without a
   need of having contiguous physical memory. In fact there is no need to have
-  as same physical memory as requested. Some memory may be, as written above,
+  as much physical memory as requested. Some memory may be, as written above,
   backed by a page stored on disk (swapped out) or even have no "physical"
   page mapped to it -- Linux uses demand paging, so that page is physically
-  backed up even after accessing it (page fault handler takes care of this).
+  backed up by page fault handler even after accessing it.
 
   On 32-bit, we are able to use up
   to 3 gibibytes\footnote{SI unit for $2^{30}$} of virtual memory per process.
@@ -349,10 +363,17 @@
   most current processors, up to $2^{47}$ may be used in userspace, kernel is
   mapped in top $2^{47}$ bytes due to 64-bit sign extension (see \cite{ia3a}
   for reference) and the space between them is an unused memory hole, which
-  might be addressed even by newer processors.
+  might be addressed even after newer processor family will be available.
 
   We will consider these facts while deciding how much memory we should
   allocate for the hardware at maximum.
+  Nevertheless, hardware doesn't have\footnote{on modern mainboards, another
+  unit called IOMMU is added between device and main memory path, which allows
+  creating virtual address space even for devices} the opportunity of having
+  virtual addressing, we will see consequences of this constraints later in
+  chapter \ref{chap.netcope}, because we cannot, as we mentioned earlier
+  allocate too much contiguous physical space.
+
 %  Note that there are strict constraints
 %  on 32-bit on how much physical memory might be used too. Even when PAE is
 %  used (and not PSE) which allows addressing up to 64 gibibytes of
@@ -367,149 +388,113 @@
   \section{Other subsystems}
   \subsection{PCI in short}
   \label{chap.pci}
-  ids, we'll use them in udev, DMA interface
+  PCI is probably the most spread bus today. Other components (including other
+  buses such as USB) are connected to it directly or via bridges. All \com\ 
+  family cards are based on PCI and we mention some of its fundamentals
+  we are reffering to later in following text.
 
-  latency, arbitration, burst trasfers
-  
-%  Unlike in past, todays DMA transfers are done in blocks (block mode as
-%  opposed to cycle stealing and burst mode XXX TODO citation needed) todays and after
-%  a processor sets up the transfer, it does its own work.
+  \subsubsection{Configuration space}
+  Every modern bus supports a mechanism to autoconfigure devices connected
+  to it. Also each PCI device has its configuration space, where all the needed
+  information are stored or may be set to. This space contains information
+  about who developed the device and which model it is. These data are useful
+  especially in driver area, where the drivers want to bind only to specific
+  subset of devices.
+
+%  Basic (common to all PCI devices except host bus bridges)
+%  configuration space is on figure \ref{fig.pciconf}.
+%
+%  \begin{figure}[h]
+%    \begin{center}
+%      \includegraphics[width=6cm]{images/pcispace}
+%      \caption{PCI configuration space}
+%      \label{fig.pciconf}
+%    \end{center}
+%  \end{figure}
+
+  In our scope of interest are device, vendor and their subsystem variant
+  IDs contained in this space, because these are mostly only identifiers
+  designating one concrete device family. It is helpful in userspace scripts
+  to create persistently named nodes in section \ref{chap.udev}.
+
+  \subsubsection{DMA interface}
+  By referring back to section \ref{chap.dma} we already know, that PCI
+  multiplexes address and data bus into one wiring. To become a master on
+  this bus, the device asks arbiter for a band and after it gets start signal
+  on control bus, it starts sending. First, address is sent, then data part.
+  If there is more data to send, burst mode is used until arbiter emits stop
+  signal. After the signal, the device must finish the transfer of near few
+  bytes in the cache line\footnote{its size is configurable through config
+  space} and acknowledge stopping. Next device gets start signal from arbiter
+  at this moment and starts data transfer. The ancestral device may ask for a
+  band again unless all data have not been sent.
+
+  The transfer is theoretically limited by the other device (including main
+  memory) boundary\footnote{it is 4096 bytes on main memory when extensions
+  disabled}. It must not
+  exceed this limit, the transfer is interrupted by the other side otherwise.
+  Transfers of 1 kibibyte at one burst are not uncommon in \com\ case.
 
   \subsection{Character device}
-  XXX What's this and what's it about\ldots
-  \subsubsection{Device nodes naming}
-  3 kind of nodes -- combo x szedata x szedataII, consistent naming needs
+  There exist several ways how to pass data from userspace to kernelspace in
+  Linux. Most of them are based on moving data through special
+  files\footnote{most of communication channels are files, even socket
+  creating system call returns a file descriptor passed to standard read and
+  write functions} such as sockets and block and character devices. Unlike
+  block devices which might be read only by blocks with other restrictions
+  and sockets which goes through Linux networking stack, character ones
+  satisfies all our prerequisites and so we use it.
+
+  \subsubsection{Device nodes}
+  We use character device approach on both \com\ driver parts -- for
+  combosix core driver and in both versions of szedata we have a separated
+  namespace combosix*, szedata* and newly szedataII*, where * stands for any
+  so far random number.
+  
+  A node in \emph{/dev} directory must be created for each such device. They
+  used to be created manually by userspace programs \emph{MAKEDEV} and
+  \emph{mknod}, although this was not perfect because of the need of every
+  single node creation and so some dynamic principles described later in
+  this section were introduced.
+
+  The existing node might then be opened and used by userspace
+  application and on the other end handled by the driver which created it.
+  Which handlers exactly are necessary in implementation will be discussed in
+  section \ref{chap.code} after considering operations done in specification.
 
   \subsubsection{udev}
-  userspace dev, successor of kernel's devfs
+  \label{chap.udev}
+  Userspace device (udev) is a dynamic device node creation system
+  with support of running external programs depending on defined configuration
+  rules. It's a successor of devfs, a filesystem implemented directly in
+  kernel and mounted on \emph{/dev}. Udev mounts only a temporary filesystem
+  (tmpfs) on the same directory, but from its name, it does all its work in
+  userspace by listening on socket for userspace events (uevents) from kernel
+  and invoking mknod, modprobe\footnote{kernel module insertion program} and
+  other programs.
 
-  How does it work, what is it for, very fast comparison with devfs
+  One particular userspace rule may look like the following one which creates
+  a symbolic
+  link \emph{/dev/input/event15} for Microsoft (vendor ID 0x045e) Laser Mouse
+  6000 (device ID 0x00f0).
+\begin{verbatim}
+KERNEL=="event*", SUBSYSTEM=="input", \
+        ATTRS{idVendor}=="045e",      \
+        ATTRS{idProduct}=="00f0",     \
+        SYMLINK="input/event15"
+\end{verbatim}
+  This is the point, where IDs read from PCI configuration space are sent by
+  kernel in uevent and might be matched in rules file by udev.
+  
+  As device node names are random so far and we want numbers in names to
+  correspond with each other, e.g. to have combosix6 and szedataII6 for one
+  concrete card in PCI slot 6, we need to write similar rules to generate
+  persistent and consistent naming.
 
-  The way, how is it used in the \lbr is described in next chapter.
-
-  \paragraph{udev rules file} a
-\begin{lstlisting}[language={},label=lst.udevrules,name=lst.udevrules]
-KERNEL!="combosix*", GOTO="cesnet_generator_end"(*@\label{lstl.udevrules_1}@*)
-ACTION!="add", GOTO="cesnet_generator_end"(*@\label{lstl.udevrules_2}@*)
-NAME=="?*", GOTO="cesnet_generator_end"(*@\label{lstl.udevrules_3}@*)
-\end{lstlisting}
-  Since we want to match only additions of combosix devices, rules at line
-  \ref{lstl.udevrules_1} and \ref{lstl.udevrules_2} are needed. To ignore
-  cases where the stored name was set yet, the skip rule at line
-  \ref{lstl.udevrules_3} is there.
-\begin{lstlisting}[name=lst.udevrules]
-ENV{CS}="$kernel"
-ENV{MATCHPATH}="$devpath"
-\end{lstlisting}
-  Set up environment variables used in shell script later. These variables are
-  filled in directly by \emph{udev} and corresponds to the name suggested by
-  kernel or device path (i.e. bus, slot\ldots) respectively.
-\begin{lstlisting}[name=lst.udevrules]
-IMPORT{PROGRAM}="csdevname" (*@\label{lstl.udevrules_11}@*)
-
-ENV{CS_NEW}=="?*", NAME="$env{CS_NEW}"
-
-LABEL="cesnet_generator_end" (*@\label{lstl.udevrules_12}@*)
-\end{lstlisting}
-  And finally invoke the script and set up the new name if the script changed
-  it. The last step (line \ref{lstl.udevrules_12}) is to define a label where
-  the first 3 rules jump to.
-
-  \paragraph{csdevname script}
-  Shell script \textbf{csdevname} called from line \ref{lstl.udevrules_11}
-  above follows:
-\lstset{language=bash}
-\begin{lstlisting}[label=lst.udevscript,name=lst.udevscript]
-RULES_FILE='/etc/udev/rules.d/70-cesnet.rules'
-
-. /lib/udev/rule_generator.functions(*@\label{lstl.udevscript_1}@*)
-\end{lstlisting}
-  This loads udev predefined functions used later. RULES\_FILE is the
-  name of file, where we store our persistent naming. Variable name is
-  predefined (and used in the script sourced at line \ref{lstl.udevscript_1})
-  and must not be changed.
-\begin{lstlisting}[name=lst.udevscript]
-cs_name_taken() {
-	local value="$(find_all_rules 'NAME=' $CS)"
-	if [ "$value" ]; then return 0; else return 1; fi
-}
-
-find_next_available() {
-	raw_find_next_available "$(find_all_rules 'NAME=' "$1")"
-}
-\end{lstlisting}
-  Functions \textbf{cs\_name\_taken} and \textbf{find\_next\_available} are
-  for finding available names for new coming device. Both uses functions
-  defined in the sourced script from line \ref{lstl.udevscript_1}, that allows
-  be them as compact as possible.
-\begin{lstlisting}[name=lst.udevscript]
-write_rule() {
-	local match="$1"
-	local name="$2"
-	local comment="$3"
-	{
-		[ "$comment" ] && echo "# $comment"
-		echo "SUBSYSTEM==\"combosix\", ACTION==\"add\"$match, NAME=\"$name\""
-	} >> $RULES_FILE
-}
-\end{lstlisting}
-  \textbf{write\_rule} takes 3 parameters -- under which condition this rule
-  is triggered, static node name and potentially a comment to this rule. The
-  result is written to previously defined \textbf{RULES\_FILE}.
-\begin{lstlisting}[name=lst.udevscript]
-lock_rules_file(*@\label{lstl.udevscript_27}@*)
-choose_rules_file(*@\label{lstl.udevscript_29}@*)
-\end{lstlisting}
-  At lines \ref{lstl.udevscript_27} and \ref{lstl.udevscript_29} we lock up
-  the rules file to prevent race
-  conditions (if two writers occurred, it would result in unpredictable
-  behavior) and decide in which file will be the new rules written (since
-  usual location might be still read-only while booting -- \emph{udev} will
-  then move the temporary file to the proper directory after it becomes
-  writable).
-\begin{lstlisting}[name=lst.udevscript]
-MATCHPATH=${MATCHPATH%/*/*}
-if [ "$MATCHPATH" ]; then
-	match="$match, DEVPATH==\"$MATCHPATH/*\""
-fi
-
-if [ -z "$match" ]; then
-	echo "missing valid match" >&2
-	unlock_rules_file
-	exit 1
-fi
-\end{lstlisting}
-  Now we define matching rule passed to \textbf{write\_rule} later (line
-  \ref{lstl.udevscript_49}). Sanity check of the value is done here and if it
-  fails we return error.
-\begin{lstlisting}[name=lst.udevscript]
-if [ "$CS_NAME" ]; then
-	COMMENT="$COMMENT (custom name)"
-	if [ "$CS_NAME" != "$CS" ]; then
-		CS=$CS_NAME;
-		echo "CS_NEW=$CS"
-	fi
-else
-	base=${CS%%[0-9]*}
-	if cs_name_taken; then
-		CS="$base$(find_next_available "$base[0-9]*")"
-		echo "CS_NEW=$CS"
-	fi
-fi
-\end{lstlisting}
-  Here the name, which is returned to rules (\textbf{CS\_NEW}), is set. Logic
-  is simple, either the one passed by external application is used or a new
-  one is found (first unused).
-\begin{lstlisting}[name=lst.udevscript]
-write_rule "$match" "$CS" "$COMMENT"(*@\label{lstl.udevscript_49}@*)
-
-unlock_rules_file
-\end{lstlisting}
-  Finally the file with static naming is augmented and unlocked.
-
-  Since this moment, if the device come in the system again later, even in
-  other order, system will ever create a node with the same name stored in
-  the rules file.
+  Two separate files are needed to achieve that, one another with persistent
+  rules will be created on the fly. Shell script which augments the one with
+  persistent rules and file with rules for matching the \com\ cards and
+  running the script are in detail described in Appendix \ref{app.udev}.
 
   \section{NetCOPE hardware}
   \label{chap.netcope}
@@ -521,7 +506,7 @@ unlock_rules_file
   What is it good for? Why is it arising? Diff between szedata and version 2.
 
   \section{Introduction}
-
+  We now know enough from hardware point of view. Let's do the real work.
   \subsection{Data path}
   card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
   mmap)
@@ -534,14 +519,19 @@ unlock_rules_file
   \subsection{Models and design}
   (bo)uml et al.
 
+  See Appendix \ref{app.models}.
+
   \subsection{Code templates}
   + design patterns if any applies
 
   \subsection{Code development}
+  \label{chap.code}
   combo6x driver as a base, new szedata2 module
     \subsubsection{Mmap space structure}
     \label{chap.mmio}
     locked : desc : rx ring : tx ring
+
+    \label{chap.hwsetup}
 
   \subsection{Back-porting to older kernels}
   Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
