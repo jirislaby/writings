@@ -91,8 +91,8 @@
   versa without any real data copying. This results in short transaction
   times.
   
-  \subsubsection{Thesis structure}
-  is commented out and will be probably wiped out completely
+%  \subsubsection{Thesis structure}
+%  is commented out and will be probably wiped out completely
 %
 %  We will see how ring buffer might be used as a data structure, its
 %  advantages,
@@ -261,36 +261,35 @@
   In the usual meaning we call main \emph{random access memory} as a physical
   memory. Although it is possible to not have this kind of memory by a
   processor in special computers like \emph{NUMA} (non-uniform memory access),
-  we usually have one or more
-  memories plugged in motherboard. There are several addressing methods how
-  processor can access data on it.
-
-  \subsubsection{Real-address mode}
-  In the early Intel 8086 processors, this mode was used. For the
-  compatibility reasons, this mode is available on todays CPUs too, and is
-  used mostly only in the early booting stage.
-
-  Physical memory is divided into 16 64-kilobyte sized segments, so that up
-  to $2^{20}$ bytes might be addressed. The rest of memory is unused.
-
-  \subsubsection{Segmentation mode}
-  Similar to previous model, but it allows segments to be up to $2^{32}$ in
-  size and their maximal count is 16383 on 32-bit. Application sees them as
-  independent address spaces potentially of different types. This might be
-  used to avoid stack or heap overflows and code or data damage, because
-  each of them can reside in separate segment.
-
-  \subsubsection{Flat mode}
-  Each byte of memory is simply addressed by \emph{linear address}. First
+  we usually have one or more memories plugged in motherboard. These can be
+  addressed by several methods; Linux implements \emph{Flat mode}, where
+%
+%  \subsubsection{Real-address mode}
+%  In the early Intel 8086 processors, this mode was used. For the
+%  compatibility reasons, this mode is available on todays CPUs too, and is
+%  used mostly only in the early booting stage.
+%
+%  Physical memory is divided into 16 64-kilobyte sized segments, so that up
+%  to $2^{20}$ bytes might be addressed. The rest of memory is unused.
+%
+%  \subsubsection{Segmentation mode}
+%  Similar to previous model, but it allows segments to be up to $2^{32}$ in
+%  size and their maximal count is 16383 on 32-bit. Application sees them as
+%  independent address spaces potentially of different types. This might be
+%  used to avoid stack or heap overflows and code or data damage, because
+%  each of them can reside in separate segment.
+%
+%  \subsubsection{Flat mode}
+  each byte of memory is simply addressed by \emph{linear address}. First
   memory byte has address 0, on 32-bit without any extensions the last
   possible byte (if there is that much physical memory) has address
   $2^{32}-1$.
 
-  This mode is implemented in Linux\footnote{In fact, on processors such as
-  x86, where segmentation can't be disabled, segment registers are set to 0
-  and segment limits to highest possible value depending if it is 32 or
-  64-bit which causes overlap each by each other resulting in a flat mode.}
-  and \com\ cards address main memory in DMA transfers this way.
+%  This mode is implemented in Linux\footnote{In fact, on processors such as
+%  x86, where segmentation can't be disabled, segment registers are set to 0
+%  and segment limits to highest possible value depending if it is 32 or
+%  64-bit which causes overlap each by each other resulting in a flat mode.}
+%  and \com\ cards address main memory in DMA transfers this way.
 
   \subsection{Virtual memory}
   With only physical memory addressing problems arose early. Applications
@@ -321,25 +320,24 @@
   \subsubsection{Paging}
   To solve the situation with external fragmentation, method named
   \emph{paging} was introduced. Linear address space is divided into pages
-  of fixed size\footnote{4096 bytes on Intel with page size extension (PSE)
+  of fixed size\footnote{4096 bytes on x86 with page size extension (PSE)
   disabled} that might be mapped to physical memory or disks as swap.
 
-  CPU addresses physical memory by virtual addresses. This is not possible
-  without translating virtual address into the physical (either in segmented
-  or flat mode) one. Transparent translation is done in \emph{memory
-  management unit} (MMU).
+  CPU accesses physical memory by virtual addresses. This is not possible
+  without translating virtual address into the physical one. Transparent
+  translation is done by \emph{memory management unit} (MMU).
 
-  Virtual address is usually divided into several parts and each of them is
-  offset in some page table. On Intel 32-bit with \emph{page address extension}
-  (PAE) and PSE disabled, 3 such tables exist and each table contains
-  entries/pointers to next table or
-  to physical page in the last table respectively. If the entry in either
-  table is marked as non-present, \emph{page fault} (exception handled by
-  operating system) is thrown. OS must either put (map) the requested page in
-  or kill the program which references illegal address.
+  Virtual address is usually divided into few parts and each of them is
+  offset in some page table. On 32-bit x86 with extensions disabled, 3 such
+  tables exist and each table contains entries/pointers to next table or
+  to physical page in the last table respectively.
+%  If the entry in either
+%  table is marked as non-present, \emph{page fault} (exception handled by
+%  operating system) is thrown. OS must either put (map) the requested page in
+%  or kill the program which references illegal address.
 
-  On figure \ref{fig.vaddr} is shown, how is logical address split on 32-bit
-  x86 with extensions disabled. CR3 is register in these processors
+  On figure \ref{fig.vaddr} is shown, how is logical address split (32-bit
+  x86, no extensions). CR3 is register in these processors
   containing location of global page directory depicted on the left side.
   \begin{figure}[h]
     \begin{center}
@@ -353,8 +351,7 @@
   need of having contiguous physical memory. In fact there is no need to have
   as much physical memory as requested. Some memory may be, as written above,
   backed by a page stored on disk (swapped out) or even have no "physical"
-  page mapped to it -- Linux uses demand paging, so that page is physically
-  backed up by page fault handler even after accessing it.
+  page mapped to it thanks to demand paging.
 
   On 32-bit, we are able to use up
   to 3 gibibytes\footnote{SI unit for $2^{30}$} of virtual memory per process.
@@ -367,9 +364,10 @@
 
   We will consider these facts while deciding how much memory we should
   allocate for the hardware at maximum.
-  Nevertheless, hardware doesn't have\footnote{on modern mainboards, another
+  Nevertheless, hardware (PCI cards) doesn't have\footnote{on modern
+  mainboards, another
   unit called IOMMU is added between device and main memory path, which allows
-  creating virtual address space even for devices} the opportunity of having
+  creating a virtual address space even for devices} the opportunity to have
   virtual addressing, we will see consequences of this constraints later in
   chapter \ref{chap.netcope}, because we cannot, as we mentioned earlier
   allocate too much contiguous physical space.
@@ -498,6 +496,9 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 
   \section{NetCOPE hardware}
   \label{chap.netcope}
+
+  tom's picture here
+
   Organization of ring buffer in the card memory. Regs, functions\ldots
 
   Physical memory constraints
@@ -514,7 +515,6 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   \subsubsection{Modified libpcap}
   ref Konik's work
 
-% --
   \section{Development cycle}
   \subsection{Models and design}
   (bo)uml et al.
