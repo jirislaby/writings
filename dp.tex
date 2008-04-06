@@ -1,4 +1,4 @@
-% vim: textwidth=78 ai
+% vim: textwidth=78 ai spell spelllang=en
 
 \documentclass[draft,11pt]{fithesis}
 
@@ -29,6 +29,7 @@
 \newcommand{\fpga}{\emph{FPGA}}
 \newcommand{\dma}{\emph{DMA}}
 \newcommand{\sze}{\emph{szedata2}}
+\newcommand{\ncope}{\emph{NetCOPE}}
 
 \lstset{tabsize=2,numbers=left,showstringspaces=false,breaklines=true,
 	breakatwhitespace=true,escapeinside={(*@}{@*)},frame=l}
@@ -92,8 +93,6 @@
   times.
   
 %  \subsubsection{Thesis structure}
-%  is commented out and will be probably wiped out completely
-%
 %  We will see how ring buffer might be used as a data structure, its
 %  advantages,
 %  caveats and a way how is it possible to store it in the memory. Hence we'll
@@ -130,10 +129,9 @@
   see consequences of such development method in detailed description of some
   subsystems in detail later and in compatible layer implementation too.
 
-  Major part of Linux kernel is licensed under GPL version 2 \cite{gplv2}, but
-  BSD and ISC code is not a rarity. Chosen license which will be the
-  implementation distributed under is GPL version 2 like other drivers
-  majority.
+  Major part of Linux kernel is licensed under GPL version 2 \cite{gplv2}.
+  Chosen license which will be the implementation distributed under is GPL
+  version 2 like most other drivers.
 
   \section{Liberouter project}
   Liberouter is a project supported by \emph{CESNET} (Czech academic network)
@@ -156,25 +154,24 @@
   will be available only for this system.
 
   \section{NetCOPE project and szedata2}
-  One of Liberouter projects is \emph{NetCOPE}. The goal is to develop a
+  One of Liberouter projects is \ncope. The goal is to develop a
   \com\ cards based platform which is immutable against fast evolution of
-  networking. \emph{NetCOPE} data flow might be seen in schematic on
-  figure \ref{fig.netcope_schema}. As one can see there, this universal
-  solution allows involving it in multiple areas
-  such as network traffic filtering, routing packets, intrusion detection and
-  others.
+  networking. \ncope\ data flow might be seen in schematic on
+  figure \ref{fig.netcope_schema}. This universal solution allows involving
+  it in multiple areas such as network traffic filtering, routing packets,
+  intrusion detection and others.
 
   \begin{figure}[h]
     \begin{center}
       \includegraphics[width=11cm]{images/netcope_color}
-      \caption{NetCope schematic}
+      \caption{NetCOPE schematic}
       \label{fig.netcope_schema}
     \end{center}
   \end{figure}
 
-  We'll develop the software on the top of the \emph{NetCOPE} platform.
-  \sze\ is chosen as a name after its ancestral first generation
-  driver based on pre-\emph{NetCOPE} hardware. It stands for \emph{straight
+  We'll develop the software on the top of the this platform. As a name, we
+  choose \sze\ after its ancestral first generation driver based on
+  \ncope\ hardware too. It stands for \emph{straight
   zero copy data} in the meaning of avoid copying data from memory to the
   application and vice versa by remapping it as we'll show in section
   \ref{chap.mmio}.
@@ -196,24 +193,21 @@
 
   \begin{figure}[ht]
     \begin{center}
-      \includegraphics[width=8cm]{images/data_flow}
+      \includegraphics[width=6cm]{images/data_flow}
       \caption{Devices interconnection}
       \label{fig.dev_inter}
     \end{center}
   \end{figure}
 
-  We are concerned especially in peripheral component interconnect (PCI)
-  devices, because both \com\ card families are PCI based. Each such device
-  is physically connected to any PCI bus via PCI slot (bottom left).
-% Other buses (might be another PCI) can be connected through PCI-to-$<$the
-% bus$>$ bridge.
-  PCI bus is attached to southbridge (called ICH\footnote{I/O
-  controller hub} by Intel, bottom center), it communicates with northbridge
-  (MCH\footnote{memory controller hub}, middle) over internal bus and it's
-  finally wired with processor via front-side bus (FSB, top center). Nowadays
+  We are concerned especially in \emph{peripheral component interconnect}
+  (PCI) devices, because both \com\ card families are PCI based. Each such
+  device is physically connected to any PCI bus via PCI slot (bottom left).
+  PCI bus is attached to \emph{southbridge} (bottom center), it communicates
+  with \emph{northbridge} (middle) over internal bus and it's finally wired
+  with processor via \emph{front-side bus} (FSB, top center). Nowadays
   it's still more common, that all southbridge, northbridge and memory
-  controller are implemented as proper PCI devices directly connected to main
-  PCI bus.
+  controller are implemented as proper PCI devices directly connected to the
+  main PCI bus.
 
   3 main signal groups are usually on each bus:
   \begin{list}{-}{}
@@ -225,13 +219,12 @@
       specified on the address bus
   \end{list}
 
-  While FSB and later PCI-X and PCI express has 64-bits wide
+  While FSB (on pentium and newer), PCI-X and PCI express has 64-bits wide
   address and data buses (PCI minimizes signal count by multiplexing these two
-  into one by first sending address and then data), standard PCI ones are
-  32-bit only. This shortcoming is important when we want to
-  (we'll in section \ref{chap.hwsetup}) send
-  64-bit numbers over PCI to older \com\ cards. Further detailed PCI
-  information are in \cite{pcispec} and \cite{pciespec}.
+  into one by first sending address and then data), legacy PCI ones are
+  32-bit only. This shortcoming is important when we will send 64-bit numbers
+  over PCI to older \com\ cards in section \ref{chap.hwsetup}.
+  Further detailed PCI information are in \cite{pcispec} and \cite{pciespec}.
 
   \section{DMA and Bus Mastering}
   \label{chap.dma}
@@ -249,9 +242,9 @@
   \ref{chap.pci}) may become a master, so that it can access memory directly
   by its own DMAC\footnote{Note that there is no common PCI DMAC, so if the
   device doesn't have one, it doesn't support DMA either.}. DMAC count is not
-  bounded to only one per device as we will see in chapter \ref{chap.netcope}.
-  Unit which takes care of honest bus accesses by more than one bus master
-  is called \emph{Arbiter}.
+  bounded to only one per device as we will see implementation of \com\ 
+  hardware in section \ref{chap.netcope}. Unit which takes care of honest bus
+  accesses by more than one DMACs is called \emph{Arbiter}.
 
   \section{Memory management}
   This chapter is a short introduction into memory management as used not
@@ -307,7 +300,7 @@
 
   \begin{figure}[h]
     \begin{center}
-      \includegraphics[width=8cm]{images/fragmentation}
+      \includegraphics[width=7cm]{images/fragmentation}
       \caption{Memory fragmentation illustration}
       \label{fig.fragmentation}
     \end{center}
@@ -320,14 +313,18 @@
   \subsubsection{Paging}
   To solve the situation with external fragmentation, method named
   \emph{paging} was introduced. Linear address space is divided into pages
-  of fixed size\footnote{4096 bytes on x86 with page size extension (PSE)
-  disabled} that might be mapped to physical memory or disks as swap.
+  of fixed size\footnote{4096 bytes on x86 with page size extension
+  disabled} that might be mapped to physical memory or disks as swapped pages.
 
   CPU accesses physical memory by virtual addresses. This is not possible
-  without translating virtual address into the physical one. Transparent
-  translation is done by \emph{memory management unit} (MMU).
+  without translating a virtual address into the physical one. Transparent
+  translation is done by \emph{memory management unit} (MMU). Some modern
+  mainboards add another unit called IOMMU between device and main memory
+  path, so that devices address by logical address too. It allows creating a
+  virtual space even for devices, but it's not widely spread so far
+  so \com\ card developers must not take it for granted.
 
-  Virtual address is usually divided into few parts and each of them is
+  Virtual address itself is usually divided into few parts and each of them is
   offset in some page table. On 32-bit x86 with extensions disabled, 3 such
   tables exist and each table contains entries/pointers to next table or
   to physical page in the last table respectively.
@@ -335,13 +332,12 @@
 %  table is marked as non-present, \emph{page fault} (exception handled by
 %  operating system) is thrown. OS must either put (map) the requested page in
 %  or kill the program which references illegal address.
-
-  On figure \ref{fig.vaddr} is shown, how is logical address split (32-bit
-  x86, no extensions). CR3 is register in these processors
-  containing location of global page directory depicted on the left side.
+  On figure \ref{fig.vaddr} is shown, how is logical address split. CR3 is
+  register in x86 processors containing location of global page directory
+  depicted on the left side.
   \begin{figure}[h]
     \begin{center}
-      \includegraphics[width=10cm]{images/vaddr}
+      \includegraphics[width=9cm]{images/vaddr}
       \caption{Virtual address format}
       \label{fig.vaddr}
     \end{center}
@@ -353,24 +349,20 @@
   backed by a page stored on disk (swapped out) or even have no "physical"
   page mapped to it thanks to demand paging.
 
-  On 32-bit, we are able to use up
-  to 3 gibibytes\footnote{SI unit for $2^{30}$} of virtual memory per process.
-  This limit comes from 1:3 of kernelspace to userspace split of process
-  virtual address space. On 64-bit, 48-bit virtual addresses are supported by
-  most current processors, up to $2^{47}$ may be used in userspace, kernel is
-  mapped in top $2^{47}$ bytes due to 64-bit sign extension (see \cite{ia3a}
-  for reference) and the space between them is an unused memory hole, which
-  might be addressed even after newer processor family will be available.
+  On 32-bit, we are able to use up to 3 gibibytes\footnote{SI unit for
+  $2^{30}$} of virtual space per process. This limit comes from 1:3 of
+  kernel to user address space split -- the remaining addressable
+  1\,GiB is used as kernelspace. On 64-bit, 48-bit virtual addresses are
+  supported by most current processors, up to $2^{47}$ may be used in
+  userspace, kernel is mapped in top $2^{47}$ bytes due to 64-bit sign
+  extension (see \cite{ia3a} for reference) and the space between them is an
+  unused memory hole, which might be addressed even after newer processor
+  family will be available.
 
-  We will consider these facts while deciding how much memory we should
-  allocate for the hardware at maximum.
-  Nevertheless, hardware (PCI cards) doesn't have\footnote{on modern
-  mainboards, another
-  unit called IOMMU is added between device and main memory path, which allows
-  creating a virtual address space even for devices} the opportunity to have
-  virtual addressing, we will see consequences of this constraints later in
-  chapter \ref{chap.netcope}, because we cannot, as we mentioned earlier
-  allocate too much contiguous physical space.
+  Consequences of all these constraints are considered later in section
+  \ref{chap.netcope}, because we cannot, as we mentioned earlier allocate
+  too much contiguous physical space and virtual memory is not unbounded
+  too, especially on 32-bit machines.
 
 %  Note that there are strict constraints
 %  on 32-bit on how much physical memory might be used too. Even when PAE is
@@ -380,8 +372,29 @@
 %  -- they must be in low memory which is 1 gibibyte (remember 3:1 split)
 %  minus mapped area on the top of that space (see \cite{gorman} for details).
 
-  \subsection{Memory mapped I/O, memory map}
-  XXX TODO
+  \subsection{Memory map}
+  As we are able to set (and unset) present bit in an entry of each table
+  MMU traverses and an exception is thrown when the bit is not set when the
+  particular table entry is accessed, we can hook a page fault handler to this
+  path which will easily install missing pages.
+
+  This can be used for \emph{memory mapping} (MMAP). We register a page fault
+  function by OS interface and when user application maps some space and
+  accesses it, we may set up there any pages we want. According to exact
+  address which was the root cause of the fault, we compute a number of page
+  which should be in that particular memory place and install it there.
+  Application sees this as a transparent process and it accesses the data from
+  the installed page since that moment.
+
+  \subsubsection{Memory mapped I/O}
+  Memory map is sometimes inappropriately confused with \emph{memory mapped
+  I/O} (MMIO). In the latter, we are able to access device memory space in
+  kernel by virtual address. It's achieved by mapping this I/O space into
+  kernelspace. For example \fpga\ memory space of a \com\ card may be referred
+  by a virtual address after being mapped this way. \\[1em]
+  \emph{Note: We are even able to access the \fpga\ from
+  userspace by memory map fault handler, but it is a separate mapping and has
+  nothing to do with MMIO.}
 
   \section{Other subsystems}
   \subsection{PCI in short}
@@ -389,7 +402,7 @@
   PCI is probably the most spread bus today. Other components (including other
   buses such as USB) are connected to it directly or via bridges. All \com\ 
   family cards are based on PCI and we mention some of its fundamentals
-  we are reffering to later in following text.
+  we are referring to later in following text.
 
   \subsubsection{Configuration space}
   Every modern bus supports a mechanism to autoconfigure devices connected
@@ -416,12 +429,12 @@
   to create persistently named nodes in section \ref{chap.udev}.
 
   \subsubsection{DMA interface}
-  By referring back to section \ref{chap.dma} we already know, that PCI
+  Referring back to section \ref{chap.dma} we already know, that PCI
   multiplexes address and data bus into one wiring. To become a master on
   this bus, the device asks arbiter for a band and after it gets start signal
   on control bus, it starts sending. First, address is sent, then data part.
   If there is more data to send, burst mode is used until arbiter emits stop
-  signal. After the signal, the device must finish the transfer of near few
+  signal. After that signal, the device must finish the transfer of near few
   bytes in the cache line\footnote{its size is configurable through config
   space} and acknowledge stopping. Next device gets start signal from arbiter
   at this moment and starts data transfer. The ancestral device may ask for a
@@ -431,17 +444,23 @@
   memory) boundary\footnote{it is 4096 bytes on main memory when extensions
   disabled}. It must not
   exceed this limit, the transfer is interrupted by the other side otherwise.
-  Transfers of 1 kibibyte at one burst are not uncommon in \com\ case.
+  Transfers of 1 KiB per one burst are not uncommon in \com\ case.
 
   \subsection{Character device}
   There exist several ways how to pass data from userspace to kernelspace in
   Linux. Most of them are based on moving data through special
   files\footnote{most of communication channels are files, even socket
   creating system call returns a file descriptor passed to standard read and
-  write functions} such as sockets and block and character devices. Unlike
+  write functions} such as sockets, block and character devices.
+  
+  We need a mechanism which allows reads byte by byte, memory map, some control
+  message passing for controlling the driver and application and direct
+  driver-application data flow. Unlike
   block devices which might be read only by blocks with other restrictions
   and sockets which goes through Linux networking stack, character ones
-  satisfies all our prerequisites and so we use it.
+  satisfies all our prerequisites and so we use it. Here comes a bare
+  introduction to char subsystem internals, other information (including
+  source code examples) are available in \cite{ldd}, chapter~3.
 
   \subsubsection{Device nodes}
   We use character device approach on both \com\ driver parts -- for
@@ -490,14 +509,34 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   persistent and consistent naming.
 
   Two separate files are needed to achieve that, one another with persistent
-  rules will be created on the fly. Shell script which augments the one with
-  persistent rules and file with rules for matching the \com\ cards and
-  running the script are in detail described in Appendix \ref{app.udev}.
+  rules will be created on the fly. Shell script which augments the persistent
+  rules and a rules file for matching the \com\ cards which runs the 
+  script are in detail described in Appendix \ref{app.udev}.
 
-  \section{NetCOPE hardware}
+  \section{NetCOPE hardware and szedata2 design}
   \label{chap.netcope}
+%  \ncope\ hardware is a base for both szedata versions.
+  \com\ cards themselves contain Xilinx \emph{field-programmable gate arrays}
+  (FPGA) with a PowerPC processor with a wiring customized for networking.
+  This platform is named NetCOPE and is universal depending on which addition
+  card is connected to the abse card and what program, so called
+  \emph{design}, is loaded into the FPGA.
+  
+  We have separate designs for szedata, szedata2, some packet filtering
+  and capturing applications and others. Each design might or might not use
+  the built in processor, it fully depends on its implementation. For example
+  in szedata
+  \ref{fig.netcope_hw}.
 
-  tom's picture here
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=7cm]{images/architecture}
+      \caption{NetCOPE hardware schema}
+      \label{fig.netcope_hw}
+    \end{center}
+  \end{figure}
+
+  report: \cite{netcope}
 
   Organization of ring buffer in the card memory. Regs, functions\ldots
 
@@ -546,7 +585,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   DMA DAC, standard network adapter mode (kernel network stack usage).
 
 \chapter{Conclusion}
-  XXX\cite{ldd}, \cite{ulk}
+  XXX\cite{ulk}
 
 \bibliographystyle{plain} 
 \bibliography{dp}
