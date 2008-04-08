@@ -464,6 +464,7 @@
   it works in \cite{ulk}.
 
   \subsubsection{Device nodes}
+  \label{chap.devnodes}
   We use character device approach on both \com\ driver parts -- for
   combosix core driver and in both versions of szedata we have a separated
   namespace combosix*, szedata* and newly szedataII*, where * stands for any
@@ -543,6 +544,15 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   We'll describe only specification parts needed for the implementation, other
   information are available in technical report \cite{netcope}.
 
+  
+  \begin{figure}[h]
+    \begin{center}
+      \includegraphics[width=7cm]{images/packet}
+      \caption{NetCOPE packet}
+      \label{fig.netcope_pkt}
+    \end{center}
+  \end{figure}
+
   Organization of ring buffer in the card memory. Regs, functions\ldots
 
   Physical memory constraints
@@ -561,21 +571,144 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 
   \section{Development cycle}
   \subsection{Models and design}
-  (bo)uml et al.
+  To not start 
+
+  We use for modelling \emph{XXX universal meta language} (UML). Several UML
+  tools are
+  available for Linux, we chose one named Bouml. It can do most of UML
+  defined diagrams, however we'll use only use case and sequence diagrams.
+
+  XXX citation needed, some UML resources.
 
   See Appendix \ref{app.models}.
+
+  \subsubsection{Use case diagram}
+  We'll start with use case diagram, because it's usually a starting point for
+  other diagrams. We create a module szedata2 in which we put use cases for
+  each task we will have and OS, hardware and application roles outside the
+  module.
+
+  The only OS's task is to insert and remove the module to/from system, we
+  only set up this use cases which allocate or free resources needed for
+  module to run. HW's only task is to inform the module that the transfer has
+  been completed. This is done by timeout or position reached registers
+  described already in section \ref{chap.netcope}.
+
+  Application will have much more use cases. First, we need to initialize the
+  device after opening the device node, next the application wants to get
+  access to the data and need to control the device somehow and finally
+  cleanup on application's close.
+
+  All the operations must be atomic due to concurrent access, this is not
+  mentioned neither in the specification nor further, because we take this for
+  granted.
+
+  \paragraph{Open and initialization} is done in the following steps. If this
+  is the first open, we must allocate space for ring buffers and their
+  descriptors
+  and set the device to initial state including device's ring buffers setup.
+  Next step is to map this memory to userspace. This is done by invokation of
+  mmap by application. Now, application has all the needed information, it
+  tells the driver which interfaces it wants to use and starts the device.
+
+  \paragraph{Data processing} includes locking (asking for) data area either
+  to read from or write to, do the processing and unlocking. Overall two
+  method of read operation raised:
+  \begin{list}{-}{}
+    \item \textbf{load balancing} -- several readers exist and data are divided
+      among them. They all get distinct data and do the same operation on
+      them. It's very similar to \emph{single program multiple data} in
+      processors theory.
+    \item \textbf{multiprocessing} -- all readers want all data to do
+      different tasks with them. We can approach this to \emph{multiple
+      program single data}.
+  \end{list}
+  We implement only the latter so far, but it's possible that we augment the
+  implementation to the former too, see \ref{chap.future}.
+
+  For outgoing direction, there is only one possibility which hardware permits.
+  Only one writer at a time is allowed, we take this in account even
+  while designing the implementation. There is a plan to extend this behaviour
+  to allow multiple writers too, it has not been finished.
+
+  \paragraph{Close and deinitialization} is done only after all application
+  have been already closed. After such last close we first stop the device
+  and then free all the allocated resources and mappings.
+
+  \subsubsection{Sequence diagram}
+  These are usually used for depicting how events happen during some time
+  period. The topmost event is done first and then all events below it
+  towards the bottom one. XXX seqd citation needed XXX
+
+  We create 2 sequence diagrams. One for receiving and one for sending data.
+  They are slightly different in how application locks and unlocks data.
+
+  \paragraph{RX sequence diagram} starts when open is called by an
+  application. We need to allocate descriptors for ring buffer, the ring
+  buffer itself if we didn't do it on module insertion (this is the first
+  optional part in the diagram). Next we \emph{mmap} a page with status
+  information
+  and space with ring buffers, choose which interfaces the application wants
+  to read from and emits start control message which results in start and end
+  pointer registers setup if it wasn't already done by some previous and still
+  running application and passing start value to control register.
+
+  A loop follows in which the application periodically calls lock, processes
+  data if any available and unlocks the area. After it finishes its work
+  (interrupts the loop), it calls stop which in return stops the device if it
+  was the last user, invokes \emph{unmap} on all earlier mapped
+  resources and closes the device node. If we allocate the ring buffer in the
+  open, we will free it now and return back to the userspace, where the caller
+  might exit. When the application ends unexpectedly (e.g. crashes), we must
+  do the cleanup work too. The convenience of the OS is that it will unmap
+  all spaces
+  call the close itself, so that we see this the same. The only exception is
+  that any control message won't be sent in such case, so we must check in
+  close if the device is stopped already or not.
+
+  \paragraph{TX sequence diagram} differs only in processing between lock and
+  unlock phase.
+  It gets locked area of some bytes, which it must fill, not process and there
+  might be only one application which might have locked area at a time.
 
   \subsection{Code templates}
   + design patterns if any applies
 
   \subsection{Code development}
   \label{chap.code}
-  combo6x driver as a base, new szedata2 module
-    \subsubsection{Mmap space structure}
-    \label{chap.mmio}
-    locked : desc : rx ring : tx ring
+  We finally can start with the implementation of the specification showed
+  above.
+  
+  \subsubsection{Combo6 code base}
+  We touched this area slightly in section \ref{chap.devnodes} already, but
+  make these things clear. All Liberouter modules are based on combo6core and
+  one of combo6 and combo6x modules. It's transparent to them which one of
+  them is in use, because the core encapsulates the behaviour -- there is
+  defined API in the core sources which might be used. They initialize the
+  base card, remap all needed spaces common to all base and additional cards
+  and export any useful info in proc and sysfs XXX citation needed XXX file
+  systems.
 
-    \label{chap.hwsetup}
+  combo6x driver as a base, new szedata2 module
+
+  \subsubsection{libsze2}
+  Although there is no library for szedata v. 1, we consider to have one for
+  szedata2. The main point to have it is not to propagate the kernel
+  interface directly to the user, to simplify the interface and make it
+  abstract.
+  
+  The library functions might be an exact copy of use cases from the
+  specification, since the use case alone means exactly that it is a
+  separate sequence of commands which might not be further divided. If we
+  encapsulate each use case's contents in a library call, we reach the
+  aims from previous paragraph. Above all, if we create a shared library,
+  we'll get easy to update part (module) of each application.
+
+  \subsubsection{Mmap space structure}
+  \label{chap.mmio}
+  locked : desc : rx ring : tx ring
+
+  \label{chap.hwsetup}
 
   \subsection{Back-porting to older kernels}
   Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
@@ -587,7 +720,8 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   License (\cite{gplv2}).
 
 \chapter{Future work}
-  DMA DAC, standard network adapter mode (kernel network stack usage).
+  \label{chap.future}
+  DMA DAC, standard network adapter mode (kernel network stack usage). SPMD
 
 \chapter{Conclusion}
   XXX\cite{ulk}
