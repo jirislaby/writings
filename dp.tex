@@ -1,6 +1,6 @@
 % vim: textwidth=78 ai spell spelllang=en
 
-\documentclass[final]{fithesis}
+\documentclass[draft]{fithesis}
 
 %\usepackage{cmap}
 \usepackage[utf8x]{inputenc}
@@ -507,14 +507,23 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   project, currently built on the top of \com\ with network profitable
   wiring and internal connections. Technicalities may be found in report
   \cite{netcope} and, for Liberouter members, also on internal wikipedia under
-  all links on NetCOPE specification page.
+  all links on \ncope\ specification page.
 
   The project was started in the middle of 2006 and currently we have a
-  functional and
-  tested prototype with 4 network interfaces. Its universal solution allows
+  functional and tested prototype with 4\footnote{a new hardware with 2
+  interfaces but with modern bus (PCIe) is prepared and tested now} network
+  interfaces. Its universal solution allows
   involving it in multiple areas such as network traffic filtering, routing
   packets, intrusion detection and others -- it depends on what program,
   so-called \emph{design}, is loaded into the FPGA.
+
+  \begin{figure}[htb]
+    \begin{center}
+      \includegraphics[width=8cm]{images/architecture}
+      \caption{Overall schema of \ncope\ hardware}
+      \label{fig.netcope_hw}
+    \end{center}
+  \end{figure}
 
 %  \begin{figure}[htb]
 %    \begin{center}
@@ -527,36 +536,51 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   \subsection{szedata2}
   Szedata2 is one of designs, the abbreviation stands for \emph{straight
   zero copy data} in the meaning of avoid copying data from memory to the
-  application and vice versa.
+  application and vice versa. The name was chosen after its predecessor
+  szedata v. 1.
 
   \paragraph{Design specification}
+  Both szedata versions operate in FPGA on \ncope\ architecture. Version 1
+  uses PowerPC as a DMA controller -- program running on that processor used
+  to transfer data through scatter-gather DMA method over memory chunk pool.
+  In the first phase, the data transferred at one turn contained only one
+  packet of constant length. While PowerPC was working with higher rates in
+  this mode, we found out, that it's a bottleneck of the whole architecture,
+  its control bus was too slow to achieve higher transfer rates.
   
-  Some uses PowerPC, for
-  instance for performing DMA transfers.
-  , but in szedata2 it's disconnected and there are 4 DMA controllers
-  implemented directly in the design for all 4 network interfaces. DMACs are
-  depicted as
-  one box on the left side of figure \ref{fig.netcope_hw}.
-
-  \begin{figure}[htb]
-    \begin{center}
-      \includegraphics[width=8cm]{images/architecture}
-      \caption{NetCOPE hardware schema}
-      \label{fig.netcope_hw}
-    \end{center}
-  \end{figure}
-
-  Tfuj.
+  We tried to improve this behaviour by aggregating more data packets into one
+  transfer block and we redefined data structure too -- data are now in packet
+  of variable length with modified header in comparison with the older one.
+  We had to redesign also the program running on the card a bit and define the
+  packet structure in the specification. The header includes two sizes:
+  segment size and header size. The former is size of whole segment, data
+  block of one transferred packet, while the latter is size of optional
+  segment part containing some control information. This part is after sizes,
+  optional padding follows and finally the packet contents aligned to 8-byte
+  boundary (thanks to padding). We refer to this structure as a packet, its
+  format is shown on figure \ref{fig.netcope_pkt}.
 
   \begin{figure}[htb]
     \begin{center}
       \includegraphics[width=7cm]{images/packet}
-      \caption{NetCOPE packet}
+      \caption{szedata variable length packet}
       \label{fig.netcope_pkt}
     \end{center}
   \end{figure}
 
-  Organization of ring buffer in the card memory. Regs, functions\ldots
+  Despite all improvements, this was still unsuitable now due to grown
+  complexity and still the transfers couldn't be done in expected speeds.
+  We decided to redesign whole design architecture and fork szedata project
+  into version 2. PowerPC is no longer used for DMA transfers, it's fully
+  disconnected. Four separate DMA controllers for each interface
+  implemented directly in the design were introduced instead. By that step we
+  eliminated the impact of slow control bus, bus we still have problems
+  with data structures, the aggregating is too complex.
+
+  
+
+  Organization of ring buffer (intel \cite{intel_gbe}) in the card memory.
+  Regs, functions\ldots
 
   Physical memory constraints
 
