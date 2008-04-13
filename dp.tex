@@ -1,6 +1,6 @@
 % vim: textwidth=78 ai spell spelllang=en
 
-\documentclass[final,11pt]{fithesis}
+\documentclass[final]{fithesis}
 
 %\usepackage{cmap}
 \usepackage[utf8x]{inputenc}
@@ -47,16 +47,17 @@
   \AdvisorName
 \end{ThesisDeclaration}
 \begin{ThesisThanks}
-  I want to thank my thesis advisor Pavel čeleda. And least but not the last
+  I want to thank my thesis advisor Pavel Čeleda. And least but not the last
   I would like to thank here my parents for their patience too.
 \end{ThesisThanks}
 \begin{ThesisAbstract}
   In this thesis we are concerned in fast transfers from hardware to computer
-  memory and vice versa. Above all we specialize to scatter-gather direct
+  programs and vice versa. Above all we specialize to scatter-gather direct
   memory access transfers from/to hardware through ring buffers. Also we
   discuss other transfer methods implemented in other projects and consider
   using them here. Finally we implement the method and test it with all
-  available tools and describe the testing process.
+  available tools, describe the testing process and compare with already
+  working products.
   
 \end{ThesisAbstract}
 \begin{ThesisKeyWords}
@@ -71,53 +72,75 @@
   hardware among its components. It's a basic function which must work,
   however there are several methods of how to achieve that. Especially
   the fast ones are very important in computer science which results in higher
-  overall throughput of the system.
+  overall throughput of the system itself and also in faster communication with
+  other ones.
 
-  There are several computer science areas, where fast transfers are very
-  important. Beside the computer-inside transfers among CPU, disks,
-  DVD writers or main memory, we must take in account also the outside ones,
-  such as moving huge data amounts from/to external disks, displays or data
-  cards in cellphones for example, all over buses with specific data formats.
-  Outstanding speed is important especially in the area of network
-  communication; backbone network routers or monitoring probes are very
-  dependent on how fast data transfer can be achieved in the end.
+%  There are many computer technology areas, where fast transfers are very
+%  important. Beside the computer-inside transfers among CPU, disks,
+%  DVD writers and main memory, we must take in account also the outside ones,
+%  such as moving huge data amounts from/to external disks, monitors or data
+%  cards in cellphones for example; all over buses with specific
+%  data formats. Outstanding speed is important especially in the area of
+%  network communication -- as an example backbone network routers or
+%  monitoring probes are very dependent on how fast data transfers can be
+%  achieved in the end.
 
-  Nowadays the equipment of operating system can do fast network transfers
-  through well-known interfaces, but there exist several methods which are
-  not so common, but might provide yet another significant improvement. For
-  instance nowadays mainly used technique of \emph{direct memory access} in
-  cooperation with ring buffer data structure and memory mapping (so-called
-  \emph{mmap}) might move big chunks of data without even processor
-  assistance from network adapter towards application in userspace and vice
-  versa without any real data copying. This results in short transaction
-  times.
+%  Nowadays the equipment of operating systems can do fast network transfers
+%  through well-known interfaces, but like in other areas, even here is a
+%  space for improvements, for methods which are not so common, but might
+%  provide yet another significant speedup.
+
+  As an answer to permanent higher requirements in the networking, Liberouter
+  has been established as a project supported by Czech academic network CESNET
+  and European Internet project 6NET. The original intention was to develop a
+  router
+  for high traffic networks. After some time, this idea was augmented to other
+  network usages such as network filtering and monitoring. All these functions
+  run on \com\ family PCI cards (on figure \ref{fig.combo6} for illustration).
+
+  \begin{figure}[tb]
+    \begin{center}
+      \includegraphics[width=8cm]{images/combo6}
+      \caption{\comx\ card}
+      \label{fig.combo6}
+    \end{center}
+  \end{figure}
+
+  This thesis is based on one of many researches that have been already done
+  under Liberouter -- \ncope\ -- which we describe in chapter
+  \ref{chap.netcope}.
+  In short, it's hardware platform trying to achieve universality along with
+  speed and it's fully programmable. Software running on them can do fast
+  transfers if it is instructed to. For this purpose are usually used drivers.
+  Despite some are already prepared, a new \ncope\ software was developed and
+  it needs a new driver.
+
+  This thesis describes the evolution process of such driver from its
+  requirements, considering variants to be as fast as possible but still be
+  compliant with hardware specification \cite{netcope}, especially
+  direct memory access (see \ref{chap.dma}) in combination with ring buffers
+  (see \ref{chap.netcope}).
+
+  After requirements
+  settle down, we model the specification with help of UML and get towards
+  final code implementation in GNU C language (see \cite{GNUC}). As much as
+  possible code parts (all corner cases at best) need testing, we figure out
+  which testing techniques might be used for drivers and finally comparing
+  with older drivers and card softwares will be done.
+
+%  For
+%  instance nowadays mainly used technique of \emph{direct memory access} in
+%  cooperation with ring buffer data structure and memory mapping (so-called
+%  \emph{mmap}) might move big chunks of data without even processor
+%  assistance from network adapter towards application in userspace and vice
+%  versa without any real data copying. This results in short transaction
+%  times.
   
-%  \subsubsection{Thesis structure}
-%  We will see how ring buffer might be used as a data structure, its
-%  advantages,
-%  caveats and a way how is it possible to store it in the memory. Hence we'll
-%  go through paging, memory management, the need of virtual memory and how it
-%  can be used in the implementation.
-%
-%  Other subsystems needed for the modules will also be discussed, their
-%  linkage to userspace (e.g. creating a device node, file operations) sorted
-%  out.
-%
-%  Hardware design description, operations which it performs, data structures
-%  which it operates with, a way, how the ring buffer is processed and registers
-%  in the card's address space and their meaning will be placed in the next
-%  section.
-%
-%  Finally we put all those information together and create a kernelspace
-%  module supported even on older kernels -- we'll take care of this in
-%  a separate chapter -- and userspace library along with documentation of
-%  both and comparison to the older version of the design.
-
-\chapter{Basic terms}
-  This chapter contains enlightment of some basic terms used later. Also it
-  makes clear why we made some decisions in naming or licensing for instance.
-  \section{Linux}
-  Linux is an operating system based on kernel which was established in the
+%\chapter{Basic terms}
+  \paragraph{Linux}
+  In the early stages, we decided to create a driver implementation only for
+  Linux operating system. It is an operating system based on kernel which was
+  established in the
   early nineties of the 20th century by Linus Torvalds. There is over 3
   hundreds variants called distributions shipped by either communities or
   software giants.
@@ -127,54 +150,11 @@
   easy to use, because the
   development is ridden and checked by a Linux kernel community. We will
   see consequences of such development method in detailed description of some
-  subsystems in detail later and in compatible layer implementation too.
+  subsystems later and in compatible layer implementation too.
 
   Major part of Linux kernel is licensed under GPL version 2 \cite{gplv2}.
   Chosen license which will be the implementation distributed under is GPL
   version 2 like most other drivers.
-
-  \section{Liberouter project}
-  Liberouter is a project supported by \emph{CESNET} (Czech academic network)
-  and \emph{6NET} (European Internet project). There were raised many projects
-  under Liberouter mainly to transfer and scan high traffic on backbones.
-  All those work on cards called \com\ or \comx\ (newer, PCI-X and PCI express
-  version) respectively. One of such card is for illustration depicted on
-  figure \ref{fig.combo6}.
-
-  \begin{figure}[h]
-    \begin{center}
-      \includegraphics[width=11cm]{images/combo6x}
-      \caption{\comx\ card}
-      \label{fig.combo6}
-    \end{center}
-  \end{figure}
- 
-  Some projects are available for some of BSD versions, but currently main
-  supported operating system is Linux. And even later described implementation
-  will be available only for this system.
-
-  \section{NetCOPE project and szedata2}
-  One of Liberouter projects is \ncope. The goal is to develop a
-  \com\ cards based platform which is immutable against fast evolution of
-  networking. \ncope\ data flow might be seen in schematic on
-  figure \ref{fig.netcope_schema}. This universal solution allows involving
-  it in multiple areas such as network traffic filtering, routing packets,
-  intrusion detection and others.
-
-  \begin{figure}[h]
-    \begin{center}
-      \includegraphics[width=11cm]{images/netcope_color}
-      \caption{NetCOPE schematic}
-      \label{fig.netcope_schema}
-    \end{center}
-  \end{figure}
-
-  We'll develop the software on the top of the this platform. As a name, we
-  choose \sze\ after its ancestral first generation driver based on
-  \ncope\ hardware too. It stands for \emph{straight
-  zero copy data} in the meaning of avoid copying data from memory to the
-  application and vice versa by remapping it as we'll show in section
-  \ref{chap.mmio}.
 
 \chapter{Hardware basics}
   Before we can start coding, many hardware questions must be answered to know
@@ -191,7 +171,7 @@
   particularly which types of buses are on the route from a CPU to a device.
   Data path may be seen on figure \ref{fig.dev_inter}.
 
-  \begin{figure}[ht]
+  \begin{figure}[htb]
     \begin{center}
       \includegraphics[width=6cm]{images/data_flow}
       \caption{Devices interconnection}
@@ -298,7 +278,7 @@
   allocate block of size 4, allocation will fail, although there is
   enough free space in sum.
 
-  \begin{figure}[h]
+  \begin{figure}[htb]
     \begin{center}
       \includegraphics[width=7cm]{images/fragmentation}
       \caption{Memory fragmentation illustration}
@@ -335,7 +315,7 @@
   On figure \ref{fig.vaddr} is shown, how is logical address split. CR3 is
   register in x86 processors containing location of global page directory
   depicted on the left side.
-  \begin{figure}[h]
+  \begin{figure}[htb]
     \begin{center}
       \includegraphics[width=9cm]{images/vaddr}
       \caption{Virtual address format}
@@ -415,7 +395,7 @@
 %  Basic (common to all PCI devices except host bus bridges)
 %  configuration space is on figure \ref{fig.pciconf}.
 %
-%  \begin{figure}[h]
+%  \begin{figure}[htb]
 %    \begin{center}
 %      \includegraphics[width=6cm]{images/pcispace}
 %      \caption{PCI configuration space}
@@ -444,9 +424,11 @@
   memory) boundary\footnote{it is 4096 bytes on main memory when extensions
   disabled}. It must not
   exceed this limit, the transfer is interrupted by the other side otherwise.
-  Transfers of 1 KiB per one burst are not uncommon in \com\ case.
+  Transfers of 1\,KiB per one burst are not uncommon in \com\ case.
 
   \subsection{Character device}
+  Totok je uplne blbe, bo to nepasuje po tom, co jsem prehazel kapitoly.
+
   There exist several ways how to pass data from userspace to kernelspace in
   Linux. Most of them are based on moving data through special
   files\footnote{most of communication channels are files, even socket
@@ -465,10 +447,10 @@
 
   \subsubsection{Device nodes}
   \label{chap.devnodes}
-  We use character device approach on both \com\ driver parts -- for
-  combosix core driver and in both versions of szedata we have a separated
-  namespace combosix*, szedata* and newly szedataII*, where * stands for any
-  so far random number.
+  We use character device approach in Liberouter already -- we have a
+  separated namespace for combosix core driver and for szedata (it's an
+  implementation for older firmware, discussed in chapter \ref{chap.netcope}):
+  combosix* and szedata*, where * stands for any so far random number.
   
   A node in \emph{/dev} directory must be created for each such device. They
   used to be created manually by userspace programs \emph{MAKEDEV} and
@@ -517,23 +499,46 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 
   \section{NetCOPE hardware and szedata2 design}
   \label{chap.netcope}
-%  \ncope\ hardware is a base for both szedata versions.
-  \com\ cards themselves contain Xilinx \emph{field-programmable gate arrays}
-  (FPGA) with a PowerPC processor with a wiring customized for networking.
-  This platform is named NetCOPE and is universal depending on which addition
-  card is connected to the base card and what program, so-called
-  \emph{design}, is loaded into the FPGA.
+  As we slightly mentioned in the introduction, all Liberouter projects are
+  based on \com\ cards. Those cards contain Xilinx \emph{field-programmable
+  gate arrays} (FPGA) with a PowerPC processor.
+  There was an aspiration to develop an independent platform which would
+  be immutable against fast evolution of networking. This is a goal of \ncope\ 
+  project, currently built on the top of \com\ with network profitable
+  wiring and internal connections. Technicalities may be found in report
+  \cite{netcope} and, for Liberouter members, also on internal wikipedia under
+  all links on NetCOPE specification page.
+
+  The project was started in the middle of 2006 and currently we have a
+  functional and
+  tested prototype with 4 network interfaces. Its universal solution allows
+  involving it in multiple areas such as network traffic filtering, routing
+  packets, intrusion detection and others -- it depends on what program,
+  so-called \emph{design}, is loaded into the FPGA.
+
+%  \begin{figure}[htb]
+%    \begin{center}
+%      \includegraphics[width=11cm]{images/netcope_color}
+%      \caption{NetCOPE schematic}
+%      \label{fig.netcope_schema}
+%    \end{center}
+%  \end{figure}
+
+  \subsection{szedata2}
+  Szedata2 is one of designs, the abbreviation stands for \emph{straight
+  zero copy data} in the meaning of avoid copying data from memory to the
+  application and vice versa.
+
+  \paragraph{Design specification}
   
-  We have separate designs for szedata, szedata2, some packet filtering
-  and capturing applications and others projects. Each of these designs might
-  or might not use the built in processor, it fully depends on their
-  implementation.
-  For example PowerPC is used for performing DMA transfers in szedata, but in
-  szedata2 it's disconnected and there are 4 DMA controllers implemented
-  directly in the design for all 4 network interfaces. DMACs are depicted as
+  Some uses PowerPC, for
+  instance for performing DMA transfers.
+  , but in szedata2 it's disconnected and there are 4 DMA controllers
+  implemented directly in the design for all 4 network interfaces. DMACs are
+  depicted as
   one box on the left side of figure \ref{fig.netcope_hw}.
 
-  \begin{figure}[h]
+  \begin{figure}[htb]
     \begin{center}
       \includegraphics[width=8cm]{images/architecture}
       \caption{NetCOPE hardware schema}
@@ -541,12 +546,9 @@ KERNEL=="event*", SUBSYSTEM=="input", \
     \end{center}
   \end{figure}
 
-  We'll describe only specification parts needed for the implementation, other
-  information are available in technical report \cite{netcope} and, for
-  Liberouter members, also on internal wikipedia under all links on NetCOPE
-  specification page.
+  Tfuj.
 
-  \begin{figure}[h]
+  \begin{figure}[htb]
     \begin{center}
       \includegraphics[width=7cm]{images/packet}
       \caption{NetCOPE packet}
@@ -579,6 +581,9 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   All requirements were summarized and acknowledged by software group with
   hardware platform people based on the hardware specification (section
   \ref{chap.netcope}).
+
+  XXX Huh, here we need to consider all the pros and cons of all possible
+  variants.
 
   \subsection{Data path}
   card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
