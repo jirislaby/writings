@@ -168,26 +168,31 @@
   \section{Devices interconnection}
   \label{chap.inter}
   The first thing to explain is how data flows from devices to processor and
-  particularly which types of buses are on the route from a CPU to a device.
-  Data path may be seen on figure \ref{fig.dev_inter}.
+  main memory and particularly which types of buses are on the route from a
+  CPU to a device. Overall view may be seen on figure \ref{fig.dev_inter}.
 
   \begin{figure}[htb]
     \begin{center}
-      \includegraphics[width=6cm]{images/data_flow}
+      \includegraphics[width=9cm]{images/data_flow}
       \caption{Devices interconnection}
       \label{fig.dev_inter}
     \end{center}
   \end{figure}
 
+  \subsection{PCI}
+  \label{chap.pci}
   We are concerned especially in \emph{peripheral component interconnect}
   (PCI) devices, because both \com\ card families are PCI based. Each such
-  device is physically connected to any PCI bus via PCI slot (bottom left).
-  PCI bus is attached to \emph{southbridge} (bottom center), it communicates
-  with \emph{northbridge} (middle) over internal bus and it's finally wired
-  with processor via \emph{front-side bus} (FSB, top center). Nowadays
+  device is physically connected to any PCI bus via PCI slot.
+  PCI bus is attached to \emph{southbridge}, it communicates
+  with \emph{northbridge} over internal bus and it's finally wired
+  with processor via \emph{front-side bus} (FSB). Nowadays
   it's still more common, that all southbridge, northbridge and memory
   controller are implemented as proper PCI devices directly connected to the
   main PCI bus.
+  
+  On 
+  PCI express bus further contains hubs
 
   3 main signal groups are usually on each bus:
   \begin{list}{-}{}
@@ -199,12 +204,40 @@
       specified on the address bus
   \end{list}
 
+  PCI is specific in this, it minimizes signal count by multiplexing address
+  and data buses. Device starts transmission by 
+
   While FSB (on pentium and newer), PCI-X and PCI express has 64-bits wide
   address and data buses (PCI minimizes signal count by multiplexing these two
   into one by first sending address and then data), legacy PCI ones are
-  32-bit only. This shortcoming is important when we will send 64-bit numbers
-  over PCI to older \com\ cards in section \ref{chap.hwsetup}.
+  32-bit only. This shortcoming affects sending 64-bit numbers over PCI bus to
+  older \com\ cards as we will see in section \ref{chap.hwsetup}.
   Further detailed PCI information are in \cite{pcispec} and \cite{pciespec}.
+
+
+  \subsubsection{Configuration space}
+  Every modern bus supports a mechanism to autoconfigure devices connected
+  to it. Also each PCI device has its configuration space, where all the needed
+  information are stored or may be set to. This space contains information
+  about who developed the device and which model it is. These data are useful
+  especially in driver area, where the drivers want to bind only to specific
+  subset of devices.
+
+%  Basic (common to all PCI devices except host bus bridges)
+%  configuration space is on figure \ref{fig.pciconf}.
+%
+%  \begin{figure}[htb]
+%    \begin{center}
+%      \includegraphics[width=6cm]{images/pcispace}
+%      \caption{PCI configuration space}
+%      \label{fig.pciconf}
+%    \end{center}
+%  \end{figure}
+
+  In our scope of interest are device, vendor and their subsystem variant
+  IDs contained in this space, because these are mostly only identifiers
+  designating one concrete device family. It is helpful in userspace scripts
+  to create persistently named nodes in section \ref{chap.udev}.
 
   \section{DMA and Bus Mastering}
   \label{chap.dma}
@@ -232,9 +265,9 @@
   in \cite{ia1} and also in \cite{gorman} and \cite{ulk}, chapter~2.
   \subsection{Physical memory}
   In the usual meaning we call main \emph{random access memory} as a physical
-  memory. Although it is possible to not have this kind of memory by a
-  processor in special computers like \emph{NUMA} (non-uniform memory access),
-  we usually have one or more memories plugged in motherboard. These can be
+  memory and we usually\footnote{It's possible to not have this kind of memory
+  by a processor in special computers like \emph{NUMA} (non-uniform memory
+  access).} have one or more of them plugged in the motherboard. These can be
   addressed by several methods; Linux implements \emph{Flat mode}, where
 %
 %  \subsubsection{Real-address mode}
@@ -296,32 +329,32 @@
   of fixed size\footnote{4096 bytes on x86 with page size extension
   disabled} that might be mapped to physical memory or disks as swapped pages.
 
-  CPU accesses physical memory by virtual addresses. This is not possible
-  without translating a virtual address into the physical one. Transparent
-  translation is done by \emph{memory management unit} (MMU). Some modern
+  CPU accesses physical memory by virtual addresses with help of \emph{memory
+  management unit} (MMU) which does transparent translation to physical
+  address. Some modern
   mainboards add another unit called IOMMU between device and main memory
   path, so that devices address by logical address too. It allows creating a
   virtual space even for devices, but it's not widely spread so far
   so \com\ card developers must not take it for granted.
 
-  Virtual address itself is usually divided into few parts and each of them is
-  offset in some page table. On 32-bit x86 with extensions disabled, 2 such
-  tables exist and each table contains entries/pointers to next table or
-  to physical page in the last table respectively.
+%  Virtual address itself is usually divided into few parts and each of them is
+%  offset in some page table. On 32-bit x86 with extensions disabled, 2 such
+%  tables exist and each table contains entries/pointers to next table or
+%  to physical page in the last table respectively.
 %  If the entry in either
 %  table is marked as non-present, \emph{page fault} (exception handled by
 %  operating system) is thrown. OS must either put (map) the requested page in
 %  or kill the program which references illegal address.
-  On figure \ref{fig.vaddr} is shown, how is logical address split. CR3 is
-  register in x86 processors containing location of global page directory
-  depicted on the left side.
-  \begin{figure}[htb]
-    \begin{center}
-      \includegraphics[width=9cm]{images/vaddr}
-      \caption{Virtual address format}
-      \label{fig.vaddr}
-    \end{center}
-  \end{figure}
+%  On figure \ref{fig.vaddr} is shown, how is logical address split. CR3 is
+%  register in x86 processors containing location of global page directory
+%  depicted on the left side.
+%  \begin{figure}[htb]
+%    \begin{center}
+%      \includegraphics[width=9cm]{images/vaddr}
+%      \caption{Virtual address format}
+%      \label{fig.vaddr}
+%    \end{center}
+%  \end{figure}
 
   This schema allows us to allocate huge contiguous memory blocks without a
   need of having contiguous physical memory. In fact there is no need to have
@@ -343,14 +376,6 @@
   \ref{chap.netcope}, because we cannot, as we mentioned earlier allocate
   too much contiguous physical space and virtual memory is not unbounded
   too, especially on 32-bit machines.
-
-%  Note that there are strict constraints
-%  on 32-bit on how much physical memory might be used too. Even when PAE is
-%  used (and not PSE) which allows addressing up to 64 gibibytes of
-%  physical memory, practically it's told that the upper boundary is about 8
-%  gibibytes. This comes from how and where the pages descriptors are stored
-%  -- they must be in low memory which is 1 gibibyte (remember 3:1 split)
-%  minus mapped area on the top of that space (see \cite{gorman} for details).
 
   \subsection{Memory map}
   As we are able to set (and unset) present bit in an entry of each table
@@ -377,37 +402,6 @@
   nothing to do with MMIO.}
 
   \section{Other subsystems}
-  \subsection{PCI in short}
-  \label{chap.pci}
-  PCI is probably the most spread bus today. Other components (including other
-  buses such as USB) are connected to it directly or via bridges. All \com\ 
-  family cards are based on PCI and we mention some of its fundamentals
-  we are referring to later in following text.
-
-  \subsubsection{Configuration space}
-  Every modern bus supports a mechanism to autoconfigure devices connected
-  to it. Also each PCI device has its configuration space, where all the needed
-  information are stored or may be set to. This space contains information
-  about who developed the device and which model it is. These data are useful
-  especially in driver area, where the drivers want to bind only to specific
-  subset of devices.
-
-%  Basic (common to all PCI devices except host bus bridges)
-%  configuration space is on figure \ref{fig.pciconf}.
-%
-%  \begin{figure}[htb]
-%    \begin{center}
-%      \includegraphics[width=6cm]{images/pcispace}
-%      \caption{PCI configuration space}
-%      \label{fig.pciconf}
-%    \end{center}
-%  \end{figure}
-
-  In our scope of interest are device, vendor and their subsystem variant
-  IDs contained in this space, because these are mostly only identifiers
-  designating one concrete device family. It is helpful in userspace scripts
-  to create persistently named nodes in section \ref{chap.udev}.
-
   \subsubsection{DMA interface}
   Referring back to section \ref{chap.dma} we already know, that PCI
   multiplexes address and data bus into one wiring. To become a master on
