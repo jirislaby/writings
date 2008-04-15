@@ -275,23 +275,26 @@
   Transfers of 1\,KiB per one transfer are not uncommon in \com\ case.
 
   \subsection{Linux DMA interface}
-  Linux has three kinds of DMA API. ISA, PCI and generic. ISA is used only for
-  old 8257 (XXX what's the number XXX) LPC chips.
+  Linux has three kinds of DMA APIs. ISA/LPC, PCI and generic. ISA/LPC is used
+  only for old 8237 chips located on old ISA buses and on todays LPC buses,
+  neither one is in our scope of interest.
 
-  \paragraph{PCI interface} supports coherent and non-coherent DMA mappings.
+  \paragraph{PCI interface} supports coherent (also called consistent) and
+  non-coherent DMA mappings.
   We always must decide which one we should use. Non-coherent mappings are
-  often mapped only for a transfer and then unmapped and freed. This is
-  method widely used for mapping socket buffers which are freed after
+  often mapped only for a transfer and then unmapped and underlying buffer
+  freed. This is method widely used for mapping socket buffers which are
+  threw away after
   successful transmission. We will probably use this interface for exactly
-  this purpose, see chapter \ref{chap.future}.
+  this purpose out of scope of this thesis, see chapter \ref{chap.future}.
 
-  The other group of coherent (alternatively consistent) are mapping usually
-  mapped at the driver load or device start and unmapped and freed even on
-  deinitialization. Its domain is DMA ring buffers, firmwares used by some
+  The other group of coherent are mappings usually
+  mapped at the driver load or device start and unmapped and freed even after
+  device stop. Its domain are DMA ring buffers, firmwares used by some
   devices and executed from main memory etc. This mapping hence perfectly fits
-  our needs and will be used, see \ref{chap.netcope}.
+  our needs and will use it, see \ref{chap.netcope}.
 
-  \paragraph{Generic interface} is actually an abstraction of PCI interface.
+  \paragraph{Generic interface} It is actually an abstraction of PCI interface.
   It's not bounded to any PCI device, it may be used for non-PCI devices,
   however it obviously doesn't support all the PCI features.
 
@@ -299,9 +302,10 @@
   This chapter is a short introduction into memory management as used not
   only in Linux. Memory management in details on Intel processors is described
   in \cite{ia1} and also in \cite{gorman} and \cite{ulk}, chapter~2.
+
   \subsection{Physical memory}
   In the usual meaning we call main \emph{random access memory} as a physical
-  memory and we usually\footnote{It's possible to not have this kind of memory
+  memory and we usually\footnote{It's possible not to have this kind of memory
   by a processor in special computers like \emph{NUMA} (non-uniform memory
   access).} have one or more of them plugged in the motherboard. These can be
   addressed by several methods; Linux implements \emph{Flat mode}, where
@@ -417,7 +421,7 @@
   As we are able to set (and unset) present bit in an entry of each table
   MMU traverses and an exception is thrown when the bit is not set when the
   particular table entry is accessed, we can hook a page fault handler to this
-  path which will easily install missing pages.
+  path which will install missing pages.
 
   This can be used for \emph{memory mapping} (MMAP). We register a page fault
   function by OS interface and when user application maps some space and
@@ -437,26 +441,60 @@
   userspace by memory map fault handler, but it is a separate mapping and has
   nothing to do with MMIO.}
 
+  \paragraph{Linux mmap interface}
+  Many incompatible interfaces were introduced and removed meanwhile Linux
+  2.6 development. First versions support remapping only by implementing real
+  fault handler called nopage. This hook is called for every page fault
+  and must install the requested page (offset is passed in as a parameter).
+  This existed till 2.6.23. After that this hook was changed to fault with
+  slightly modified prototype.
+
+  Not to implement fault or nopage handler for each mmapped space, helpers
+  exist. For remapping I/O space, io\_remap\_page\_range was used in
+  some variants, because it changed prototype time by time, then
+  io\_remap\_pfn\_range was implemented and it's still in use.
+  While for remapping kernel memory obtained by page allocation mechanism,
+  remap\_pfn\_range may be used, for virtual memory even since 2.6.18 a helper
+  called remap\_vmalloc\_range exists. We'll
+  use all these mentioned interfaces to be back-compatible and to have all the
+  functionality (and simpleness for later kernels).
+
+  \paragraph{MMIO interface} Memory mapped I/O is done by invoking ioremap or
+  pci\_iomap for PCI devices. Then, for the former, \emph{read} and
+  \emph{write} are used for device space access. The latter interface is
+  slower, because it calls \emph{ioremap} and all consequent read and writes
+  (functions \emph{ioread} \emph{iowrite}) are done through calling back
+  \emph{read} and \emph{write} or \emph{in} and \emph{out} depending on what
+  kind is the underlying mapping of. In our case we know, it's mapped memory,
+  so that we use \emph{ioremap}/\emph{iounmap} and \emph{read} and
+  \emph{write} functions.
+
+  We refer to \cite{ldd}, chapter~9 and 15 for further reading.
+
   \section{Other subsystems}
 
   \subsection{Character device}
-  Totok je uplne blbe, bo to nepasuje po tom, co jsem prehazel kapitoly.
-
-  There exist several ways how to pass data from userspace to kernelspace in
-  Linux. Most of them are based on moving data through special
+  While we are able to pass data from device to memory available only to kernel
+  via DMA so far, we still need to put the data to userspace application
+  somehow. Several ways how to do it exist in Linux.
+  Most of them are based on moving data through special
   files\footnote{most of communication channels are files, even socket
   creating system call returns a file descriptor passed to standard read and
   write functions} such as sockets, block and character devices.
-  
-  We need a mechanism which allows reads byte by byte, memory map, some control
-  message passing for controlling the driver and application and direct
-  driver-application data flow. Unlike
-  block devices which might be read only by blocks with other restrictions
-  and sockets which goes through Linux networking stack, character ones
-  satisfies all our prerequisites and so we use it. Here comes a bare
-  introduction to char subsystem internals, information about API (including
-  source code examples) are available in \cite{ldd}, chapter~3 and about how
-  it works in \cite{ulk}.
+
+  The basic and simplest idea is to  \textbf{copy} the data by processor
+  from a kernel buffer to an user one passed via read system call through
+  any instance of a file.
+
+%  We need a mechanism which allows reads byte by byte, memory map, some control
+%  message passing for controlling the driver and application and direct
+%  driver-application data flow. Unlike
+%  block devices which might be read only by blocks with other restrictions
+%  and sockets which goes through Linux networking stack, character ones
+%  satisfies all our prerequisites and so we use it. Here comes a bare
+%  introduction to char subsystem internals, information about API (including
+%  source code examples) are available in \cite{ldd}, chapter~3 and about how
+%  it works in \cite{ulk}.
 
   \subsubsection{Device nodes}
   \label{chap.devnodes}
