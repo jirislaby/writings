@@ -186,34 +186,24 @@
   device is physically connected to any PCI bus via PCI slot.
   PCI bus is attached to \emph{southbridge}, it communicates
   with \emph{northbridge} over internal bus and it's finally wired
-  with processor via \emph{front-side bus} (FSB). Nowadays
+  with processor via \emph{front-side bus} (FSB) and with memory. Nowadays
   it's still more common, that all southbridge, northbridge and memory
   controller are implemented as proper PCI devices directly connected to the
   main PCI bus.
   
-  On 
-  PCI express bus further contains hubs
+  Older PCI buses have control bus supposed to send controlling signals and
+  synchronize objects which are connected to it and multiplexed address and
+  data buses. Device starts transmission by sending address, then follow data
+  on the same wires. On the other hand, PCI express uses packets for
+  communication over serial physical layer, it further must contain hubs and
+  switches for packet transmission. Data and addresses (might be both 32 and
+  64-bit) are part of packets, each request and reply is a packet here. 
 
-  3 main signal groups are usually on each bus:
-  \begin{list}{-}{}
-    \item \textbf{control bus} -- it's supposed to send controlling signals
-      and synchronize objects which are connected to it
-    \item \textbf{address bus} -- that is address of memory which is requested
-      to read from or write to
-    \item \textbf{data bus} -- data itself which flows from/to address
-      specified on the address bus
-  \end{list}
-
-  PCI is specific in this, it minimizes signal count by multiplexing address
-  and data buses. Device starts transmission by 
-
-  While FSB (on pentium and newer), PCI-X and PCI express has 64-bits wide
-  address and data buses (PCI minimizes signal count by multiplexing these two
-  into one by first sending address and then data), legacy PCI ones are
-  32-bit only. This shortcoming affects sending 64-bit numbers over PCI bus to
-  older \com\ cards as we will see in section \ref{chap.hwsetup}.
-  Further detailed PCI information are in \cite{pcispec} and \cite{pciespec}.
-
+  Legacy PCI has 32-bit wide address/data bus. This shortcoming affects
+  sending 64-bit numbers over the
+  bus to older \com\ cards as we will see in section \ref{chap.hwsetup}.
+  Further detailed PCI information are in \cite{pcispec} (PCI, PCI-X) and
+  \cite{pciespec} (PCI express).
 
   \subsubsection{Configuration space}
   Every modern bus supports a mechanism to autoconfigure devices connected
@@ -223,21 +213,22 @@
   especially in driver area, where the drivers want to bind only to specific
   subset of devices.
 
-%  Basic (common to all PCI devices except host bus bridges)
-%  configuration space is on figure \ref{fig.pciconf}.
-%
-%  \begin{figure}[htb]
-%    \begin{center}
-%      \includegraphics[width=6cm]{images/pcispace}
-%      \caption{PCI configuration space}
-%      \label{fig.pciconf}
-%    \end{center}
-%  \end{figure}
-
   In our scope of interest are device, vendor and their subsystem variant
   IDs contained in this space, because these are mostly only identifiers
   designating one concrete device family. It is helpful in userspace scripts
-  to create persistently named nodes in section \ref{chap.udev}.
+  to create persistently named nodes in chapter \ref{chap.udev}.
+
+  \subsubsection{Linux PCI support}
+  PCI is well supported in Linux since it became a standard. Concrete API is
+  in a scope of chapter 12 of \cite{ldd}. In short, driver's hook is called
+  whenever subsystem finds suitable PCI device, initialization is done by
+  functions with pci\_ prefix, especially device must be enabled and spaces
+  remapped to be usable. Then the device is ready to work. Deinitialization
+  and device switch off is done in driver's remove hook.
+
+  Transfers are done by processor by standard read and writes over the
+  remapped space, unit by unit. On 32-bit unit is up to 4 bytes, on 64-bit up
+  to 8 bytes. These transfers are not too fast and need processor attention.
 
   \section{DMA and Bus Mastering}
   \label{chap.dma}
@@ -258,6 +249,51 @@
   bounded to only one per device as we will see implementation of \com\ 
   hardware in section \ref{chap.netcope}. Unit which takes care of honest bus
   accesses by more than one DMACs is called \emph{Arbiter}.
+
+  \subsection{PCI DMA interface}
+  To become a master on legacy PCI bus, the device asks arbiter for a band and
+  after it gets start signal on control bus, it starts sending. First,
+  address is sent, then data part.
+  If there is more data to send, burst mode is used until arbiter emits stop
+  signal. After that signal, the device must finish the transfer of near few
+  bytes in the cache line\footnote{its size is configurable through config
+  space} and acknowledge stopping. Next device gets start signal from arbiter
+  at this moment and starts data transfer. The ancestral device may ask for a
+  band again unless all data have not been sent. This method is implemented in
+  PCI and PCI-X versions of \com\ cards.
+
+  PCI express is a bit different, it asks the other device to get some amount
+  of data in request packet and the device fills reply packet with the data
+  for receive direction. Sending is similar, the source device fills the data
+  directly in the request and gets back completion packet. This is obvoiusly
+  implemented in PCI express based \com.
+
+  The transfer is theoretically limited by the other device (including main
+  memory) boundary\footnote{it is 4096 bytes on main memory when extensions
+  disabled}. It must not
+  exceed this limit, the transfer is interrupted by the other side otherwise.
+  Transfers of 1\,KiB per one transfer are not uncommon in \com\ case.
+
+  \subsection{Linux DMA interface}
+  Linux has three kinds of DMA API. ISA, PCI and generic. ISA is used only for
+  old 8257 (XXX what's the number XXX) LPC chips.
+
+  \paragraph{PCI interface} supports coherent and non-coherent DMA mappings.
+  We always must decide which one we should use. Non-coherent mappings are
+  often mapped only for a transfer and then unmapped and freed. This is
+  method widely used for mapping socket buffers which are freed after
+  successful transmission. We will probably use this interface for exactly
+  this purpose, see chapter \ref{chap.future}.
+
+  The other group of coherent (alternatively consistent) are mapping usually
+  mapped at the driver load or device start and unmapped and freed even on
+  deinitialization. Its domain is DMA ring buffers, firmwares used by some
+  devices and executed from main memory etc. This mapping hence perfectly fits
+  our needs and will be used, see \ref{chap.netcope}.
+
+  \paragraph{Generic interface} is actually an abstraction of PCI interface.
+  It's not bounded to any PCI device, it may be used for non-PCI devices,
+  however it obviously doesn't support all the PCI features.
 
   \section{Memory management}
   This chapter is a short introduction into memory management as used not
@@ -402,23 +438,6 @@
   nothing to do with MMIO.}
 
   \section{Other subsystems}
-  \subsubsection{DMA interface}
-  Referring back to section \ref{chap.dma} we already know, that PCI
-  multiplexes address and data bus into one wiring. To become a master on
-  this bus, the device asks arbiter for a band and after it gets start signal
-  on control bus, it starts sending. First, address is sent, then data part.
-  If there is more data to send, burst mode is used until arbiter emits stop
-  signal. After that signal, the device must finish the transfer of near few
-  bytes in the cache line\footnote{its size is configurable through config
-  space} and acknowledge stopping. Next device gets start signal from arbiter
-  at this moment and starts data transfer. The ancestral device may ask for a
-  band again unless all data have not been sent.
-
-  The transfer is theoretically limited by the other device (including main
-  memory) boundary\footnote{it is 4096 bytes on main memory when extensions
-  disabled}. It must not
-  exceed this limit, the transfer is interrupted by the other side otherwise.
-  Transfers of 1\,KiB per one burst are not uncommon in \com\ case.
 
   \subsection{Character device}
   Totok je uplne blbe, bo to nepasuje po tom, co jsem prehazel kapitoly.
