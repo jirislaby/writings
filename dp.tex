@@ -298,6 +298,7 @@
   however it obviously doesn't support all the PCI features.
 
   \section{Memory management}
+  \label{chap.mm}
   This chapter is a short introduction into memory management as used not
   only in Linux. Memory management in details on Intel processors is described
   in \cite{ia1} and also in \cite{gorman} and \cite{ulk}, chapter~2.
@@ -640,18 +641,34 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   eliminated the impact of slow control bus, but we still have problems
   with data structures, the aggregation is too complex.
 
-  While studying other projects and implementation of other network cards, the
-  idea to have a ring buffer came. E.g. Intel uses in their modern card
+  After digging through some specifications such as Intel gigabit Ethernet
+  cards \cite{intel_gbe}, drivers e.g. for Broadcom 43 wireless cards
+  and info about projects such as Endace DAG, we considered ring buffer
+  structure as an underlying structure. This was the breakpoint to start
+  szedata2 Liberouter project.
 
-  Organization of ring buffer (intel \cite{intel_gbe}) in the card memory.
+  First, we needed to create a design specification. Let's consider 10\,Gb/s
+  data flow and process latency of 50\,ms. We need a buffer of size
+  at least $\frac{10\cdot10^{3}\cdot0,05}{8}\doteq60$\,MiB per interface not
+  to throw incoming data away. But as we noted in chapter \ref{chap.mm}, we
+  cannot allocate that much contiguous physical memory. This made us to split
+  the buffer on the page basis and create a mechanism to cope with this.
+
+  The idea is to allocate yet another memory for descriptor page with entries
+  pointing to the pages of the interspersed ring buffer. We took in account
+  64-bit systems, so that the pointers are represented by 8 bytes each. Since
+  we allocate the descriptor memory on a page basis too, it allows us to have
+  only $\frac{4096}{8}=512$ pointers to pages
+  which gives $512\cdot4096=2$\,MiB sized ring buffer. This is not enough, so
+  we introduced two kinds of descriptor entries. One is still a direct pointer
+  to ring buffer pages, the other one is a pointer to the next descriptor
+  table. To distinguish them, we take to advantage of all page addresses being
+  zeroed in low 12~bits (see \cite{gorman}, chapter~3) -- descriptor pointers
+  are logically or-ed with~1.
+  
   Regs, functions\ldots
 
-  Physical memory constraints
-
-\chapter{szedata2}
-  \section{Introduction}
-  What is it good for? Why is it arising? Diff between szedata and version 2.
-
+\chapter{szedata2 driver}
   \section{Development cycle}
   This thesis also aims to be a clue for other Liberouter developers, how can
   newer techniques be used in development process. We'll use some of agile
@@ -815,7 +832,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   we'll get easy to update part (module) of each application.
 
   \subsubsection{Mmap space structure}
-  \label{chap.mmio}
+  \label{chap.mmap}
   locked : desc : rx ring : tx ring
 
   \label{chap.hwsetup}
