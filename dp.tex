@@ -52,7 +52,7 @@
 \end{ThesisThanks}
 \begin{ThesisAbstract}
   In this thesis we are concerned in fast transfers from hardware to computer
-  programs and vice versa. Above all we specialize to scatter-gather direct
+  programs and vice versa. Above all we specialize to coherent direct
   memory access transfers from/to hardware through ring buffers. Also we
   discuss other transfer methods implemented in other projects and consider
   using them here. Finally we implement the method and test it with all
@@ -395,9 +395,37 @@
   too much contiguous physical space and virtual memory is not unbounded
   too, especially on 32-bit machines.
 
-  \paragraph{Linux memory interface} To obtain a buffer smaller than page
-  \emph{kmalloc} is used
-  Physical addresses are in linux obtai
+  \paragraph{Linux memory interface} To obtain a buffer smaller than a page
+  is used \emph{kmalloc} and \emph{kzalloc} returning a zeroed space. It's
+  calls of slab allocator (see \cite{gorman}, chapter~8). Freeing is provided
+  by \emph{kfree}.
+  
+  For larger physically contiguous buffers (consequent pages)
+  \emph{get\_free\_page} family should be used -- variants for zeroed page(s),
+  for single page, for functions which returns \emph{struct page} pointer
+  instead of logical address. Freeing is done by \emph{free\_page}. This
+  page allocations might be theoretically used for DMA, its physical addresses
+  could be gained by \emph{page\_to\_phys} (\emph{struct page}) or
+  \emph{virt\_to\_phys} (logical address), however this is not clean, because
+  the returned address needn't be device addressable. We should call
+  \emph{dma\_alloc\_coherent} to get an addressable page. It gets
+  \emph{struct device} as one of parameters where DMA capabilities are
+  written down and so it knows which addresses are OK to return. Possibly
+  wrapper \emph{pci\_alloc\_consistent} might be used to pass \emph{struct
+  pci\_dev} directly. \emph{dma\_free\_coherent} and
+  \emph{pci\_free\_consistent} serves as cleanups.
+
+  \emph{vmalloc} is for in-kernel virtual contiguous memory allocations.
+  Another wrappers like \emph{vmalloc\_32}, \emph{vmalloc\_user} and
+  \emph{vmalloc\_32\_user} exist for allocating buffers addressable by 32-bit
+  addresses and for those intended to use in userspace as of 2.6.18 --
+  underlying pages are marked as user and zeroed not to leak any information.
+  \emph{vfree} frees all these allocations.
+
+  For the convenience of \com\ PCI devices, we use
+  \emph{pci\_alloc\_consistent} and \emph{pci\_free\_consistent} for DMA
+  allocations, \emph{vmalloc\_32\_user} for buffer to be mapped to userspace
+  and obviously \emph{kmalloc} for driver state structures.
 
   \subsection{Memory map}
   As we are able to set (and unset) present bit in an entry of each table
@@ -413,49 +441,50 @@
   Application sees this as a transparent process and it accesses the data from
   the installed page since that moment.
 
-  \subsubsection{Memory mapped I/O}
-  Memory map is sometimes inappropriately confused with \emph{memory mapped
-  I/O} (MMIO). In the latter, we are able to access device memory space in
-  kernel by virtual address. It's achieved by mapping this I/O space into
-  kernelspace. For example \fpga\ memory space of a \com\ card may be referred
-  by a virtual address after being mapped this way. \\[1em]
-  \emph{Note: We are even able to access the \fpga\ from
-  userspace by memory map fault handler, but it is a separate mapping and has
-  nothing to do with MMIO.}
-
   \paragraph{Linux mmap interface}
   Many incompatible interfaces were introduced and removed meanwhile Linux
-  2.6 development. First versions support remapping only by implementing real
-  fault handler called nopage. This hook is called for every page fault
-  and must install the requested page (offset is passed in as a parameter).
-  This existed till 2.6.23. After that this hook was changed to fault with
-  slightly modified prototype.
+  2.6 development process. First versions support remapping of some kind of
+  memory only by implementing real
+  fault handler called \emph{nopage}. This hook is called for every page fault
+  and must install the requested page (offset is passed in as a parameter) or
+  fail to program be killed. \emph{nopage} hook was changed to \emph{fault}
+  with slightly modified prototype in 2.6.23.
 
-  Not to implement fault or nopage handler for each mmapped space, helpers
-  exist. For remapping I/O space, io\_remap\_page\_range was used in
-  some variants, because it changed prototype time by time, then
-  io\_remap\_pfn\_range was implemented and it's still in use.
-  While for remapping kernel memory obtained by page allocation mechanism,
-  remap\_pfn\_range may be used, for virtual memory even since 2.6.18 a helper
-  called remap\_vmalloc\_range exists. We'll
-  use all these mentioned interfaces to be back-compatible and to have all the
-  functionality (and simpleness for later kernels).
+  Not to implement \emph{fault} or \emph{nopage} handler for each mapped
+  space, helpers exist. For remapping I/O space, \emph{io\_remap\_page\_range}
+  was used in some variants, because it changed prototype time by time, then
+  \emph{io\_remap\_pfn\_range} was implemented and it's still in use.
+  While for remapping kernel memory obtained by page allocation mechanism
+  (i.e. memory which is physically contiguous),
+  \emph{remap\_pfn\_range} may be used, a helper called
+  \emph{remap\_vmalloc\_range} for virtual memory exists even since 2.6.18 and
+  it remaps only \emph{vmalloc\_*user} buffers. We'll use all these mentioned
+  interfaces, depending on which kernel we compile for, to be backward 
+  compatible and to have all the functionality (and simpleness for later
+  kernels).
 
-  \paragraph{MMIO interface} Memory mapped I/O is done by invoking ioremap or
-  pci\_iomap for PCI devices. Then, for the former, \emph{read} and
-  \emph{write} are used for device space access. The latter interface is
+  \subsubsection{Memory mapped I/O}
+  Memory map is sometimes inappropriately confused with \emph{memory mapped
+  I/O} (MMIO). We are able to access device memory space in kernel by virtual
+  address by MMIO. It's achieved by mapping I/O space into kernelspace.
+  For example \fpga\ memory space of a \com\ card may be referred
+  by a virtual address after being mapped this way.
+
+  \paragraph{MMIO interface} Memory mapped I/O is done by invoking
+  \emph{ioremap} or \emph{pci\_iomap} for PCI devices. Then, for the former,
+  \emph{read} and \emph{write} are used for device space access. The latter
+  interface is
   slower, because it calls \emph{ioremap} and all consequent read and writes
-  (functions \emph{ioread} \emph{iowrite}) are done through calling back
+  (functions \emph{ioread}, \emph{iowrite}) are done through calling back
   \emph{read} and \emph{write} or \emph{in} and \emph{out} depending on what
   kind is the underlying mapping of. In our case we know, it's mapped memory,
   so that we use \emph{ioremap}/\emph{iounmap} and \emph{read} and
   \emph{write} functions.
 
-  We refer to \cite{ldd}, chapter~9 and 15 for further reading.
+  We refer to \cite{ldd}, chapter~9 and 15 for further reading about accessing
+  device I/O and memory mapping.
 
-  \section{Other subsystems}
-
-  \subsection{Character device}
+  \section{Character device}
   While we are able to pass data from device to memory available only to kernel
   via DMA so far, we still need to put the data to userspace application
   somehow. Several ways how to do it exist in Linux.
@@ -478,7 +507,7 @@
 %  source code examples) are available in \cite{ldd}, chapter~3 and about how
 %  it works in \cite{ulk}.
 
-  \subsubsection{Device nodes}
+  \subsection{Device nodes}
   \label{chap.devnodes}
   We use character device approach in Liberouter already -- we have a
   separated namespace for combosix core driver and for szedata (it's an
@@ -496,7 +525,7 @@
   Which handlers exactly are necessary in implementation will be discussed in
   section \ref{chap.code} after considering operations done in specification.
 
-  \subsubsection{udev}
+  \subsection{udev}
   \label{chap.udev}
   Userspace device (udev) is a dynamic device node creation system
   with support of running external programs depending on defined configuration
@@ -543,9 +572,9 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   all links on \ncope\ specification page.
 
   The project was started in the middle of 2006 and currently we have a
-  functional and tested prototype with 4\footnote{a new hardware with 2
-  interfaces but with modern bus (PCIe) is prepared and tested now} network
-  interfaces. Its universal solution allows
+  functional and tested prototype with 4 network interfaces\footnote{a new
+  hardware with 2 interfaces but with modern bus (PCIe) is prepared and tested
+  now}. Its universal solution allows
   involving it in multiple areas such as network traffic filtering, routing
   packets, intrusion detection and others -- it depends on what program,
   so-called \emph{design}, is loaded into the FPGA.
@@ -575,7 +604,8 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   \paragraph{Design specification}
   Both szedata versions operate in FPGA on \ncope\ architecture. Version 1
   uses PowerPC as a DMA controller -- program running on that processor used
-  to transfer data through scatter-gather DMA method over memory chunk pool.
+  to transfer data through scatter-gather DMA method (described in
+  \cite{ldd}, chapter~15) over memory chunk pool.
   In the first phase, the data transferred at one turn contained only one
   packet of constant length. While PowerPC was working with higher rates in
   this mode, we found out, that it's a bottleneck of the whole architecture,
@@ -583,15 +613,16 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   
   We tried to improve this behaviour by aggregating more data packets into one
   transfer block and we redefined data structure too -- data are now in packet
-  of variable length with modified header in comparison with the older one.
+  of variable length with modified header in comparison to the older one.
   We had to redesign also the program running on the card a bit and define the
   packet structure in the specification. The header includes two sizes:
-  segment size and header size. The former is size of whole segment, data
-  block of one transferred packet, while the latter is size of optional
-  segment part containing some control information. This part is after sizes,
-  optional padding follows and finally the packet contents aligned to 8-byte
-  boundary (thanks to padding). We refer to this structure as a packet, its
-  format is shown on figure \ref{fig.netcope_pkt}.
+  segment size and header size. The former is size of whole segment, i.e.
+  size of header, padding and data in sum, while the latter is size of optional
+  part of segment containing some control information. This control data are
+  placed directly after the header, optional padding follows and finally the
+  packet contents with start aligned to 8-byte
+  boundary (thanks to padding). We refer to this structure as a \emph{packet},
+  its format is shown on figure \ref{fig.netcope_pkt}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -601,16 +632,18 @@ KERNEL=="event*", SUBSYSTEM=="input", \
     \end{center}
   \end{figure}
 
-  Despite all improvements, this was still unsuitable now due to grown
-  complexity and still the transfers couldn't be done in expected speeds.
+  Despite all improvements, this was still unsuitable due to grown
+  complexity and still the transfers couldn't be done at estimated
+  (theoretically computed) speeds.
   We decided to redesign whole design architecture and fork szedata project
   into version 2. PowerPC is no longer used for DMA transfers, it's fully
-  disconnected. Four separate DMA controllers for each interface
-  implemented directly in the design were introduced instead. By that step we
-  eliminated the impact of slow control bus, bus we still have problems
-  with data structures, the aggregating is too complex.
+  disconnected. Four separate DMA controllers for each interface are
+  implemented directly in the design instead. By that step we
+  eliminated the impact of slow control bus, but we still have problems
+  with data structures, the aggregation is too complex.
 
-  
+  While studying other projects and implementation of other network cards, the
+  idea to have a ring buffer came. E.g. Intel uses in their modern card
 
   Organization of ring buffer (intel \cite{intel_gbe}) in the card memory.
   Regs, functions\ldots
