@@ -700,7 +700,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   to ring buffer pages, the other one is a pointer to the next descriptor
   table. To distinguish them, we take to advantage of all page addresses being
   zeroed in low 12~bits (see \cite{gorman}, chapter~3) -- descriptor pointers
-  are logically or-ed with~1. Such situation is depicted at figure
+  are logically or-ed with~1. Such situation is depicted on figure
   \ref{fig.ring}.
 
   \begin{figure}[htb]
@@ -711,8 +711,37 @@ KERNEL=="event*", SUBSYSTEM=="input", \
     \end{center}
   \end{figure}
 
-  \paragraph{Registers and functions}
-  
+  \paragraph{Registers and address space}
+  The last thing we need to cover before implementation is how we declare
+  communication channel between driver and newly specified design. For the
+  convenience of MMIO, we define design address space as a memory area. Every
+  DMA engine has its own subspace with its controlling register. Up to 16
+  engines are supported for future purposes, we use only 4 so far. Each space
+  consist of these register groups:
+
+  \begin{enumerate}
+    \item pointer to the first page with descriptors
+    \item start, end and size registers -- ring buffer state pointers, it's
+      head, tail and size of whole buffer
+    \item control and status registers -- used to control the design and check
+      actual state
+    \item interrupt registers -- timeout, position or both may be used for
+      interrupt generation; position is triggered when one of ring buffer
+      registers reaches value stored in position register
+  \end{enumerate}
+
+  As the DMA engine needs to have information about ring buffer before it
+  starts working, registers groups 1. and 2. shall be set prior to sending
+  start command to control register 3. Interrupt registers 4. are optional,
+  they may be set and changed on the fly. Concrete steps of hardware
+  initialization and deinitialization will be described in the driver
+  specification in chapter~\ref{chap.spec}.
+
+  After successfully launch of the engine, we only need to update tail
+  pointers for receive direction after we process data and head for transmit
+  after we write data to the ring buffer. Any other processing is implemented
+  in the engine and we needn't to care.
+
 %  We use character device approach in Liberouter already -- we have a
 %  separated namespace for combosix core driver and for szedata (it's an
 %  implementation for older firmware, discussed in chapter \ref{chap.netcope}):
@@ -723,7 +752,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   This thesis also aims to be a clue for other Liberouter developers, how can
   newer techniques be used in development process. We'll use some of agile
   techniques evolved in the mid-1990s and established in \emph{Agile
-  Manifesto}\cite{agile}, some basic UML modeling techniques from XXX cite XXX
+  Manifesto}\cite{agile}, some basic UML modeling methods from XXX cite XXX
   and by referencing design patterns that should be used for some
   particular code parts too.
 
@@ -748,6 +777,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   ref Konik's work
 
   \subsection{Models and design}
+  \label{chap.spec}
   To not start 
 
   We use for modelling \emph{unified modeling language} (UML). Several UML
@@ -791,7 +821,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   \paragraph{Data processing} includes locking (asking for) data area either
   to read from or write to, do the processing and unlocking. Overall two
   method of read operation raised:
-  \begin{list}{-}{}
+  \begin{itemize}
     \item \textbf{load balancing} -- several readers exist and data are divided
       among them. They all get distinct data and do the same operation on
       them. It's very similar to \emph{single program multiple data} in
@@ -799,7 +829,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
     \item \textbf{multiprocessing} -- all readers want all data to do
       different tasks with them. We can approach this to \emph{multiple
       program single data}.
-  \end{list}
+  \end{itemize}
   We implement only the latter so far, but it's possible that we augment the
   implementation to the former too, see \ref{chap.future}.
 
