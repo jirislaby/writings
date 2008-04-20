@@ -492,48 +492,42 @@
   creating system call returns a file descriptor passed to standard read and
   write functions} such as sockets, block and character devices.
 
-  The basic and simplest idea is to  \textbf{copy} the data by processor
-  from a kernel buffer to an user one passed via read system call through
-  any instance of a file.
-
-%  We need a mechanism which allows reads byte by byte, memory map, some control
-%  message passing for controlling the driver and application and direct
-%  driver-application data flow. Unlike
-%  block devices which might be read only by blocks with other restrictions
-%  and sockets which goes through Linux networking stack, character ones
-%  satisfies all our prerequisites and so we use it. Here comes a bare
-%  introduction to char subsystem internals, information about API (including
-%  source code examples) are available in \cite{ldd}, chapter~3 and about how
-%  it works in \cite{ulk}.
+  The basic and simplest idea is to \textbf{copy} the data by a processor
+  from kernel buffer to an user one. It's easy to implement and least
+  error-prone, on the other hand it's one of the slowest known methods and as
+  we need to read high bandwidth data in userspace, it's unusable in our case.
+  Memory map suits in such situation, this eliminates use of both sockets and
+  block devices, since neither of them can be mapped, furthermore socket data
+  flow through networking stack. The only remaining are character devices,
+  introduction to char subsystem internals follows further.
 
   \subsection{Device nodes}
   \label{chap.devnodes}
-  We use character device approach in Liberouter already -- we have a
-  separated namespace for combosix core driver and for szedata (it's an
-  implementation for older firmware, discussed in chapter \ref{chap.netcope}):
-  combosix* and szedata*, where * stands for any so far random number.
-  
-  A node in \emph{/dev} directory must be created for each such device. They
-  used to be created manually by userspace programs \emph{MAKEDEV} and
-  \emph{mknod}, although this was not perfect because of the need of every
-  single node creation and so some dynamic principles described later in
-  this section were introduced.
+  As as entry point from userspace to kernelspace serves \emph{device nodes}.
+  The existing node in \emph{/dev} might be opened and used by userspace
+  application,
+  control is handled by the driver which registered it. It depends on what
+  features are implemented in the driver and what controls are defined as an
+  interface. Handlers for szedata2 will be discussed in section
+  \ref{chap.code} after review of operations done in specification.
 
-  The existing node might then be opened and used by userspace
-  application and on the other end handled by the driver which created it.
-  Which handlers exactly are necessary in implementation will be discussed in
-  section \ref{chap.code} after considering operations done in specification.
+  If the driver is loaded and requested node does not exist yet, it must be
+  created. It used to be created manually by userspace program \emph{mknod} or
+  wrapper scripts like \emph{MAKEDEV}, however this was not perfect
+  because of the need of every single node creation and so some dynamic
+  principles described later in this section were introduced.
 
   \subsection{udev}
   \label{chap.udev}
-  Userspace device (udev) is a dynamic device node creation system
+  Userspace device (\emph{udev}) is a dynamic device node creation mechanism
   with support of running external programs depending on defined configuration
-  rules. It's a successor of devfs, a filesystem implemented directly in
-  kernel and mounted on \emph{/dev}. Udev mounts only a temporary filesystem
-  (tmpfs) on the same directory, but from its name, it does all its work in
-  userspace by listening on socket for userspace events (uevents) from kernel
-  and invoking mknod, modprobe\footnote{kernel module insertion program} and
-  other programs.
+  rules. It's a successor of \emph{devfs}, a filesystem implemented directly
+  in kernel and mounted on \emph{/dev}. Udev mounts only a temporary
+  filesystem (tmpfs) on the same directory, but from its name, it does all its
+  work in userspace by listening on socket for userspace events
+  (\emph{uevents}) from kernel and invoking \emph{mknod},
+  \emph{modprobe}\footnote{kernel module insertion program} and other
+  programs.
 
   One particular userspace rule may look like the following one which creates
   a symbolic
@@ -541,15 +535,17 @@
   6000 (device ID 0x00f0).
 \begin{verbatim}
 KERNEL=="event*", SUBSYSTEM=="input", \
-        ATTRS{idVendor}=="045e",      \
-        ATTRS{idProduct}=="00f0",     \
-        SYMLINK="input/event15"
+    ATTRS{idVendor}=="045e",      \
+    ATTRS{idProduct}=="00f0",     \
+    SYMLINK="input/event15" XXX puj, kdo to chce?
+    My tady chcem krasny pravidlo pro combo.
 \end{verbatim}
   This is the point, where IDs read from PCI configuration space are sent by
-  kernel in uevent and might be matched in rules file by udev.
+  kernel in \emph{uevent} and might be matched in rules file by udev.
   
   As device node names are random so far and we want numbers in names to
-  correspond with each other, e.g. to have combosix6 and szedataII6 for one
+  correspond with each other, e.g. to have \emph{combosix6} and
+  \emph{szedataII6} for one
   concrete card in PCI slot 6, we need to write similar rules to generate
   persistent and consistent naming.
 
@@ -558,6 +554,46 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   rules and a rules file for matching the \com\ cards which runs the 
   script are in detail described in Appendix \ref{app.udev}.
 
+  \subsection{Character device Linux interface}
+  First step to support character devices by a driver is to allocate a
+  region of devices. This was done by \emph{register\_chrdev\_region} in the
+  past since regions were statically assigned among certain drivers, nowadays
+  is used a variant for dynamic registration \emph{register\_chrdev} which
+  registers 256 nodes immediately or \emph{alloc\_chrdev\_region} which
+  registers none, but keeps a track of a region being virtually used. These
+  two give a registered region descriptor as a return value which is then
+  passed to \emph{unregister\_chrdev} in cleanup path.
+
+  Each character device has its own file operations structure with hooks to be
+  called on each particular event (\emph{open}, \emph{close},
+  \emph{mmap}\ldots). Entries left blank (except \emph{open} and \emph{close})
+  means that this concrete function is unsupported.
+  While we pass this structure directly to \emph{register\_chrdev},
+  \emph{alloc\_chrdev\_region} needs further attention, each incoming hardware
+  device must be added by \emph{cdev\_add} with operations as second
+  parameter. \emph{cdev\_del} is used for removal.
+
+  Although that's all what is needed from Linux kernel view, this is not
+  enough to support \emph{udev} node creation. Each driver creates a class by
+  \emph{class\_create}, frees up by \emph{class\_destroy}. Then each device is
+  created by \emph{device\_create} and after this call \emph{udev} receives a
+  signal to create a node. Node is deleted after \emph{device\_destroy}. Both
+  these functions are created in class namespace, hence the class must be
+  unconditionally created before and freed after \emph{device\_*} calls.
+  This API evolved even in 2.6 Linux kernel and is probably most unstable one
+  in a scope of this thesis. Many function variants appeared, many changed
+  prototypes and then disappeared during 2.6. Functions like
+  \emph{class\_simple\_create}, \emph{class\_device\_create} and others will
+  be mentioned in back-porting chapter~\ref{chap.backport}.
+
+  We should mention also misc character devices. This interface allows adding
+  of only one character device and is mostly implemented for single devices
+  like timers or access to e.g. virtualization resources and hence doesn't
+  suit to our needs. We choose \emph{alloc\_chrdev\_region} method, since it's
+  recommended and \emph{device\_create} as well. Further
+  character device resources are available in \cite{ldd}, chapter~3 and in
+  \cite{ulk}.
+  
   \section{NetCOPE hardware and szedata2 design}
   \label{chap.netcope}
   As we slightly mentioned in the introduction, all Liberouter projects are
@@ -601,14 +637,14 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   szedata v. 1.
 
   \subsubsection{Design specification}
-  Both szedata versions operate in FPGA on \ncope\ architecture. Version 1
-  uses PowerPC as a DMA controller -- program running on that processor used
-  to transfer data through scatter-gather DMA method (described in
-  \cite{ldd}, chapter~15) over memory chunk pool.
+  Both szedata versions operate in \emph{FPGA} on \ncope\ architecture.
+  Version 1 uses \emph{PowerPC} as a DMA controller -- program running
+  on that processor used to transfer data through scatter-gather DMA method
+  (described in \cite{ldd}, chapter~15) over memory chunk pool.
   In the first phase, the data transferred at one turn contained only one
-  packet of constant length. While PowerPC was working with higher rates in
-  this mode, we found out, that it's a bottleneck of the whole architecture,
-  its control bus was too slow to achieve higher transfer rates.
+  packet of constant length. While \emph{PowerPC} was working with higher
+  rates in this mode, we found out, that it's a bottleneck of the whole
+  architecture, its control bus was too slow to achieve higher transfer rates.
   
   We tried to improve this behaviour by aggregating more data packets into one
   transfer block and we redefined data structure too -- data are now in packet
@@ -635,20 +671,20 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   complexity and still the transfers couldn't be done at estimated
   (theoretically computed) speeds.
   We decided to redesign whole design architecture and fork szedata project
-  into version 2. PowerPC is no longer used for DMA transfers, it's fully
-  disconnected. Four separate DMA controllers for each interface are
-  implemented directly in the design instead. By that step we
-  eliminated the impact of slow control bus, but we still have problems
+  into the version 2. \emph{PowerPC} will be no longer used for DMA transfers,
+  it'll be fully disconnected. Four separate DMA controllers for each
+  interface will be implemented directly in the design instead. By that step
+  we eliminate the impact of slow control bus, but we still have problems
   with data structures, the aggregation is too complex.
 
   After digging through some specifications such as Intel gigabit Ethernet
   cards \cite{intel_gbe}, drivers e.g. for Broadcom 43 wireless cards
-  and info about projects such as Endace DAG, we considered ring buffer
+  and info about projects such as Endace DAG, we considered a ring buffer
   structure as an underlying structure. This was the breakpoint to start
   szedata2 Liberouter project.
 
   First, we needed to create a design specification. Let's consider 10\,Gb/s
-  data flow and process latency of 50\,ms. We need a buffer of size
+  data flow and userspace task latency of 50\,ms. We need a buffer of size
   at least $\frac{10\cdot10^{3}\cdot0,05}{8}\doteq60$\,MiB per interface not
   to throw incoming data away. But as we noted in chapter \ref{chap.mm}, we
   cannot allocate that much contiguous physical memory. This made us to split
@@ -669,13 +705,18 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 
   \begin{figure}[htb]
     \begin{center}
-      \includegraphics[width=8cm]{images/ring_struct}
+      \includegraphics[width=9cm]{images/ring_struct}
       \caption{szedata2 ring buffer structure}
       \label{fig.ring}
     \end{center}
   \end{figure}
+
+  \paragraph{Registers and functions}
   
-  Regs, functions\ldots
+%  We use character device approach in Liberouter already -- we have a
+%  separated namespace for combosix core driver and for szedata (it's an
+%  implementation for older firmware, discussed in chapter \ref{chap.netcope}):
+%  combosix* and szedata*, where * stands for any so far random number.
 
 \chapter{szedata2 driver}
   \section{Development cycle}
@@ -847,6 +888,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   \label{chap.hwsetup}
 
   \subsubsection{Back-porting to older kernels}
+  \label{chap.backport}
   Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
   remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
   vs. 2.6.16).
