@@ -161,7 +161,7 @@
   communication will guide us towards complete implementation.
   
   After each section, we consult what exactly does that particular part
-  means for the final code.
+  means for the final code and to achieve that in Linux.
 
   \section{Devices interconnection}
   \label{chap.inter}
@@ -240,14 +240,15 @@
   data phases after address phase on multiplexed bus, the transfer is done in
   so-called \emph{burst mode}.
   
-  On older machines, there was only one device called DMA controller (DMAC),
+  On older machines, there was only one device called \emph{DMA controller}
+  (DMAC),
   which could become a master. Nowadays each PCI device (see also Section
   \ref{chap.pci}) may become a master, so that it can access memory directly
   by its own DMAC\footnote{Note that there is no common PCI DMAC, so if the
-  device doesn't have one, it doesn't support DMA either.}. DMAC count is not
-  bounded to only one per device as we will see implementation of \com\ 
-  hardware in section \ref{chap.netcope}. Unit which takes care of honest bus
-  accesses by more than one DMACs is called \emph{Arbiter}.
+  device doesn't have one, it doesn't support DMA either.}.
+  As we will see in chapter~\ref{chap.netcope}, their count is not limited to
+  one per PCI device. Unit which takes care of honest bus
+  accesses by more than one DMAC is called \emph{Arbiter}.
 
   \subsection{PCI DMA interface}
   To become a master on legacy PCI bus, the device asks arbiter for a band and
@@ -274,24 +275,27 @@
   Transfers of 1\,KiB per one transfer are not uncommon in \com\ case.
 
   \subsection{Linux DMA interface}
-  Linux has three kinds of DMA APIs. ISA/LPC, PCI and generic. ISA/LPC is used
+  Linux has three groups of DMA APIs. ISA/LPC, PCI and generic. ISA/LPC is used
   only for old 8237 chips located on old ISA buses and on todays LPC buses,
-  neither one is in our scope of interest.
+  neither one is in our scope of interest. See
+  \emph{Documentation/DMA-ISA-LPC.txt} from Linux kernel sources for usage
+  explanation.
 
-  \paragraph{PCI interface} supports coherent (also called consistent) and
-  non-coherent DMA mappings.
+  \paragraph{PCI interface} This interface supports coherent (also called
+  consistent) and non-coherent DMA mappings.
   We always must decide which one we should use. Non-coherent mappings are
   often mapped only for a transfer and then unmapped and underlying buffer
-  freed. This is method widely used for mapping socket buffers which are
-  threw away after
+  freed. This is method widely used for socket buffers which are
+  thrown away after
   successful transmission. We will probably use this interface for exactly
-  this purpose out of scope of this thesis, see chapter \ref{chap.future}.
+  this purpose out of scope of this thesis, see chapter~\ref{chap.future}.
 
-  The other group of coherent are mappings usually
+  The other group of coherent are mappings usually XXX what? XXX
   mapped at the driver load or device start and unmapped and freed even after
   device stop. Its domain are DMA ring buffers, firmwares used by some
-  devices and executed from main memory etc. This mapping hence perfectly fits
-  our needs and will use it, see \ref{chap.netcope}.
+  devices and executed from main memory while device work and so on. This
+  mapping hence perfectly fits our needs and will use it,
+  see~\ref{chap.netcope}.
 
   \paragraph{Generic interface} It is actually an abstraction of PCI interface.
   It's not bounded to any PCI device, it may be used for non-PCI devices,
@@ -320,28 +324,33 @@
   continuous big chunks of memory, but it was impossible to find such long
   block after a while system was running. It was caused by process called
   (external) fragmentation. Other tasks held memory blocks and there wasn't
-  enough space in between them to return. See figure \ref{fig.fragmentation}
-  for illustration.
+  enough space in between them to return.
   
-  Task 1 holds two memory blocks of size 2 units. Task 2
-  allocated one block three units wide. Now, if any of the two wants to
-  allocate block of size 4, allocation will fail, although there is
-  enough free space in sum.
-
-  \begin{figure}[htb]
-    \begin{center}
-      \includegraphics[width=7cm]{images/fragmentation}
-      \caption{Memory fragmentation illustration}
-      \label{fig.fragmentation}
-    \end{center}
-  \end{figure}
-
+%  See figure \ref{fig.fragmentation}
+%  for illustration.
+%  
+%  Task 1 holds two memory blocks of size 2 units. Task 2
+%  allocated one block three units wide. Now, if any of the two wants to
+%  allocate block of size 4, allocation will fail, although there is
+%  enough free space in sum.
+%
+%  \begin{figure}[htb]
+%    \begin{center}
+%      \includegraphics[width=7cm]{images/fragmentation}
+%      \caption{Memory fragmentation illustration}
+%      \label{fig.fragmentation}
+%    \end{center}
+%  \end{figure}
+%
   Many algorithms were introduced to avoid this behavior, some of them are
   described in \cite{knuth_art} including buddy system used in Linux
-  kernel for in-kernel allocations.
+  kernel for in-kernel allocations of larger blocks.
   
   \subsubsection{Paging}
-  To solve the situation with external fragmentation, method named
+  However, the algorithms only lowers the risk of fragmentation inconvenience
+  being hit, we would still have problems with allocations bigger than some
+  value specific for each allocation mechanism.  
+  To really solve the situation with external fragmentation, method named
   \emph{paging} was introduced. Linear address space is divided into pages
   of fixed size\footnote{4096 bytes on x86 with page size extension
   disabled} that might be mapped to physical memory or disks as swapped pages.
@@ -379,23 +388,18 @@
   backed by a page stored on disk (swapped out) or even have no "physical"
   page mapped to it thanks to demand paging.
 
-  On 32-bit, we are able to use up to 3 gibibytes\footnote{SI unit for
-  $2^{30}$} of virtual space per process. This limit comes from 1:3 of
-  kernel to user address space split -- the remaining addressable
-  1\,GiB is used as kernelspace. On 64-bit, 48-bit virtual addresses are
-  supported by most current processors, up to $2^{47}$ may be used in
-  userspace, kernel is mapped in top $2^{47}$ bytes due to 64-bit sign
-  extension (see \cite{ia3a} for reference) and the space between them is an
-  unused memory hole, which might be addressed even after newer processor
-  family will be available.
-
-  Consequences of all these constraints are considered later in section
-  \ref{chap.netcope}, because we cannot, as we mentioned earlier allocate
-  too much contiguous physical space and virtual memory is not unbounded
-  too, especially on 32-bit machines.
+  Although 64-bit kernels are able to address up to $2^{47}=128$\,TiB mapped
+  to the bottom of address space on modern processors (kernel is mapped to
+  the top of the same size thank to 64-bit sign extension, see
+  \cite{ia3a} for reference, with
+  so far unused hole between them), 32-bit ones are bounded to nowadays real
+  limit of 3\,GiB of virtual space per process. The remaining addressable
+  1\,GiB is used as kernelspace. This will be reflected while estimating
+  size of buffers needed for userspace applications along with
+  physical memory constraints for device memory buffers.
 
   \paragraph{Linux memory interface} To obtain a buffer smaller than a page
-  is used \emph{kmalloc} and \emph{kzalloc} returning a zeroed space. It's
+  is used \emph{kmalloc} and \emph{kzalloc} returning a zeroed space. They are
   calls of slab allocator (see \cite{gorman}, chapter~8). Freeing is provided
   by \emph{kfree}.
   
@@ -417,7 +421,7 @@
   \emph{vmalloc} is for in-kernel virtual contiguous memory allocations.
   Another wrappers like \emph{vmalloc\_32}, \emph{vmalloc\_user} and
   \emph{vmalloc\_32\_user} exist for allocating buffers addressable by 32-bit
-  addresses and for those intended to use in userspace as of 2.6.18 --
+  addresses and for those intended to be used in userspace as of 2.6.18 --
   underlying pages are marked as user and zeroed not to leak any information.
   \emph{vfree} frees all these allocations.
 
@@ -427,10 +431,10 @@
   and obviously \emph{kmalloc} for driver state structures.
 
   \subsection{Memory map}
-  As we are able to set (and unset) present bit in an entry of each table
-  MMU traverses and an exception is thrown when the bit is not set when the
-  particular table entry is accessed, we can hook a page fault handler to this
-  path which will install missing pages.
+  As we are able to set (and unset) page present bit in structures
+  MMU traverses and an exception is thrown when the bit is not set while any
+  of the structures is accessed, we can hook a page fault handler to this
+  path which would install missing pages.
 
   This can be used for \emph{memory mapping} (MMAP). We register a page fault
   function by OS interface and when user application maps some space and
@@ -763,24 +767,40 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   all these steps in this chapter.
 
   \subsection{Requirements}
-  All requirements were summarized and acknowledged by software group with
-  hardware platform people based on the hardware specification (section
-  \ref{chap.netcope}).
+%  The most important requirement is speed as we want to achieve as highest
+%  performance as possible. We adopted ring buffer hardware design principle
+%  with help of DMA in chapter~\ref{chap.netcope}), so that we are able to pass
+%  data from card to memory in fast manner. Our task is to pass this data
+%  further to application. We described memory map in chapter~\ref{chap.mm}
+%  (XXX isn't this chardev?) and found it suitable for getting data to
+%  userspace over character device.
 
-  XXX Huh, here we need to consider all the pros and cons of all possible
-  variants.
+  We decided to use some methods yet in previous chapters, here we
+  summarize them and add some other requirements we must
+  ensure our implementation will satisfy:
+  \begin{itemize}
+    \item multiple ring buffer support (per interface and direction)
+    \item correct ring buffers operations (transmit head must not exceed tail)
+    \item ring buffers and their descriptors setup in hardware
+    \item hardware setup (another initialization, start, stop)
+    \item export/remap data through memory map
+    \item some controlling mechanism to communicate with application
+    \item multiple applications support, multiple access to the data
+    \item speed
+    \item as highest as possible code correctness (successful testing)
+    \item documentation (the more well commented code the better)
+    \item abstraction (userspace library would be good)
+  \end{itemize}
 
-  \subsection{Data path}
-  card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
-  mmap)
-
-  \paragraph{Modified libpcap}
-  ref Konik's work
-
+%  \subsection{Data path}
+%  card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
+%  mmap)
+%
+%  \paragraph{Modified libpcap}
+%  ref Konik's work
+%
   \subsection{Models and design}
   \label{chap.spec}
-  To not start 
-
   We use for modelling \emph{unified modeling language} (UML). Several UML
   tools are
   available for Linux, we chose one named Bouml. It can do most of UML
@@ -791,10 +811,10 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   See Appendix \ref{app.models}.
 
   \subsubsection{Use case diagram}
-  We'll start with use case diagram, because it's usually a starting point for
-  other diagrams. We create a module szedata2 in which we put use cases for
-  each task we will have and OS, hardware and application roles outside the
-  module.
+  Starting points in UML are use cases enclosed in modules. We create a module
+  szedata2 in which we put use cases for each task we will have and OS,
+  hardware and application actors (actor is a role outside the module, which
+  can asynchronously emits commands or demands).
 
   The only OS's task is to insert and remove the module to/from system, we
   only set up this use cases which allocate or free resources needed for
