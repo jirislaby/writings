@@ -171,7 +171,7 @@
 
   \begin{figure}[htb]
     \begin{center}
-      \includegraphics[width=9cm]{images/data_flow}
+      \includegraphics[width=11cm]{images/data_flow}
       \caption{Devices interconnection}
       \label{fig.dev_inter}
     \end{center}
@@ -535,11 +535,13 @@
 
   For instance following example shows a node creation in \emph{/dev/combosix/}
   for \com\ device matched by IDs read from PCI configuration space which were
-  sent by kernel in uevent. %Node name is a number sent by the driver.
+  sent by kernel in uevent. \vspace{0.5em}
+%Node name is a number sent by the driver.
 \begin{verbatim}
 KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     ATTRS{idProduct}=="c058", NAME="combosix/%n"
 \end{verbatim}
+\vspace{0.5em}
   
   As device node names are random so far -- it depends only on kernel PCI cards
   enumeration (which may vary) -- and we want numbers in names to
@@ -751,9 +753,11 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   This thesis also aims to be a clue for other Liberouter developers, how may
   modern techniques be used in development process. We'll use some of agile
   techniques evolved in the mid-1990s and established in \emph{Agile
-  Manifesto}\cite{agile}, some basic UML modeling methods declared as standard
-  in UML 1.x versions and reference design patterns that should be used for
-  some particular code parts too.
+  Manifesto}\footnote{It is a statement from 2001 establishing principles of
+  agile programming. Freely available at \url{http://agilemanifesto.org/}.},
+  some basic \emph{unified modeling language} (UML) methods declared as
+  standard in UML 1.x versions and reference design patterns that should be
+  used for some particular code parts too.
 
   If we abstract to simple waterfall model (see \cite{codecomplete}), code
   development usually starts
@@ -780,6 +784,22 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     \item last but not the least: clean code (satisfying kernel coding style)
   \end{itemize}
 
+  The only thing worth to discuss is how and when we should allocate space
+  for a ring buffer. Since the impact to the system might be significant due
+  to large amount of memory requirements, we must consider following two
+  variants. Either we can allocate the space right after the driver loads or
+  alternatively even after first application opens the corresponding character
+  device node.
+
+  The former variant assures fast application startup, but we might risk that
+  we'll never use the allocated memory just because no user opens the node.
+  Since the driver is about to be used in environments where the application
+  is expected to be executed if the driver was loaded yet, we proceed with
+  this choice by default. Otherwise we would stall on every application start
+  end exit potentially exposed to start-up failures due to momental memory
+  exhaustion. In spite of all the threats, somebody might want the latter
+  behaviour, so we'll let user to choose by adding an option for this.
+
 %  \subsection{Data path}
 %  card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
 %  mmap)
@@ -789,42 +809,45 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %
   \subsection{Models and design}
   \label{chap.spec}
-  We use for modelling \emph{unified modeling language} (UML). Several UML
-  tools are
-  available for Linux, we chose one named Bouml. It can do most of UML
-  defined diagrams, however we'll use only use case and sequence diagrams.
-
-  XXX citation needed, some UML resources.
-
-  See Appendix \ref{app.models}.
+  As we mentioned earlier, we use UML for modelling. Many UML tools are
+  available for Linux, we chose one named \emph{Bouml}\footnote{
+  Bouml is a free (under the terms of GPL) multiplatform project with support
+  of UML including version 2. See its homepages at \url{http://bouml.free.fr/}
+  for more info.}. It can do most of UML
+  defined diagrams, however we'll use only \emph{use case} and
+  \emph{sequence} diagrams. Complete diagrams and their documentation are in
+  Appendix~\ref{app.models}, this chapter introduces the way how we got
+  those diagrams as a result.
 
   \subsubsection{Use case diagram}
-  Starting points in UML are use cases enclosed in modules. We create a module
-  szedata2 in which we put use cases for each task we will have and OS,
-  hardware and application actors (actor is a role outside the module, which
-  can asynchronously emits commands or demands).
+  Starting point is use case diagram. We create only one use case module
+  which will correspond to our driver and so we name it the same -- szedata2.
+  Actors choice is simple, we have an \emph{OS}, \emph{hardware} and an
+  \emph{application}. OS only \emph{inserts} and \emph{removes} the driver to
+  and from the kernel and furthermore
+  since there are no asynchronous actions which hardware can do except
+  optional interrupts, the only use case regarding hardware is
+  \emph{interrupt}.
+  
+  Insert and remove takes care of initialization, the module may allocate and
+  also free ring buffers depending on allocate-on-modprobe option in these two
+  use cases. HW interrupt use case only wakes up applications waiting for
+  this event.
 
-  The only OS's task is to insert and remove the module to/from system, we
-  only set up this use cases which allocate or free resources needed for
-  module to run. HW's only task is to inform the module that the transfer has
-  been completed. This is done by timeout or position reached registers
-  described already in section \ref{chap.netcope}.
-
-  Application will have much more use cases. First, we need to initialize the
-  device after opening the device node, next the application wants to get
-  access to the data and need to control the device somehow and finally
-  cleanup on application's close.
-
+  Application is more complicated actor, it opens (and initializes) the
+  device, process data (and communicate) and finally closes (and stops) it.
   All the operations must be atomic due to concurrent access, this is not
   mentioned neither in the specification nor further, because we take this for
-  granted.
+  granted. Fine grained application use cases description follows.
 
-  \paragraph{Open and initialization} is done in the following steps. If this
-  is the first open, we must allocate space for ring buffers and their
-  descriptors
-  and set the device to initial state including device's ring buffers setup.
-  Next step is to map this memory to userspace. This is done by invokation of
-  mmap by application. Now, application has all the needed information, it
+  \paragraph{Open and initialization} It starts by open syscall invoked by
+  application. If it is first open, we must allocate space for ring buffer
+  descriptors and depending on the option ring buffers themselves. We must set
+  the rest of the device registers in the order described in
+  chapter~\ref{chap.netcope},
+
+  map ring buffer memory to userspace.
+  Now, application has all the needed information, it
   tells the driver which interfaces it wants to use and starts the device.
 
   \paragraph{Data processing} includes locking (asking for) data area either
