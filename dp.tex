@@ -533,21 +533,16 @@
   \emph{modprobe}\footnote{kernel module insertion program} and other
   programs.
 
-  One particular userspace rule may look like the following one which creates
-  a symbolic
-  link \emph{/dev/input/event15} for Microsoft (vendor ID 0x045e) Laser Mouse
-  6000 (device ID 0x00f0).
+  For instance following example shows a node creation in \emph{/dev/combosix/}
+  for \com\ device matched by IDs read from PCI configuration space which were
+  sent by kernel in uevent. %Node name is a number sent by the driver.
 \begin{verbatim}
-KERNEL=="event*", SUBSYSTEM=="input", \
-    ATTRS{idVendor}=="045e",      \
-    ATTRS{idProduct}=="00f0",     \
-    SYMLINK="input/event15" XXX puj, kdo to chce?
-    My tady chcem krasny pravidlo pro combo.
+KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
+    ATTRS{idProduct}=="c058", NAME="combosix/%n"
 \end{verbatim}
-  This is the point, where IDs read from PCI configuration space are sent by
-  kernel in \emph{uevent} and might be matched in rules file by udev.
   
-  As device node names are random so far and we want numbers in names to
+  As device node names are random so far -- it depends only on kernel PCI cards
+  enumeration (which may vary) -- and we want numbers in names to
   correspond with each other, e.g. to have \emph{combosix6} and
   \emph{szedataII6} for one
   concrete card in PCI slot 6, we need to write similar rules to generate
@@ -556,7 +551,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   Two separate files are needed to achieve that, one another with persistent
   rules will be created on the fly. Shell script which augments the persistent
   rules and a rules file for matching the \com\ cards which runs the 
-  script are in detail described in Appendix \ref{app.udev}.
+  script are in detail commented in Appendix \ref{app.udev}.
 
   \subsection{Character device Linux interface}
   First step to support character devices by a driver is to allocate a
@@ -620,7 +615,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 
   \begin{figure}[htb]
     \begin{center}
-      \includegraphics[width=8cm]{images/architecture}
+      \includegraphics[width=7cm]{images/architecture}
       \caption{Overall schema of \ncope\ hardware}
       \label{fig.netcope_hw}
     \end{center}
@@ -665,7 +660,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 
   \begin{figure}[hbt]
     \begin{center}
-      \includegraphics[width=7cm]{images/packet}
+      \includegraphics[width=10cm]{images/packet}
       \caption{szedata variable length packet}
       \label{fig.netcope_pkt}
     \end{center}
@@ -698,10 +693,10 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   pointing to the pages of the interspersed ring buffer. We took in account
   64-bit systems, so that the pointers are represented by 8 bytes each. Since
   we allocate the descriptor memory on a page basis too, it allows us to have
-  only $\frac{4096}{8}=512$ pointers to pages
+  only $\frac{4096}{8}=512$ pointers to ring pages
   which gives $512\cdot4096=2$\,MiB sized ring buffer. This is not enough, so
   we introduced two kinds of descriptor entries. One is still a direct pointer
-  to ring buffer pages, the other one is a pointer to the next descriptor
+  to a ring buffer page, the other one is a pointer to the next descriptor
   table. To distinguish them, we take to advantage of all page addresses being
   zeroed in low 12~bits (see \cite{gorman}, chapter~3) -- descriptor pointers
   are logically or-ed with~1. Such situation is depicted on figure
@@ -754,7 +749,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
 \chapter{szedata2 driver}
   \section{Development cycle}
   This thesis also aims to be a clue for other Liberouter developers, how may
-  be modern techniques used in development process. We'll use some of agile
+  modern techniques be used in development process. We'll use some of agile
   techniques evolved in the mid-1990s and established in \emph{Agile
   Manifesto}\cite{agile}, some basic UML modeling methods declared as standard
   in UML 1.x versions and reference design patterns that should be used for
@@ -767,14 +762,6 @@ KERNEL=="event*", SUBSYSTEM=="input", \
   all these steps in this chapter.
 
   \subsection{Requirements}
-%  The most important requirement is speed as we want to achieve as highest
-%  performance as possible. We adopted ring buffer hardware design principle
-%  with help of DMA in chapter~\ref{chap.netcope}), so that we are able to pass
-%  data from card to memory in fast manner. Our task is to pass this data
-%  further to application. We described memory map in chapter~\ref{chap.mm}
-%  (XXX isn't this chardev?) and found it suitable for getting data to
-%  userspace over character device.
-
   We decided to use some methods yet in previous chapters, here we
   summarize them and add some other requirements we must
   ensure our implementation will satisfy:
@@ -790,6 +777,7 @@ KERNEL=="event*", SUBSYSTEM=="input", \
     \item as highest as possible code correctness (successful testing)
     \item documentation (the more well commented code the better)
     \item abstraction (userspace library would be good)
+    \item last but not the least: clean code (satisfying kernel coding style)
   \end{itemize}
 
 %  \subsection{Data path}
