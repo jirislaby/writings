@@ -842,25 +842,27 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   \paragraph{Open and initialization} We already know operations order from
   chapter~\ref{chap.netcope} that shall be done before using the device. We
-  create 
+  create one use case as a starting point and place following steps in it:
+  \begin{enumerate}
+    \item \emph{open} system call $\rightarrow$ initialize buffers if it was
+      first open (not to break yet started hardware)
+    \item \emph{mmap} system call $\rightarrow$ memory map buffers
+    \item \emph{select/subscribe} command $\rightarrow$ select which
+      interfaces are about to be used
+    \item \emph{start} command $\rightarrow$ initialize and start selected
+      hardware (allow only one start per interface throughout all
+      applications)
+  \end{enumerate}
+  Even though \emph{open} and \emph{mmap} are different calls from the driver
+  view, application sees them as one basic operation, so we leave them in one
+  use case. On the other hand, we want to allow the application to select
+  and start interfaces on the fly, so we must place points 3 and 4 in
+  separate use cases.
  
-  This phase starts by open system call
-  invoked by an application.
+  \paragraph{Data processing} We can split processing further in two
+  categories -- receive (RX) and transmit (TX).
   
-  As it is a basic operation, we create one use
-  case for it. Any initialization not depending on further operation mode
-  (receiving, sending) should be made here.
-  
-  If it is first open, we must allocate space for ring buffer
-  descriptors and depending on the option ring buffers themselves. We must set
-  the rest of the device registers in the order described in
-  chapter~\ref{chap.netcope},
-
-  map ring buffer memory to userspace.
-  Now, application has all the needed information, it
-  tells the driver which interfaces it wants to use and starts the device.
-
-  \paragraph{Data processing} includes locking (asking for) data area either
+  includes locking (asking for) data area either
   to read from or write to, do the processing and unlocking. Overall two
   method of read operation raised:
   \begin{itemize}
@@ -939,6 +941,13 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   systems.
 
   combo6x driver as a base, new szedata2 module
+
+  \subsubsection{XXX impl}
+  As we see, we need some command passing mechanism through character devices.
+  Although \emph{ioctl} system call was uttered as deprecated long time ago,
+  nothing better was introduced so far and it's still widely used even in new
+  project. Hence we'll use it for command passing too. Exact implementation
+  is left for chapter~\ref{chap.code}.
 
   \subsubsection{libsze2}
   Even though there is no library for szedata v. 1, we consider to have one for
