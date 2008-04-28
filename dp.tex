@@ -861,21 +861,38 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
  
   \paragraph{Data processing} We can split processing further in two
   categories -- receive (RX) and transmit (TX).
-  
-  includes locking (asking for) data area either
-  to read from or write to, do the processing and unlocking. Overall two
-  method of read operation raised:
+
+  \subparagraph{RX} Since hardware is started and it does RX processing fully
+  standalone, we only need to check buffer tail pointer for changes.
+  This means calling kernel and getting back area with data (or no data if
+  no change). After finished processing on those data, we need to free them
+  up to tell the driver to move the tail. This gives us two separate use cases
+  \emph{get\_data} and \emph{release\_data}, since the processing is done in
+  application.
+
+  Two receive processing methods raised altogether: XXX TODO
   \begin{itemize}
     \item \textbf{load balancing} -- several readers exist and data are divided
       among them. They all get distinct data and do the same operation on
-      them. It's very similar to \emph{single program multiple data} in
-      processors theory.
+      them. It's very similar to \emph{single program multiple
+      data}\footnote{see \url{http://en.wikipedia.org/wiki/SPMD} for
+      reference} in processors theory.
     \item \textbf{multiprocessing} -- all readers want all data to do
       different tasks with them. We can approach this to \emph{multiple
       program single data}.
   \end{itemize}
   We implement only the latter so far, but it's possible that we augment the
   implementation to the former too, see \ref{chap.future}.
+
+  \subparagraph{TX} Outbound direction is similar in locking -- application
+  asks for area to write to (get current transmit head), writes data and
+  issues command to move the head. Different is how application may access the
+  buffer. TODO
+
+  \vspace{1cm}
+  \textbf{-- The following contents is unreviewed and will be probably
+  massively changed --}
+  \vspace{1cm}
 
   For outgoing direction, there is only one possibility which hardware permits.
   Only one writer at a time is allowed, we take this in account even
