@@ -749,7 +749,6 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  combosix* and szedata*, where * stands for any so far random number.
 
 \chapter{szedata2 driver}
-  \section{Development cycle}
   This thesis also aims to be a clue for other Liberouter developers, how may
   modern techniques be used in development process. We'll use some of agile
   techniques evolved in the mid-1990s and established in \emph{Agile
@@ -765,7 +764,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   a base for a programmer. Verification and maintenance follows. We go through
   all these steps in this chapter.
 
-  \subsection{Requirements}
+  \section{Requirements}
   We decided to use some methods yet in previous chapters, here we
   summarize them and add some other requirements we must
   ensure our implementation will satisfy:
@@ -807,7 +806,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  \paragraph{Modified libpcap}
 %  ref Konik's work
 %
-  \subsection{Models and design}
+  \section{Models and design}
   \label{chap.spec}
   As we mentioned earlier, we use UML for modelling. Many UML tools are
   available for Linux, we chose one named \emph{Bouml}\footnote{
@@ -819,7 +818,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   Appendix~\ref{app.models}, this chapter introduces the way how we got
   those diagrams as a result.
 
-  \subsubsection{Use case diagram}
+  \subsection{Use case diagram}
   Starting point is use case diagram. We create only one use case module
   which will correspond to our driver and so we name it the same -- szedata2.
   Actors choice is simple, we have an \emph{OS}, \emph{hardware} and an
@@ -840,7 +839,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   mentioned neither in the specification nor further, because we take this for
   granted. Fine grained application use cases description follows.
 
-  \paragraph{Open and initialization} We already know operations order from
+  \subsubsection{Open and initialization} We already know operations order from
   chapter~\ref{chap.netcope} that shall be done before using the device. We
   create one use case as a starting point and place following steps in it:
   \begin{enumerate}
@@ -860,11 +859,11 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   points 3 and 4 in separate use cases which gives three initialization use
   cases in the end.
  
-  \paragraph{Data processing} Design supports full-duplex communication, so
+  \subsubsection{Data processing} Design supports full-duplex communication, so
   we split processing further in two categories -- receive (RX) and
   transmit (TX) and describe them separately.
 
-  \subparagraph{RX} Since hardware is started and it does RX processing fully
+  \paragraph{RX} Since hardware is started and it does RX processing fully
   standalone, we only check buffer tail pointer for changes in loop.
   This means calling kernel and getting back area with data (or no data if
   no change). After finished processing on those data, we free them
@@ -888,7 +887,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   implementation to the former too, see future work in
   chapter~\ref{chap.future}.
 
-  \subparagraph{TX} Outbound direction is similar in data processing --
+  \paragraph{TX} Outbound direction is similar in data processing --
   application asks for area to write to (gets current transmit head), writes
   data and issues command to move the head. It corresponds to the two created
   use cases \emph{request\_space} and \emph{put\_data}. It differs in access
@@ -898,25 +897,32 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   multiple writers too, however it has not been finished yet.}. We cope with
   this by setting up proper prerequisites in the use case descriptions.
 
-  \paragraph{Close and deinitialization} After open reference count drops to
-  zero we do steps from initialization in reverse order. \emph{close\_node}
+  \subsubsection{Close and deinitialization} After open reference count drops
+  to zero we do steps from initialization in reverse order. \emph{close\_node}
   use case consist of \emph{hardware stop} command, \emph{unmap} and
   allocated memory cleanup. We might alternatively consider placing
   \emph{hardware stop} command in separate use case to allow stopping out of
   line, anyway we must turn off the hardware on last close if the use case
   wasn't invoked before.
 
-  \subsubsection{Sequence diagram}
+  \subsection{Sequence diagrams}
   We model sequence diagrams to show up how events happen during time. The
   topmost event is done first and then all events below it towards the bottom
   one. We create two depicting again RX and TX, they will slightly differ in
   how application locks and unlocks data.
 
   \paragraph{RX sequence diagram} We specify better application code flow
-  here. We establish three LINES XXX, \textbf{application}, \textbf{module}
-  and \textbf{hardware}. When we start by \emph{open} from
-  \textbf{application} to \textbf{module}, we are in module, allocation is
-  done and pointers potentially set to \textbf{hardware}.
+  here. We establish three lifelines, \textbf{application}, \textbf{module}
+  and \textbf{hardware} which obviously match use case actors.
+  
+  The work starts by \emph{open} message from \textbf{application} to
+  \textbf{module}. The diagram copies actions described in use case
+  initialization section above, so it nonsense to repeat the steps again. We
+  just augment the use case specification further by splitting single use case
+  steps into multiple messages here. For instance \emph{mmap} from use case is
+  here as two messages: \emph{mmap status page} and \emph{mmap RX space}.
+  That's because we try to be as much exact as possible to directly turn these
+  information into the real code in the next chapter.
   
 %  starts when open is called by an
 %  application. We need to allocate descriptors for ring buffer, the ring
@@ -941,22 +947,21 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  that any control message won't be sent in such case, so we must check in
 %  close if the device is stopped already or not.
 
-  \paragraph{TX sequence diagram} a
-%  differs only in processing between lock and
-%  unlock phase.
-%  It gets locked area of some bytes, which it must fill, not process and there
-%  might be only one application which might have locked area at a time.
+  \paragraph{TX sequence diagram} We reflect difference of RX and TX showed
+  before in use case modeling here by not conditioning head move on
+  \emph{put\_data} message and we also change all RX occurrences to TX and
+  invoke proper messages, indeed. There is no other difference to consider
+  from model view.
 
-  \subsection{Code development}
+  \section{Code development}
   \label{chap.code}
 
+  At this point we have a complete specification to start to implement.
+
   \vspace{1cm}
-  \textbf{-- The following contents is unreviewed and will be probably
+  \textbf{-- The following contents is unrevised and will be probably
   massively changed --}
   \vspace{1cm}
-
-  We finally can start with the implementation of the specification showed
-  above.
   
 %  \subsubsection{Code templates}
 %  + design patterns if any applies
