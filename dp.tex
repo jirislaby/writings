@@ -845,7 +845,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   create one use case as a starting point and place following steps in it:
   \begin{enumerate}
     \item \emph{open} system call $\rightarrow$ initialize buffers if it was
-      first open (not to break yet started hardware)
+      first open (not to break yet started hardware) XXX refcounter
     \item \emph{mmap} system call $\rightarrow$ memory map buffers
     \item \emph{select/subscribe} command $\rightarrow$ select which
       interfaces are about to be used
@@ -855,22 +855,25 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \end{enumerate}
   Even though \emph{open} and \emph{mmap} are different calls from the driver
   view, application sees them as one basic operation, so we leave them in one
-  use case. On the other hand, we want to allow the application to select
-  and start interfaces on the fly, so we must place points 3 and 4 in
-  separate use cases.
+  use case. On the other hand, we find out, that we want to allow the
+  application to select and start interfaces on the fly, so we must place
+  points 3 and 4 in separate use cases which gives three initialization use
+  cases in the end.
  
-  \paragraph{Data processing} We can split processing further in two
-  categories -- receive (RX) and transmit (TX).
+  \paragraph{Data processing} Design supports full-duplex communication, so
+  we split processing further in two categories -- receive (RX) and
+  transmit (TX) and describe them separately.
 
   \subparagraph{RX} Since hardware is started and it does RX processing fully
-  standalone, we only need to check buffer tail pointer for changes.
+  standalone, we only check buffer tail pointer for changes in loop.
   This means calling kernel and getting back area with data (or no data if
-  no change). After finished processing on those data, we need to free them
+  no change). After finished processing on those data, we free them
   up to tell the driver to move the tail. This gives us two separate use cases
   \emph{get\_data} and \emph{release\_data}, since the processing is done in
   application.
 
-  Two receive processing methods raised altogether: XXX TODO
+  After we gained access to the data, two receive processing methods raised
+  altogether:
   \begin{itemize}
     \item \textbf{load balancing} -- several readers exist and data are divided
       among them. They all get distinct data and do the same operation on
@@ -882,65 +885,76 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
       program single data}.
   \end{itemize}
   We implement only the latter so far, but it's possible that we augment the
-  implementation to the former too, see \ref{chap.future}.
+  implementation to the former too, see future work in
+  chapter~\ref{chap.future}.
 
-  \subparagraph{TX} Outbound direction is similar in locking -- application
-  asks for area to write to (get current transmit head), writes data and
-  issues command to move the head. Different is how application may access the
-  buffer. TODO
+  \subparagraph{TX} Outbound direction is similar in data processing --
+  application asks for area to write to (gets current transmit head), writes
+  data and issues command to move the head. It corresponds to the two created
+  use cases \emph{request\_space} and \emph{put\_data}. It differs in access
+  to the buffer, because all applications shares one TX
+  ring buffer and hence only one may access it at a time not to create holes
+  of unused space\footnote{There is a plan to extend this behaviour to allow
+  multiple writers too, however it has not been finished yet.}. We cope with
+  this by setting up proper prerequisites in the use case descriptions.
+
+  \paragraph{Close and deinitialization} After open reference count drops to
+  zero we do steps from initialization in reverse order. \emph{close\_node}
+  use case consist of \emph{hardware stop} command, \emph{unmap} and
+  allocated memory cleanup. We might alternatively consider placing
+  \emph{hardware stop} command in separate use case to allow stopping out of
+  line, anyway we must turn off the hardware on last close if the use case
+  wasn't invoked before.
+
+  \subsubsection{Sequence diagram}
+  We model sequence diagrams to show up how events happen during time. The
+  topmost event is done first and then all events below it towards the bottom
+  one. We create two depicting again RX and TX, they will slightly differ in
+  how application locks and unlocks data.
+
+  \paragraph{RX sequence diagram} We specify better application code flow
+  here. We establish three LINES XXX, \textbf{application}, \textbf{module}
+  and \textbf{hardware}. When we start by \emph{open} from
+  \textbf{application} to \textbf{module}, we are in module, allocation is
+  done and pointers potentially set to \textbf{hardware}.
+  
+%  starts when open is called by an
+%  application. We need to allocate descriptors for ring buffer, the ring
+%  buffer itself if we didn't do it on module insertion (this is the first
+%  optional part in the diagram). Next we \emph{mmap} a page with status
+%  information
+%  and space with ring buffers, choose which interfaces the application wants
+%  to read from and emits start control message which results in start and end
+%  pointer registers setup if it wasn't already done by some previous and still
+%  running application and passing start value to control register.
+%
+%  A loop follows in which the application periodically calls lock, processes
+%  data if any available and unlocks the area. After it finishes its work
+%  (interrupts the loop), it calls stop which in return stops the device if it
+%  was the last user, invokes \emph{unmap} on all earlier mapped
+%  resources and closes the device node. If we allocate the ring buffer in the
+%  open, we will free it now and return back to the userspace, where the caller
+%  might exit. When the application ends unexpectedly (e.g. crashes), we must
+%  do the cleanup work too. The convenience of the OS is that it will unmap
+%  all spaces
+%  call the close itself, so that we see this the same. The only exception is
+%  that any control message won't be sent in such case, so we must check in
+%  close if the device is stopped already or not.
+
+  \paragraph{TX sequence diagram} a
+%  differs only in processing between lock and
+%  unlock phase.
+%  It gets locked area of some bytes, which it must fill, not process and there
+%  might be only one application which might have locked area at a time.
+
+  \subsection{Code development}
+  \label{chap.code}
 
   \vspace{1cm}
   \textbf{-- The following contents is unreviewed and will be probably
   massively changed --}
   \vspace{1cm}
 
-  For outgoing direction, there is only one possibility which hardware permits.
-  Only one writer at a time is allowed, we take this in account even
-  while designing the implementation. There is a plan to extend this behaviour
-  to allow multiple writers too, it has not been finished.
-
-  \paragraph{Close and deinitialization} is done only after all application
-  have been already closed. After such last close we first stop the device
-  and then free all the allocated resources and mappings.
-
-  \subsubsection{Sequence diagram}
-  These are usually used for depicting how events happen during some time
-  period. The topmost event is done first and then all events below it
-  towards the bottom one. XXX seqd citation needed XXX
-
-  We create 2 sequence diagrams. One for receiving and one for sending data.
-  They are slightly different in how application locks and unlocks data.
-
-  \paragraph{RX sequence diagram} starts when open is called by an
-  application. We need to allocate descriptors for ring buffer, the ring
-  buffer itself if we didn't do it on module insertion (this is the first
-  optional part in the diagram). Next we \emph{mmap} a page with status
-  information
-  and space with ring buffers, choose which interfaces the application wants
-  to read from and emits start control message which results in start and end
-  pointer registers setup if it wasn't already done by some previous and still
-  running application and passing start value to control register.
-
-  A loop follows in which the application periodically calls lock, processes
-  data if any available and unlocks the area. After it finishes its work
-  (interrupts the loop), it calls stop which in return stops the device if it
-  was the last user, invokes \emph{unmap} on all earlier mapped
-  resources and closes the device node. If we allocate the ring buffer in the
-  open, we will free it now and return back to the userspace, where the caller
-  might exit. When the application ends unexpectedly (e.g. crashes), we must
-  do the cleanup work too. The convenience of the OS is that it will unmap
-  all spaces
-  call the close itself, so that we see this the same. The only exception is
-  that any control message won't be sent in such case, so we must check in
-  close if the device is stopped already or not.
-
-  \paragraph{TX sequence diagram} differs only in processing between lock and
-  unlock phase.
-  It gets locked area of some bytes, which it must fill, not process and there
-  might be only one application which might have locked area at a time.
-
-  \subsection{Code development}
-  \label{chap.code}
   We finally can start with the implementation of the specification showed
   above.
   
