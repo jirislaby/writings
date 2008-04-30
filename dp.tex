@@ -803,9 +803,6 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
 %  mmap)
 %
-%  \paragraph{Modified libpcap}
-%  ref Konik's work
-%
   \section{Models and design}
   \label{chap.spec}
   As we mentioned earlier, we use UML for modelling. Many UML tools are
@@ -844,7 +841,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   create one use case as a starting point and place following steps in it:
   \begin{enumerate}
     \item \emph{open} system call $\rightarrow$ initialize buffers if it was
-      first open (not to break yet started hardware) XXX refcounter
+      first open (not to break yet started hardware), we use reference counter
+      to assure only one start of the device
     \item \emph{mmap} system call $\rightarrow$ memory map buffers
     \item \emph{select/subscribe} command $\rightarrow$ select which
       interfaces are about to be used
@@ -924,6 +922,120 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   That's because we try to be as much exact as possible to directly turn these
   information into the real code in the next chapter.
   
+  \paragraph{TX sequence diagram} We reflect difference of RX and TX showed
+  before in use case modeling here by not conditioning head move on
+  \emph{put\_data} message and we also change all RX occurrences to TX and
+  invoke proper messages, indeed. There is no other difference to consider
+  from model view.
+
+  \section{Code development}
+  \label{chap.code}
+  Now we have a complete specification to start implementing.
+
+%  \subsubsection{Code templates}
+%  + design patterns if any applies
+
+  \subsection{Combo6 code base}
+  We have evolved base common to all Liberouter projects not to reinvent the
+  wheel for each design. These base drivers are responsible for whole card
+  initialization, an interrupt hook setup, loading firmware/design,
+  controlling combosix device node which allows access to all spaces of the
+  card and few other tasks. Since we have two types of \com\ cards, two
+  card-specific drivers exist: \emph{combo6} and \emph{combo6x}; they
+  are used by the \emph{combo6core} module which consist of common parts of
+  both. Since this module provides encapsulation, design drivers needn't care
+  about which particular card driver is driving the device, it uses
+  \emph{combo6core} interface to call the proper one, so
+  that the access is fully transparent.
+
+  One more convenience is exported info in \emph{sysfs}\footnote{sysfs on
+  wikipedia: \url{http://en.wikipedia.org/wiki/Sysfs}} and
+  \emph{procfs}\footnote{procfs on wikipedia:
+  \url{http://en.wikipedia.org/wiki/Procfs}} filesystems done by the central
+  driver. This info may be further used by application to recognize module
+  version or tune some values and parameters.
+
+  Design driver should define \emph{combo6\_device\_ops} structure with name,
+  card type, IDs which it supports and hooks for attach, detach and interrupt
+  and pass it to \emph{combo6\_device\_register} to register it by the core
+  module. Deregistration is then done by \emph{combo6\_device\_unregister}
+  call. Our structure looks like this code:
+\begin{lstlisting}[language=C,label=lst.c6dops,name=lst.c6dops]
+static struct combo6_device_ops szedata2x_ops = {
+	.owner = THIS_MODULE,
+	.name = "szedata2", /* name of this driver */
+	.dhw = DHW_COMBO6X, /* combo6x card only */ (*@\label{lstl.c6dops_4}@*)
+	.exclusive = 1, /* only one attached driver */
+	.intfs = 2, /* limit interfaces */
+	.id_lsw	= 0x41c10300, /* from id */
+	.id_hsw = 0x41c103ff, /* to id */
+	.id_text = "NIC_NetCOPE", /* design name */
+	.attach	= szedata2_hw_attach,
+	.detach	= szedata2_hw_detach,
+	.interrupt = szedata2_hw_interrupt,
+};
+\end{lstlisting}
+  We need to explain some entry values here:
+  \begin{itemize}
+    \item \emph{owner} is set not to allow in-use modules removal, core driver
+      adds 1 to reference count of the module and kernel disallows the module
+      removal
+    \item \emph{intfs} are limited to 2 of total 4, since the testing design
+      supports only 2 interfaces so far, whereas the hardware reports 4
+      present
+    \item \emph{id\_*} entries are taken directly from the szedata2 design
+  \end{itemize}
+  We can see, that the structure also contains designator of combo6x card on
+  the line~\ref{lstl.c6dops_4}.
+  We must set that entry and that means creating two such structures to
+  support both \com\ and \comx\ cards.
+
+  \subsection{Implementation}
+  We used term command in the specification many times, but we haven't
+  explained command passing mechanism. Although \emph{ioctl} system call was
+  uttered as deprecated long time ago, nothing better was introduced so far
+  and it's still widely used even in new projects. Hence we'll use it for
+  commands passing too.
+
+  We split the implementation into two separate files. One is for
+  non-hardware dependent part (\emph{szedata2.c} and \emph{szedata2.h}) and
+  one with the rest depending on the hardware (\emph{hw.c} and \emph{hw.h}).
+  The former will consist of ring buffer computations, initialization and DMA
+  allocations and also character device node operations (incl. \emph{ioctls}
+  and \emph{mmap}). The latter will contain the structure from previous
+  section and registration to the \emph{combo6} base and all ring buffer
+  operations done on the hardware (get and set head/tail pointers, ring size
+  and descriptors setting, etc.) and last but not the least invocation of DMA
+  allocation routines from the former file.
+  
+  We can conveniently use this split
+  for testing and early development, because we hadn't working design while
+  writing the driver. We'll create dummy \emph{hw.c} with few timers and fake
+  ring operations and develop szedata2 part as specified and test it by
+  that dummy module. We'll get properly working and tested driver by evoking
+  corner cases by this technique. More of this is in the testing
+  chapter~\ref{chap.testing}.
+
+  \subsubsection{Structures}
+  As a first thing let's settle data structures passed through the system.
+  Many of them raised through the modeling and module specification, we
+  summarize them here.
+
+  \paragraph{Application-driver interface}
+  To be 32-bit friendly
+
+  \begin{figure}[htb]
+    \begin{center}
+      \includegraphics[width=12cm]{images/status_page}
+      \caption{\emph{mmap} status page structure}
+      \label{fig.status_page}
+    \end{center}
+  \end{figure}
+
+  \vspace{1cm}
+  \textbf{-- The following contents is unrevised and will be probably
+  massively changed --}
+  \vspace{1cm}
 %  starts when open is called by an
 %  application. We need to allocate descriptors for ring buffer, the ring
 %  buffer itself if we didn't do it on module insertion (this is the first
@@ -947,43 +1059,17 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  that any control message won't be sent in such case, so we must check in
 %  close if the device is stopped already or not.
 
-  \paragraph{TX sequence diagram} We reflect difference of RX and TX showed
-  before in use case modeling here by not conditioning head move on
-  \emph{put\_data} message and we also change all RX occurrences to TX and
-  invoke proper messages, indeed. There is no other difference to consider
-  from model view.
+  \label{chap.hwsetup}
 
-  \section{Code development}
-  \label{chap.code}
+  \subsubsection{Back-porting to older kernels}
+  \label{chap.backport}
+  Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
+  remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
+  vs. 2.6.16).
 
-  At this point we have a complete specification to start to implement.
-
-  \vspace{1cm}
-  \textbf{-- The following contents is unrevised and will be probably
-  massively changed --}
-  \vspace{1cm}
-  
-%  \subsubsection{Code templates}
-%  + design patterns if any applies
-
-  \subsubsection{Combo6 code base}
-  We touched this area slightly in section \ref{chap.devnodes} already, but
-  make these things clear. All Liberouter modules are based on combo6core and
-  one of combo6 and combo6x modules. It's transparent to them which one of
-  them is in use, because the core encapsulates the behaviour -- there is
-  defined API in the core sources which might be used. They initialize the
-  base card, remap all needed spaces common to all base and additional cards
-  and export any useful info in proc and sysfs XXX citation needed XXX file
-  systems.
-
-  combo6x driver as a base, new szedata2 module
-
-  \subsubsection{XXX impl}
-  As we see, we need some command passing mechanism through character devices.
-  Although \emph{ioctl} system call was uttered as deprecated long time ago,
-  nothing better was introduced so far and it's still widely used even in new
-  project. Hence we'll use it for command passing too. Exact implementation
-  is left for chapter~\ref{chap.code}.
+  \subsection{Final code}
+  Nice, working, debugged kernel module as a result. Documentation.
+  License (\cite{gplv2}).
 
   \subsubsection{libsze2}
   Even though there is no library for szedata v. 1, we consider to have one for
@@ -998,23 +1084,11 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   aims from previous paragraph. Above all, if we create a shared library,
   we'll get easy to update part (module) of each application.
 
-  \subsubsection{Mmap space structure}
-  \label{chap.mmap}
-  locked : desc : rx ring : tx ring
-
-  \label{chap.hwsetup}
-
-  \subsubsection{Back-porting to older kernels}
-  \label{chap.backport}
-  Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
-  remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
-  vs. 2.6.16).
-
-  \subsubsection{Final code}
-  Nice, working, debugged kernel module as a result. Documentation.
-  License (\cite{gplv2}).
-
+%  \paragraph{Modified libpcap}
+%  ref Konik's work
+%
   \section{Verification}
+  \label{chap.testing}
   Testing (TDD) and tools (sparse).
 
   \section{Maintenance}
