@@ -975,7 +975,7 @@ static struct combo6_device_ops szedata2x_ops = {
 	.interrupt = szedata2_hw_interrupt,
 };
 \end{lstlisting}
-  We need to explain some entry values here:
+  Some entry values need to be explained:
   \begin{itemize}
     \item \emph{owner} is set not to allow in-use modules removal, core driver
       adds 1 to reference count of the module and kernel disallows the module
@@ -1017,12 +1017,20 @@ static struct combo6_device_ops szedata2x_ops = {
   chapter~\ref{chap.testing}.
 
   \subsubsection{Structures}
-  As a first thing let's settle data structures passed through the system.
-  Many of them raised through the modeling and module specification, we
-  summarize them here.
+  As a first thing let's settle down data structures passed through the
+  system. Many of them raised through the modeling and module specification,
+  we summarize them here.
+
+  Since 64-bit operations are expensive and non-atomic on 32-bit machines,
+  we try to minimize 64-bit computations as much as possible. In fact we need
+  only an mmap offset to be 64-bit to allow spaces be bigger in sum than
+  4\,GiB on 64-bit or 32-bit PAE enabled machines. See following structure
+  descriptions and notes about 64-bit needs.
 
   \paragraph{Application-driver interface}
-  To be 32-bit friendly
+  We decided to pass all read-only information in status page which is
+  allocated per application on its first open. It's depicted on the top left
+  on the figure~\ref{fig.status_page}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -1032,12 +1040,65 @@ static struct combo6_device_ops szedata2x_ops = {
     \end{center}
   \end{figure}
 
+  First, from the specification, status page shall contain information about
+  spaces
+  to be mmaped. According to the manual page of mmap and Linux kernel
+  requirements, only two parameters must be known -- offset and size. As
+  mentioned earlier, offset is 64-bit value and so the size is. Eleven
+  (indexed by 0 through 10) such values might be stored in the page, however
+  we use only
+  two\footnote{Note that it's not space wasting, page size is usually 4\,KiB
+  and it's enough space to reserve some entries for future purposes.}, one for
+  RX space, one for TX. These offsets point to so-called \emph{spaces}
+  (on the right side) which might consist (only ring buffer spaces) of
+  \emph{areas}. \emph{Area} is directly the ring buffer corresponding to one
+  particular hardware interface in the \com\ hardware case, however we do not
+  call it interface ring buffer, because area-interface one-to-one mapping
+  needn't hold if we recall,
+  that the part which assures the mapping is hardware independent and might be
+  used for any hardware.
+
+  The application then remaps all desired spaces indexed by \emph{SZE2\_MMIO}
+  constants and may poll for their status in \emph{area descriptors} (another
+  status page entries). It's a structure with 64-bit offset and 32-bit size
+  pointing directly to the area and flags which denotes if area/ring buffer
+  wrap occurred and where is the next \emph{area descriptor} for the wrapped
+  data.
+
+  There are also sanity checks (magic numbers), version number and set values
+  for e.g. poll in the status page, it's not so important so we let reader to
+  investigate exact descriptor structure. Status page is named as \emph{struct
+  sze2\_instance\_info} in the source code.
+
+  To not poll every area we use commands to get a number of area which is
+  ready to be read or write to. Four \emph{ioctls} corresponding to use cases
+  exist for this purpose. RX lock and unlock are easy to define. We only ask
+  for areas we want (bitmap in one parameter) and unlock all areas without
+  a parameter.
+  TX direction needs complicated passing of parameters. Beside the area we are
+  interested in, we need to pass a size too. We define \emph{struct
+  sze2\_tx\_lock} containing these two entries, unlock has same contents, only
+  the name is \emph{struct sze2\_tx\_unlock}. All these sizes are sufficient
+  to be 32-bit, since we don't expect somebody to read or write chunks bigger
+  than 4\,GiB.
+
+  The remaining is the area subscription done by \emph{ioctl} too. It contains
+  array of two members (RX and TX) with info about areas to subscribe and poll
+  threshold (minimal ready-to-process size which resumes application). This
+  interface is part of \emph{szedata2.h} header file.
+
+  \paragraph{In-driver interface}
+  We've declared already, that we will split the driver into two parts.
+  Interface between them is straightforward. Interrupt, tail and head pointers
+  passing is needed in one direction, registration and DMA allocation in the
+  other one. This interface is described in \emph{szedata2k.h} file, see it
+  for exact implementation details.
+
   \vspace{1cm}
   \textbf{-- The following contents is unrevised and will be probably
   massively changed --}
   \vspace{1cm}
-%  starts when open is called by an
-%  application. We need to allocate descriptors for ring buffer, the ring
+%  We need to allocate descriptors for ring buffer, the ring
 %  buffer itself if we didn't do it on module insertion (this is the first
 %  optional part in the diagram). Next we \emph{mmap} a page with status
 %  information
