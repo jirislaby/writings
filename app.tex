@@ -131,13 +131,211 @@ unlock_rules_file
   the rules file.
 \chapter{Models}
   \label{app.models}
-  Here comes the models of the design and the description (the one generated
-  from bouml).
-
-  \newpage
   \begin{center}
     \includegraphics[width=12.5cm]{images/usecase}
   \end{center}
+
+  \section{Use Case open\_node}
+  \begin{CompactEnumerate}
+    \item the module's device node is opened
+    \item per application descriptor allocation is done including space for
+      status structure
+    \item if (not allocate\_on\_modprobe and refcount was 0) then call
+      \emph{alloc\_rings}
+    \item node is mmap-ed (offset 0) -- status
+    \item node is mmap-ed with values from previously mapped memory (rx, tx
+      spaces) -- note that all buffers are visible as a virtual contiguos
+      memory. The only difference between TX and RX mmio space is read/write
+      protection
+  \end{CompactEnumerate}
+
+  \section{Use Case subscribe}
+  \subsection{Precondition}
+    Node must be opened yet and close must not to be in progress
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item subscribe\_area ioctl is called with areas bitmap and poll\_thresh;
+      both for each direction
+    \item APP poll\_thresh and areas are set to the status page
+  \end{CompactEnumerate}
+
+  \section{Use Case start}
+  \subsection{Precondition}
+    Node must be opened yet and close must not to be in progress
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item start ioctl is called
+    \item each APP rx\_tail\_ptr and APP rx\_head\_ptr is set to the current
+  corresponding HW rx\_tail\_ptr
+    \item if (refcount was 0) then the device is started -- enabling of interrupts,
+  capture start ...
+  \end{CompactEnumerate}
+
+  \section{Use Case wait\_for\_data}
+
+  \subsection{Precondition}
+  Node must be opened yet and close must not to be in progress
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item poll is invoked
+    \item while:
+    \begin{CompactEnumerate}
+      \item for all requested rx areas: difference(HW rx\_head\_ptr, APP
+        rx\_tail\_ptr) $<$ APP rx\_poll\_thresh and
+      \item for all requested tx areas: (tx\_ring\_size - difference(HW
+        tx\_head\_ptr, HW tx\_tail\_ptr)) $<$ APP tx\_poll\_thresh
+    \end{CompactEnumerate}
+      do: the proccess is slept and interrupt scheduled
+    \item return status to the application
+  \end{CompactEnumerate}
+
+  \subsection{Alternative flow}
+  \begin{CompactItemize}
+    \item signal is catched while sleeping $\rightarrow$ interrupt waiting and
+      return
+  \end{CompactItemize}
+
+  \section{Use Case get\_data}
+  \subsection{Precondition}
+  Node must be opened yet and close must not to be in progress
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item rx\_lock\_data ioctl is invoked with requested areas bitmap
+    \item the requested bitmap is logically ANDed with the subscribed bitmap
+    \item size is computed as difference (APP rx\_tail\_ptr, HW rx\_head\_ptr)
+      for each area until size is zero and this area number is stored
+    \item the size (even 0 is valid) is stored into the status page along with
+      offset obtained from APP rx\_tail\_ptr
+    \item offset + size sum is stored into the right APP rx\_head\_ptr
+    \item stored area is returned
+  \end{CompactEnumerate}
+
+  \subsection{Alternative flow}
+  \begin{CompactItemize}
+    \item size is zero -- invalid area is returned
+  \end{CompactItemize}
+
+  \section{Use Case release\_data}
+
+  \subsection{Precondition}
+  Node must be opened yet and close must not to be in progress
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item rx\_unlock\_data ioctl was invoked
+    \item foreach area do
+    \begin{CompactEnumerate}
+      \item corresponding APP rx\_tail\_ptr is set to the APP rx\_head\_ptr
+        value previously stored in get\_data
+      \item HW rx\_tail\_ptr is updated to the min(APP rx\_tail\_ptrs $>$ HW
+        rx\_tail\_ptr), if there is no such value, then use min(APP
+	rx\_tail\_ptrs) of corresponding area pointers. This is needed to
+	catch pointers actually higher than others, but still belonging to the
+	slowest readers (head usually wraps around and continues from the
+	entry number 0).
+    \end{CompactEnumerate}
+  \end{CompactEnumerate}
+
+  \section{Use Case request\_space}
+
+  \subsection{Precondition}
+  Node must be opened yet and close must not to be in progress.
+  Application must have this area subscribed for tx.
+  TX for requested area is not in progress (only one writer at a time).
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item request\_space ioctl is called with size and area parameters
+    \item size is computed as min(max\_tx\_request\_count, requested size,
+  tx\_ring\_buffer\_size - difference(HW tx\_head\_ptr, HW tx\_tail ptr))
+    \item the size and HW tx\_head\_ptr as offset is stored into APP status\_page
+  \end{CompactEnumerate}
+
+  \section{Use Case put\_data}
+
+  \subsection{Precondition}
+  Node must be opened yet and close must not to be in progress.
+  request\_space was called by this application for area in parameter.
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item put\_data ioctl is invoked with filled size and area where the data was
+  filled to
+    \item min(size computed in request\_space, supplied size) is added to the
+  HW.tx\_head\_ptr
+  \end{CompactEnumerate}
+
+  \section{Use Case close\_node}
+
+  \subsection{Precondition}
+  open\_node was invoked before this call
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item stop ioctl was called
+    \item node is unmap-ed
+    \item module's close function is called
+    \item if (refcount will be 0)
+  a) the device is stopped (it's waited for dma transfers to be
+  aborted/finished)
+  b) if (allocation on modprobe) then null HW ptrs else call dealloc\_rings
+    \item per application descriptor is deallocated
+  \end{CompactEnumerate}
+
+
+  \section{Use Case interrupt}
+
+  \subsection{Precondition}
+  Hardware was started and expected to run (i.e. refcount $>$ 0)
+
+  \subsection{Normal flow}
+  \begin{CompactEnumerate}
+    \item interrupt (timeout or ring buffer pointer reached) is raised -- ring
+  buffer is in state we requested
+    \item wake applications, which are waiting for this info up
+  \end{CompactEnumerate}
+
+  \subsection{Alternative flow}
+  \begin{CompactItemize}
+    \item missed interrupt -- set up timer (watchdog) to cope with this
+  \end{CompactItemize}
+
+  \section{Use Case insert\_module}
+  \begin{CompactEnumerate}
+    \item modprobe/insmod the module is invoked
+    \item if (allocate on modpobe) then call alloc\_rings
+  \end{CompactEnumerate}
+
+  Note: 'allocate on modpobe' is set to true by default, but might be
+  overriden by module parameter at insertion time
+
+  \section{Use Case remove\_module}
+
+  \begin{CompactEnumerate}
+    \item rmmod the module is called
+    \item if (allocate on modpobe) then call dealloc\_rings
+  \end{CompactEnumerate}
+
+
+  \section{Use Case alloc\_rings}
+
+  \begin{CompactEnumerate}
+    \item alloc\_ring is called
+    \item pages for the ring buffer are allocated, each interface has its own area
+  in the buffer (each interface has its own DMA controller and a ring buffer)
+    \item physical addresses are put to the hardware page pointers list -- the last
+  descriptor points to the first
+  \end{CompactEnumerate}
+
+  \section{Use Case dealloc\_rings}
+
+  \begin{CompactEnumerate}
+    \item all ring buffer (dma) mappings and buffers are unmapped and deallocated
+  \end{CompactEnumerate}
 
   \newpage
   \begin{center}
@@ -149,5 +347,165 @@ unlock_rules_file
     \includegraphics[width=12.5cm]{images/seqd_tx}
   \end{center}
 
-\chapter{Documentation}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Doxygen documentation}
   Probably generated doxygen docs and wiki pages with short user's manual.
+  \section{Class Documentation}
+  \input{doc/structszedata2__packet}
+  \input{doc/structszedata__lock}
+  \section{File Documentation}
+  \input{doc/libsze2_8h}
+
+\section*{struct sze2\_instance\_info}
+\label{API-struct-sze2-instance-info}\hypertarget{API-struct-sze2-instance-info}{}%
+\label{id206501}
+
+\chapter{Kernel-doc documentation}
+
+\section*{struct sze2\_instance\_info}
+\label{API-struct-sze2-instance-info}\hypertarget{API-struct-sze2-instance-info}{}%
+\label{id206501}
+
+\section*{Name}
+struct sze2\_instance\_info --- info mapped at offset 0\label{id206511}
+\subsection*{Synopsis}
+
+\begin{Verbatim}[]
+
+struct sze2_instance_info {
+  __u32 magic;
+  __u32 reserved1;
+  __u64 offsets[SZE2_MMIO_MAX];
+  __u64 sizes[SZE2_MMIO_MAX];
+  __u32 areas[2];
+  __u64 reserved2[5];
+  struct sze2_adesc adesc[0][2];
+};  
+\end{Verbatim}
+
+\subsection*{Members}
+\label{id206525}
+
+\begin{description}
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{magic}]\null{}
+0xde4dAAII (mAjor=0x02, mInor)
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{reserved1}]\null{}
+for future/testing purposes
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{offsets[SZE2\_MMIO\_MAX]}]\null{}
+offset of each mmap space
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{sizes[SZE2\_MMIO\_MAX]}]\null{}
+size of each mmap space
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{areas[2]}]\null{}
+subscribed areas (rx and tx)
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{reserved2[5]}]\null{}
+reserved for future purposes
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{adesc[0][2]}]\null{}
+desc for each area and direction
+\end{description}
+\noindent % 
+% -------------------------------------------------------------
+% Refentry 
+% ------------------------------------------------------------- 	
+\section*{struct sze2\_subscribe\_area}
+\label{API-struct-sze2-subscribe-area}\hypertarget{API-struct-sze2-subscribe-area}{}%
+\label{id206702}
+
+\section*{Name}
+struct sze2\_subscribe\_area --- SUBSCRIBE\_AREA ioctl parameter\label{id206713}
+\subsection*{Synopsis}
+
+\begin{Verbatim}[]
+
+struct sze2_subscribe_area {
+  __u32 areas[2];
+  __u32 poll_thresh[2];
+};  
+\end{Verbatim}
+
+\subsection*{Members}
+\label{id206725}
+
+\begin{description}
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{areas[2]}]\null{}
+bitmap of areas to be subscribed
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{poll\_thresh[2]}]\null{}
+minimal size which will wake the application from poll sleep
+\end{description}
+\noindent 
+\subsection*{Description}
+\label{id206757}
+
+if areas are set to \textasciitilde{}0U, it means {``}all available{''}, corrected value is in mmap space after the ioctl
+% 
+% -------------------------------------------------------------
+% Refentry 
+% ------------------------------------------------------------- 	
+\section*{struct sze2\_tx\_lock}
+\label{API-struct-sze2-tx-lock}\hypertarget{API-struct-sze2-tx-lock}{}%
+\label{id206809}
+
+\section*{Name}
+struct sze2\_tx\_lock --- TXLOCKDATA ioctl parameter\label{id206819}
+\subsection*{Synopsis}
+
+\begin{Verbatim}[]
+
+struct sze2_tx_lock {
+  __u32 size;
+  __u8 area;
+};  
+\end{Verbatim}
+
+\subsection*{Members}
+\label{id244787}
+
+\begin{description}
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{size}]\null{}
+how many bytes should be reserved
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{area}]\null{}
+which area to involve
+\end{description}
+\noindent % 
+% -------------------------------------------------------------
+% Refentry 
+% ------------------------------------------------------------- 	
+\section*{struct sze2\_tx\_unlock}
+\label{API-struct-sze2-tx-unlock}\hypertarget{API-struct-sze2-tx-unlock}{}%
+\label{id244854}
+
+\section*{Name}
+struct sze2\_tx\_unlock --- TXUNLOCKDATA ioctl parameter\label{id244863}
+\subsection*{Synopsis}
+
+\begin{Verbatim}[]
+
+struct sze2_tx_unlock {
+  __u32 size;
+  __u8 area;
+};  
+\end{Verbatim}
+
+\subsection*{Members}
+\label{id244875}
+
+\begin{description}
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{size}]\null{}
+how many bytes were really written
+% \null and \mbox are tricks to induce different typesetting decisions
+\item[{area}]\null{}
+to which area; it must be locked earlier
+\end{description}
