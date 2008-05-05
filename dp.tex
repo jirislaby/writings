@@ -11,7 +11,11 @@
 \usepackage[final]{listings}
 \usepackage{fancyvrb}         
 
-\setcounter{tocdepth}{2}
+\setcounter{tocdepth}{3}
+
+\newcommand{\settocdepth}[1]{%
+  \addtocontents{toc}{\protect\setcounter{tocdepth}{#1}}
+}
 
 % doxygen bloat
 \newenvironment{CompactList}
@@ -54,6 +58,12 @@
 }
 {\end{list}}
 \newcommand{\doxyref}[3]{\textbf{#1} (\textnormal{#2}\,\pageref{#3})}
+\newenvironment{kdocdescription}
+	{\list{}{\labelwidth 0pt \itemindent-\leftmargin
+		\let\makelabel\descriptionlabel}
+		\setlength{\parsep}{0pt}
+		\setlength{\itemsep}{-1.4em}}
+	{\endlist}
 
 \thesislang{en}
 
@@ -1130,7 +1140,8 @@ static struct combo6_device_ops szedata2x_ops = {
 
   The remaining is the area subscription done by \emph{ioctl} too. It contains
   array of two members (RX and TX) with info about areas to subscribe and poll
-  threshold (minimal ready-to-process size which resumes application).
+  threshold (minimal ready-to-process size which resumes application) used for
+  waiting in the driver via \emph{poll} system call.
   Documentation in Appendix~\ref{app.doxygen} deals with this interface.
 
   \paragraph{In-driver interface}
@@ -1143,13 +1154,60 @@ static struct combo6_device_ops szedata2x_ops = {
   \subsubsection{Hardware independent part}
   As we don't have fully working design yet, we start with design
   independent part. First we code module \emph{init} and \emph{exit}
-  functions. We'll create a \emph{class} and reserve character device region
+  functions. We create a \emph{class} and reserve character device region
   (with at most \emph{SZEDATA2\_MAX\_MINORS}\footnote{currently the value is
   8, but it may be altered on compile time, since it's a macro}) as described
   in chapter~\ref{chap.devnodes} and store a number which we got from it to
   use later in \emph{exit} function when unregistering character device.
 
-  We must 
+  We see, that we don't allocate any buffers or any other data, so we must
+  export hooks for events when device comes and leaves, even than we can
+  create and destroy any structures. These operations are let to the hardware
+  specific part, because it knows how many areas are needed and how large ring
+  buffers should be allocated.
+  
+  Registration of incoming device is split into two parts -- allocation
+  (\emph{alloc\_szedata2}) and registration (\emph{szedata2\_register})
+  itself. After calling the former, callbacks shall be set up and eventually
+  DMA allocations must be done now (or alternatively even on the first
+  open). If we didn't the split, we might end up with kernel panic, because
+  concrete character device is set in the register path and some so far zeroed
+  callback invoked. \emph{szedata2\_destroy} is created for cleanup purposes.
+  We must take in account situations when latter register function
+  hasn't been called at all. This is achieved by setting one bit in the
+  register function and test for this bit in the destroy one.
+
+  DMA allocation is done through PCI interface described in
+  chapter~\ref{chap.dma}. Allocation is done per page basis (recall
+  chapter~\ref{chap.netcope}), so if we consider four interfaces, both RX and
+  TX directions and 50\,MiB sized ring buffers, we have
+  $\frac{4\cdot2\cdot50\cdot2^{20}}{4096}\doteq100000$ pages for 4096\,B pages.
+  We need to store physical and virtual address for each page (to be able to
+  work with the buffer and also free it later), worst case are on 64-bit
+  machines, where both numbers are 8-bytes, we further have
+  $100000\cdot2\cdot8=1600000$. This information might be stored in
+  $\frac{1600000}{4096}\doteq390$ pages. That's a number very close to
+  $2^{MAX\_ORDER}$\footnote{\emph{MAX\_ORDER} is maximum allowed power of 2
+  to allocate via \emph{get\_free\_page}, it used to be between 5 and 20
+  depending on architecture and configuration}, so that we would end up in
+  failure if we didn't use virtual memory (\emph{vmalloc}) for those
+  descriptors.
+
+  Even if we're allocating ring buffer page after page, we might face
+  failures. It's because of how allocations work in memory management
+  subsystem. For implementation in Linux 2.4 see~\cite{gorman}, 2.6 differs
+  slightly, but it's the same in principle. Most of inactive pages is freed
+  even under high pressure, i.e. priority is high. The priority is raised by
+  each failure and the higher the priority is the more pages are tried to free
+  (also the used ones might be swapped out if they belong to userspace). This
+  means we should try to allocate pages which failed at least several times
+  to raise the priority with some delay between the tries to let swapper move
+  some pages to the swap device. See \emph{szedata2\_alloc\_dmaspace} function
+  for final implementation.
+
+  We passed also \emph{struct file\_operations} when registering concrete
+  character device which contains \emph{open}, \emph{release} (close),
+  \emph{mmap}, \emph{poll} and \emph{ioctl} hooks.
 
   \vspace{1cm}
   \textbf{-- The following contents is unrevised and will be probably
