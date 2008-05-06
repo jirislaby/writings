@@ -1144,7 +1144,7 @@ static struct combo6_device_ops szedata2x_ops = {
   waiting in the driver via \emph{poll} system call.
   Documentation in Appendix~\ref{app.doxygen} deals with this interface.
 
-  \paragraph{In-driver interface}
+  \paragraph{Intradriver interface}
   We've declared already, that we will split the driver into two parts.
   Interface between them is straightforward. Interrupt, tail and head pointers
   passing is needed in one direction, registration and DMA allocation in the
@@ -1239,6 +1239,32 @@ static struct combo6_device_ops szedata2x_ops = {
 
   \subsubsection{Back-porting to older kernels}
   \label{chap.backport}
+  Since we want the driver to be used on many configurations, we have to
+  support all Linux~2.6 kernel in the best case. This is not possible without
+  help of a programmer. Several APIs have changed during 2.6 as we mentioned
+  in \emph{Linux interface} sections earlier.
+
+  For the convenience of modularism, we needn't to care of IRQ handler or
+  MMIO mapping changes, since we caught the changes in the \emph{combo6}
+  modules already. We created a file named \emph{kocompat.h} where
+  compatibilities are solved by testing for kernel version and using proper
+  interface. However we must solve \emph{mmap} and \emph{class} changes for
+  all drivers, because change in them is too new and unresolved.
+  
+  While we were porting drivers from one versioning system to another, we
+  created two trees with drivers. One is \emph{kernel} and there are
+  sourcecodes prepared for inclusion in mainline kernel and the another is
+  \emph{build}. This is where we locally build the drivers and where another
+  compatibility stuff lays. It has the same hierarchy and file names except
+  the files contain only \emph{\#include} line to "load" the contents of the
+  real file from \emph{kernel} subtree. We'll use this split for compatibility
+  handling, because this issues need to be solved in the \emph{build} tree.
+
+  \paragraph{Mmap} \emph{.fault} handler was introduced and previously used
+  \emph{.nopage} was removed.
+
+  \vspace{4em}
+
   Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
   remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
   vs. 2.6.16).

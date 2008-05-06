@@ -22,4 +22,4 @@ dp.tex: dp.bbl
 	rm $(subst .tex$,.dvi,$<)
 
 clean:
-	rm -f dp.{pdf,dvi,toc,aux,log,bbl,blg,ps,out}
+	rm -f dp.{pdf,dvi,toc,aux,log,bbl,blg,ps,out} app.aux
