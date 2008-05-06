@@ -992,6 +992,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  + design patterns if any applies
 
   \subsection{Combo6 code base}
+  \label{chap.c6base}
   We have evolved base common to all Liberouter projects not to reinvent the
   wheel for each design. These base drivers are responsible for whole card
   initialization, an interrupt hook setup, loading firmware/design,
@@ -1205,36 +1206,61 @@ static struct combo6_device_ops szedata2x_ops = {
   some pages to the swap device. See \emph{szedata2\_alloc\_dmaspace} function
   for final implementation.
 
+  \paragraph{Character device operations}
   We passed also \emph{struct file\_operations} when registering concrete
   character device which contains \emph{open}, \emph{release} (close),
-  \emph{mmap}, \emph{poll} and \emph{ioctl} hooks.
+  \emph{mmap}, \emph{poll} and \emph{ioctl} hooks. With use of reference
+  counting we call HW open and close callbacks only once. The rest of
+  \emph{open}, \emph{close} and \emph{poll} (wait for data) is implemented
+  exactly as specified in model by recommended techniques from \cite{ldd} and
+  later from Linux kernel mailing list.
 
-  \vspace{1cm}
-  \textbf{-- The following contents is unrevised and will be probably
-  massively changed --}
-  \vspace{1cm}
-%  We need to allocate descriptors for ring buffer, the ring
-%  buffer itself if we didn't do it on module insertion (this is the first
-%  optional part in the diagram). Next we \emph{mmap} a page with status
-%  information
-%  and space with ring buffers, choose which interfaces the application wants
-%  to read from and emits start control message which results in start and end
-%  pointer registers setup if it wasn't already done by some previous and still
-%  running application and passing start value to control register.
-%
-%  A loop follows in which the application periodically calls lock, processes
-%  data if any available and unlocks the area. After it finishes its work
-%  (interrupts the loop), it calls stop which in return stops the device if it
-%  was the last user, invokes \emph{unmap} on all earlier mapped
-%  resources and closes the device node. If we allocate the ring buffer in the
-%  open, we will free it now and return back to the userspace, where the caller
-%  might exit. When the application ends unexpectedly (e.g. crashes), we must
-%  do the cleanup work too. The convenience of the OS is that it will unmap
-%  all spaces
-%  call the close itself, so that we see this the same. The only exception is
-%  that any control message won't be sent in such case, so we must check in
-%  close if the device is stopped already or not.
+  \emph{ioctls} need special handling, there are three types of \emph{ioctl}
+  handling\footnote{Explanation is part of virtual filesystem documentation in
+  Linux kernel tree at Documentation/filesystems/vfs.txt}. New drivers should
+  use \emph{unlocked\_ioctl} and so this implementation. We also implement
+  \emph{compat\_ioctl} for 32-bit emulation on 64-bit, however we only
+  call \emph{unlocked\_ioctl} from it, because all \emph{ioctl} structure
+  sizes and alignments are compatible. If we didn't implement it, commands
+  wouldn't work, because 32-bit emulation ioctl code calls only this function.
 
+  As per specification, commands must be atomic, we use spin locks to
+  avoid race conditions, because they are faster than mutexes and there is
+  not much code in critical sections to be feared of starving caused by long
+  busy waiting loops.
+
+  \emph{mmap} of status page is solved by \emph{remap\_vmalloc\_range} helper
+  described in chapter~\ref{chap.mm}, on the other hand for ring buffer
+  non-continuos memory must be implemented \emph{fault} method.
+
+  This was the last step in hardware independent part, testing of this
+  fraction is descried in Testing, phase~I, chapter~\ref{chap.testI}.
+
+  \subsubsection{Hardware dependent part}
+  After successful testing of the base we built on, we may start construction
+  of hardware dependent part. This is a bridge between \emph{combo6} base and
+  right finished module code. To be able to operate with the hardware, we
+  transcript constants from the hardware specification into header file. These
+  might be found in \emph{hw.h} file.
+
+  Then we start building the source file beginning with init and exit
+  functions. Decision is so far to create a single module, so both module parts
+  will be linked into one loadable object file. It means we can't add another
+  \emph{module\_init} and \emph{module\_exit} functions in this part and we
+  must solve it by calling those functions from the former code's init and
+  exit functions. Their contents is straightforward from
+  section~\ref{chap.c6base}, we only take care of combo6 operations
+  registration.
+
+  Even when the attach function from the operations is called with real
+  device, which was attached, we might allocate szedata2 device, set
+  callbacks up and register it (\emph{szedata2\_hw\_attach}). We also allocate
+  space for descriptor memory information storage only by passing size of this
+  information to the szedata2 allocation call.
+
+  \emph{open} and \emph{close} callbacks allocates ring buffer if it isn't
+  done at init and exit phases.
+ 
   \label{chap.hwsetup}
 
   \subsubsection{Back-porting to older kernels}
@@ -1263,7 +1289,10 @@ static struct combo6_device_ops szedata2x_ops = {
   \paragraph{Mmap} \emph{.fault} handler was introduced and previously used
   \emph{.nopage} was removed.
 
-  \vspace{4em}
+  \vspace{1cm}
+  \textbf{-- The following contents is unrevised and will be probably
+  massively changed --}
+  \vspace{1cm}
 
   Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
   remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
@@ -1293,12 +1322,17 @@ static struct combo6_device_ops szedata2x_ops = {
   \label{chap.testing}
   Testing (TDD) and tools (sparse).
 
+  \subsection{Testing, phase I}
+  \label{chap.testI}
+  XXX fake hardware implementation, few timers, packets generation\ldots
+
   \section{Maintenance}
+  YYY
 
 
 \chapter{Conclusion and future work}
   \section{Conclusion}
-  XXX\cite{ulk}
+  XXX
   \section{Future work}
   \label{chap.future}
   DMA DAC, standard network adapter mode (kernel network stack usage). SPMD
