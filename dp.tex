@@ -1237,6 +1237,7 @@ static struct combo6_device_ops szedata2x_ops = {
   fraction is descried in Testing, phase~I, chapter~\ref{chap.testI}.
 
   \subsubsection{Hardware dependent part}
+  \label{chap.hwsetup}
   After successful testing of the base we built on, we may start construction
   of hardware dependent part. This is a bridge between \emph{combo6} base and
   right finished module code. To be able to operate with the hardware, we
@@ -1258,10 +1259,19 @@ static struct combo6_device_ops szedata2x_ops = {
   space for descriptor memory information storage only by passing size of this
   information to the szedata2 allocation call.
 
-  \emph{open} and \emph{close} callbacks allocates ring buffer if it isn't
-  done at init and exit phases.
- 
-  \label{chap.hwsetup}
+  Everything what \emph{open} and \emph{close} callbacks do is allocation
+  and free of ring buffer if it isn't done at init and exit phases (the
+  allocate-on-modprobe option from specification). Common functions
+  \emph{szedata2\_hw\_alloc/free\_dma} are implemented to not copy the code.
+
+  Hardware initialization is done even on \emph{start} command. We use
+  \emph{combo6} core wrappers for 32-bit writes to PCI bus. This means, that
+  64-bit descriptor must be send in two rounds, all other values are 32-bit.
+  After posting start to control register, the code inside the command waits
+  until status register is either running or idle. After it the
+  \emph{start} command finished. It's possible, that hardware is locked up and
+  we must bound the waiting loop by some constant. According to design
+  specification, 100\,$\mu$s should be enough.
 
   \subsubsection{Back-porting to older kernels}
   \label{chap.backport}
