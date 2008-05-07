@@ -1075,7 +1075,7 @@ static struct combo6_device_ops szedata2x_ops = {
   ring operations and develop szedata2 part as specified and test it by
   that dummy module. We'll get properly working and tested driver by evoking
   corner cases by this technique. More of this is in the testing
-  chapter~\ref{chap.testing}.
+  chapter~\ref{chap.testI}.
 
   \subsubsection{Structures}
   As a first thing let's settle down data structures passed through the
@@ -1238,19 +1238,47 @@ static struct combo6_device_ops szedata2x_ops = {
   non-continuos memory must be implemented \emph{fault} method.
 
   \subsection{Testing, phase I}
-  As we have first increment complete, we need to do first tests. To test this
-  piece of code we need to implement source which will behave as a fake
+  \label{chap.testI}
+  As we have first increment complete, we need to do first tests. To check
+  this piece of code we need to implement source which will behave as a fake
   hardware.
 
-  Right on module load we 
-  find first available PCI device (of any type) and
-  try to register it by the module szedata2.
+  Right on module load code which tests illegal inputs by fault injection of 
+  \emph{NULL} pointers and error states encoded in a pointer passed to register
+  functions. Then first available PCI device (of any type) is used as a parent
+  parameter to allocation function to be able to allocate DMA space.
+  After doing allocation tests, the device is registered along with other more
+  than \emph{SZEDATA2\_MAX\_MINORS} to test proper error handling. Also
+  another tests as closing used device or destroying opened device are
+  presented in the \emph{szetest.c} file. See \emph{szetest\_test\_init}
+  function for details.
 
-  XXX few timers, packets generation\ldots
+  After initialization phase, some timers are fired to pretend real hardware
+  work. Ring buffers are filled with random-sized packets with all possible
+  corner cases such as wraps of packet over page and whole ring buffer, split
+  of packet header over the same boundaries and so on. \emph{szetest\_timer}
+  and \emph{szetest\_timer1} implement this logic.
+
+  To be able to utter the driver works, also reader/writer in user space must
+  be implemented. \emph{szetest2} application is constructed in similar manner
+  like the fake hardware code -- to test as much as possible. Some of these
+  userspace tests were ready yet before the implementation itself, because we
+  knew from specification how it should behave and how not. Implementation is
+  further programmed to satisfy all the tests\footnote{This agile method is
+  known as \emph{test driven development} (TDD), see
+  \url{http://en.wikipedia.org/wiki/Test-driven_development} for reference.}.
+  
+  Tests for all implemented character device hooks are in \emph{szetest2.c}
+  see for example \emph{test\_mmap}, which tests correctness of \emph{mmap} by
+  trying to forge invalid values (longer space, wrong offsets etc.). In
+  addition we should add tests for commands and reading and writing of "real"
+  data from ring buffer or to it respectively. These checks are implemented
+  in \emph{read\_data} and \emph{write\_data} in the test application.
 
   \subsection{Hardware dependent code, phase II}
   \label{chap.hwsetup}
-  After successful testing of the base we built on, we may start construction
+  After successful testing of the base we build on further, we start
+  construction
   of hardware dependent part. This is a bridge between \emph{combo6} base and
   right finished module code. To be able to operate with the hardware, we
   transcript constants from the hardware specification into header file. These
@@ -1263,7 +1291,14 @@ static struct combo6_device_ops szedata2x_ops = {
   must solve it by calling those functions from the former code's init and
   exit functions. Their contents is straightforward from
   section~\ref{chap.c6base}, we only take care of combo6 operations
-  registration.
+  registration and in addition do module parameters alignment.
+  
+  \emph{block\_size} is aligned to whole page and \emph{block\_count} to
+  nearest power of two as ring buffer size is multiple of these two numbers
+  and design
+  expect buffer size to be power of two\footnote{It's formally correct to
+  assume the multiple is power of two, since page size is power of two too and
+  $2^a\cdot2^b=2^{a+b}$ from algebra.}.
 
   Even when the attach function from the operations is called with real
   device, which was attached, we might allocate szedata2 device, set
@@ -1295,7 +1330,8 @@ static struct combo6_device_ops szedata2x_ops = {
   chance to tell the kernel, that close function (which issues this
   callback) failed.
 
-  Pointer callbacks are simple calls of PCI space reads and writes, problem
+  Pointer and interrupt callbacks are simple calls of PCI space reads and
+  writes, a problem
   arises when computing sizes of spaces between read tail and head. When tail
   equals to head it's hard to distinguish if the buffer is empty or full. Few
   techniques with less or more overhead exist\footnote{See
@@ -1305,18 +1341,11 @@ static struct combo6_device_ops szedata2x_ops = {
   hardware never sets them the same, it will ever use size-1 at most. But we
   must take care of transmit size, because we move with the head and we mustn't
   reach tail. This is done by this code in \emph{szedata2\_head\_tail\_size}:
+
 \begin{verbatim}
 if (head == tail)
   return size - 1;
 \end{verbatim}
-
-  Again the rest of functions is line by line implementation of the
-  specification.
-
-  \subsection{Testing, phase II}
-  After we finish the implementation, we might test the code,
-  see Testing, phase~II in chapter~\ref{chap.testII}.
-  XXX functional layers, we test HW dependent part.
 
   \subsection{Back-porting to older kernels, phase III}
   \label{chap.backport}
@@ -1378,10 +1407,10 @@ if (head == tail)
   know this is most variable API in 2.6. Let's summarize what happened during
   2.6 development in following points:
   \begin{CompactItemize}
-    \item \textbf{between 2.6.2 and 2.6.13} -- \emph{sysfs} created,
+    \item \textbf{between 2.6.2 and 2.6.13} -- \emph{sysfs} created and
       \emph{class\_simple} defined in 2.6.2; \emph{class\_simple\_create}
       and \emph{class\_simple\_device\_add} are used (with their destroy
-      opposites) to operate with classes
+      opposites) to operate with classes and devices
     \item \textbf{between 2.6.13 and 2.6.15} -- \emph{class\_simple}
       disappeared with all its functions, \emph{class} structure which was not
       "simple" enough before is simplified and used instead.
@@ -1399,41 +1428,65 @@ if (head == tail)
   We handle this incompatibilities in \emph{kocompat.h} header by testing
   which kernel release we are building against. 
 
-  \subsection{Testing, phase III}
-  XX
+  \subsection{Testing, phases II and III}
+  In fact, there isn't much new to test, only tests showed in phase I must
+  pass again both after phase II completion and now. The tests should show no
+  regressions on all kernels we have available for phase~III tests though.
 
-  \subsection{Final code}
-  \vspace{1cm}
-  \textbf{-- The following contents is unrevised and will be probably
-  massively changed --}
-  \vspace{1cm}
+  However we might use another techniques to catch bugs. Linux kernel itself
+  provide many options for development under \emph{Kernel hacking}
+  configuration submenu. Most these configurations slow down kernel operation
+  rapidly, but they still may be handful while seeking for deadlocks or
+  missing lists initialization for example. We tried to enable all this
+  options, built a kernel and tested the driver by this techniques without any
+  obvious problems.
 
-  Nice, working, debugged kernel module as a result. Documentation.
-  License.
+  Next bug hunting might lead to static analysis of C language. We might found 
+  tools
+  (sparse).
 
-  \subsubsection{libsze2}
-  Even though there is no library for szedata v. 1, we consider to have one for
-  szedata2. The main point to have it is not to propagate the kernel
-  interface directly to the user, to simplify the interface and make it
-  abstract.
+  \subsubsection{Userspace library}
+  Even though there is no library for szedata v.~1, we consider to have one
+  for szedata2. The main point to have it is to not propagate the kernel
+  interface directly to the user, to simplify the interface (get rid of status
+  page) and make it abstract.
   
-  The library functions might be an exact copy of use cases from the
+  The library functions are an exact copy of use cases from the
   specification, since the use case alone means exactly that it is a
   separate sequence of commands which might not be further divided. If we
-  encapsulate each use case's contents in a library call, we reach the
+  encapsulate each use case's contents in a library call, we reach the two
   aims from previous paragraph. Above all, if we create a shared library,
   we'll get easy to update part (module) of each application.
 
-%  \paragraph{Modified libpcap}
-%  ref Konik's work
-%
-  \section{Verification}
-  \label{chap.testing}
-  Testing (TDD) and tools (sparse).
+  Most of the library code is extraction from \emph{szetest2.c} testing code.
+  We only take away testing stuff and place atomic (from use case view)
+  commands in one function call. Then this interface is exposed by library
+  header file \emph{libsze2.h} and compiled and linked into \emph{libsze2.so}
+  for further usage.
+
+  \subsection{Final code}
+  We get to the phase where everything works correctly. Also we didn't forget
+  to document the code for easy reuse or possible changes by other developers.
+  Userspace code documentation is provided through
+  \emph{doxygen}\footnote{Source code documentation generator tool, visit home
+  page with description at \url{http://www.stack.nl/~dimitri/doxygen/}},
+  generated text is available in Appendix~\ref{app.doxygen}. Documentation of
+  kernel code is done through kernel-doc facility\footnote{It's collection of
+  scripts which can generate bunch of formats such as \emph{man}, \emph{pdf},
+  \emph{html} or whatever is possible to be generated from \emph{sgml} or
+  \emph{DocBook} formats.}, see generated documentation in
+  Appendix~\ref{app.kdoc}.
+
+  Nice, working, debugged kernel module as a result.
+
+  As we mentioned in the introduction, all the code may be distributed under
+  GPL v. 2.
 
   \section{Maintenance}
   YYY
 
+  \section{Measurements and comparisons}
+  XXX
 
 \chapter{Conclusion and future work}
   \section{Conclusion}
