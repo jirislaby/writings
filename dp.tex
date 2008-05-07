@@ -544,6 +544,7 @@
   device I/O and memory mapping.
 
   \section{Character device}
+  \label{chap.chardev}
   While we are able to pass data from device to memory available only to kernel
   via DMA so far, we still need to put the data to userspace application
   somehow. Several ways how to do it exist in Linux.
@@ -643,10 +644,11 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \emph{class\_simple\_create}, \emph{class\_device\_create} and others will
   be mentioned in back-porting chapter~\ref{chap.backport}.
 
-  We should mention also misc character devices. This interface allows adding
-  of only one character device and is mostly implemented for single devices
-  like timers or access to e.g. virtualization resources and hence doesn't
-  suit to our needs. We choose \emph{alloc\_chrdev\_region} method, since it's
+%  We should mention also misc character devices. This interface allows adding
+%  of only one character device and is mostly implemented for single devices
+%  like timers or access to e.g. virtualization resources and hence doesn't
+%  suit to our needs.
+  We choose \emph{alloc\_chrdev\_region} method, since it's
   recommended and \emph{device\_create} as well. Further
   character device resources are available in \cite{ldd}, chapter~3 and in
   \cite{ulk}.
@@ -987,7 +989,11 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   \section{Code development}
   \label{chap.code}
-  Now we have a complete specification to start implementing.
+  Now we have a complete specification to start implementing. However we
+  needn't to start from scratch, we'll describe usable code base. Then we
+  start with hardware independent part and complete it with the hardware
+  operating last part. Both these parts are will be tested separately and
+  after all an encapsulating library implemented.
 
   \subsection{Combo6 code base}
   \label{chap.c6base}
@@ -1150,7 +1156,7 @@ static struct combo6_device_ops szedata2x_ops = {
   other one. This interface is described in the documentation contained in
   Appendix~\ref{app.kdoc}.
 
-  \subsubsection{Hardware independent part}
+  \subsection{Hardware independent code, phase I}
   As we don't have fully working design yet, we start with design
   independent part. First we code module \emph{init} and \emph{exit}
   functions. We create a \emph{class} and reserve character device region
@@ -1231,10 +1237,18 @@ static struct combo6_device_ops szedata2x_ops = {
   described in chapter~\ref{chap.mm}, on the other hand for ring buffer
   non-continuos memory must be implemented \emph{fault} method.
 
-  This was the last step in hardware independent part, testing of this
-  fraction is descried in Testing, phase~I, chapter~\ref{chap.testI}.
+  \subsection{Testing, phase I}
+  As we have first increment complete, we need to do first tests. To test this
+  piece of code we need to implement source which will behave as a fake
+  hardware.
 
-  \subsubsection{Hardware dependent part}
+  Right on module load we 
+  find first available PCI device (of any type) and
+  try to register it by the module szedata2.
+
+  XXX few timers, packets generation\ldots
+
+  \subsection{Hardware dependent code, phase II}
   \label{chap.hwsetup}
   After successful testing of the base we built on, we may start construction
   of hardware dependent part. This is a bridge between \emph{combo6} base and
@@ -1253,60 +1267,147 @@ static struct combo6_device_ops szedata2x_ops = {
 
   Even when the attach function from the operations is called with real
   device, which was attached, we might allocate szedata2 device, set
-  callbacks up and register it (\emph{szedata2\_hw\_attach}). We also allocate
+  callbacks up and register it (all this is \emph{szedata2\_hw\_attach}). We
+  also allocate
   space for descriptor memory information storage only by passing size of this
   information to the szedata2 allocation call.
 
   Everything what \emph{open} and \emph{close} callbacks do is allocation
   and free of ring buffer if it isn't done at init and exit phases (the
   allocate-on-modprobe option from specification). Common functions
-  \emph{szedata2\_hw\_alloc/free\_dma} are implemented to not copy the code.
+  \emph{szedata2\_hw\_alloc/free\_dma} are called from both code paths to not
+  copy the code.
 
-  Hardware initialization is done even on \emph{start} command. We use
-  \emph{combo6} core wrappers for 32-bit writes to PCI bus. This means, that
-  64-bit descriptor must be send in two rounds, all other values are 32-bit.
+  Hardware initialization is done even in \emph{start} callback. We use
+  \emph{combo6} core wrappers for 32-bit writes to PCI bus, so that
+  64-bit descriptor must be send in two rounds, all other values to send are
+  32-bit.
   After posting start to control register, the code inside the command waits
-  until status register is either running or idle. After it the
-  \emph{start} command finished. It's possible, that hardware is locked up and
-  we must bound the waiting loop by some constant. According to design
-  specification, 100\,$\mu$s should be enough.
+  until status register is either running or idle then the \emph{start}
+  callback finishes and returns. It's possible, that hardware is locked up and
+  it doesn't become ready in reasonable time, so we must bound the waiting
+  loop by some constant. According to design specification, 100\,$\mu$s should
+  be enough.
 
-  \subsubsection{Back-porting to older kernels}
+  \emph{Stop} callback is implemented in similar manner, except the fact we
+  wait one whole second until DMA transfers get completed. When this timeout
+  expires, we only report failure to logs and go on, because we don't have any
+  chance to tell the kernel, that close function (which issues this
+  callback) failed.
+
+  Pointer callbacks are simple calls of PCI space reads and writes, problem
+  arises when computing sizes of spaces between read tail and head. When tail
+  equals to head it's hard to distinguish if the buffer is empty or full. Few
+  techniques with less or more overhead exist\footnote{See
+  \href{http://en.wikipedia.org/wiki/Circular_buffer\#Full_.2F_Empty_Buffer_Distinction}{http://en.wikipedia.org/wiki/Circular\_buffer}
+  for description of all methods.}. "Always Keep One Byte Open" method is
+  implemented in the design. This is not a problem for receive pointers,
+  hardware never sets them the same, it will ever use size-1 at most. But we
+  must take care of transmit size, because we move with the head and we mustn't
+  reach tail. This is done by this code in \emph{szedata2\_head\_tail\_size}:
+\begin{verbatim}
+if (head == tail)
+  return size - 1;
+\end{verbatim}
+
+  Again the rest of functions is line by line implementation of the
+  specification.
+
+  \subsection{Testing, phase II}
+  After we finish the implementation, we might test the code,
+  see Testing, phase~II in chapter~\ref{chap.testII}.
+  XXX functional layers, we test HW dependent part.
+
+  \subsection{Back-porting to older kernels, phase III}
   \label{chap.backport}
-  Since we want the driver to be used on many configurations, we have to
-  support all Linux~2.6 kernel in the best case. This is not possible without
-  help of a programmer. Several APIs have changed during 2.6 as we mentioned
-  in \emph{Linux interface} sections earlier.
+  So far the implementation has been run and tested only on later kernels
+  (2.6.24-rc8-mm1 and newer) and since we want the driver to be used on many
+  configurations, we have to support all Linux~2.6 kernel in the best case.
+  This is not possible without a help of programmer. Several APIs have changed
+  during 2.6 as we mentioned in \emph{Linux interface} sections earlier.
 
   For the convenience of modularism, we needn't to care of IRQ handler or
   MMIO mapping changes, since we caught the changes in the \emph{combo6}
-  modules already. We created a file named \emph{kocompat.h} where
-  compatibilities are solved by testing for kernel version and using proper
-  interface. However we must solve \emph{mmap} and \emph{class} changes for
+  modules already far before this design was decided to create. We have a
+  file named \emph{kocompat.h} where compatibilities are solved by testing for
+  kernel versions and using proper interfaces. However we must solve
+  \emph{mmap}, \emph{ioctl} and \emph{class} changes for
   all drivers, because change in them is too new and unresolved.
   
-  While we were porting drivers from one versioning system to another, we
-  created two trees with drivers. One is \emph{kernel} and there are
-  sourcecodes prepared for inclusion in mainline kernel and the another is
+  While we were porting drivers from one versioning system to the another one
+  in the past, we created two trees with drivers. One is \emph{kernel} with
+  sourcecodes prepared for inclusion to mainline kernel and the another is
   \emph{build}. This is where we locally build the drivers and where another
   compatibility stuff lays. It has the same hierarchy and file names except
   the files contain only \emph{\#include} line to "load" the contents of the
   real file from \emph{kernel} subtree. We'll use this split for compatibility
-  handling, because this issues need to be solved in the \emph{build} tree.
+  handling, because this issues need to be solved in the \emph{build} tree
+  only.
 
-  \paragraph{Mmap} \emph{.fault} handler was introduced and previously used
-  \emph{.nopage} was removed.
+  \paragraph{Mmap} After some investigation\footnote{The most powerful tools
+  for such kind of research are \emph{cscope} to see, where the symbol is
+  defined, \emph{git-blame} to figure out when and by what commit was each
+  particular line (and function) changed and \emph{git-show} to see the patch
+  which does the change.}, we found out, that \emph{.fault} handler was
+  introduced in 2.6.23 and previously used \emph{.nopage} was removed along
+  with that change. Also 2.6.18 was the first kernel, where is
+  \emph{remap\_vmalloc\_range} available for public use. This gives three
+  variants:
+  \begin{CompactItemize}
+    \item \textbf{before 2.6.18} -- we implement \emph{.nopage} handler for
+      all spaces
+    \item \textbf{between 2.6.18 and 2.6.23} -- only non-contiguos spaces
+      need \emph{.nopage}, i.e. ring buffer; \emph{status\_page} is mapped by
+      helper
+    \item \textbf{after 2.6.23} -- ring buffer is switched to use \emph{.fault}
+  \end{CompactItemize}
 
+  Code for older variants is obviously located only in \emph{build} tree in
+  the \emph{szecore2.c} file with function prototypes before \emph{\#include}
+  line and implementation after it. Unfortunately \emph{.fault} code in
+  \emph{kernel} tree must be placed in conditional section too, but the test
+  are easy to remove right before posting to mainline.
+
+  \paragraph{Ioctl} \emph{unlocked\_ioctl} and \emph{compat\_ioctl} were
+  introduced even in 2.6.11. Before that, only \emph{ioctl} existed. We behave
+  similarly as for \emph{compat\_ioctl}, only call unlocked variant with
+  proper parameters. It's possible thanks to difference being only in
+  function prototype. Again this handler is present only \emph{build} tree.
+
+  \paragraph{Class} With refer back to section~\ref{chap.chardev}, we already
+  know this is most variable API in 2.6. Let's summarize what happened during
+  2.6 development in following points:
+  \begin{CompactItemize}
+    \item \textbf{between 2.6.2 and 2.6.13} -- \emph{sysfs} created,
+      \emph{class\_simple} defined in 2.6.2; \emph{class\_simple\_create}
+      and \emph{class\_simple\_device\_add} are used (with their destroy
+      opposites) to operate with classes
+    \item \textbf{between 2.6.13 and 2.6.15} -- \emph{class\_simple}
+      disappeared with all its functions, \emph{class} structure which was not
+      "simple" enough before is simplified and used instead.
+      \emph{class\_create} and \emph{class\_device\_create} are functions of
+      our interest in these two kernel releases.
+    \item \textbf{between 2.6.15 and 2.6.18} -- \emph{class\_device\_create}
+      changed prototype, it may have two parents reference in it (one
+      \emph{device} and one \emph{class\_device}).
+    \item \textbf{after 2.6.18} -- \emph{device\_create} should be used
+      instead of \emph{class\_device\_create}. \emph{class\_device\_create}
+      is going to be removed soon with \emph{class\_device} which is
+      considered deprecated nowadays.
+  \end{CompactItemize}
+
+  We handle this incompatibilities in \emph{kocompat.h} header by testing
+  which kernel release we are building against. 
+
+  \subsection{Testing, phase III}
+  XX
+
+  \subsection{Final code}
   \vspace{1cm}
   \textbf{-- The following contents is unrevised and will be probably
   massively changed --}
   \vspace{1cm}
 
-  Why we should do this? Macros used (irq handler vs. 2.6.19, mmap vs.
-  remap\_pfn\_range, remap\_page\_range), workarounds (class+class\_simple
-  vs. 2.6.16).
-
-  \subsection{Final code}
   Nice, working, debugged kernel module as a result. Documentation.
   License.
 
@@ -1329,10 +1430,6 @@ static struct combo6_device_ops szedata2x_ops = {
   \section{Verification}
   \label{chap.testing}
   Testing (TDD) and tools (sparse).
-
-  \subsection{Testing, phase I}
-  \label{chap.testI}
-  XXX fake hardware implementation, few timers, packets generation\ldots
 
   \section{Maintenance}
   YYY
