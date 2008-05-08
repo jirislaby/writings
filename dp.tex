@@ -246,25 +246,26 @@
   main PCI bus.
 
   Older PCI buses have a \emph{control bus} supposed to send controlling
-  signals and synchronize objects which are connected to it and multiplexed
-  \emph{address} and \emph{data buses}. Device starts transmission by sending
-  address, then follow data
-  on the same wires. On the other hand, PCI express uses packets for
-  communication over serial physical layer, it further must contain hubs and
-  switches for packet transmission. Data and addresses (might be both 32 and
-  64-bit) are part of packets, each request and reply is a packet here.
+  signals and synchronize objects which are connected to it and further
+  \emph{address} and \emph{data buses} multiplexed on one address/data bus.
+  Transmission starts by sending address followed by data on the same wires.
+  Legacy PCI address/data bus is only 32-bit wide and hence sending of 64-bit
+  numbers over the bus to older \com\ cards is not possible. Unlike data,
+  addresses are normally sent in so-called \emph{single address cycle} (SAC)
+  mode, when 32-bit address is set on the bus and latched by the other side,
+  but it's possible to send even 64-bit address via \emph{double} (sometimes
+  \emph{dual}) \emph{address cycle} (DAC) by negotiating it and repeating SAC
+  twice. The \com\ hardware supports SAC nowadays, but we plan to use DAC
+  mechanism in the future to address more than 4\,GiB of the memory, see
+  chapter~\ref{chap.future}.
 
-  Legacy PCI has 32-bit wide address/data bus. This shortcoming affects
-  sending 64-bit numbers over the bus to older \com\ cards as we will see in
-  section \ref{chap.hwsetup}. Addresses are normally sent in so-called
-  \emph{single address cycle} (SAC) mode, when 32-bit address is set on the
-  bus and latched by the other side. This will be supported by first
-  generation of the hardware. However it's possible to send even 64-bit
-  addresses via \emph{double} (sometimes \emph{dual}) \emph{address cycle} DAC
-  by negotiating it and repeating SAC twice. See chapter~\ref{chap.future}, we
-  plan to use DAC mechanism in the future to address more than 4\,GiB of
-  memory. Further detailed PCI information are in
-  \cite{pcispec} (PCI, PCI-X) and \cite{pciespec} (PCI express).
+  This problems are completely avoided later in PCI express which communicates
+  over serial physical layer by packets routed by switches and hubs. Each
+  request or reply is a packet which may contain both 32 and 64-bit addresses
+  in the packet header and whatever data in the payload.
+
+  Further detailed PCI information are in \cite{pcispec} (Legacy PCI, PCI-X)
+  and \cite{pciespec} (PCI express).
 
   \subsubsection{Configuration space}
   Every modern bus supports a mechanism to autoconfigure devices connected
@@ -330,10 +331,10 @@
   implemented in PCI express based \com.
 
   The transfer is theoretically limited by the other device (including main
-  memory) boundary\footnote{it is 4096 bytes on main memory when extensions
-  disabled}. It must not
-  exceed this limit, the transfer is interrupted by the other side otherwise.
-  Transfers of 1\,KiB per one transfer are not uncommon in \com\ case.
+  memory) boundary\footnote{It is 4096 bytes on main memory with extensions
+  disabled.}. It must not exceed this limit, the transfer is interrupted by
+  the other side otherwise. Transfers of 1\,KiB per one transfer are not
+  uncommon in \com\ case.
 
   \subsection{Linux DMA interface}
   Linux has three groups of DMA APIs. ISA/LPC, PCI and generic. ISA/LPC is used
@@ -343,23 +344,27 @@
   explanation.
 
   \paragraph{PCI interface} This interface supports coherent (also called
-  consistent) and non-coherent DMA mappings. We always must decide which one
-  we should use. Non-coherent mappings are often mapped only for a transfer
+  consistent) and non-coherent DMA mappings, both documented in
+  \emph{Documentation/DMA-mapping.txt}. We always must decide which one
+  we should use.
+  
+  Non-coherent mappings are often mapped only for a transfer
   and then unmapped and underlying buffer freed. This is method widely used
   for socket buffers which are thrown away after successful transmission. We
   will probably use this interface for exactly this purpose out of scope of
   this thesis, see chapter~\ref{chap.future}.
 
-  The other group of coherent are mappings usually XXX what? XXX
-  mapped at the driver load or device start and unmapped and freed even after
-  device stop. Its domain are DMA ring buffers, firmwares used by some
-  devices and executed from main memory while device work and so on. This
-  mapping hence perfectly fits our needs and will use it,
+  The other group are coherent mappings usually mapped at the driver load or
+  device start and unmapped and freed even after a device stop. Its domain are
+  DMA ring buffers, firmwares used by some devices and executed from main
+  memory meanwhile device operation and so on. This mapping hence perfectly
+  fits our needs and will be implemented in the new module,
   see~\ref{chap.netcope}.
 
   \paragraph{Generic interface} It is actually an abstraction of PCI interface.
   It's not bounded to any PCI device, it may be used for non-PCI devices,
-  however it obviously doesn't support all the PCI features.
+  however it obviously doesn't support all the PCI features. API of this type
+  is took down in \emph{Documentation/DMA-API.txt}.
 
   \section{Memory management}
   \label{chap.mm}
@@ -530,13 +535,13 @@
 
   \section{Character device}
   \label{chap.chardev}
-  While we are able to pass data from device to memory available only to kernel
-  via DMA so far, we still need to put the data to userspace application
-  somehow. Several ways how to do it exist in Linux.
-  Most of them are based on moving data through special
-  files\footnote{most of communication channels are files, even socket
-  creating system call returns a file descriptor passed to standard read and
-  write functions} such as sockets, block and character devices.
+  While we are able to pass data from device to memory available only to
+  kernel via DMA so far, we still need to put the data to userspace
+  application somehow. Several ways how to achieve that exist in Linux. Most
+  of them are based on moving data through special files
+%  \footnote{many communication channels are files, even socket creating system
+%  call returns a file descriptor passed to standard read and write functions}
+  such as sockets, block and character devices.
 
   The basic and simplest idea is to \textbf{copy} the data by a processor
   from kernel buffer to an user one. It's easy to implement and least
@@ -549,19 +554,20 @@
 
   \subsection{Device nodes}
   \label{chap.devnodes}
-  As as entry point from userspace to kernelspace serves \emph{device nodes}.
+  As as entry point from userspace to kernelspace serve \emph{device nodes}.
   The existing node in \emph{/dev} might be opened and used by userspace
-  application,
-  control is handled by the driver which registered it. It depends on what
-  features are implemented in the driver and what controls are defined as an
-  interface. Handlers for szedata2 will be discussed in section
-  \ref{chap.code} after review of operations done in specification.
+  application, demanded operations are handled by the driver which has
+  registered it before. It depends on what features are implemented in the
+  driver and what operations are defined as an interface. Handlers for
+  szedata2 will be discussed in section \ref{chap.code} after review of
+  operations done in specification.
 
   If the driver is loaded and requested node does not exist yet, it must be
-  created. It used to be created manually by userspace program \emph{mknod} or
-  wrapper scripts like \emph{MAKEDEV}, however this was not perfect
-  because of the need of every single node creation and so some dynamic
-  principles described later in this section were introduced.
+  created to allow access to it. It used to be created manually by userspace
+  program \emph{mknod} or wrapper scripts like \emph{MAKEDEV}, however this
+  was not perfect and mostly causes problems, because of the need of every
+  single node creation and so some dynamic principles described later in this
+  section were introduced.
 
   \subsection{udev}
   \label{chap.udev}
@@ -711,9 +717,9 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     \end{center}
   \end{figure}
 
-  Despite all improvements, this was still unsuitable due to grown
-  complexity and still the transfers couldn't be done at estimated
-  (theoretically computed) speeds.
+  Despite all improvements, this was still unsuitable due to grown complexity
+  and still the transfers couldn't be performed at estimated (theoretically
+  computed) speeds.
   We decided to redesign whole design architecture and fork szedata project
   into the version 2. \emph{PowerPC} will be no longer used for DMA transfers,
   it'll be fully disconnected. Four separate DMA controllers for each
@@ -856,7 +862,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   As we mentioned earlier, we use UML for modelling. Many UML tools are
   available for Linux, we chose one named \emph{Bouml}\footnote{
   Bouml is a free (under the terms of GPL) multiplatform project with support
-  of UML including version 2. See its homepages at \url{http://bouml.free.fr/}
+  of UML including version 2. See its homepage at \url{http://bouml.free.fr/}
   for more info.}. It can do most of UML
   defined diagrams, however we'll use only \emph{use case} and
   \emph{sequence} diagrams. Complete diagrams and their documentation are in
@@ -884,9 +890,10 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   mentioned neither in the specification nor further, because we take this for
   granted. Fine grained application use cases description follows.
 
-  \subsubsection{Open and initialization} We already know operations order from
-  chapter~\ref{chap.netcope} that shall be done before using the device. We
-  create one use case as a starting point and place following steps in it:
+  \subsubsection{Open and initialization} We already know the order of
+  operations
+  that shall be done before using the device from chapter~\ref{chap.netcope}.
+  We create one use case as a starting point and place following steps in it:
   \begin{enumerate}
     \item \emph{open} system call $\rightarrow$ initialize buffers if it was
       first open (not to break yet started hardware), we use reference counter
@@ -900,7 +907,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \end{enumerate}
   Even though \emph{open} and \emph{mmap} are different calls from the driver
   view, application sees them as one basic operation, so we leave them in one
-  use case. On the other hand, we find out, that we want to allow the
+  use case. On the other hand, we find out later, that we want to allow the
   application to select and start interfaces on the fly, so we must place
   points 3 and 4 in separate use cases which gives three initialization use
   cases in the end.
@@ -914,8 +921,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   This means calling kernel and getting back area with data (or no data if
   no change). After finished processing on those data, we free them
   up to tell the driver to move the tail. This gives us two separate use cases
-  \emph{get\_data} and \emph{release\_data}, since the processing is done in
-  application.
+  \emph{get\_data} and \emph{release\_data}, since the processing is in charge
+  of application.
 
   After we gained access to the data, two receive processing methods raised
   altogether:
@@ -952,10 +959,10 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   wasn't invoked before.
 
   \subsection{Sequence diagrams}
-  We model sequence diagrams to show up how events happen during time. The
-  topmost event is done first and then all events below it towards the bottom
-  one. We create two depicting again RX and TX, they will slightly differ in
-  how application locks and unlocks data.
+  Sequence diagrams are modeled to show up how events happen during time. The
+  topmost event is executed first and then all events below it towards the
+  bottom one. We create two, depicting RX and TX, they will slightly
+  differ in how application locks and unlocks data.
 
   \paragraph{RX sequence diagram} We specify better application code flow
   here. We establish three lifelines, \textbf{application}, \textbf{module}
@@ -1001,14 +1008,14 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   One more convenience is exported info in \emph{sysfs}\footnote{sysfs on
   wikipedia: \url{http://en.wikipedia.org/wiki/Sysfs}} and
   \emph{procfs}\footnote{procfs on wikipedia:
-  \url{http://en.wikipedia.org/wiki/Procfs}} filesystems done by the central
-  driver. This info may be further used by application to recognize module
-  version or tune some values and parameters.
+  \url{http://en.wikipedia.org/wiki/Procfs}} filesystems provided by the
+  central driver. This info may be further used by application to recognize
+  module version or tune some values and parameters.
 
   Design driver should define \emph{combo6\_device\_ops} structure with name,
   card type, IDs which it supports and hooks for attach, detach and interrupt
   and pass it to \emph{combo6\_device\_register} to register it by the core
-  module. Deregistration is then done by \emph{combo6\_device\_unregister}
+  module. Deregistration is then provoked by \emph{combo6\_device\_unregister}
   call. Our structure looks like this code:
 \begin{lstlisting}[language=C,label=lst.c6dops,name=lst.c6dops]
 static struct combo6_device_ops szedata2x_ops = {
@@ -1171,7 +1178,7 @@ static struct combo6_device_ops szedata2x_ops = {
   hasn't been called at all. This is achieved by setting one bit in the
   register function and test for this bit in the destroy one.
 
-  DMA allocation is done through PCI interface described in
+  DMA allocation is performed via PCI interface described in
   chapter~\ref{chap.dma}. Allocation is done per page basis (recall
   chapter~\ref{chap.netcope}), so if we consider four interfaces, both RX and
   TX directions and 50\,MiB sized ring buffers, we have
@@ -1266,7 +1273,6 @@ static struct combo6_device_ops szedata2x_ops = {
   in \emph{read\_data} and \emph{write\_data} in the test application.
 
   \subsection{Hardware dependent code, phase II}
-  \label{chap.hwsetup}
   After successful testing of the base, we start construction of hardware
   dependent part. The design was built meanwhile the specification and first
   part implementation. The code we build up here will be a bridge between
@@ -1450,8 +1456,8 @@ if (head == tail)
   and also it helped us to prove locking correctness.
 
   Sometimes we hit design bug, because it's often very hard to emulate high
-  traffic in simulations which are done hardware developers. In such case this
-  bug is forwarded to concrete hardware person via \emph{trac} system. After
+  traffic in simulations performed by hardware developers. This bug is in such
+  case forwarded to a concrete hardware person via \emph{trac} system. After
   they solve the issue, we re-test and possibly change code if it is
   misunderstanding or details specification. We cooperated this way when we
   discovered a bug in stop hardware path both in the design and the driver.
@@ -1532,6 +1538,8 @@ if (head == tail)
 
   \paragraph{Results} XXX missing :)
 
+% http://www.endace.com/assets/docs/accelerated/DAGPacketCapturePerformance.pdf
+
   \begin{figure}[htb]
     \begin{center}
       \begin{tabular}{|l|l|l|l|} \hline
@@ -1555,7 +1563,7 @@ if (head == tail)
 
   \section{Maintenance}
   Drivers are deployed on all machines and kernel versions after successful
-  tests done by testers. This must have been done for a first time due to
+  tests performed by testers. This must have been done for a first time due to
   conversion from one versioning system to another and dropping support of
   older kernels than 2.6. Meanwhile we have been creating this implementation
   all other drivers were moved to the new system with many intrusive changes,
@@ -1570,12 +1578,31 @@ if (head == tail)
 
 \chapter{Conclusion and future work}
   \section{Conclusion}
-  XXX architecture, linux kernel possibilities, szedata2 module, library, used
-  techniques, testing, comparison
+  This thesis aims at fast data transfers from network to application and vice
+  versa and tries to find a way how to do such transfer on fast speeds. As a
+  first step we introduced hardware basics and limitations in fast transfer
+  mechanisms such as DMA on PCI bus and then walk through possible fast data
+  structures and implementation of ring buffer data structure on \com\ cards.
+
+  Also several Linux interfaces for fast operations on the ring buffer were
+  described and we decided to use DMA and memory map which gave us as a
+  result zero CPU data copying between hardware and userspace in both
+  directions. These information were instrumental to summarize requirements,
+  model design and implement the driver with reuse of current combo6 base
+  modules as a base.
+
+  We verified functionality during implementation with help of modern
+  techniques. Each functional increment was tested, some coding was ridden by
+  tests thanks to requirements and specification being ready before the
+  development. After all we were able to do integration testing when we
+  finished whole module.
+
+  Finally was developed module compared with other available products
+  measurements and numbers provided by some vendors of similar solutions.
 
   \section{Future work}
   \label{chap.future}
-  Out implementation has been done, however some parts might still be
+  Our implementation has been done, however some parts might still be
   improved. At least three kinds of improvements currently exist which are out
   of scope of this thesis.
   
@@ -1597,7 +1624,7 @@ if (head == tail)
   application specific interface. Instead of multiprocessing of incoming data,
   we would want to balance load among many threads on multiprocessor machine
   to do more time-consuming jobs. Remember computation of ring buffer size,
-  where we consider only 50\,ms latencies.
+  where we considered only 50\,ms latencies.
 
 \bibliographystyle{plain}
 \bibliography{dp}
