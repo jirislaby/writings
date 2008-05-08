@@ -9,7 +9,7 @@
 \usepackage{hyperref}
 \usepackage{graphicx}
 \usepackage[final]{listings}
-\usepackage{fancyvrb}         
+\usepackage{fancyvrb}
 
 \setcounter{tocdepth}{3}
 
@@ -111,7 +111,7 @@
   using them here. Finally we implement the method and test it with all
   available tools, describe the testing process and compare with already
   working products.
-  
+
 \end{ThesisAbstract}
 \begin{ThesisKeyWords}
   Linux, Driver, ring buffer, mmap, DMA, COMBO6x, NetCOPE, Liberouter
@@ -188,7 +188,7 @@
 %  assistance from network adapter towards application in userspace and vice
 %  versa without any real data copying. This results in short transaction
 %  times.
-  
+
 %\chapter{Basic terms}
   \paragraph{Linux}
   In the early stages, we decided to create a driver implementation only for
@@ -197,7 +197,7 @@
   early nineties of the 20th century by Linus Torvalds. There is over 3
   hundreds variants called distributions shipped by either communities or
   software giants.
-  
+
   Linux kernel in its version 2.6 has no stable application programming
   interface (API) inside the kernel, but still the API is well-evolved and
   easy to use, because the
@@ -215,7 +215,7 @@
   under which circumstances we can achieve concrete goals and what constraints
   kernel driver implementation has. Understanding hardware-software
   communication will guide us towards complete implementation.
-  
+
   After each section, we consult what exactly does that particular part
   means for the final code and to achieve that in Linux.
 
@@ -244,7 +244,7 @@
   it's still more common, that all southbridge, northbridge and memory
   controller are implemented as proper PCI devices directly connected to the
   main PCI bus.
-  
+
   Older PCI buses have a \emph{control bus} supposed to send controlling
   signals and synchronize objects which are connected to it and multiplexed
   \emph{address} and \emph{data buses}. Device starts transmission by sending
@@ -252,13 +252,19 @@
   on the same wires. On the other hand, PCI express uses packets for
   communication over serial physical layer, it further must contain hubs and
   switches for packet transmission. Data and addresses (might be both 32 and
-  64-bit) are part of packets, each request and reply is a packet here. 
+  64-bit) are part of packets, each request and reply is a packet here.
 
   Legacy PCI has 32-bit wide address/data bus. This shortcoming affects
-  sending 64-bit numbers over the
-  bus to older \com\ cards as we will see in section \ref{chap.hwsetup}.
-  Further detailed PCI information are in \cite{pcispec} (PCI, PCI-X) and
-  \cite{pciespec} (PCI express).
+  sending 64-bit numbers over the bus to older \com\ cards as we will see in
+  section \ref{chap.hwsetup}. Addresses are normally sent in so-called
+  \emph{single address cycle} (SAC) mode, when 32-bit address is set on the
+  bus and latched by the other side. This will be supported by first
+  generation of the hardware. However it's possible to send even 64-bit
+  addresses via \emph{double} (sometimes \emph{dual}) \emph{address cycle} DAC
+  by negotiating it and repeating SAC twice. See chapter~\ref{chap.future}, we
+  plan to use DAC mechanism in the future to address more than 4\,GiB of
+  memory. Further detailed PCI information are in
+  \cite{pcispec} (PCI, PCI-X) and \cite{pciespec} (PCI express).
 
   \subsubsection{Configuration space}
   Every modern bus supports a mechanism to autoconfigure devices connected
@@ -295,16 +301,15 @@
   bus and sends or latches data on a data bus. When there are more than one
   data phases after address phase on multiplexed bus, the transfer is done in
   so-called \emph{burst mode}.
-  
+
   On older machines, there was only one device called \emph{DMA controller}
-  (DMAC),
-  which could become a master. Nowadays each PCI device (see also Section
-  \ref{chap.pci}) may become a master, so that it can access memory directly
-  by its own DMAC\footnote{Note that there is no common PCI DMAC, so if the
-  device doesn't have one, it doesn't support DMA either.}.
-  As we will see in chapter~\ref{chap.netcope}, their count is not limited to
-  one per PCI device. Unit which takes care of honest bus
-  accesses by more than one DMAC is called \emph{Arbiter}.
+  (DMAC), which could become a master. Nowadays each PCI device (see also
+  Section \ref{chap.pci}) may become a master, so that it can access memory
+  directly by its own DMAC\footnote{Note that there is no common PCI DMAC, so
+  if the device doesn't have one, it doesn't support DMA either.}. As we will
+  see in chapter~\ref{chap.netcope}, their count is not limited to one per PCI
+  device. Unit which takes care of honest bus accesses by more than one DMAC
+  is called \emph{Arbiter}.
 
   \subsection{PCI DMA interface}
   To become a master on legacy PCI bus, the device asks arbiter for a band and
@@ -338,13 +343,12 @@
   explanation.
 
   \paragraph{PCI interface} This interface supports coherent (also called
-  consistent) and non-coherent DMA mappings.
-  We always must decide which one we should use. Non-coherent mappings are
-  often mapped only for a transfer and then unmapped and underlying buffer
-  freed. This is method widely used for socket buffers which are
-  thrown away after
-  successful transmission. We will probably use this interface for exactly
-  this purpose out of scope of this thesis, see chapter~\ref{chap.future}.
+  consistent) and non-coherent DMA mappings. We always must decide which one
+  we should use. Non-coherent mappings are often mapped only for a transfer
+  and then unmapped and underlying buffer freed. This is method widely used
+  for socket buffers which are thrown away after successful transmission. We
+  will probably use this interface for exactly this purpose out of scope of
+  this thesis, see chapter~\ref{chap.future}.
 
   The other group of coherent are mappings usually XXX what? XXX
   mapped at the driver load or device start and unmapped and freed even after
@@ -381,10 +385,10 @@
   block after a while system was running. It was caused by process called
   (external) fragmentation. Other tasks held memory blocks and there wasn't
   enough space in between them to return.
-  
+
 %  See figure \ref{fig.fragmentation}
 %  for illustration.
-%  
+%
 %  Task 1 holds two memory blocks of size 2 units. Task 2
 %  allocated one block three units wide. Now, if any of the two wants to
 %  allocate block of size 4, allocation will fail, although there is
@@ -401,11 +405,11 @@
   Many algorithms were introduced to avoid this behavior, some of them are
   described in \cite{knuth_art} including buddy system used in Linux
   kernel for in-kernel allocations of larger blocks.
-  
+
   \subsubsection{Paging}
   However, the algorithms only lowers the risk of fragmentation
   being hit, we would still have problems with allocations bigger than some
-  constant specific for each allocation mechanism.  
+  constant specific for each allocation mechanism.
   To really solve the situation with external fragmentation, method named
   \emph{paging} was introduced. Linear address space is divided into pages
   of fixed size\footnote{4096 bytes on x86 with page size extension
@@ -418,25 +422,6 @@
   path, so that devices address by logical address too. It allows creating a
   virtual space even for devices, but it's not widely spread so far
   so \com\ card developers must not take it for granted.
-
-%  Virtual address itself is usually divided into few parts and each of them is
-%  offset in some page table. On 32-bit x86 with extensions disabled, 2 such
-%  tables exist and each table contains entries/pointers to next table or
-%  to physical page in the last table respectively.
-%  If the entry in either
-%  table is marked as non-present, \emph{page fault} (exception handled by
-%  operating system) is thrown. OS must either put (map) the requested page in
-%  or kill the program which references illegal address.
-%  On figure \ref{fig.vaddr} is shown, how is logical address split. CR3 is
-%  register in x86 processors containing location of global page directory
-%  depicted on the left side.
-%  \begin{figure}[htb]
-%    \begin{center}
-%      \includegraphics[width=9cm]{images/vaddr}
-%      \caption{Virtual address format}
-%      \label{fig.vaddr}
-%    \end{center}
-%  \end{figure}
 
   This schema allows us to allocate huge contiguous memory blocks without a
   need of having contiguous physical memory. In fact there is no need to have
@@ -458,7 +443,7 @@
   is used \emph{kmalloc} and \emph{kzalloc} returning a zeroed space. They are
   calls of slab allocator (see \cite{gorman}, chapter~8). Freeing is provided
   by \emph{kfree}.
-  
+
   For larger physically contiguous buffers (consequent pages)
   \emph{get\_free\_page} family should be used -- variants for zeroed page(s),
   for single page, for functions which returns \emph{struct page} pointer
@@ -518,7 +503,7 @@
   \emph{remap\_pfn\_range} may be used, a helper called
   \emph{remap\_vmalloc\_range} for virtual memory exists even since 2.6.18 and
   it remaps only \emph{vmalloc\_*user} buffers. We'll use all these mentioned
-  interfaces, depending on which kernel we compile for, to be backward 
+  interfaces, depending on which kernel we compile for, to be backward
   compatible and to have all the functionality (and simpleness for later
   kernels).
 
@@ -599,7 +584,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     ATTRS{idProduct}=="c058", NAME="combosix/%n"
 \end{verbatim}
 \vspace{0.5em}
-  
+
   As device node names are random so far -- it depends only on kernel PCI cards
   enumeration (which may vary) -- and we want numbers in names to
   correspond with each other, e.g. to have \emph{combosix6} and
@@ -609,7 +594,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   Two separate files are needed to achieve that, one another with persistent
   rules will be created on the fly. Shell script which augments the persistent
-  rules and a rules file for matching the \com\ cards which runs the 
+  rules and a rules file for matching the \com\ cards which runs the
   script are in detail commented in Appendix \ref{app.udev}.
 
   \subsection{Character device Linux interface}
@@ -652,14 +637,14 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   recommended and \emph{device\_create} as well. Further
   character device resources are available in \cite{ldd}, chapter~3 and in
   \cite{ulk}.
-  
+
   \section{NetCOPE hardware and szedata2 design}
   \label{chap.netcope}
   As we slightly mentioned in the introduction, all Liberouter projects are
   based on \com\ cards. Those cards contain Xilinx \emph{field-programmable
   gate arrays} (FPGA) with a PowerPC processor.
   There was an aspiration to develop an independent platform which would
-  be immutable against fast evolution of networking. This is a goal of \ncope\ 
+  be immutable against fast evolution of networking. This is a goal of \ncope\
   project, currently built on the top of \com\ with network profitable
   wiring and internal connections. Technicalities may be found in report
   \cite{netcope} and, for Liberouter members, also on internal wikipedia under
@@ -704,7 +689,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   packet of constant length. While \emph{PowerPC} was working with higher
   rates in this mode, we found out, that it's a bottleneck of the whole
   architecture, its control bus was too slow to achieve higher transfer rates.
-  
+
   We tried to improve this behaviour by aggregating more data packets into one
   transfer block and we redefined data structure too -- data are now in packet
   of variable length with modified header in comparison to the older one.
@@ -824,6 +809,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   all these steps in this chapter.
 
   \section{Requirements}
+  \label{chap.requirements}
   We decided to use some methods yet in previous chapters, here we
   summarize them and add some other requirements we must
   ensure our implementation will satisfy:
@@ -837,7 +823,10 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     \item multiple applications support, multiple access to the data
     \item speed
     \item as highest as possible code correctness (successful testing)
-    \item documentation (the more well commented code the better)
+    \item documentation (the more well\footnote{Avoid over-commenting, well
+      comments are good, over-commented core is worse than non-commented, see
+      chapter~8 of Documentation/CodingStyle document from kernel sources.}
+      commented code the better)
     \item abstraction (userspace library would be good)
     \item last but not the least: clean code (satisfying kernel coding style)
   \end{itemize}
@@ -883,7 +872,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   since there are no asynchronous actions which hardware can do except
   optional interrupts, the only use case regarding hardware is
   \emph{interrupt}.
-  
+
   Insert and remove takes care of initialization, the module may allocate and
   also free ring buffers depending on allocate-on-modprobe option in these two
   use cases. HW interrupt use case only wakes up applications waiting for
@@ -915,7 +904,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   application to select and start interfaces on the fly, so we must place
   points 3 and 4 in separate use cases which gives three initialization use
   cases in the end.
- 
+
   \subsubsection{Data processing} Design supports full-duplex communication, so
   we split processing further in two categories -- receive (RX) and
   transmit (TX) and describe them separately.
@@ -971,7 +960,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \paragraph{RX sequence diagram} We specify better application code flow
   here. We establish three lifelines, \textbf{application}, \textbf{module}
   and \textbf{hardware} which obviously match use case actors.
-  
+
   The work starts by \emph{open} message from \textbf{application} to
   \textbf{module}. The diagram copies actions described in use case
   initialization section above, so it nonsense to repeat the steps again. We
@@ -980,7 +969,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   here as two messages: \emph{mmap status page} and \emph{mmap RX space}.
   That's because we try to be as much exact as possible to directly turn these
   information into the real code in the next chapter.
-  
+
   \paragraph{TX sequence diagram} We reflect difference of RX and TX showed
   before in use case modeling here by not conditioning head move on
   \emph{put\_data} message and we also change all RX occurrences to TX and
@@ -1068,7 +1057,7 @@ static struct combo6_device_ops szedata2x_ops = {
   operations done on the hardware (get and set head/tail pointers, ring size
   and descriptors setting, etc.) and last but not the least invocation of DMA
   allocation routines from the former file.
-  
+
   We can conveniently use this split
   for testing and early development, because we hadn't working design while
   writing the driver. We'll create dummy \emph{hw.c} with few timers and fake
@@ -1170,7 +1159,7 @@ static struct combo6_device_ops szedata2x_ops = {
   create and destroy any structures. These operations are let to the hardware
   specific part, because it knows how many areas are needed and how large ring
   buffers should be allocated.
-  
+
   Registration of incoming device is split into two parts -- allocation
   (\emph{alloc\_szedata2}) and registration (\emph{szedata2\_register})
   itself. After calling the former, callbacks shall be set up and eventually
@@ -1228,10 +1217,11 @@ static struct combo6_device_ops szedata2x_ops = {
   sizes and alignments are compatible. If we didn't implement it, commands
   wouldn't work, because 32-bit emulation ioctl code calls only this function.
 
-  As per specification, commands must be atomic, we use spin locks to
-  avoid race conditions, because they are faster than mutexes and there is
-  not much code in critical sections to be feared of starving caused by long
-  busy waiting loops.
+  As per specification and requirements in chapter~\ref{chap.requirements},
+  commands must be atomic due to multiple application access, hence we use
+  spin locks to avoid race conditions. We use spin locks rather than mutexes,
+  because they are faster and there is not much code in critical sections to
+  be feared of starving caused by long busy waiting loops.
 
   \emph{mmap} of status page is solved by \emph{remap\_vmalloc\_range} helper
   described in chapter~\ref{chap.mm}, on the other hand for ring buffer
@@ -1243,7 +1233,7 @@ static struct combo6_device_ops szedata2x_ops = {
   this piece of code we need to implement source which will behave as a fake
   hardware.
 
-  Right on module load code which tests illegal inputs by fault injection of 
+  Right on module load code which tests illegal inputs by fault injection of
   \emph{NULL} pointers and error states encoded in a pointer passed to register
   functions. Then first available PCI device (of any type) is used as a parent
   parameter to allocation function to be able to allocate DMA space.
@@ -1267,7 +1257,7 @@ static struct combo6_device_ops szedata2x_ops = {
   further programmed to satisfy all the tests\footnote{This agile method is
   known as \emph{test driven development} (TDD), see
   \url{http://en.wikipedia.org/wiki/Test-driven_development} for reference.}.
-  
+
   Tests for all implemented character device hooks are in \emph{szetest2.c}
   see for example \emph{test\_mmap}, which tests correctness of \emph{mmap} by
   trying to forge invalid values (longer space, wrong offsets etc.). In
@@ -1277,12 +1267,15 @@ static struct combo6_device_ops szedata2x_ops = {
 
   \subsection{Hardware dependent code, phase II}
   \label{chap.hwsetup}
-  After successful testing of the base we build on further, we start
-  construction
-  of hardware dependent part. This is a bridge between \emph{combo6} base and
-  right finished module code. To be able to operate with the hardware, we
-  transcript constants from the hardware specification into header file. These
-  might be found in \emph{hw.h} file.
+  After successful testing of the base, we start construction of hardware
+  dependent part. The design was built meanwhile the specification and first
+  part implementation. The code we build up here will be a bridge between
+  currently finished szedata2 core and \emph{combo6} base.
+
+  To be able to cooperate with the hardware behind the base, the driver needs
+  to know constants which hardware can understand. They are described in the
+  hardware specification and are transcribed to a header file named
+  \emph{hw.h}.
 
   Then we start building the source file beginning with init and exit
   functions. Decision is so far to create a single module, so both module parts
@@ -1292,7 +1285,7 @@ static struct combo6_device_ops szedata2x_ops = {
   exit functions. Their contents is straightforward from
   section~\ref{chap.c6base}, we only take care of combo6 operations
   registration and in addition do module parameters alignment.
-  
+
   \emph{block\_size} is aligned to whole page and \emph{block\_count} to
   nearest power of two as ring buffer size is multiple of these two numbers
   and design
@@ -1362,7 +1355,7 @@ if (head == tail)
   kernel versions and using proper interfaces. However we must solve
   \emph{mmap}, \emph{ioctl} and \emph{class} changes for
   all drivers, because change in them is too new and unresolved.
-  
+
   While we were porting drivers from one versioning system to the another one
   in the past, we created two trees with drivers. One is \emph{kernel} with
   sourcecodes prepared for inclusion to mainline kernel and the another is
@@ -1426,35 +1419,53 @@ if (head == tail)
   \end{CompactItemize}
 
   We handle this incompatibilities in \emph{kocompat.h} header by testing
-  which kernel release we are building against. 
+  which kernel release we are building against and providing correct function
+  calls and structure definitions.
 
   \subsection{Testing, phases II and III}
   In fact, there isn't much new to test, only tests showed in phase I must
   pass again both after phase II completion and now. The tests should show no
   regressions on all kernels we have available for phase~III tests though.
+  However we might also use another techniques to catch bugs.
 
-  However we might use another techniques to catch bugs. Linux kernel itself
-  provide many options for development under \emph{Kernel hacking}
+  Next steps usually lead to a static analysis of C language. Over hundred both
+  commercial and free tools for this purpose exist\footnote{Non-complete list
+  of checkers is on wikipedia at
+  \url{http://en.wikipedia.org/wiki/List_of_tools_for_static_code_analysis}.},
+  \emph{sparse}, one of the tools, was designed directly for Linux kernel
+  needs. The
+  checking is included in kernel makefile system, \emph{make C=1} will invoke
+  \emph{sparse} checker ever before each file compilation. The output
+  is printed on standard error like usual compiler warnings and errors. We
+  caught many signedness, cast and I/O operation bugs thanks to it.
+
+  Linux kernel itself provides many options for development under \emph{Kernel
+  hacking}
   configuration submenu. Most these configurations slow down kernel operation
   rapidly, but they still may be handful while seeking for deadlocks or
-  missing lists initialization for example. We tried to enable all this
-  options, built a kernel and tested the driver by this techniques without any
-  obvious problems.
+  missing lists initialization for example. All these options enabled allowed
+  us to catch some section mismatches (problems when one function may call
+  another from distinct, potentially already freed section and thus kernel
+  crash may occur), unchecked return values of functions which must be checked
+  and also it helped us to prove locking correctness.
 
-  Next bug hunting might lead to static analysis of C language. We might found 
-  tools
-  (sparse).
+  Sometimes we hit design bug, because it's often very hard to emulate high
+  traffic in simulations which are done hardware developers. In such case this
+  bug is forwarded to concrete hardware person via \emph{trac} system. After
+  they solve the issue, we re-test and possibly change code if it is
+  misunderstanding or details specification. We cooperated this way when we
+  discovered a bug in stop hardware path both in the design and the driver.
 
-  \subsubsection{Userspace library}
+  \subsection{Userspace library}
   Even though there is no library for szedata v.~1, we consider to have one
   for szedata2. The main point to have it is to not propagate the kernel
   interface directly to the user, to simplify the interface (get rid of status
   page) and make it abstract.
-  
-  The library functions are an exact copy of use cases from the
+
+  The library functions are exact copy of use cases from the
   specification, since the use case alone means exactly that it is a
-  separate sequence of commands which might not be further divided. If we
-  encapsulate each use case's contents in a library call, we reach the two
+  separate sequence of commands which might not be further split. If we
+  encapsulate each use case contents in a library call, we reach the two
   aims from previous paragraph. Above all, if we create a shared library,
   we'll get easy to update part (module) of each application.
 
@@ -1464,38 +1475,131 @@ if (head == tail)
   header file \emph{libsze2.h} and compiled and linked into \emph{libsze2.so}
   for further usage.
 
+  \paragraph{Testing} Since we changed szetest2 only internally, the tests in
+  it must work even now except the processing is delegated to the library.
+  Its output should not change anyhow and it's checked in that manner.
+
   \subsection{Final code}
-  We get to the phase where everything works correctly. Also we didn't forget
-  to document the code for easy reuse or possible changes by other developers.
-  Userspace code documentation is provided through
-  \emph{doxygen}\footnote{Source code documentation generator tool, visit home
-  page with description at \url{http://www.stack.nl/~dimitri/doxygen/}},
-  generated text is available in Appendix~\ref{app.doxygen}. Documentation of
-  kernel code is done through kernel-doc facility\footnote{It's collection of
-  scripts which can generate bunch of formats such as \emph{man}, \emph{pdf},
-  \emph{html} or whatever is possible to be generated from \emph{sgml} or
-  \emph{DocBook} formats.}, see generated documentation in
-  Appendix~\ref{app.kdoc}.
+  With a use of iterative extreme programming technique and test driven
+  development we get to a phase where everything works correctly as far as we
+  can test and prove at best. If we get back to the requirements
+  established in chapter~\ref{chap.requirements}, we find few so far executory
+  points in it. In fact we only didn't mention we already satisfied some of
+  them.
 
-  Nice, working, debugged kernel module as a result.
+  Coding style is taken for granted, we took it in consideration while
+  writing the code. \emph{Checkpatch} -- one of the kernel scripts which
+  checks satisfaction of kernel coding style -- passed when checking the code.
 
-  As we mentioned in the introduction, all the code may be distributed under
-  GPL v. 2.
+  Also we didn't forget to document the code for easy reuse or possible
+  changes by other developers. Userspace (library) code documentation is
+  provided through \emph{doxygen}\footnote{Source code documentation generator
+  tool, visit home page with description and documentation at
+  \url{http://www.stack.nl/~dimitri/doxygen/}.}, generated text is available
+  in Appendix~\ref{app.doxygen}. Documentation of
+  kernel code is done via \emph{kernel-doc} facility\footnote{It's a
+  collection of scripts which can generate bunch of formats such as
+  \emph{man}, \emph{pdf}, \emph{html} or whatever is possible to be generated
+  from \emph{sgml} and \emph{DocBook} formats.}, see generated documentation
+  in Appendix~\ref{app.kdoc}.
 
-  \section{Maintenance}
-  YYY
+  Speed (throughput) of the implementation is one of the most interesting
+  areas in this thesis, we'll cover it in the next section. Further
+  deeper testing of final code available in subversion repository is
+  turned over to testers group.
 
   \section{Measurements and comparisons}
-  XXX
+  Now when we have all drivers ready for real operation, we are able to
+  realize some performance tests if the implementation improved the throughput
+  as expected. However, we do only basics measurements in the scope of this
+  thesis, complex tests with reference numbers will be measured by Liberouter
+  testers group, since they have appropriate tools and enough knowledge how to
+  test throughput in predicative manner.
+
+  Above all we are interested in RX direction, because we have a machine
+  which can generate high traffic on the ethernet and is fully programmable by
+  scripts. \emph{Spirent Communication AX/4000}\footnote{Visit Spirent
+  homepage at \url{http://www.spirent.com} to see exact AX/4000
+  specification.} is a broadband test system that we use for stress tests.
+  The scripts are available only in Tcl shell (\emph{tclsh}), their
+  documentation is available only on internal \emph{trac} system.
+
+  We are about to test three distinct packet lengths: 64 (minimal ethernet
+  frame length according to its RFC including header and checksum), 500 and
+  1518 (maximal frame length) on \emph{szedata} 1 and 2 and compare results
+  also with \emph{Endace DAG} cards which are intended to be deployed in the
+  same area as our cards with szedata design.
+
+  \paragraph{Results} XXX missing :)
+
+  \begin{figure}[htb]
+    \begin{center}
+      \begin{tabular}{|l|l|l|l|} \hline
+\textbf{Pkt len}& \textbf{64}	& \textbf{500}	& \textbf{1518}	\\ \hline
+\emph{Szedata}	&		&		&		\\ \hline
+\emph{Szedata2}	&		&		&		\\ \hline
+\emph{DAG}	&		&		&		\\ \hline
+      \end{tabular}
+      \caption{Measurements, tabular, a}
+      \label{fig.measures_tab}
+    \end{center}
+  \end{figure}
+
+  \begin{figure}[hbt]
+    \begin{center}
+      \includegraphics[width=9cm]{images/measures}
+      \caption{Measurements, graph}
+      \label{fig.measures_gr}
+    \end{center}
+  \end{figure}
+
+  \section{Maintenance}
+  Drivers are deployed on all machines and kernel versions after successful
+  tests done by testers. This must have been done for a first time due to
+  conversion from one versioning system to another and dropping support of
+  older kernels than 2.6. Meanwhile we have been creating this implementation
+  all other drivers were moved to the new system with many intrusive changes,
+  which broke compatibility between the two version from both systems, so they
+  must be tested, now including \sze.
+
+  Thanks to modularity, further maintenance and updating are easy to realize.
+  When we have the state, when all the drivers are from the new versioning
+  system, changing one single module is possible by simply removing it and
+  placing in the same directory updated version either with fixes or some new
+  features.
 
 \chapter{Conclusion and future work}
   \section{Conclusion}
-  XXX
+  XXX architecture, linux kernel possibilities, szedata2 module, library, used
+  techniques, testing, comparison
+
   \section{Future work}
   \label{chap.future}
-  DMA DAC, standard network adapter mode (kernel network stack usage). SPMD
+  Out implementation has been done, however some parts might still be
+  improved. At least three kinds of improvements currently exist which are out
+  of scope of this thesis.
+  
+  We already introduced idea to support 64-bit PCI addressing in DAC
+  mode in chapter~\ref{chap.pci}. After hardware being ready to do such
+  transfers, our task would be to add support to \emph{combo6} base. Note that
+  \sze\ driver is 64-bit ready and so the design registers, what blocks using
+  address higher than $2^{32}$ is PCI core code which is told to do so by
+  set DMA mask. Memory management then return pages with physical addresses
+  satisfying belonging to this address mask.
 
-\bibliographystyle{plain} 
+  Next, it would be great to have ability to use \sze design also in a
+  standard network adapter mode, i.e. with use of kernel network stack. This
+  needs slight changing of \emph{hw.c} and rewriting whole hardware
+  independent part -- conversion from character device data passing to socket
+  operations.
+
+  Also we know, that we have another option in data processing in this
+  application specific interface. Instead of multiprocessing of incoming data,
+  we would want to balance load among many threads on multiprocessor machine
+  to do more time-consuming jobs. Remember computation of ring buffer size,
+  where we consider only 50\,ms latencies.
+
+\bibliographystyle{plain}
 \bibliography{dp}
 
 \include{app}
