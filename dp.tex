@@ -51,19 +51,30 @@
   {
     \settowidth{\labelwidth}{40pt}
     \setlength{\leftmargin}{\labelwidth}
-    \setlength{\parsep}{0pt}
+    \setlength{\parsep}{-4pt}
     \setlength{\itemsep}{-4pt}
     \renewcommand{\makelabel}{\entrylabel}
   }
 }
 {\end{list}}
 \newcommand{\doxyref}[3]{\textbf{#1} (\textnormal{#2}\,\pageref{#3})}
+\makeatletter
+\newcommand*\kdocsubsection{%
+  \@startsection{subsection}{2}{\z@}%
+    {-1\baselineskip\@plus -.5\baselineskip \@minus -.25\baselineskip}%
+    {.01\baselineskip}%
+    {\normalfont\normalsize\SSectFont}}
+\makeatother
 \newenvironment{kdocdescription}
-	{\list{}{\labelwidth 0pt \itemindent-\leftmargin
-		\let\makelabel\descriptionlabel}
+	{\begin{list}{}{
+		\settowidth{\labelwidth}{40pt}
+		\setlength{\leftmargin}{\labelwidth}
 		\setlength{\parsep}{0pt}
-		\setlength{\itemsep}{-1.4em}}
-	{\endlist}
+		\setlength{\itemsep}{-0pt}
+		\setlength{\partopsep}{-1.5em}
+		\renewcommand{\makelabel}{\descriptionlabel}
+		}}
+	{\end{list}}
 
 \thesislang{en}
 
@@ -1376,7 +1387,9 @@ if (head == tail)
   for such kind of research are \emph{cscope} to see, where the symbol is
   defined, \emph{git-blame} to figure out when and by what commit was each
   particular line (and function) changed and \emph{git-show} to see the patch
-  which does the change.}, we found out, that \emph{.fault} handler was
+  which does the change. Finally \emph{git-describe} on the commit gives
+  directly a version which the patch was committed after.}, we found out, that
+  \emph{.fault} handler was
   introduced in 2.6.23 and previously used \emph{.nopage} was removed along
   with that change. Also 2.6.18 was the first kernel, where is
   \emph{remap\_vmalloc\_range} available for public use. This gives three
@@ -1429,8 +1442,10 @@ if (head == tail)
   calls and structure definitions.
 
   \subsection{Testing, phases II and III}
-  In fact, there isn't much new to test, only tests showed in phase I must
-  pass again both after phase II completion and now. The tests should show no
+  In fact, there isn't much new to test by our testing techniques thanks to
+  test being ready before the driver programming. Only tests showed in phase~I
+  must
+  pass again both after phase~II completion and now. The tests should show no
   regressions on all kernels we have available for phase~III tests though.
   However we might also use another techniques to catch bugs.
 
@@ -1438,9 +1453,9 @@ if (head == tail)
   commercial and free tools for this purpose exist\footnote{Non-complete list
   of checkers is on wikipedia at
   \url{http://en.wikipedia.org/wiki/List_of_tools_for_static_code_analysis}.},
-  \emph{sparse}, one of the tools, was designed directly for Linux kernel
-  needs. The
-  checking is included in kernel makefile system, \emph{make C=1} will invoke
+  one of the tools, \emph{sparse}, was designed directly for Linux kernel
+  driver development needs. The checking is included in kernel makefile system
+  also, \emph{make C=1} will invoke
   \emph{sparse} checker ever before each file compilation. The output
   is printed on standard error like usual compiler warnings and errors. We
   caught many signedness, cast and I/O operation bugs thanks to it.
@@ -1455,27 +1470,31 @@ if (head == tail)
   crash may occur), unchecked return values of functions which must be checked
   and also it helped us to prove locking correctness.
 
-  Sometimes we hit design bug, because it's often very hard to emulate high
+  Sometimes we hit a design bug, because it's often very hard to emulate high
   traffic in simulations performed by hardware developers. This bug is in such
   case forwarded to a concrete hardware person via \emph{trac} system. After
   they solve the issue, we re-test and possibly change code if it is
-  misunderstanding or details specification. We cooperated this way when we
-  discovered a bug in stop hardware path both in the design and the driver.
+  misunderstanding of specification details. We cooperated this way when we
+  discovered a bug in stop hardware path both in the design and the driver for
+  instance.
 
   \subsection{Userspace library}
   Even though there is no library for szedata v.~1, we consider to have one
-  for szedata2. The main point to have it is to not propagate the kernel
+  for \sze. The main point to have it is to not propagate the kernel
   interface directly to the user, to simplify the interface (get rid of status
   page) and make it abstract.
 
-  The library functions are exact copy of use cases from the
-  specification, since the use case alone means exactly that it is a
-  separate sequence of commands which might not be further split. If we
-  encapsulate each use case contents in a library call, we reach the two
+  We create a directory for library in versioning system in software package,
+  integrate with existing build system and create a file with where the
+  library heart is going to be. The function bodies are exact copy of use
+  cases from the specification, since the use case alone means exactly that it
+  is a separate sequence of commands which might not be further split. If we
+  carry over each use case contents to a library call, we reach the two
   aims from previous paragraph. Above all, if we create a shared library,
   we'll get easy to update part (module) of each application.
 
-  Most of the library code is extraction from \emph{szetest2.c} testing code.
+  If we look closer at the use cases, we'll see, that most of the library code
+  may be extracted from \emph{szetest2.c} testing code, thanks to XXX
   We only take away testing stuff and place atomic (from use case view)
   commands in one function call. Then this interface is exposed by library
   header file \emph{libsze2.h} and compiled and linked into \emph{libsze2.so}
@@ -1526,9 +1545,10 @@ if (head == tail)
   which can generate high traffic on the ethernet and is fully programmable by
   scripts. \emph{Spirent Communication AX/4000}\footnote{Visit Spirent
   homepage at \url{http://www.spirent.com} to see exact AX/4000
-  specification.} is a broadband test system that we use for stress tests.
+  specification.} is a broadband test system we use for stress tests.
   The scripts are available only in Tcl shell (\emph{tclsh}), their
-  documentation is available only on internal \emph{trac} system.
+  documentation is available only on internal \emph{trac}
+  system\footnote{\url{https://www.liberouter.org/trac/tests/wiki/dokumentaceKTestum}}.
 
   We are about to test three distinct packet lengths: 64 (minimal ethernet
   frame length according to its RFC including header and checksum), 500 and
@@ -1536,8 +1556,24 @@ if (head == tail)
   also with \emph{Endace DAG} cards which are intended to be deployed in the
   same area as our cards with szedata design.
 
-  \paragraph{Results} XXX missing :)
+  Also this kind of traffic may provoke situations which we are not able to
+  evoke in any other way. So these measurements are helpful in finding so far
+  hidden bugs. We found out, that we revealed few in design and hence we
+  could further improve the stability.
 
+  \paragraph{Measurements} To gather some statistics about incoming data, we
+  must program some utility which would measure time, incoming packets and
+  their volume. With use of the time, we can count packets per second and
+  also average packet length. Conveniently we might augment \emph{szetest2}
+  application by adding few lines among other yet implemented testing code.
+  
+  This yields a tool which can beside operation with pointers do some basic
+  measurements and report numbers we may build charts from.
+
+  \paragraph{Results} After we gain some results, we must average the values
+  to have at least basically correct statistics. Computed values are enlisted
+  in the table on figure~\ref{fig.measures_tab}. Their graphic representation
+  then on chart on figure~\ref{fig.measures_gr}.
 % http://www.endace.com/assets/docs/accelerated/DAGPacketCapturePerformance.pdf
 
   \begin{figure}[htb]
