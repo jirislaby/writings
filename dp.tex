@@ -1043,27 +1043,30 @@ static struct combo6_device_ops szedata2x_ops = {
 	.interrupt = szedata2_hw_interrupt,
 };
 \end{lstlisting}
-  Some entry values need to be explained:
+  Let's explain values in some entries:
   \begin{itemize}
-    \item \emph{owner} is set not to allow in-use modules removal, core driver
-      adds 1 to reference count of the module and kernel disallows the module
-      removal
+    \item \emph{owner} is set to not allow used modules removal, core driver
+      adds 1 to reference counter of the module and kernel forbids the
+      module removal
     \item \emph{intfs} are limited to 2 of total 4, since the testing design
       supports only 2 interfaces so far, whereas the hardware reports 4
-      present
-    \item \emph{id\_*} entries are taken directly from the szedata2 design
+      present, so we would end up in initialization of non-existent hardware
+    \item \emph{id\_*} entries are taken directly from the \sze\ design,
+      0x41c1 is \ncope\ project, 0x03 is major version (0x02 was szedata1
+      design) and finally 0x00 is a minor. As we want to bind this driver to
+      all \sze\ designs, we grab all its potential minors up to 0xff.
   \end{itemize}
   We can see, that the structure also contains designator of combo6x card on
   the line~\ref{lstl.c6dops_4}.
-  We must set that entry and that means creating two such structures to
-  support both \com\ and \comx\ cards.
+  We must set that entry and that means creating two such structures with the
+  same contents but \emph{dhw} to support both \com\ and \comx\ cards.
 
   \subsection{Implementation}
-  We used term command in the specification many times, but we haven't
+  We used term \emph{command} in the specification many times, but we haven't
   explained command passing mechanism. Although \emph{ioctl} system call was
-  uttered as deprecated long time ago, nothing better was introduced so far
-  and it's still widely used even in new projects. Hence we'll use it for
-  commands passing too.
+  uttered as deprecated long time ago, nothing better was introduced so far,
+  its kernel interface has been improved and it's still widely used even in
+  new projects. Hence we'll use it for commands passing too.
 
   We split the implementation into two separate files. One is for
   non-hardware dependent part (\emph{szedata2.c} and \emph{szedata2.h}) and
@@ -1074,7 +1077,7 @@ static struct combo6_device_ops szedata2x_ops = {
   section and registration to the \emph{combo6} base and all ring buffer
   operations done on the hardware (get and set head/tail pointers, ring size
   and descriptors setting, etc.) and last but not the least invocation of DMA
-  allocation routines from the former file.
+  allocation routines from the HW independent file.
 
   We can conveniently use this split
   for testing and early development, because we hadn't working design while
@@ -1091,9 +1094,9 @@ static struct combo6_device_ops szedata2x_ops = {
 
   Since 64-bit operations are expensive and non-atomic on 32-bit machines,
   we try to minimize 64-bit computations as much as possible. In fact we need
-  only an mmap offset to be 64-bit to allow spaces be bigger in sum than
-  4\,GiB on 64-bit or 32-bit PAE enabled machines. See following structure
-  descriptions and notes about 64-bit needs.
+  only an mmap offset and size to be 64-bit to allow spaces be bigger in sum
+  than 4\,GiB on 64-bit or 32-bit PAE enabled machines. See following
+  structure descriptions and notes about 64-bit needs.
 
   \paragraph{Application-driver interface}
   We decided to pass all read-only information in status page which is
@@ -1113,7 +1116,7 @@ static struct combo6_device_ops szedata2x_ops = {
   to be mmaped. According to the manual page of mmap and Linux kernel
   requirements, only two parameters must be known -- offset and size. As
   mentioned earlier, offset is 64-bit value and so the size is. Eleven
-  (indexed by 0 through 10) such values might be stored in the page, however
+  (indexed by 0 through 10) such pairs might be stored in the page, however
   we use only
   two\footnote{Note that it's not space wasting, page size is usually 4\,KiB
   and it's enough space to reserve some entries for future purposes.}, one for
@@ -1173,21 +1176,21 @@ static struct combo6_device_ops szedata2x_ops = {
   use later in \emph{exit} function when unregistering character device.
 
   We see, that we don't allocate any buffers or any other data, so we must
-  export hooks for events when device comes and leaves, even than we can
-  create and destroy any structures. These operations are let to the hardware
-  specific part, because it knows how many areas are needed and how large ring
-  buffers should be allocated.
+  export hooks for events when a device comes and leaves, even then we can
+  create and destroy any structures. These operations are yielded to the
+  hardware specific part, because it knows how many areas are needed and how
+  large ring buffers should be allocated.
 
   Registration of incoming device is split into two parts -- allocation
   (\emph{alloc\_szedata2}) and registration (\emph{szedata2\_register})
   itself. After calling the former, callbacks shall be set up and eventually
   DMA allocations must be done now (or alternatively even on the first
   open). If we didn't the split, we might end up with kernel panic, because
-  concrete character device is set in the register path and some so far zeroed
-  callback invoked. \emph{szedata2\_destroy} is created for cleanup purposes.
-  We must take in account situations when latter register function
-  hasn't been called at all. This is achieved by setting one bit in the
-  register function and test for this bit in the destroy one.
+  concrete character device is set in the register call and some so far zeroed
+  callback may be invoked already. \emph{szedata2\_destroy} is created for
+  cleanup purposes. We must take in account situations when latter register
+  function hasn't been called at all. This is achieved by setting one bit in
+  the register function and test for this bit in the destroy one.
 
   DMA allocation is performed via PCI interface described in
   chapter~\ref{chap.dma}. Allocation is done per page basis (recall
@@ -1195,8 +1198,8 @@ static struct combo6_device_ops szedata2x_ops = {
   TX directions and 50\,MiB sized ring buffers, we have
   $\frac{4\cdot2\cdot50\cdot2^{20}}{4096}\doteq100000$ pages for 4096\,B pages.
   We need to store physical and virtual address for each page (to be able to
-  work with the buffer and also free it later), worst case are on 64-bit
-  machines, where both numbers are 8-bytes, we further have
+  work with the buffer and also free it later), worst case is on 64-bit
+  machines, where both numbers are 8-bytes, so that we further have
   $100000\cdot2\cdot8=1600000$. This information might be stored in
   $\frac{1600000}{4096}\doteq390$ pages. That's a number very close to
   $2^{MAX\_ORDER}$\footnote{\emph{MAX\_ORDER} is maximum allowed power of 2
@@ -1205,11 +1208,11 @@ static struct combo6_device_ops szedata2x_ops = {
   failure if we didn't use virtual memory (\emph{vmalloc}) for those
   descriptors.
 
-  Even if we're allocating ring buffer page after page, we might face
+  Even if we're allocating ring buffer page by page, we might face
   failures. It's because of how allocations work in memory management
   subsystem. For implementation in Linux 2.4 see~\cite{gorman}, 2.6 differs
   slightly, but it's the same in principle. Most of inactive pages is freed
-  even under high pressure, i.e. priority is high. The priority is raised by
+  even under high pressure, when priority is high. The priority is raised by
   each failure and the higher the priority is the more pages are tried to free
   (also the used ones might be swapped out if they belong to userspace). This
   means we should try to allocate pages which failed at least several times
@@ -1341,20 +1344,22 @@ static struct combo6_device_ops szedata2x_ops = {
   callback) failed.
 
   Pointer and interrupt callbacks are simple calls of PCI space reads and
-  writes, a problem
-  arises when computing sizes of spaces between read tail and head. When tail
-  equals to head it's hard to distinguish if the buffer is empty or full. Few
+  writes, a problem arises when computing sizes of spaces between read head
+  and stored tail. When tail equals to head it's impossible to distinguish if
+  the buffer is empty or full. Few
   techniques with less or more overhead exist\footnote{See
   \href{http://en.wikipedia.org/wiki/Circular_buffer\#Full_.2F_Empty_Buffer_Distinction}{http://en.wikipedia.org/wiki/Circular\_buffer}
   for description of all methods.}. "Always Keep One Byte Open" method is
-  implemented in the design. This is not a problem for receive pointers,
-  hardware never sets them the same, it will ever use size-1 at most. But we
-  must take care of transmit size, because we move with the head and we mustn't
-  reach tail. This is done by this code in \emph{szedata2\_head\_tail\_size}:
+  implemented in the design, head and tail never equals in both cases, only if
+  the buffer is empty. This is not a problem for receive pointers in the
+  driver, hardware never sets them the same, it will ever use size-1 at most.
+  But we must take care of transmit size, because we move with the head and we
+  mustn't reach the tail. This is done by this code in
+  \emph{szedata2\_head\_tail\_size}:
 
 \begin{verbatim}
 if (head == tail)
-  return size - 1;
+    return size - 1;
 \end{verbatim}
 
   \subsection{Back-porting to older kernels, phase III}
@@ -1501,11 +1506,15 @@ if (head == tail)
   interface is exposed by library header file \emph{libsze2.h} and compiled
   and linked into \emph{libsze2.so} for further usage.
 
-  \paragraph{Testing} Since we changed szetest2 only internally, the tests in
+  \paragraph{Testing} Since we changed \emph{szetest2} only internally, the
+  tests in
   it must work even now except the processing is delegated to the library.
   Its output should not change anyhow and it's checked in that manner.
 
-  splint. XXX
+  Also userspace application may be checked by some static code analyser. Even
+  \emph{sparse} may be used for that purpose, but also \emph{lint} successors
+  such as splint. This helped us to fix some mostly coding style and
+  non-intrusive errors.
 
   \subsection{Final code}
   With a use of iterative extreme programming technique and test driven
@@ -1595,7 +1604,7 @@ if (head == tail)
   \begin{figure}[hbt]
     \begin{center}
       \includegraphics[width=9cm]{images/measures}
-      \caption{Measurements, graph}
+      \caption{Measurements, chart}
       \label{fig.measures_gr}
     \end{center}
   \end{figure}
@@ -1650,28 +1659,37 @@ if (head == tail)
   \section{Future work}
   \label{chap.future}
   Our implementation has been done, however some parts might still be
-  improved. At least three kinds of improvements currently exist which are out
+  improved. At least four kinds of improvements currently exist which are out
   of scope of this thesis.
   
+  \begin{itemize}
+  \item
   We already introduced idea to support 64-bit PCI addressing in DAC
   mode in chapter~\ref{chap.pci}. After hardware being ready to do such
   transfers, our task would be to add support to \emph{combo6} base. Note that
   \sze\ driver is 64-bit ready and so the design registers, what blocks using
   address higher than $2^{32}$ is PCI core code which is told to do so by
-  set DMA mask. Memory management then return pages with physical addresses
-  satisfying belonging to this address mask.
-
-  Next, it would be great to have ability to use \sze design also in a
-  standard network adapter mode, i.e. with use of kernel network stack. This
-  needs slight changing of \emph{hw.c} and rewriting whole hardware
+  setting DMA mask. Memory management then return pages with physical
+  addresses  satisfying this address mask.
+  \item
+  Next, it would be great to have ability to use \sze\ design also in a
+  standard network adapter mode, i.e. with use of kernel networking stack.
+  This needs slight changes of \emph{hw.c} and rewriting whole hardware
   independent part -- conversion from character device data passing to socket
   operations.
-
+  \item
   Also we know, that we have another option in data processing in this
   application specific interface. Instead of multiprocessing of incoming data,
   we would want to balance load among many threads on multiprocessor machine
   to do more time-consuming jobs. Remember computation of ring buffer size,
   where we considered only 50\,ms latencies.
+  \item
+  Further optimizations may be introduced in the area of reading pointer from
+  hardware. Reads and writes to slow (in comparison to front-side bus) PCI bus
+  may take many hundreds of processor cycles until they finish. To
+  avoid so long delays we might cache pointers for later use for example in
+  \emph{poll}.
+  \end{itemize}
 
 \bibliographystyle{plain}
 \bibliography{dp}
