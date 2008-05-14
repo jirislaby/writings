@@ -1,6 +1,6 @@
 % vim: textwidth=78 ai spell spelllang=en
 
-\documentclass[draft]{fithesis}
+\documentclass[final]{fithesis}
 
 %\usepackage{cmap}
 \usepackage[utf8x]{inputenc}
@@ -12,6 +12,9 @@
 \usepackage{fancyvrb}
 
 \setcounter{tocdepth}{3}
+
+\addtolength{\textwidth}{2cm}
+\addtolength{\oddsidemargin}{-1cm}
 
 \newcommand{\settocdepth}[1]{%
   \addtocontents{toc}{\protect\setcounter{tocdepth}{#1}}
@@ -160,7 +163,7 @@
   router
   for high traffic networks. After some time, this idea was augmented to other
   network usages such as network filtering and monitoring. All these functions
-  run on \com\ family PCI cards (on figure \ref{fig.combo6} for illustration).
+  run on \com\ family PCI cards (in figure \ref{fig.combo6} for illustration).
 
   \begin{figure}[tb]
     \begin{center}
@@ -234,7 +237,7 @@
   \label{chap.inter}
   The first thing to explain is how data flows from devices to processor and
   main memory and particularly which types of buses are on the route from a
-  CPU to a device. Overall view may be seen on figure \ref{fig.dev_inter}.
+  CPU to a device. Overall view may be seen in figure \ref{fig.dev_inter}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -270,13 +273,13 @@
   mechanism in the future to address more than 4\,GiB of the memory, see
   chapter~\ref{chap.future}.
 
-  This problems are completely avoided later in PCI express which communicates
+  These problems are completely avoided later in PCI express which communicates
   over serial physical layer by packets routed by switches and hubs. Each
   request or reply is a packet which may contain both 32 and 64-bit addresses
   in the packet header and whatever data in the payload.
 
-  Further detailed PCI information are in \cite{pcispec} (Legacy PCI, PCI-X)
-  and \cite{pciespec} (PCI express).
+  Further detailed PCI information are in Legacy PCI, PCI-X\cite{pcispec} and
+  PCI express\cite{pciespec} specifications.
 
   \subsubsection{Configuration space}
   Every modern bus supports a mechanism to autoconfigure devices connected
@@ -288,8 +291,8 @@
 
   In our scope of interest are device, vendor and their subsystem variant
   IDs contained in this space, because these are mostly only identifiers
-  designating one concrete device family. It is helpful in userspace scripts
-  to create persistently named nodes in chapter \ref{chap.udev}.
+  designating one concrete device family. It is also helpful in userspace
+  scripts to create persistently named nodes in chapter \ref{chap.udev}.
 
   \subsubsection{Linux PCI support}
   PCI is well supported in Linux since it became a standard. Concrete API is
@@ -482,7 +485,7 @@
   underlying pages are marked as user and zeroed not to leak any information.
   \emph{vfree} frees all these allocations.
 
-  For the convenience of \com\ PCI devices, we use
+  For the convenience of \com\ being PCI devices, we use
   \emph{pci\_alloc\_consistent} and \emph{pci\_free\_consistent} for DMA
   allocations, \emph{vmalloc\_32\_user} for buffer to be mapped to userspace
   and obviously \emph{kmalloc} for driver state structures.
@@ -658,14 +661,14 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \section{NetCOPE hardware and szedata2 design}
   \label{chap.netcope}
   As we slightly mentioned in the introduction, all Liberouter projects are
-  based on \com\ cards. Those cards contain Xilinx \emph{field-programmable
+  based on \com\ cards. They contain Xilinx \emph{field-programmable
   gate arrays} (FPGA) with a PowerPC processor.
   There was an aspiration to develop an independent platform which would
   be immutable against fast evolution of networking. This is a goal of \ncope\
   project, currently built on the top of \com\ with network profitable
-  wiring and internal connections. Technicalities may be found in report
-  \cite{netcope} and, for Liberouter members, also on internal wikipedia under
-  all links on \ncope\ specification page.
+  wiring and internal connections. Technicalities may be found in Netcope
+  report\cite{netcope} and, for Liberouter members, also on internal wikipedia
+  under all links on \ncope\ specification page.
 
   The project was started in the middle of 2006 and currently we have a
   functional and tested prototype with 4 network interfaces\footnote{a new
@@ -693,14 +696,14 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   \subsection{szedata2}
   Szedata2 is one of designs, the abbreviation stands for \emph{straight
-  zero copy data} in the meaning of avoid copying data from memory to the
-  application and vice versa. The name was chosen after its predecessor
-  szedata v. 1.
+  zero copy data} in the meaning of avoid copying data actively by processor
+  from memory to the application and vice versa. The name was chosen after its
+  predecessor szedata version 1.
 
   \subsubsection{Design specification}
   Both szedata versions operate in \emph{FPGA} on \ncope\ architecture.
   Version 1 uses \emph{PowerPC} as a DMA controller -- program running
-  on that processor used to transfer data through scatter-gather DMA method
+  on that processor used to transfer data by scatter-gather DMA method
   (described in \cite{ldd}, chapter~15) over memory chunk pool.
   In the first phase, the data transferred at one turn contained only one
   packet of constant length. While \emph{PowerPC} was working with higher
@@ -711,14 +714,17 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   transfer block and we redefined data structure too -- data are now in packet
   of variable length with modified header in comparison to the older one.
   We had to redesign also the program running on the card a bit and define the
-  packet structure in the specification. The header includes two sizes:
-  segment size and header size. The former is size of whole segment, i.e.
-  size of header, padding and data in sum, while the latter is size of optional
-  part of segment containing some control information. This control data are
-  placed directly after the header, optional padding follows and finally the
-  packet contents with start aligned to 8-byte
-  boundary (thanks to padding). We refer to this structure as a \emph{packet},
-  its format is shown on figure \ref{fig.netcope_pkt}.
+  packet structure in the specification.
+  
+  Packet header includes two sizes: segment size and header size. The former
+  is size of whole segment, i.e. size of the header, padding and data in sum,
+  while the latter is size of optional part of segment containing some control
+  information. These control data are placed directly after the header,
+  optional padding follows and finally the packet contents (payload) with
+  start aligned to 8-byte boundary (thanks to padding). Whole structure is
+  padded at the and again to 8-byte boundary. We refer to this as
+  a~\emph{packet of variable length}, its format is shown in figure
+  \ref{fig.netcope_pkt}.
 
   \begin{figure}[hbt]
     \begin{center}
@@ -730,21 +736,20 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   Despite all improvements, this was still unsuitable due to grown complexity
   and still the transfers couldn't be performed at estimated (theoretically
-  computed) speeds.
-  We decided to redesign whole design architecture and fork szedata project
-  into the version 2. \emph{PowerPC} will be no longer used for DMA transfers,
+  computed) speeds. We decided to redesign whole design architecture and fork
+  \emph{szedata} project into the version~2. \emph{PowerPC} will be no longer
+  used for DMA transfers,
   it'll be fully disconnected. Four separate DMA controllers for each
   interface will be implemented directly in the design instead. By that step
   we eliminate the impact of slow control bus, but we still have problems
-  with data structures, the aggregation is too complex.
+  with packet transfers, the aggregation is too complex.
 
   After digging through some specifications such as Intel gigabit Ethernet
-  cards \cite{intel_gbe}, drivers e.g. for Broadcom 43 wireless cards
+  cards\cite{intel_gbe}, drivers e.g. for Broadcom~43 wireless cards
   and info about projects such as Endace DAG, we considered a ring buffer
-  structure as an underlying structure. This was the breakpoint to start
-  szedata2 Liberouter project.
+  structure as an underlying medium.
 
-  First, we needed to create a design specification. Let's consider 10\,Gb/s
+  First, we needed to create a design specification. Let's consider 10\,Gbit/s
   data flow and userspace task latency of 50\,ms. We need a buffer of size
   at least $\frac{10\cdot10^{3}\cdot0,05}{8}\doteq60$\,MiB per interface not
   to throw incoming data away. But as we noted in chapter \ref{chap.mm}, we
@@ -755,14 +760,17 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   pointing to the pages of the interspersed ring buffer. We took in account
   64-bit systems, so that the pointers are represented by 8 bytes each. Since
   we allocate the descriptor memory on a page basis too, it allows us to have
-  only $\frac{4096}{8}=512$ pointers to ring pages
-  which gives $512\cdot4096=2$\,MiB sized ring buffer. This is not enough, so
-  we introduced two kinds of descriptor entries. One is still a direct pointer
-  to a ring buffer page, the other one is a pointer to the next descriptor
+  only $\frac{4096}{8}=512$ pointers to ring pages which gives
+  $512\cdot4096=2$\,MiB sized ring buffer. This is not enough, so we
+  introduced two kinds of descriptor entries. One is still a direct pointer to
+  a single ring buffer page, the other one is a pointer to the next descriptor
   table. To distinguish them, we take to advantage of all page addresses being
-  zeroed in low 12~bits (see \cite{gorman}, chapter~3) -- descriptor pointers
-  are logically or-ed with~1. Such situation is depicted on figure
-  \ref{fig.ring}.
+  zeroed in low 12~bits (see \cite{gorman}, chapter~3) by using these few bits
+  for flags. Pointers to the next descriptor table read by the hardware are
+  logically or-ed with~1. We call these pointers \emph{type 1} in
+  figure~\ref{fig.ring}, ring buffer page pointers are denoted as
+  \emph{type 0}, and for illustration we also connect ring buffer pages with
+  dashed \emph{virtual link}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -776,15 +784,16 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   The last thing we need to cover before implementation is how we declare
   communication channel between driver and newly specified design. For the
   convenience of MMIO, we define design address space as a memory area. Every
-  DMA engine has its own subspace with its controlling register. Up to 16
+  DMA engine has its own subspace with its controlling registers within this
+  area. Up to 16
   engines are supported for future purposes, we use only 2 so far. Each space
   consist of these register groups:
 
   \begin{enumerate}
     \item pointer to the first page with descriptors
-    \item start, end and size registers -- ring buffer state pointers, it's
-      head, tail and size of whole buffer
-    \item control and status registers -- used to control the design and check
+    \item start, end and size registers -- ring buffer state pointers, they
+      are current head and tail and size of whole buffer
+    \item control and status registers -- used to instruct the design and check
       actual state
     \item interrupt registers -- timeout, position or both may be used for
       interrupt generation; position is triggered when one of ring buffer
@@ -793,37 +802,47 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   As the DMA engine needs to have information about ring buffer before it
   starts working, registers groups 1. and 2. shall be set prior to sending
-  start command to control register 3. Interrupt registers 4. are optional,
-  they may be set and changed on the fly. Concrete steps of hardware
+  \emph{start} command to control register 3. Interrupt registers 4. are
+  optional, they may be set and changed on the fly. Concrete steps of hardware
   initialization and deinitialization will be described in the driver
   specification in chapter~\ref{chap.spec}.
 
-  After successfully launch of the engine, we only need to update tail
+  After successful launch of the engine, we only need to update tail
   pointers for receive direction after we process data and head for transmit
   after we write data to the ring buffer. Any other processing is implemented
-  in the engine and we needn't to care.
-
-%  We use character device approach in Liberouter already -- we have a
-%  separated namespace for combosix core driver and for szedata (it's an
-%  implementation for older firmware, discussed in chapter \ref{chap.netcope}):
-%  combosix* and szedata*, where * stands for any so far random number.
+  in the engine and we needn't to care about it.
 
 \chapter{szedata2 driver}
-  This thesis also aims to be a clue for other Liberouter developers, how may
-  modern techniques be used in development process. We'll use some of agile
+  This thesis also aims to apply modern techniques in Liberouter development
+  process. We'll use some of agile
   techniques evolved in the mid-1990s and established in \emph{Agile
   Manifesto}\footnote{It is a statement from 2001 establishing principles of
   agile programming. Freely available at \url{http://agilemanifesto.org/}.},
   some basic \emph{unified modeling language} (UML) methods declared as
-  standard in UML 1.x versions.
-%  and reference design patterns that should be
-%  used for some particular code parts too.
+  a~standard in UML 1.x versions.
 
-  If we abstract to simple waterfall model (see \cite{codecomplete}), code
-  development usually starts
-  even after requirements declaration followed by a design creation, which is
-  a base for a programmer. Verification and maintenance follows. We go through
-  all these steps in this chapter.
+  Development is scheduled and planned with use of Gantt
+  charts\footnote{\url{http://en.wikipedia.org/wiki/Gantt_chart}} available in
+  Liberouter \emph{trac} system at
+  \url{https://www.liberouter.org/trac/netcope/wiki/}. One task is rigidly
+  dependent on the another so every interested parties should finish on
+  schedule otherwise whole project would stall. To make sure we will finish
+  it on time we included fund of time for each task into the Gantt chart.
+
+  According to the incremental model\cite{codecomplete} we finished the early
+  planning and need to declare requirements. This is performed in
+  chapter~\ref{chap.requirements}. We then build on it a model in
+  chapter~\ref{chap.spec} and first increment of code itself in further
+  sections also interleaved with testing. Since the requirements and models
+  usually aren't complete (some mistakes and missing features are found) we'll
+  reedit them and will go on with next iteration. These steps will be repeated
+  until we get complete code.
+
+  Finished result must be integrated to the rest of the project into
+  versioning system and successfully verified to run reliably including
+  performance tests and even after then may be deployed on machines. Also
+  documentation should be provided as a result of development process. This
+  topic is covered in Final code chapter~\ref{chap.final} and further.
 
   \section{Requirements}
   \label{chap.requirements}
@@ -831,6 +850,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   summarize them and add some other requirements we must
   ensure our implementation will satisfy:
   \begin{itemize}
+    \setlength{\itemsep}{-4pt}
     \item multiple ring buffer support (per interface and direction)
     \item correct ring buffers operations (transmit head must not exceed tail)
     \item ring buffers and their descriptors setup in hardware
@@ -848,7 +868,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     \item last but not the least: clean code (satisfying kernel coding style)
   \end{itemize}
 
-  The only thing worth to discuss is how and when we should allocate space
+  The only thing needs discussion is how and when we should allocate space
   for a ring buffer. Since the impact to the system might be significant due
   to large amount of memory requirements, we must consider following two
   variants. Either we can allocate the space right after the driver loads or
@@ -864,10 +884,6 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   exhaustion. In spite of all the threats, somebody might want the latter
   behaviour, so we'll let user to choose by adding an option for this.
 
-%  \subsection{Data path}
-%  card $\rightarrow$ host memory (kernelspace) $\rightarrow$ userspace (pcap,
-%  mmap)
-%
   \section{Models and design}
   \label{chap.spec}
   As we mentioned earlier, we use UML for modelling. Many UML tools are
@@ -1101,7 +1117,7 @@ static struct combo6_device_ops szedata2x_ops = {
   \paragraph{Application-driver interface}
   We decided to pass all read-only information in status page which is
   allocated per application on its first open. It's depicted on the top left
-  on the figure~\ref{fig.status_page}.
+  in figure~\ref{fig.status_page}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -1517,6 +1533,7 @@ if (head == tail)
   non-intrusive errors.
 
   \subsection{Final code}
+  \label{chap.final}
   With a use of iterative extreme programming technique and test driven
   development we get to a phase where everything works correctly as far as we
   can test and prove at best. If we get back to the requirements
@@ -1580,19 +1597,24 @@ if (head == tail)
   application by adding few lines among other yet implemented testing code.
   
   This yields a tool which can beside operation with pointers do some basic
-  measurements and report numbers we may build charts from.
+  measurements and report numbers we may build statistics from. We need also
+  capture traffic with former design, so we augment similar program,
+  \emph{szetest}, by same changes.
 
   \paragraph{Results} After we gain some results, we must average the values
   to have at least basically correct statistics. Computed values are enlisted
-  in the table on figure~\ref{fig.measures_tab}. Their graphic representation
-  then on chart on figure~\ref{fig.measures_gr}. Values of the DAG card are
-  taken from \emph{Endace} Capture Performance document available at
-  \url{http://www.endace.com/assets/docs/accelerated/DAGPacketCapturePerformance.pdf}.
+  in the table in figure~\ref{fig.measures_tab}. Their graphic representation
+  then on chart in figure~\ref{fig.measures_gr}. In spite of we borrowed
+  a \emph{DAG} card for testing purposes, we must not make public numbers from
+  its measurement to not violate \emph{Endace} conditions. Hence values
+  \emph{DAG} card values in the following comparison are taken from
+  \emph{Endace} Capture Performance document\cite{dag} and should be
+  considered rather as a theoretical limit of the cards.
 
   \begin{figure}[htb]
     \begin{center}
-      \begin{tabular}{|l|l|l|l|} \hline
-\textbf{Pkt len}& \textbf{64}	& \textbf{512}	& \textbf{1518}	\\ \hline
+      \begin{tabular}{|l|r|r|r|} \hline
+\textbf{Packet length (B)}&\textbf{64}&\textbf{512}&\textbf{1518}\\ \hline
 \emph{Szedata}	& 96		& 770		& 987		\\ \hline
 \emph{Szedata2}	& 991		& 992		& 991		\\ \hline
 \emph{DAG}	& 1000		& 1000		& 1000		\\ \hline
@@ -1610,6 +1632,12 @@ if (head == tail)
     \end{center}
   \end{figure}
 
+  We see rapid improvement especially when receiving short packets. Speed
+  of \sze\ in comparison with non-aggregated previous version is more than ten
+  times higher and if we consider margin at 1000\,Mbit/s as a theoretical
+  limit, we approached almost maximum possible throughput on 1\,Gbit ethernet
+  with it.
+
   \section{Maintenance}
   Drivers for all designs and card types are deployed on all machines and
   kernel versions after successful tests performed by testers. This must have
@@ -1622,7 +1650,7 @@ if (head == tail)
 
   Userspace library is not kernel dependent, so it needn't be necessarily
   tested on all kernels, however because of testing program dependency on this
-  library, it's tested too. Deployment is easy \emph{strip}\footnote{Binaries
+  library, it's tested too. Deployment is \emph{strip}\footnote{Binaries
   are usually freed of unnecessary debugging sections and symbols not needed
   for running on UNIX systems by \emph{strip} utility (see \emph{man strip}).}
   followed by a copy to shared directory of all machines in Liberouter.
@@ -1643,10 +1671,10 @@ if (head == tail)
 
   Also several Linux interfaces for fast operations on the ring buffer were
   described and we decided to use DMA and memory map which gave us as a
-  result zero CPU data copying between hardware and userspace in both
-  directions. These information were instrumental to summarize requirements,
-  model design and implement the driver with reuse of current combo6 base
-  modules as a base.
+  result zero CPU time consumed by data copying between hardware and userspace
+  in both directions. These information were instrumental to summarize
+  requirements, model a design and implement the driver with reuse of current
+  \emph{combo6} modules as a base.
 
   We verified functionality during implementation with help of modern
   techniques. Each functional increment was tested, some coding was ridden by
@@ -1654,8 +1682,9 @@ if (head == tail)
   development. After all we were able to do integration testing when we
   finished whole module.
 
-  Finally was developed module compared with other available products
-  measurements and numbers provided by some vendors of similar solutions.
+  Finally, developed module was compared with other available products with
+  similar orientation in network environment. Measurements provided by
+  an external vendor were compared with our solutions.
 
   \section{Future work}
   \label{chap.future}
@@ -1667,9 +1696,11 @@ if (head == tail)
   \item
   We already introduced idea to support 64-bit PCI addressing in DAC
   mode in chapter~\ref{chap.pci}. After hardware being ready to do such
-  transfers, our task would be to add support to \emph{combo6} base. Note that
-  \sze\ driver is 64-bit ready and so the design registers, what blocks using
-  address higher than $2^{32}$ is PCI core code which is told to do so by
+  transfers, our task would be to add the support to the \emph{combo6} base.
+  Note that \sze\ driver is 64-bit ready and so the design registers, what
+  blocks using address higher than $2^{32}$ is the design as a whole. Its DMA
+  controllers can't do DAC transfers and so PCI core code is told to limit
+  allocations by
   setting DMA mask. Memory management then return pages with physical
   addresses  satisfying this address mask.
   \item
@@ -1679,7 +1710,7 @@ if (head == tail)
   independent part -- conversion from character device data passing to socket
   operations.
   \item
-  Also we know, that we have another option in data processing in this
+  Also we know, that we have another option in data processing in the
   application specific interface. Instead of multiprocessing of incoming data,
   we would want to balance load among many threads on multiprocessor machine
   to do more time-consuming jobs. Remember computation of ring buffer size,
