@@ -465,7 +465,7 @@
 
   For larger physically contiguous buffers (consequent pages)
   \emph{get\_free\_page} family should be used -- variants for zeroed page(s),
-  for single page, for functions which returns \emph{struct page} pointer
+  for single page, for functions which return \emph{struct page} pointer
   instead of logical address. Freeing is done by \emph{free\_page}. This
   page allocations might be theoretically used for DMA, its physical addresses
   could be gained by \emph{page\_to\_phys} (\emph{struct page}) or
@@ -518,11 +518,11 @@
   was used in some variants, because it changed prototype time by time, then
   \emph{io\_remap\_pfn\_range} was implemented and it's still in use.
   While for remapping kernel memory obtained by page allocation mechanism
-  (i.e. memory which is physically contiguous),
+  (i.e. physically contiguous memory),
   \emph{remap\_pfn\_range} may be used, a helper called
   \emph{remap\_vmalloc\_range} for virtual memory exists even since 2.6.18 and
   it remaps only \emph{vmalloc\_*user} buffers. We'll use all these mentioned
-  interfaces, depending on which kernel we compile for, to be backward
+  interfaces, depending on kernel we compile for, to be backward
   compatible and to have all the functionality (and simpleness for later
   kernels).
 
@@ -606,16 +606,16 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 \vspace{0.5em}
 
   As device node names are random so far -- it depends only on kernel PCI cards
-  enumeration (which may vary) -- and we want numbers in names to
+  enumeration (and it may vary) -- and we want numbers in names to
   correspond with each other, e.g. to have \emph{combosix6} and
   \emph{szedataII6} for one
   concrete card in PCI slot 6, we need to write similar rules to generate
   persistent and consistent naming.
 
   Two separate files are needed to achieve that, one another with persistent
-  rules will be created on the fly. Shell script which augments the persistent
+  rules will be created on the fly. Shell script augmenting both the persistent
   rules and a rules file for matching the \com\ cards which runs the
-  script are in detail commented in Appendix \ref{app.udev}.
+  script are in detail commented in Appendix~\ref{app.udev}.
 
   \subsection{Character device Linux interface}
   First step to support character devices by a driver is to allocate a
@@ -624,7 +624,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   is used a variant for dynamic registration \emph{register\_chrdev} which
   registers 256 nodes immediately or \emph{alloc\_chrdev\_region} which
   registers none, but keeps a track of a region being virtually used. These
-  two give a registered region descriptor as a return value which is then
+  two give a registered region descriptor as a return value and it is then
   passed to \emph{unregister\_chrdev} in cleanup path.
 
   Each character device has its own file operations structure with hooks to be
@@ -896,15 +896,15 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   Appendix~\ref{app.models}, this chapter introduces the way how we got
   those diagrams as a result.
 
+  % XXX TODO security consideration all see everything
   \subsection{Use case diagram}
   Starting point is use case diagram. We create only one use case module
   which will correspond to our driver and so we name it the same -- szedata2.
   Actors choice is simple, we have an \emph{OS}, \emph{hardware} and an
   \emph{application}. OS only \emph{inserts} and \emph{removes} the driver to
-  and from the kernel and furthermore
-  since there are no asynchronous actions which hardware can do except
-  optional interrupts, the only use case regarding hardware is
-  \emph{interrupt}.
+  and from the kernel and furthermore since there are no asynchronous actions
+  doable by hardware except optional interrupts, the only use case regarding
+  hardware is \emph{interrupt}.
 
   Insert and remove takes care of initialization, the module may allocate and
   also free ring buffers depending on allocate-on-modprobe option in these two
@@ -926,8 +926,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
       first open (not to break yet started hardware), we use reference counter
       to assure only one start of the device
     \item \emph{mmap} system call $\rightarrow$ memory map buffers
-    \item \emph{select/subscribe} command $\rightarrow$ select which
-      interfaces are about to be used
+    \item \emph{select/subscribe} command $\rightarrow$ select interfaces
+      which are about to be used
     \item \emph{start} command $\rightarrow$ initialize and start selected
       hardware (allow only one start per interface throughout all
       applications)
@@ -1026,7 +1026,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   controlling combosix device node which allows access to all spaces of the
   card and few other tasks. Since we have two types of \com\ cards, two
   card-specific drivers exist: \emph{combo6} and \emph{combo6x}; they
-  are used by the \emph{combo6core} module which consist of common parts of
+  are used by the \emph{combo6core} module consisting of common parts of
   both. Since this module provides encapsulation, design drivers needn't care
   about which particular card driver is driving the device, it uses
   \emph{combo6core} interface to call the proper one, so
@@ -1137,18 +1137,17 @@ static struct combo6_device_ops szedata2x_ops = {
   two\footnote{Note that it's not space wasting, page size is usually 4\,KiB
   and it's enough space to reserve some entries for future purposes.}, one for
   RX space, one for TX. These offsets point to so-called \emph{spaces}
-  (on the right side) which might consist (only ring buffer spaces) of
+  (on the right side) which might consist (only ring buffer spaces do) of
   \emph{areas}. \emph{Area} is directly the ring buffer corresponding to one
   particular hardware interface in the \com\ hardware case, however we do not
   call it interface ring buffer, because area-interface one-to-one mapping
-  needn't hold if we recall,
-  that the part which assures the mapping is hardware independent and might be
-  used for any hardware.
+  needn't hold if we recall, that the part which assures the mapping is
+  hardware independent and might be used for any hardware.
 
   The application then remaps all desired spaces indexed by \emph{SZE2\_MMIO}
   constants and may poll for their status in \emph{area descriptors} (another
   status page entries). It's a structure with 64-bit offset and 32-bit size
-  pointing directly to the area and flags which denotes if area/ring buffer
+  pointing directly to the area and flags. Flags denote if area/ring buffer
   wrap occurred and where is the next \emph{area descriptor} for the wrapped
   data.
 
@@ -1157,8 +1156,8 @@ static struct combo6_device_ops szedata2x_ops = {
   investigate exact descriptor structure. Status page is named as \emph{struct
   sze2\_instance\_info} in the source code.
 
-  To not poll every area we use commands to get a number of area which is
-  ready to be read or write to. Four \emph{ioctls} corresponding to use cases
+  To not poll every area we use commands to get a number of the area ready to
+  be read or written to. Four \emph{ioctls} corresponding to use cases
   exist for this purpose. RX lock and unlock are easy to define. We only ask
   for areas we want (bitmap in one parameter) and unlock all areas without
   a parameter.
@@ -1171,7 +1170,7 @@ static struct combo6_device_ops szedata2x_ops = {
 
   The remaining is the area subscription done by \emph{ioctl} too. It contains
   array of two members (RX and TX) with info about areas to subscribe and poll
-  threshold (minimal ready-to-process size which resumes application) used for
+  threshold (minimal ready-to-process size resuming the application) used for
   waiting in the driver via \emph{poll} system call.
   Documentation in Appendix~\ref{app.doxygen} deals with this interface.
 
@@ -1231,7 +1230,7 @@ static struct combo6_device_ops szedata2x_ops = {
   even under high pressure, when priority is high. The priority is raised by
   each failure and the higher the priority is the more pages are tried to free
   (also the used ones might be swapped out if they belong to userspace). This
-  means we should try to allocate pages which failed at least several times
+  means we should try to allocate failing pages at least several times
   to raise the priority with some delay between the tries to let swapper move
   some pages to the swap device. See \emph{szedata2\_alloc\_dmaspace} function
   for final implementation.
@@ -1270,9 +1269,10 @@ static struct combo6_device_ops szedata2x_ops = {
   this piece of code we need to implement source which will behave as a fake
   hardware.
 
-  Right on module load code which tests illegal inputs by fault injection of
-  \emph{NULL} pointers and error states encoded in a pointer passed to register
-  functions. Then first available PCI device (of any type) is used as a parent
+  Right on module load code we test forged illegal inputs by fault injection
+  of \emph{NULL} pointers and error states encoded in a pointer (see
+  \emph{ERR\_PTR} macro in \emph{linux/err.h}) passed to register functions.
+  Then first available PCI device (of any type) is used as a parent
   parameter to allocation function to be able to allocate DMA space.
   After doing allocation tests, the device is registered along with other more
   than \emph{SZEDATA2\_MAX\_MINORS} to test proper error handling. Also
@@ -1296,7 +1296,7 @@ static struct combo6_device_ops szedata2x_ops = {
   \url{http://en.wikipedia.org/wiki/Test-driven_development} for reference.}.
 
   Tests for all implemented character device hooks are in \emph{szetest2.c}
-  see for example \emph{test\_mmap}, which tests correctness of \emph{mmap} by
+  see for example \emph{test\_mmap} which tests correctness of \emph{mmap} by
   trying to forge invalid values (longer space, wrong offsets etc.). In
   addition we should add tests for commands and reading and writing of "real"
   data from ring buffer or to it respectively. These checks are implemented
@@ -1309,7 +1309,7 @@ static struct combo6_device_ops szedata2x_ops = {
   currently finished szedata2 core and \emph{combo6} base.
 
   To be able to cooperate with the hardware behind the base, the driver needs
-  to know constants which hardware can understand. They are described in the
+  to know constants understood by the hardware. They are described in the
   hardware specification and are transcribed to a header file named
   \emph{hw.h}.
 
@@ -1330,7 +1330,7 @@ static struct combo6_device_ops szedata2x_ops = {
   $2^a\cdot2^b=2^{a+b}$ from algebra.}.
 
   Even when the attach function from the operations is called with real
-  device, which was attached, we might allocate szedata2 device, set
+  attached device, we might allocate a szedata2 device, set
   callbacks up and register it (all this is \emph{szedata2\_hw\_attach}). We
   also allocate a space for descriptor memory information storage only by
   passing size of this information to the szedata2 allocation call.
@@ -1355,7 +1355,7 @@ static struct combo6_device_ops szedata2x_ops = {
   \emph{Stop} callback is implemented in similar manner, except the fact we
   wait one whole second until DMA transfers get completed. When this timeout
   expires, we only report failure to logs and go on, because we don't have any
-  chance to tell the kernel, that close function (which issues this
+  chance to tell the kernel, that \emph{close} function (which issues this
   callback) failed.
 
   Pointer and interrupt callbacks are simple calls of PCI space reads and
@@ -1407,9 +1407,9 @@ if (head == tail)
   for such kind of research are \emph{cscope} to see, where the symbol is
   defined, \emph{git-blame} to figure out when and by what commit was each
   particular line (and function) changed and \emph{git-show} to see the patch
-  which does the change. Finally \emph{git-describe} on the commit gives
-  directly a version which the patch was committed after.}, we found out, that
-  \emph{.fault} handler was
+  which does the change. Finally \emph{git-describe} on the particular commit
+  gives directly a kernel version the patch was committed after.}, we found
+  out, that \emph{.fault} handler was
   introduced in 2.6.23 and previously used \emph{.nopage} was removed along
   with that change. Also 2.6.18 was the first kernel, where is
   \emph{remap\_vmalloc\_range} available for public use. This gives three
@@ -1508,7 +1508,7 @@ if (head == tail)
   integrate with existing build system and create a file with where the
   library heart is going to be. The function bodies are exact copy of use
   cases from the specification, since the use case alone means exactly that it
-  is a separate sequence of commands which might not be further split. If we
+  is a separate sequence of commands not being able to split further. If we
   carry over each use case contents to a library call, we reach the two
   aims from previous paragraph. Above all, if we create a shared library,
   we'll get easy to update part (module) of each application.
@@ -1541,8 +1541,8 @@ if (head == tail)
   them.
 
   Coding style is taken for granted, we took it in consideration while
-  writing the code. \emph{Checkpatch} -- one of the kernel scripts which
-  checks satisfaction of kernel coding style -- passed when checking the code.
+  writing the code. \emph{Checkpatch} -- one of the kernel scripts checking
+  fulfillment of kernel coding style -- passed when checking the code.
 
   Also we didn't forget to document the code for easy reuse or possible
   changes by other developers. Userspace (library) code documentation is
@@ -1581,7 +1581,7 @@ if (head == tail)
   We are about to test three distinct packet lengths: 64 (minimal ethernet
   frame length according to its RFC including header and checksum), 512 and
   1518 (maximal frame length) on \emph{szedata} 1 and 2 and compare results
-  also with \emph{Endace DAG} cards which are intended to be deployed in the
+  also with \emph{Endace DAG} cards intended to be deployed in the
   same area as our cards with szedata design.
 
   Also this sort of traffic may provoke situations which we are not able to
@@ -1595,7 +1595,7 @@ if (head == tail)
   also average packet length. Conveniently we might augment \emph{szetest2}
   application by adding few lines among other yet implemented testing code.
   
-  This yields a tool which can beside operation with pointers do some basic
+  This yields a tool which beside operation with pointers can do some basic
   measurements and report numbers we may build statistics from. We need also
   capture traffic with former design, so we augment similar program,
   \emph{szetest}, by same changes.
@@ -1641,11 +1641,11 @@ if (head == tail)
   Drivers for all designs and card types are deployed on all machines and
   kernel versions after successful tests performed by testers. This must have
   been done for a first time due to conversion from one versioning system to
-  another and dropping support of kernels older than 2.6.
-  Meanwhile we have been creating this implementation
-  all other drivers were moved to the new system with many intrusive changes,
-  which broke compatibility between the two version from both systems, so they
-  must be tested and distributed at once, now including \sze.
+  another and dropping support of kernels older than 2.6. Meanwhile we have
+  been creating this implementation all other drivers were moved to the new
+  system with many intrusive changes and it broke compatibility between the
+  two versions from both systems, so they must be tested and distributed at
+  once, now including \sze.
 
   Userspace library is not kernel dependent, so it needn't be necessarily
   tested on all kernels, however because of testing program dependency on this
@@ -1676,7 +1676,7 @@ if (head == tail)
   userspace. All this information was instrumental to summarize
   requirements, model a design and implement the driver with reuse of current
   \emph{combo6} modules as a base and propose subtle interface between the
-  driver and a library which was programmed as a part of this thesis too.
+  driver and a library programmed as a part of this thesis too.
 
   We verified functionality during implementation with help of modern
   techniques. Each functional increment was tested, some coding was ridden by
@@ -1684,17 +1684,16 @@ if (head == tail)
   development itself. After all we were able to do integration testing when we
   finished whole module.
 
-  Finally, developed module was compared with other available products which
-  orient similarly in network environment. Measurements provided by
+  Finally, developed module was compared with other available products
+  orienting similarly in network environment. Measurements provided by
   an external vendor were compared with our solutions and whole package of
   drivers and library was deployed on Liberouter machines.
 
   \section{Future work}
   \label{chap.future}
   Our implementation has been done, however some parts might still be
-  improved. At least four kinds of improvements currently exist which are out
-  of scope of this thesis.
-  
+  improved. At least four kinds of improvements currently exist, but are out
+  of scope of this thesis. We summarize them in these points:  
   \begin{itemize}
   \item
   We already introduced idea to support 64-bit PCI addressing in DAC
