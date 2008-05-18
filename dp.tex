@@ -318,21 +318,22 @@
 
   On older machines, there was merely one device called \emph{DMA controller}
   (DMAC), which could become a master. Nowadays each PCI device (see also
-  Section~\ref{chap.pci}) may become a master, so that it can access memory
+  section~\ref{chap.pci}) may become a master, so that it can access memory
   directly by its own DMAC\footnote{Note that there is no common PCI DMAC, so
   if the device doesn't have one, it doesn't support DMA either.}. As we will
   see in chapter~\ref{chap.netcope}, their count is not limited to one per PCI
-  device. Unit which takes care of honest bus accesses by more than one DMAC
+  device. An unit which takes care of fair bus accesses by more than one DMAC
   is called \emph{Arbiter}.
 
   \subsection{PCI DMA Interface}
-  To become a master on legacy PCI bus, the device asks arbiter for a band and
-  after it gets start signal on control bus, it starts sending. First,
-  address is sent, then data part.
-  If there is more data to send, burst mode is used until arbiter emits stop
+  To become a master on legacy PCI bus, the device asks the Arbiter for a band
+  and after it gets start signal on control bus, it starts sending. First,
+  address is sent, then data part. If there is more data to send, burst mode
+  is used until the Arbiter emits a stop
   signal. After that signal, the device must finish the transfer of near few
-  bytes in the cache line\footnote{its size is configurable through config
-  space} and acknowledge stopping. Next device gets start signal from arbiter
+  bytes in the cache line\footnote{Its size is configurable through config
+  space.} and acknowledge stopping. Next device gets start signal from the
+  Arbiter
   at this moment and starts data transfer. The ancestral device may ask for a
   band again unless all data have not been sent. This method is implemented in
   PCI and PCI-X versions of \com\ cards.
@@ -343,11 +344,11 @@
   directly in the request and gets back completion packet. This is obviously
   implemented in PCI-Express based \com.
 
-  The transfer is theoretically limited by the other device (including main
-  memory) boundary\footnote{It is 4096 bytes on main memory with extensions
-  disabled.}. It must not exceed this limit, the transfer is interrupted by
-  the other side otherwise. Transfers of 1\,KiB per one transfer are not
-  uncommon in \com\ case.
+  The transfer is theoretically limited by the other device (including the
+  main memory) boundary\footnote{It is 4096 bytes on the main memory with
+  extensions disabled.}. It must not exceed this limit, the transfer is
+  interrupted by the other side otherwise. Transfers of 1\,KiB per one
+  transfer are not uncommon in \com\ case.
 
   \subsection{Linux DMA Interface}
   Linux has three groups of DMA APIs. ISA/LPC, PCI and generic. ISA/LPC is
@@ -366,14 +367,15 @@
   and then unmapped and underlying buffer freed. This is method widely used
   for socket buffers which are thrown away after successful transmission. We
   will probably utilize this interface for exactly this purpose out of scope
-  of this thesis, see chapter~\ref{chap.future}.
+  of this thesis, see section~\ref{chap.future}.
 
   The other group are coherent mappings usually mapped at the driver load or
-  device start and unmapped and freed even after a device stop. Its domain are
+  the device start and unmapped and freed even after the device stop. Its
+  domain are
   DMA ring buffers, firmwares used by some devices and executed from main
   memory meanwhile device operation and so on. This mapping hence perfectly
   fits our needs and will be implemented in the new module,
-  see~\ref{chap.netcope}.
+  see section~\ref{chap.netcope}.
 
   \paragraph{Generic interface} It is actually an abstraction of PCI interface.
   It is not bounded to any PCI device, it may be applied for non-PCI devices,
@@ -390,7 +392,8 @@
   In the usual meaning we call main \emph{random access memory} as a physical
   memory and we usually\footnote{It's possible not to have this kind of memory
   by a processor in special computers like \emph{NUMA} (non-uniform memory
-  access).} have one or more of them plugged in the motherboard. These can be
+  access).} have one or more of them plugged in the motherboard. These modules
+  can be
   addressed by several methods; Linux implements \emph{flat mode}, where
   each byte of memory is simply addressed by \emph{linear address}. First
   memory byte has address 0, on 32-bit without any extensions the last
@@ -401,12 +404,12 @@
   With just physical memory addressing problems arose early. Applications
   needed large amounts of continuous memory, but it was inconceivable to find
   such long block after a while system was running. It was caused by process
-  called (external) fragmentation. Other tasks held memory blocks and there
-  wasn't enough space in between them to return.
+  called (\emph{external}) \emph{fragmentation}. Other tasks held memory
+  blocks and there wasn't enough space in between them to return.
 
   Many algorithms were introduced to avoid this behavior, some of them are
-  described in \cite{knuth_art} including buddy system employed in Linux
-  kernel for in-kernel allocations of larger blocks.
+  described in \cite{knuth_art} including \emph{buddy system} employed in
+  Linux kernel for in-kernel allocations of larger blocks.
 
   \subsubsection{Paging}
   However, the algorithms only mitigate the risk of fragmentation
@@ -415,34 +418,36 @@
   To really solve the situation with external fragmentation, method named
   \emph{paging} was introduced. Linear address space is divided into pages
   of fixed size\footnote{4096 bytes on x86 with page size extension
-  disabled} that might be mapped to physical memory or disks as swapped pages.
+  disabled.} that might be mapped to physical memory or disks as swapped pages.
 
   CPU accesses physical memory by virtual addresses with help of \emph{memory
-  management unit} (MMU) which does transparent translation to physical
-  address. Some modern mainboards add another unit called IOMMU (MMU for I/O)
-  between device and main memory
+  management unit} (MMU) which performs transparent translation to physical
+  address. Some modern mainboards contain another unit called IOMMU (MMU for
+  I/O) between a device and the main memory
   path, so that devices address by logical address too. It allows creating a
   virtual space even for devices, but it is not widely spread so far
   so \com\ card developers must not take it for granted.
 
-  This schema allows us to allocate huge contiguous memory blocks without a
+  The paging schema allows us to allocate huge contiguous memory blocks
+  without a
   need of having contiguous physical memory. In fact there is no need to have
   as much physical memory as requested. Some memory may be, as written above,
   backed by a page stored on disk (swapped out) or even have no "physical"
-  page mapped to it thanks to demand paging.
+  page mapped to it thanks to \emph{demand paging}.
 
   Although 64-bit kernels are able to address up to $2^{47}=128$\,TiB mapped
-  to the bottom of address space on modern processors (kernel is mapped to
-  the top of the same size thank to 64-bit sign extension, see
-  \cite{ia3a} for reference, with
-  so far unused hole between them), 32-bit ones are bounded to nowadays real
+  to the bottom of address space on modern processors (the kernel is mapped
+  in the top of the same size thank to 64-bit sign extension, see
+  \cite{ia3a} for reference, with so far unused \emph{memory hole} between
+  them), 32-bit ones are bounded to nowadays real
   limit of 3\,GiB of virtual space per process. The remaining addressable
   1\,GiB is used as kernelspace. This will be reflected while estimating
   size of buffers needed for userspace applications along with
   physical memory constraints for device memory buffers.
 
   \paragraph{Linux memory interface} To obtain a buffer smaller than a page
-  is used \emph{kmalloc} and \emph{kzalloc} returning a zeroed space. They are
+  is used \emph{kmalloc} function and \emph{kzalloc} returning a zeroed
+  space (buffer filled with zeroes). They are
   calls of slab allocator (see \cite{gorman}, chapter~8). Freeing is provided
   by \emph{kfree}.
 
@@ -450,23 +455,25 @@
   \emph{get\_free\_page} family should be employed -- variants for zeroed
   page(s), for single page, for functions which return \emph{struct page}
   pointer instead of logical address. Freeing is done by \emph{free\_page}.
-  This page allocations might be theoretically used for DMA, its physical
+  These page allocations might be theoretically used for DMA, its physical
   addresses could be gained by \emph{page\_to\_phys} (\emph{struct page}) or
   \emph{virt\_to\_phys} (logical address), however this is not clean, because
   the returned address needn't be device addressable. We should call
   \emph{dma\_alloc\_coherent} to get an addressable page. It gets
   \emph{struct device} as one of parameters where DMA capabilities are
-  written down and so it knows which addresses are OK to return. Possibly
-  wrapper \emph{pci\_alloc\_consistent} might be used to pass \emph{struct
+  written down and so it "knows" which addresses are fine to return. Possibly
+  a wrapper \emph{pci\_alloc\_consistent} might be used to pass \emph{struct
   pci\_dev} directly. \emph{dma\_free\_coherent} and
-  \emph{pci\_free\_consistent} serves as cleanups.
+  \emph{pci\_free\_consistent} serves as clean-up calls.
 
-  \emph{vmalloc} is for in-kernel virtual contiguous memory allocations.
-  Another wrappers like \emph{vmalloc\_32}, \emph{vmalloc\_user} and
+  \emph{vmalloc} is utilized for in-kernel virtual contiguous memory
+  allocations. Other wrappers like \emph{vmalloc\_32}, \emph{vmalloc\_user} and
   \emph{vmalloc\_32\_user} exist for allocating buffers addressable by 32-bit
-  addresses and for those intended to be used in userspace as of 2.6.18 kernel
-  -- underlying pages are marked as user and zeroed not to leak any
-  information. \emph{vfree} frees all these allocations.
+  addresses and the two latter for buffers intended to be used in
+  userspace. In such allocations are underlying pages marked as \emph{user}
+  and zeroed not to leak any previously stored information, however they are
+  present only in kernels as of 2.6.18. \emph{vfree} frees all these
+  allocations.
 
   For the convenience of \com\ being PCI devices, we employ
   \emph{pci\_alloc\_consistent} and \emph{pci\_free\_consistent} for DMA
