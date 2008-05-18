@@ -843,16 +843,17 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     \item correct ring buffers operations (transmit head must not exceed tail)
     \item ring buffers and their descriptors setup in hardware
     \item hardware setup (another initialization, start, stop)
-    \item export/remap data through memory map
-    \item some controlling mechanism to communicate with application
+    \item export/remap data by memory mapping
+    \item some controlling mechanism to communicate with an application
     \item multiple applications support, multiple access to the data
-    \item speed
+    \item high performance
     \item as highest as possible code correctness (successful testing)
     \item documentation (the more well\footnote{Avoid over-commenting, well
       comments are good, over-commented core is worse than non-commented, see
-      chapter~8 of Documentation/CodingStyle document from kernel sources.}
+      chapter~8 of Documentation/CodingStyle document from kernel sources
+      available from \url{http://kernel.org/}.}
       commented code the better)
-    \item abstraction (userspace library would be good)
+    \item abstraction (an userspace library would be good)
     \item last but not the least: clean code (fulfil kernel coding style)
   \end{itemize}
 
@@ -877,15 +878,15 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   As we mentioned earlier, we use UML for modelling. Many UML tools are
   available for Linux, we chose one named \emph{Bouml}\footnote{
   Bouml is a free (under the terms of GPL) multiplatform project with support
-  of UML including version 2. See its homepage at \url{http://bouml.free.fr/}
-  for more info.}. It can do most of UML
+  of UML including version~2. See its homepage at \url{http://bouml.free.fr/}
+  for more info.}. It can model most of UML
   defined diagrams, however we'll use just \emph{use case} and
   \emph{sequence} diagrams. Complete diagrams and their documentation are in
   Appendix~\ref{app.models}, this chapter introduces the way how we got
   those diagrams as a result.
 
   \subsection{Use Case Diagram}
-  Starting point is an use case diagram. We create only one use case module
+  The starting point is an use case diagram. We create only one use case module
   which will correspond to our driver and so we name it the same -- szedata2.
   Actors choice is simple, we have an \emph{OS}, \emph{hardware} and an
   \emph{application}. OS just \emph{inserts} and \emph{removes} the driver to
@@ -894,12 +895,13 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   regarding hardware is \emph{interrupt}.
 
   Insert and remove takes care of initialization, the module may allocate and
-  also free ring buffers depending on allocate-on-modprobe option in these two
-  use cases. HW interrupt use case only wakes up applications waiting for
-  this event.
+  also free ring buffers depending on \emph{allocate-on-modprobe} option in
+  these two use cases. HW interrupt use case only wakes up applications
+  waiting for this event.
 
-  Application is more complicated actor, it opens (and initializes) the
-  device, process data (and communicate) and finally closes (and stops) it.
+  The application is more complicated actor, it opens (and initializes) the
+  device, process data (and communicate) and finally closes (and stops) the
+  device.
   All the operations must be atomic due to concurrent access, this is not
   mentioned neither in the specification nor further, because we take this for
   granted. Fine grained application use cases description follows.
@@ -909,24 +911,25 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   that shall be done before using the device from chapter~\ref{chap.netcope}.
   We create one use case as a starting point and place following steps in it:
   \begin{enumerate}
-    \item \emph{open} system call $\rightarrow$ initialize buffers if it was
-      the first open (not to break yet started hardware), we use reference
+    \item \emph{open} system call -- initialize buffers if it was
+      the first open (not to break yet started hardware), we use a reference
       counter to assure only one start of the device
-    \item \emph{mmap} system call $\rightarrow$ memory map buffers
-    \item \emph{select/subscribe} command $\rightarrow$ select interfaces
+    \item \emph{mmap} system call -- map buffers
+    \item \emph{select/subscribe} command -- select interfaces
       which are about to be used
-    \item \emph{start} command $\rightarrow$ initialize and start selected
+    \item \emph{start} command -- initialize and start selected
       hardware (allow exclusively one start per interface throughout all
       applications)
   \end{enumerate}
   Even though \emph{open} and \emph{mmap} are different calls from the driver
-  view, application sees them as one basic operation, so we leave them in one
-  use case. On the other hand, we find out later, that we want to allow the
+  view, application "sees" them as one basic operation, so we leave them in one
+  use case. On the other hand, we find out later that we want to allow the
   application to select and start interfaces on the fly, so we must place
   points 3 and 4 in separate use cases which gives three initialization use
   cases in the end.
 
-  \subsubsection{Data Processing} Design supports full-duplex communication, so
+  \subsubsection{Data Processing} The hardware design supports full-duplex
+  communication, so
   we split processing further in two categories -- receive (RX) and
   transmit (TX) and describe them separately.
 
@@ -941,7 +944,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   After we gained access to the data, two receive processing methods raised
   altogether:
   \begin{itemize}
-    \item \textbf{load balancing} -- several readers exist and data are
+    \item \textbf{load balancing} -- several readers exist and the data are
       divided among them. Every single application gets distinct data and do
       the same operation on them. It is very similar to \emph{single program
       multiple data}\footnote{see \url{http://en.wikipedia.org/wiki/SPMD} for
@@ -956,7 +959,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   \paragraph{TX} Outbound direction is similar in data processing --
   application asks for area to write to (gets current transmit head), writes
-  data and issues command to move the head. It corresponds to the two created
+  data and issues a command to move the head. It corresponds to the two created
   use cases \emph{request\_space} and \emph{put\_data}. It differs in access
   to the buffer, because all applications shares one TX
   ring buffer and hence only one may access it at a time not to create holes
@@ -978,10 +981,11 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   and also out of scope of this thesis.
 
   \subsubsection{Close And Deinitialization} After open reference count drops
-  to zero we do steps from initialization in reverse order. \emph{close\_node}
-  use case consist of \emph{hardware stop} command, \emph{unmap} and
-  allocated memory cleanup. We might alternatively consider placing
-  \emph{hardware stop} command in separate use case to allow stopping out of
+  to zero we do steps from the initialization in reverse order. The
+  \emph{close\_node} use case consists of a \emph{hardware stop} command,
+  \emph{unmap} and allocated memory cleanup. We might alternatively consider
+  placing the \emph{hardware stop} command in separate use case to allow
+  stopping out of
   line, anyway we must turn off the hardware on last close if the use case
   wasn't invoked before.
 
@@ -997,7 +1001,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   The work starts by \emph{open} message from \textbf{application} to
   \textbf{module}. The diagram copies actions described in use case
-  initialization section above, so it nonsense to repeat the steps again. We
+  initialization section above, so it is nonsense to repeat the steps again. We
   just augment the use case specification further by splitting single use case
   steps into multiple messages here. For instance \emph{mmap} from use case is
   here as two messages: \emph{mmap status page} and \emph{mmap RX space}.
@@ -1014,7 +1018,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \label{chap.code}
   Now we have a complete specification to start implementing. However we
   needn't to start from scratch, we'll describe usable code base. Then we
-  start with hardware independent part and complete it with the hardware
+  start with a hardware independent part and complete it with the hardware
   operating last part. Both these parts will be tested separately and
   after all an encapsulating library implemented.
 
@@ -1023,8 +1027,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   We have evolved base common to all Liberouter projects not to reinvent the
   wheel for each design. These base drivers are responsible for whole card
   initialization, an interrupt hook setup, loading firmware/design,
-  controlling combosix device node which allows access to all spaces of the
-  card and few other tasks. Since we have two types of \com\ cards, two
+  controlling \emph{combosix} device node which allows access to all spaces of
+  the card and few other tasks. Since we have two types of \com\ cards, two
   card-specific drivers exist: \emph{combo6} and \emph{combo6x}; they
   are used by the \emph{combo6core} module consisting of common parts of
   both. Since this module provides encapsulation, design drivers needn't care
@@ -1039,11 +1043,12 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   central driver. This info may be further used by application to recognize
   module version or tune some values and parameters.
 
-  Design driver should define \emph{combo6\_device\_ops} structure with name,
+  The design driver should define \emph{combo6\_device\_ops} structure with
+  name,
   card type, IDs which it supports and hooks for attach, detach and interrupt
   and pass it to \emph{combo6\_device\_register} to register it by the core
   module. Deregistration is then invoked by \emph{combo6\_device\_unregister}
-  call. Our structure looks like this code:
+  call. Our structure looks like this C code:
 \begin{lstlisting}[language=C,label=lst.c6dops,name=lst.c6dops]
 static struct combo6_device_ops szedata2x_ops = {
 	.owner = THIS_MODULE,
@@ -1072,14 +1077,14 @@ static struct combo6_device_ops szedata2x_ops = {
       design) and finally 0x00 is a minor. As we want to bind this driver to
       all \sze\ designs, we grab all its potential minors up to 0xff.
   \end{itemize}
-  We can see, that the structure also contains designator of combo6x card on
+  We can see, that the structure also contains a designator of combo6x card on
   the line~\ref{lstl.c6dops_4}.
   We must set that entry and that means creating two such structures with the
   same contents but \emph{dhw} to support both \com\ and \comx\ cards.
 
   \subsection{Implementation}
-  We used term \emph{command} in the specification many times, but we haven't
-  explained command passing mechanism. Although \emph{ioctl} system call was
+  We used \emph{command} term in the specification many times, but we haven't
+  explained the command passing mechanism. Although \emph{ioctl} system call was
   uttered as deprecated long time ago, nothing better was introduced so far,
   its kernel interface has been improved and it is still widely used even in
   new projects. Hence we'll use it for commands passing too.
@@ -1089,24 +1094,24 @@ static struct combo6_device_ops szedata2x_ops = {
   one with the rest depending on the hardware (\emph{hw.c} and \emph{hw.h}).
   The former will consist of ring buffer computations, initialization and DMA
   allocations and also character device node operations (incl. \emph{ioctls}
-  and \emph{mmap}). The latter will contain the structure from previous
+  and \emph{mmap}). The latter will contain the structure from the previous
   section and registration to the \emph{combo6} base and all ring buffer
   operations done on the hardware (get and set head/tail pointers, ring size
   and descriptors setting, etc.) and last but not the least invocation of DMA
   allocation routines from the HW independent file.
 
   We can conveniently use this split
-  for testing and early development, because we hadn't working design while
+  for testing and early development, because we hadn't a working design while
   writing the driver. We'll create dummy \emph{hw.c} with few timers and fake
   ring operations and develop szedata2 part as specified and test it by
   that dummy module. We'll get properly working and tested driver by evoking
   corner cases by this technique. More of this is in the testing
-  chapter~\ref{chap.testI}.
+  section~\ref{chap.testI}.
 
   \subsubsection{Structures}
   As a first thing let's settle down data structures passed through the
-  system. Many of them raised through the modeling and module specification,
-  we summarize them here.
+  system. Many of them raised through the modeling and the module
+  specification, we summarize them here.
 
   Since 64-bit operations are expensive and non-atomic on 32-bit machines,
   we try to minimize 64-bit computations as much as possible. In fact we need
@@ -1117,7 +1122,7 @@ static struct combo6_device_ops szedata2x_ops = {
   structure descriptions and notes about 64-bit needs.
 
   \paragraph{Application-driver interface}
-  We decided to pass all read-only information in status page which is
+  We decided to pass all read-only information in a status page which is
   allocated per application on its first open. It is depicted on the top left
   in Figure~\ref{fig.status_page}.
 
@@ -1130,7 +1135,7 @@ static struct combo6_device_ops szedata2x_ops = {
   \end{figure}
 
   First, from the specification, status page shall contain information about
-  spaces to be mmaped. According to the manual page of mmap and Linux kernel
+  spaces to be mapped. According to the manual page of mmap and Linux kernel
   requirements, only two parameters must be known -- offset and size. As
   mentioned earlier, offset is 64-bit value and so the size is. Eleven
   (indexed by 0 through 10) such pairs might be stored in the page, however we
@@ -1139,13 +1144,13 @@ static struct combo6_device_ops szedata2x_ops = {
   one for RX space, one for TX. These offsets point to so-called \emph{spaces}
   (on the right side) which might consist (exclusively ring buffer spaces do)
   of \emph{areas}. \emph{Area} is directly the ring buffer corresponding to
-  one particular hardware interface in the \com\ hardware case, however we do
-  not call it interface ring buffer, because area-interface one-to-one mapping
+  one particular hardware interface in the \com\ hardware case. However we do
+  not call it interface directly, because area-interface one-to-one mapping
   needn't hold if we recall, that the part which assures the mapping is
   hardware independent and might be used for any hardware.
 
   The application then remaps all desired spaces indexed by \emph{SZE2\_MMIO}
-  constants and may poll for their status in \emph{area descriptors} (another
+  constants and may poll for their status in \emph{area descriptors} (other
   status page entries). It is a structure with 64-bit offset and 32-bit size
   pointing directly to the area and flags. Flags denote if area/ring buffer
   wrap occurred and where is the next \emph{area descriptor} for the wrapped
@@ -1160,17 +1165,18 @@ static struct combo6_device_ops szedata2x_ops = {
   be read or written to. Four \emph{ioctls} corresponding to use cases
   exist for this purpose. RX lock and unlock are easy to define. We just ask
   for areas we want (bitmap in one parameter) and unlock all areas without
-  a parameter. TX direction needs complicated passing of parameters. Beside
-  the area we are interested in, we need to pass a size too. We define
-  \emph{struct sze2\_tx\_lock} containing these two entries, is the same but
-  the name -- \emph{struct sze2\_tx\_unlock}. All these sizes are sufficient
+  a parameter. The TX direction needs more complicated passing of parameters.
+  Beside the area we are interested in, we need to pass a size too. For
+  locking we define a \emph{struct sze2\_tx\_lock} containing these two
+  entries, unlocking is the same but the name --
+  \emph{struct sze2\_tx\_unlock}. All these sizes are sufficient
   to be 32-bit, since we don't expect somebody to read or write amounts larger
   than 4\,GiB.
 
   The remaining is the area subscription done by \emph{ioctl} too. It contains
-  array of two members (RX and TX) with info about areas to subscribe and poll
-  threshold (minimal ready-to-process size resuming the application) used for
-  waiting in the driver via \emph{poll} system call.
+  an array of two members (RX and TX) with info about areas to subscribe and
+  poll threshold (minimal ready-to-process size resuming the application) used
+  for waiting in the driver via \emph{poll} system call.
   Documentation in Appendix~\ref{app.doxygen} deals with this interface.
 
   \paragraph{Internal interface} We've declared already, that we will split
@@ -1181,21 +1187,21 @@ static struct combo6_device_ops szedata2x_ops = {
   Appendix~\ref{app.kdoc}.
 
   \subsection{Phase I -- Hardware Independent Code}
-  As we don't have fully working design yet, we start with design
+  As we don't have fully working design yet, we start with the design
   independent part. First we write module \emph{init} and \emph{exit}
   functions. We create a \emph{class} and reserve character device region
   (with at most \emph{SZEDATA2\_MAX\_MINORS}\footnote{currently the value is
-  8, but it may be altered on compile time, since it is a macro}) as described
+  8, but it may be altered at compile time, since it is a macro}) as described
   in chapter~\ref{chap.devnodes} and store a number which we got from it to
   use later in \emph{exit} function when unregistering character device.
 
-  We see, that we don't allocate any buffers or any other data, so we must
+  We see that we don't allocate any buffers or any other data, so we must
   export hooks for events when a device comes and leaves, even then we can
   create and destroy any structures. These operations are yielded to the
   hardware specific part, because it knows how many areas are needed and how
   large ring buffers should be allocated.
 
-  Registration of incoming device is split into two parts -- allocation
+  The registration of incoming device is split into two parts -- allocation
   (\emph{alloc\_szedata2}) and registration (\emph{szedata2\_register})
   itself. After calling the former, callbacks shall be set up and eventually
   DMA allocations must be done now (or alternatively even on the first
@@ -1216,14 +1222,14 @@ static struct combo6_device_ops szedata2x_ops = {
   machines, where both numbers are 8-bytes, so we further have
   $100000\cdot2\cdot8=1600000$. This information might be stored in
   $\frac{1600000}{4096}\doteq390$ pages. That is a number very close to
-  $2^{MAX\_ORDER}$\footnote{\emph{MAX\_ORDER} is maximum allowed power of 2
+  $2^{MAX\_ORDER}$\footnote{\emph{MAX\_ORDER} is a maximum allowed power of 2
   to allocate via \emph{get\_free\_page}, it used to be between 5 and 20
   depending on architecture and configuration}, so we would end up in
   failure if we didn't use virtual memory (\emph{vmalloc}) for those
   descriptors.
 
   Even if we're allocating ring buffer page by page, we might face
-  failures. It is because of how allocations work in memory management
+  failures. It is because of how allocations work in the memory management
   subsystem. For implementation in Linux 2.4 see~\cite{gorman}, 2.6 differs
   slightly, but it is the same in principle. Most of inactive pages is freed
   even under high pressure, when priority is high. The priority is raised by
@@ -1232,7 +1238,7 @@ static struct combo6_device_ops szedata2x_ops = {
   means we should try to allocate failing pages at least several times
   to raise the priority with some delay between the tries to let swapper move
   some pages to the swap device. See \emph{szedata2\_alloc\_dmaspace} function
-  for final implementation.
+  for the final implementation.
 
   \paragraph{Character Device Operations}
   We passed also \emph{struct file\_operations} when registering concrete
@@ -1265,14 +1271,14 @@ static struct combo6_device_ops szedata2x_ops = {
 
   \subsection{Phase I Testing}
   \label{chap.testI}
-  As we have completed first increment, we need to do first tests. To check
+  After we completed the first increment, we need to do first tests. To check
   this piece of code we need to implement source which will behave as a fake
   hardware.
 
   Right on module load code we test forged illegal inputs by fault injection
   of \emph{NULL} pointers and error states encoded in a pointer (see
   \emph{ERR\_PTR} macro in \emph{linux/err.h}) passed to register functions.
-  Then first available PCI device (of any type) is used as a parent
+  Then the first available PCI device (of any type) is used as a parent
   parameter to allocation function to be able to allocate DMA space.
   After doing allocation tests, the device is registered along with other more
   than \emph{SZEDATA2\_MAX\_MINORS} to test proper error handling. Also
@@ -1280,30 +1286,31 @@ static struct combo6_device_ops szedata2x_ops = {
   presented in the \emph{szetest.c} file. See \emph{szetest\_test\_init}
   function for details.
 
-  After initialization phase, some timers are fired to pretend real hardware
+  After the initialization phase, some timers are fired to pretend real hardware
   work. Ring buffers are filled with random-sized packets with all reachable
   corner cases such as wraps of packet over page and whole ring buffer, split
-  of packet header over the same boundaries and so on. \emph{szetest\_timer}
-  and \emph{szetest\_timer1} implement this logic.
+  of packet header over the same boundaries and so on. Functions
+  \emph{szetest\_timer} and \emph{szetest\_timer1} implement this logic.
 
   To be able to utter the driver works, also reader/writer in user space must
   be implemented. \emph{szetest2} application is constructed in similar manner
   like the fake hardware code -- to test as much as possible. Some of these
   userspace tests were ready yet before the implementation itself, because we
-  knew from specification how it should behave and how not. Implementation is
-  further programmed to satisfy all the tests\footnote{This agile method is
+  knew from specification how it should behave and how not. The implementation
+  is further programmed to satisfy all the tests\footnote{This agile method is
   known as \emph{test driven development} (TDD), for reference see
   \url{http://en.wikipedia.org/wiki/Test-driven_development}.}.
 
-  Tests for all implemented character device hooks are in \emph{szetest2.c}
-  see for example \emph{test\_mmap} which tests correctness of \emph{mmap} by
+  Tests for all implemented character device hooks are in \emph{szetest2.c}.
+  See for example \emph{test\_mmap} which tests correctness of \emph{mmap} by
   trying to forge invalid values (longer space, wrong offsets etc.). In
   addition we ought to add tests for commands and reading and writing of "real"
   data from ring buffer or to it respectively. These checks are implemented
   in \emph{read\_data} and \emph{write\_data} in the test application.
 
   \subsection{Phase II -- Hardware Dependent Code}
-  After successful testing of the base, we start construction of the hardware
+  After successful testing of the base, we start a construction of the
+  hardware
   dependent part. The design was built meanwhile the specification and first
   part implementation and is fully working now. Note that the design was
   developed by a Liberouter hardware group out of scope of this thesis, hence
@@ -1317,7 +1324,8 @@ static struct combo6_device_ops szedata2x_ops = {
   \emph{hw.h}.
 
   Then we start building the source file beginning with init and exit
-  functions. Decision is so far to create a single module, so both module parts
+  functions. The decision is so far to create a single module, so both module
+  parts
   will be linked into one loadable object file. It means we can't add another
   \emph{module\_init} and \emph{module\_exit} functions in this part and we
   must solve it by calling those functions from the former code's init and
@@ -1326,10 +1334,10 @@ static struct combo6_device_ops szedata2x_ops = {
   registration and in addition do module parameters alignment.
 
   \emph{block\_size} is aligned to whole page and \emph{block\_count} to
-  nearest power of two as ring buffer size is multiple of these two numbers
-  and design
-  expect buffer size to be power of two\footnote{It's formally correct to
-  assume the multiple is power of two, since page size is power of two too and
+  nearest power of two, because the ring buffer size is a multiple of these
+  two numbers and the design expects buffer size to be a power of
+  two\footnote{It's formally correct to assume the multiple is a power of two,
+  since page size is a power of two too and
   $2^a\cdot2^b=2^{a+b}$ from algebra.}.
 
   Even when the attach function from the operations is called with real
@@ -1344,7 +1352,7 @@ static struct combo6_device_ops szedata2x_ops = {
   \emph{szedata2\_hw\_alloc/free\_dma} are called from both code paths to not
   copy the code.
 
-  Hardware initialization is done even in \emph{start} callback. We use
+  The hardware initialization is done even in \emph{start} callback. We use
   \emph{combo6} core wrappers for 32-bit writes to PCI bus, so that
   64-bit descriptor must be send in two rounds, all other values to send are
   32-bit.
@@ -1370,8 +1378,8 @@ static struct combo6_device_ops szedata2x_ops = {
   for description of each method.}. "Always Keep One Byte Open" method is
   implemented in the design, head and tail never equals in both cases, if and
   only if the buffer is empty. This is not a problem for receive pointers in
-  the driver, hardware never sets them the same, it will ever use size-1 at
-  most. But we must take care of transmit size, because we move with the head
+  the driver, hardware never sets them the same, it will ever use $size-1$ at
+  most. But we must take care of transmit size, because we move the head
   and we mustn't reach the tail. This is done by this code in
   \emph{szedata2\_head\_tail\_size}:
 
@@ -1383,8 +1391,8 @@ if (head == tail)
   \subsection{Phase III -- Back-porting To Older Kernels}
   \label{chap.backport}
   So far the implementation has been run and tested exclusively on later
-  kernels (2.6.24-rc8-mm1\footnote{release candidate with Andrew Morton's
-  patch applied} and newer) and since we want the driver to be used on many
+  kernels (2.6.24-rc8-mm1\footnote{A release candidate with Andrew Morton's
+  patch applied.} and newer) and since we want the driver to be used on many
   configurations, we have to support all Linux~2.6 kernels in the best case.
   This is not feasible without a help of a programmer. Several APIs have
   changed during 2.6 kernel development as we mentioned in \emph{Linux
@@ -1428,8 +1436,9 @@ if (head == tail)
     \item \textbf{after 2.6.23} -- ring buffer is switched to use \emph{.fault}
   \end{CompactItemize}
 
-  Code for older variants is obviously located only in the \emph{build} tree
-  in the \emph{szecore2.c} file with function prototypes before \emph{\#include}
+  The code for older variants is obviously located only in the \emph{build}
+  tree in the \emph{szecore2.c} file with function prototypes before
+  \emph{\#include}
   line and implementation after it. Unfortunately \emph{.fault} code in
   \emph{kernel} tree must be placed in conditional section too, but the test
   are easy to remove right before posting to mainline.
@@ -1443,19 +1452,19 @@ if (head == tail)
 
   \paragraph{Class} With refer back to section~\ref{chap.chardev}, we already
   know this is most variable API in 2.6. Let's summarize what happened during
-  2.6 development in following points:
+  2.6 development in the following points:
   \begin{CompactItemize}
-    \item \textbf{between 2.6.2 and 2.6.13} -- \emph{sysfs} filesystem
+    \item \textbf{from 2.6.2 to 2.6.13} -- \emph{sysfs} filesystem
       created and
       \emph{class\_simple} defined in 2.6.2; \emph{class\_simple\_create}
       and \emph{class\_simple\_device\_add} are used (with their destroy
       opposites) to operate with classes and devices
-    \item \textbf{between 2.6.13 and 2.6.15} -- \emph{class\_simple}
+    \item \textbf{from 2.6.13 to 2.6.15} -- \emph{class\_simple}
       disappeared with all its functions, \emph{class} structure which was not
       "simple" enough before is simplified and used instead.
       \emph{class\_create} and \emph{class\_device\_create} are functions of
       our interest in these two kernel releases.
-    \item \textbf{between 2.6.15 and 2.6.18} -- \emph{class\_device\_create}
+    \item \textbf{from 2.6.15 to 2.6.18} -- \emph{class\_device\_create}
       changed prototype, it may have two parents reference in it (one
       \emph{device} and one \emph{class\_device}).
     \item \textbf{after 2.6.18} -- \emph{device\_create} should be used
@@ -1474,7 +1483,7 @@ if (head == tail)
   test being ready before the driver programming. Only tests showed in phase~I
   must pass again both after phase~II completion and now. The tests should
   show no regressions on every last kernel we have available for phase~III
-  tests though. However we might also use another techniques to catch bugs.
+  tests though. However we might also use other techniques to catch bugs.
 
   Next steps usually lead to a static analysis of C language. Over hundred both
   commercial and free tools for this purpose exist\footnote{Non-complete list
@@ -1485,10 +1494,12 @@ if (head == tail)
   also, \emph{make C=1} will invoke
   \emph{sparse} checker ever before each file compilation. The output
   is printed on standard error like usual compiler warnings and errors. We
-  caught many signedness, cast and I/O operation bugs thanks to it.
+  caught many
+  signedness\footnote{\url{http://en.wikipedia.org/wiki/Signedness}}, cast and
+  I/O operation bugs thanks to it.
 
-  Linux kernel itself provides many options for development under \emph{Kernel
-  hacking}
+  The Linux kernel itself provides many options for development under
+  \emph{Kernel hacking}
   configuration submenu. Most these configurations slow down kernel operation
   rapidly, but they still may be handful while seeking for deadlocks or
   missing lists initialization for example. All these options enabled allowed
@@ -1499,7 +1510,7 @@ if (head == tail)
 
   Sometimes we hit a design bug, because it is often very hard to emulate high
   traffic in simulations performed by hardware developers. This bug is in such
-  case forwarded to a concrete hardware person via \emph{trac} system. After
+  case forwarded to a concrete VHDL developer via \emph{trac} system. After
   they solve the issue, we re-test and possibly change code if it is
   misunderstanding of specification details. We cooperated this way when we
   discovered a bug in stop hardware path both in the design and the driver for
@@ -1508,10 +1519,10 @@ if (head == tail)
   \subsection{Userspace Library}
   Even though there is no library for szedata v.~1, we consider to have one
   for \sze. The main point to have it is to not propagate the kernel
-  interface directly to the user, to simplify the interface (get rid of status
-  page) and make it abstract.
+  interface directly to the user, to simplify the interface (get rid of the
+  status page) and make it abstract.
 
-  We create a directory for library in versioning system in software package,
+  We create a directory for library in versioning system in a software package,
   integrate with existing build system and create a file with where the
   library heart is going to be. The function bodies are exact copy of use
   cases from the specification, since the use case alone means exactly that it
@@ -1524,17 +1535,18 @@ if (head == tail)
   may be extracted from \emph{szetest2.c} testing code thanks to its
   construction -- we though of creating a library from it later, so we wrote
   the code modularly. We just take away testing stuff and place atomic (from
-  use case view) commands in one function call if not done already. Then this
-  interface is exposed by library header file \emph{libsze2.h} and compiled
-  and linked into \emph{libsze2.so} for further usage.
+  an use case view) commands in one function call if it hasn't been done
+  already. Then this interface is exposed by library header file
+  \emph{libsze2.h}, compiled and linked into \emph{libsze2.so} for further
+  usage.
 
   \paragraph{Testing} Since we changed \emph{szetest2} only internally, the
   tests in
   it must work even now except the processing is delegated to the library.
   Its output should not change anyhow and it is checked in that manner.
 
-  Also userspace application may be checked by some static code analyser. Even
-  \emph{sparse} may be used for that purpose, but also
+  Also the userspace application may be checked by some static code analyser.
+  Even \emph{sparse} may be used for that purpose, but also
   \emph{lint}\footnote{\url{http://en.wikipedia.org/wiki/Lint_programming_tool}}
   successors such as
   \emph{splint}\footnote{\url{http://en.wikipedia.org/wiki/Splint_(programming_tool)}}.
@@ -1542,7 +1554,7 @@ if (head == tail)
 
   \subsection{Final Code}
   \label{chap.final}
-  With a use of iterative extreme programming technique and test driven
+  With a use of an iterative extreme programming technique and test driven
   development we get to a phase where everything works correctly as far as we
   can test and prove at best. If we get back to the requirements
   established in chapter~\ref{chap.requirements}, we find few so far executory
@@ -1555,8 +1567,8 @@ if (head == tail)
 
   Also we didn't forget to document the code for easy reuse or possible
   changes by other developers. Userspace (library) code documentation is
-  provided through \emph{doxygen}\footnote{Source code documentation generator
-  tool, visit home page with description and documentation at
+  provided through \emph{doxygen}\footnote{A source code documentation
+  generator tool, visit home page with description and documentation at
   \url{http://www.stack.nl/~dimitri/doxygen/}.}, generated text is available
   in Appendix~\ref{app.doxygen}. Documentation of
   kernel code is done via \emph{kernel-doc} facility\footnote{It's a
@@ -1571,13 +1583,14 @@ if (head == tail)
   turned over to testers group.
 
   \section{Measurements And Comparisons}
-  Now when we have all drivers ready for real operation, we are able to
+  Now when we have all drivers ready for the real operation, we are able to
   realize some performance tests if the implementation improved the throughput
   as expected. However, we do only basics measurements in the scope of this
   thesis, complex tests with reference numbers will be measured by Liberouter
   testers group, since they have appropriate tools and enough knowledge how to
   test throughput in a predicative manner.
 
+  % XXX traffic ?
   Also we should keep an eye on a stability while performing the tests, since
   this sort of traffic may provoke situations which we are not able to
   evoke in any other way. These measurements may be helpful in finding so far
@@ -1586,15 +1599,15 @@ if (head == tail)
 
   In testing we are interested especially in RX direction, because we have a
   machine
-  which can generate high traffic on the ethernet and is fully programmable by
+  which can generate high traffic at the Ethernet and is fully programmable by
   scripts. \emph{Spirent Communication AX/4000}\footnote{Visit Spirent
   homepage at \url{http://www.spirent.com} to see AX/4000 product sheet.} is
   a~broadband test system we use for stress tests.
   The scripts are available merely for a Tcl shell (\emph{tclsh}), scripts'
   documentation is available exclusively on internal \emph{trac}
-  system\footnote{\url{https://www.liberouter.org/trac/tests/wiki/dokumentaceKTestum}}.
+  system.
 
-  We are about to test three distinct packet lengths: 64 (minimal ethernet
+  We are about to test three distinct packet lengths: 64 (minimal Ethernet
   frame length according to its RFC\footnote{Request For Comments documents
   are a series of memoranda encompassing new research, innovations, and
   methodologies applicable to Internet technologies (cited from
@@ -1607,8 +1620,8 @@ if (head == tail)
 
   \paragraph{Measurements} To gather some statistics about incoming data, we
   must program some utility which would measure time, incoming packets and
-  their volume for szedata2. With use of the time, we can count packets per
-  second and
+  their volume for szedata2. With use of the time, we can count framerate
+  (in packets per second) and
   also average packet length. Conveniently we might augment \emph{szetest2}
   application by adding few lines among other yet implemented testing code.
   
@@ -1617,9 +1630,9 @@ if (head == tail)
   capture traffic with former design, so we augment program for szedata
   version 1, \emph{szetest}, by same changes.
 
-  \paragraph{Configurations} The Spirent is a multiport device and its third
-  port is currently connected to \emph{cabernet.liberouter.org}, where we
-  perform the tests. \emph{cabernet} is a machine with eight Xeon
+  \paragraph{Configurations} The Spirent is a multiport device. One of its
+  ports was connected to a machine where we performed the tests. The machine
+  is equipped with eight Xeon
   E5335 cores at 2\,GHz and 4\,GiB of memory. Both kernel and user environments
   are 32-bit. A \comx\ card with c610.05.0b \ncope\ PCI bridge version is
   installed in a PCI-X slot. A \sze\ design from May~12 2008 (minor version 0)
@@ -1674,7 +1687,7 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
 \emph{Intel}	& 777		& 936		& 936		\\ \hline
 \emph{DAG}	& 1000		& 1000		& 1000		\\ \hline
       \end{tabular}
-      \caption{Measurements, table, in Mbit/s}
+      \caption{Measurements, table, in Mbps}
       \label{fig.measures_tab}
     \end{center}
   \end{figure}
@@ -1687,10 +1700,11 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
     \end{center}
   \end{figure}
 
-  We see rapid improvement especially when receiving short packets. Speed
+  We see rapid improvement especially when receiving short packets.
+  Performance
   of \sze\ in comparison with non-aggregated previous version is more than ten
-  times higher and if we consider margin at 1000\,Mbit/s as a theoretical
-  limit, we approached almost maximum feasible throughput on 1\,Gbit ethernet
+  times higher and if we consider margin at 1000\,Mbps as a theoretical
+  limit, we approached almost maximum feasible throughput on 1\,Gbit Ethernet
   with it.
 
   \section{Maintenance}
@@ -1703,9 +1717,10 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
   two versions from both systems, so they must be tested and distributed at
   once, now including \sze.
 
-  Userspace library is not kernel dependent, so it needn't be necessarily
+  The userspace library is not kernel dependent, so it needn't be necessarily
   tested on all kernels, however because of testing program dependency on this
-  library, it is tested too. Deployment is \emph{strip}\footnote{Binaries
+  library, it is tested too. Deployment comprises
+  \emph{strip}\footnote{Binaries
   are usually freed of unnecessary debugging sections and symbols not needed
   for running on UNIX systems by \emph{strip} utility (see \emph{man strip}).}
   followed by a copy to a directory shared between Liberouter machines.
@@ -1718,12 +1733,12 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
 
 \chapter{Conclusion And Future Work}
   \section{Conclusion}
-  This thesis aimed at data transfers between network and an application in
-  both directions and tried to find out a way how to do such transfers as fast
-  as possible. As a
+  This thesis was aimed at data transfers between network and an application in
+  both directions and tried to find out a way how to perform such transfers as
+  fast as possible. As a
   first step we introduced hardware basics and limitations in fast transfer
-  mechanisms such as DMA on PCI bus and then walk through possible data
-  structures eligible rapid transmissions and implementation of ring buffer
+  mechanisms such as DMA on a PCI bus and then walk through possible data
+  structures eligible rapid transmissions and implementation of a ring buffer
   data structure on \com\ cards.
 
   Also several Linux interfaces for fast operations on the ring buffer were
@@ -1734,14 +1749,14 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
   \emph{combo6} modules as a base and propose subtle interface between the
   driver and a library programmed as a part of this thesis too.
 
-  We verified functionality during implementation with help of modern
+  We verified functionality during implementation with a help of modern
   techniques. Each functional increment was tested, some code writing was
   ridden by
   tests thanks to requirements and specification being ready before the
   development itself. After all we were able to do integration testing when we
-  finished whole module.
+  finished the whole module.
 
-  Finally, developed module was compared with other available solutions
+  Finally, the developed module was compared with other available solutions
   orienting similarly in network environment. Measurements provided by
   an external vendor were compared with our solutions and whole package of
   drivers and library was deployed on Liberouter machines.
@@ -1750,7 +1765,7 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
   \label{chap.future}
   Our implementation has been done, however some parts might still be
   improved. At least four kinds of improvements currently exist, but are out
-  of scope of this thesis. We summarize them in these points:  
+  of scope of this thesis. We summarize them in the following points:  
   \begin{itemize}
   \item
   We already introduced idea to support 64-bit PCI addressing in DAC
@@ -1759,24 +1774,24 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
   Note that \sze\ driver is 64-bit ready and so the design registers, what
   blocks using address higher than $2^{32}$ is the design as a whole. Its DMA
   controllers can't do DAC transfers and so PCI core code is told to limit
-  allocations by setting DMA mask. Memory management then return pages with
-  physical addresses complying with the address mask.
+  allocations by setting proper DMA mask. Memory management then return pages
+  with physical addresses complying with the address mask.
   \item
   It would be worth to have an ability to use the \sze\ design also in a
   standard network adapter mode, i.e. with use of kernel networking stack.
   This needs slight changes of \emph{hw.c} and rewriting whole hardware
-  independent part -- conversion from character device data passing to socket
+  independent part -- a conversion from character device data passing to socket
   operations.
   \item
   Also we know, that we have another option in data processing in the
   application specific interface. Instead of multiprocessing of incoming data,
-  we would want to balance load among many threads on multiprocessor machine
-  to do more time-consuming jobs. Remember computation of ring buffer size,
+  we would want to balance load among many threads on a multiprocessor machine
+  to do more time-consuming jobs. Remember computation of a ring buffer size,
   where we considered only 50\,ms latencies.
   \item
   Further optimizations may be introduced in the area of reading pointer from
-  hardware. Reads and writes to slow (in comparison to front-side bus) PCI bus
-  may take many hundreds of processor cycles until they finish. To
+  hardware. Reads and writes to slow (in comparison to the front-side bus) PCI
+  bus may take many hundreds of processor cycles until they finish. To
   avoid so long delays we might cache pointers for later use for example in
   \emph{poll}.
   \end{itemize}
