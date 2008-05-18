@@ -89,7 +89,7 @@
 
 \thesiswoman{false}
 \thesisfaculty{fi}
-\thesisyear{spring 2008}
+\thesisyear{2008}
 
 \newcommand{\lbr}{\emph{Liberouter}}
 \newcommand{\com}{\emph{COMBO6}}
@@ -116,7 +116,7 @@
   \AdvisorName
 \end{ThesisDeclaration}
 \begin{ThesisThanks}
-  I want to thank my thesis advisor Pavel Čeleda. And least but not the last
+  I want to thank my thesis advisor Pavel Čeleda. And last but not the least
   I would like to thank here my parents for their patience too.
 \end{ThesisThanks}
 \begin{ThesisAbstract}
@@ -124,9 +124,9 @@
   programs and vice versa. Above all we specialize to coherent direct
   memory access transfers from/to hardware through ring buffers. Also we
   discuss other transfer methods implemented in other projects and consider
-  using them here. Finally we implement the method and test it with all
+  using them here. Finally we implement chosen method and test it with all
   available tools, describe the testing process and compare with already
-  available solutions.
+  existing solutions.
 
 \end{ThesisAbstract}
 \begin{ThesisKeyWords}
@@ -137,12 +137,12 @@
 \tableofcontents
 
 \chapter{Introduction}
-  To even boot a computer, it's necessary to proceed many transfers inside the
-  hardware among its components. It's a basic function which must work,
+  To even boot a computer, it is necessary to proceed many transfers inside the
+  hardware among its components. It is a basic function which must work,
   however there are several methods of how to achieve that. Especially
-  the fast ones are very important in computer science which results in higher
-  overall throughput of the system itself and also in faster communication with
-  other ones.
+  the fast transfers are very important in computer science which results in
+  higher overall throughput of the system itself and also in faster
+  communication with other ones.
 
 %  There are many computer technology areas, where fast transfers are very
 %  important. Beside the computer-inside transfers among CPU, disks,
@@ -161,8 +161,8 @@
 
   As an answer to permanent higher requirements in the networking area,
   Liberouter project has been established as a project supported by Czech
-  academic network CESNET and European project 6NET. The original intention
-  was to develop a router
+  national research and education network CESNET and European project 6NET.
+  The original intention was to develop a router
   for high traffic networks. After some time, this idea was augmented to other
   network usages such as network filtering and monitoring. All these functions
   run on \com\ family PCI cards (see Figure~\ref{fig.combo6} for
@@ -179,10 +179,10 @@
   This thesis is based on one of many researches that have been already done
   under Liberouter -- \ncope\ -- which we describe in
   chapter~\ref{chap.netcope}.
-  In short, it's hardware platform trying to achieve universality along with
-  speed and it's fully programmable. Software running on them can do fast
+  In short, it is a hardware platform trying to achieve universality along with
+  speed and it is fully programmable. Software running on them can do fast
   transfers if it is instructed to. Drivers are usually used for this purpose.
-  Despite some are already prepared, a new \ncope\ software was developed and
+  Despite some are ready yet, a new \ncope\ software was developed and
   it needs a new driver.
 
   This thesis describes the evolution process of such driver from its
@@ -215,7 +215,7 @@
 
   Major part of Linux kernel is licensed under GPL version 2\footnote{License
   is available at \url{http://www.gnu.org/licenses/gpl-2.0.html}.}.
-  Chosen license which will be the implementation distributed under is GPL
+  Chosen license which the implementation will be distributed under is GPL
   version 2 like most other drivers.
 
 \chapter{Hardware Basics}
@@ -225,8 +225,8 @@
   kernel driver implementation has. Understanding hardware-software
   communication will guide us towards complete implementation.
 
-  After each section, we consult what exactly does that particular part
-  means for the final code and how to achieve that in Linux.
+  After each section, we consult what exactly that particular part
+  means for the final code and how to achieve that in Linux kernel.
 
   \section{Devices Interconnection}
   \label{chap.inter}
@@ -247,38 +247,38 @@
   We are concerned especially in \emph{peripheral component interconnect}
   (PCI) devices, because \com\ card families are PCI based. Currently we have
   a legacy PCI (32-bit PCI) \com\ card, \comx\ for PCI-X (64-bit PCI) and
-  \come\ based on PCI express specification (64-bit packet based PCI). Each
+  \come\ based on PCI-Express specification (64-bit packet based PCI). Each
   such device is physically connected to any PCI bus via PCI slot.
   PCI bus is attached to \emph{southbridge}, it communicates
-  with \emph{northbridge} over internal bus and it's finally wired
+  with \emph{northbridge} over internal bus and it is finally wired
   with processor via \emph{front-side bus} (FSB) and with memory. Nowadays
-  it's still more common, that all southbridge, northbridge and memory
+  it is still more common, that all southbridge, northbridge and memory
   controller are implemented as proper PCI devices directly connected to the
   main PCI bus.
 
   Older PCI buses have a \emph{control bus} supposed to send controlling
   signals and synchronize objects which are connected to it and further
   \emph{address} and \emph{data buses} multiplexed on one address/data bus.
-  Transmission starts by sending address followed by data on the same wires.
+  A transmission starts by sending address followed by data on the same wires.
   Legacy PCI address/data bus is only 32-bit wide and hence sending of 64-bit
   numbers over the bus to older \com\ cards is not possible. Unlike data,
   addresses are normally sent in so-called \emph{single address cycle} (SAC)
   mode, when 32-bit address is set on the bus and latched by the other side,
-  but it's possible to send even 64-bit address via \emph{double} (sometimes
+  but it is possible to send even 64-bit address via \emph{double} (sometimes
   \emph{dual}) \emph{address cycle} (DAC) by negotiating it and repeating SAC
   twice. The \com\ hardware supports SAC nowadays, but we plan to utilize DAC
   mechanism in the future to address more than 4\,GiB of physical memory, see
   chapter~\ref{chap.future}.
 
-  These problems are completely avoided later in PCI express which communicates
-  over serial physical layer by packets routed by switches and hubs. Each
+  These problems are completely avoided later in PCI-Express which communicates
+  over a serial physical layer by packets routed by switches and hubs. Each
   request or reply is a packet which may contain both 32 and 64-bit addresses
   in the packet header and whatever data in the payload.
 
   Further detailed PCI information is in Legacy PCI, PCI-X\cite{pcispec} and
-  PCI express\cite{pciespec} specifications.
+  PCI-Express\cite{pciespec} specifications.
 
-  \subsubsection{Configuration Space}
+  \paragraph{Configuration Space}
   Every modern bus supports a mechanism to autoconfigure devices connected
   to it. Also each PCI device has its configuration space, where all the
   needed settings are stored or may be set to. This space contains information
@@ -291,25 +291,26 @@
   designating one concrete device family. It is also helpful in userspace
   scripts to create persistently named nodes in section~\ref{chap.udev}.
 
-  \subsubsection{Linux PCI Support}
+  \paragraph{Linux PCI Support}
   PCI is well supported in Linux since it became a standard. Concrete API is
-  in a scope of chapter~12 of \cite{ldd}. In short, driver's hook is called
-  whenever subsystem finds suitable PCI device, initialization is done by
-  functions with pci\_ prefix, especially device must be enabled and spaces
+  in a scope of the chapter~12 of \cite{ldd}. In short, a driver's hook is
+  called whenever the PCI subsystem finds a suitable device,
+  initialization is done by functions with a \emph{pci\_} prefix, especially
+  device must be enabled and spaces
   remapped to be usable. Then the device is ready to work. Deinitialization
   and device switch off is done in driver's remove hook.
 
   Transfers are done by a processor performing standard read and writes over
-  the
-  remapped space, unit by unit. On 32-bit unit is up to 4 bytes, on 64-bit up
-  to 8 bytes. These transfers are not too fast and need processor attention.
+  the remapped space, unit by unit. The unit is up to 4 bytes long on 32-bit,
+  on 64-bit up to 8 bytes. These transfers are not too fast and need processor
+  attention.
 
   \section{DMA and Bus Mastering}
   \label{chap.dma}
   \emph{Direct memory access} known as DMA is a method widely used to
-  speed up transfers in computer engineering. It's based on technique called
+  speed up transfers in computer engineering. It is based on technique called
   \emph{bus mastering}. A device which wants to move data from/to memory
-  becomes a bus master and no other device or even processor can't touch
+  becomes a bus master and no other device or even processor cannot touch
   address and data bus. While being a master, it sets address on an address
   bus and sends or latches data on a data bus. When there are more than one
   data phases after address phase on multiplexed bus, the transfer is done in
@@ -336,11 +337,11 @@
   band again unless all data have not been sent. This method is implemented in
   PCI and PCI-X versions of \com\ cards.
 
-  PCI express is a bit different, it asks the other device to get some amount
+  PCI-Express is a bit different, it asks the other device to get some amount
   of data in request packet and the device fills reply packet with the data.
   Sending is similar, the source device fills the data
   directly in the request and gets back completion packet. This is obviously
-  implemented in PCI express based \com.
+  implemented in PCI-Express based \com.
 
   The transfer is theoretically limited by the other device (including main
   memory) boundary\footnote{It is 4096 bytes on main memory with extensions
@@ -375,7 +376,7 @@
   see~\ref{chap.netcope}.
 
   \paragraph{Generic interface} It is actually an abstraction of PCI interface.
-  It's not bounded to any PCI device, it may be applied for non-PCI devices,
+  It is not bounded to any PCI device, it may be applied for non-PCI devices,
   however it obviously doesn't support PCI features completely. API of this
   type is taken down in \emph{Documentation/DMA-API.txt}.
 
@@ -421,7 +422,7 @@
   address. Some modern mainboards add another unit called IOMMU (MMU for I/O)
   between device and main memory
   path, so that devices address by logical address too. It allows creating a
-  virtual space even for devices, but it's not widely spread so far
+  virtual space even for devices, but it is not widely spread so far
   so \com\ card developers must not take it for granted.
 
   This schema allows us to allocate huge contiguous memory blocks without a
@@ -498,7 +499,7 @@
   Not to implement \emph{fault} or \emph{nopage} handler for each mapped
   space, helpers exist. For remapping I/O space, \emph{io\_remap\_page\_range}
   was used in some variants, because it changed prototype time by time, then
-  \emph{io\_remap\_pfn\_range} was implemented and it's still in use. While
+  \emph{io\_remap\_pfn\_range} was implemented and it is still in use. While
   for remapping kernel memory obtained by page allocation mechanism (i.e.
   physically contiguous memory), \emph{remap\_pfn\_range} may be used, a
   helper called \emph{remap\_vmalloc\_range} for virtual memory exists even
@@ -511,7 +512,7 @@
   \subsubsection{Memory Mapped I/O}
   Memory map is sometimes inappropriately confused with \emph{memory mapped
   I/O} (MMIO). We are able to access device memory space in kernel by virtual
-  address by MMIO. It's achieved by mapping I/O space into kernelspace.
+  address by MMIO. It is achieved by mapping I/O space into kernelspace.
   For example \fpga\ memory space of a \com\ card may be referred
   by a virtual address after being mapped this way.
 
@@ -522,7 +523,7 @@
   slower, because it calls \emph{ioremap} and all consequent read and writes
   (functions \emph{ioread}, \emph{iowrite}) are done through calling back
   \emph{read} and \emph{write} or \emph{in} and \emph{out} depending on what
-  kind is the underlying mapping of. In our case we know, it's mapped memory,
+  kind is the underlying mapping of. In our case we know, it is mapped memory,
   so that we use \emph{ioremap}/\emph{iounmap} and \emph{read} and
   \emph{write} functions.
 
@@ -538,9 +539,9 @@
   block and character devices.
 
   The basic and simplest idea is to \textbf{copy} the data by a processor
-  from kernel buffer to an user one. It's easy to implement and least
-  error-prone, on the other hand it's one of the slowest known methods and as
-  we need to read high bandwidth data in userspace, it's unusable in our case.
+  from kernel buffer to an user one. It is easy to implement and least
+  error-prone, on the other hand it is one of the slowest known methods and as
+  we need to read high bandwidth data in userspace, it is unusable in our case.
   Memory map suits in such situation, this eliminates utilization of both
   sockets and
   block devices, since neither of them can be mapped, furthermore socket data
@@ -616,7 +617,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   device must be added by \emph{cdev\_add} with operations as second
   parameter. \emph{cdev\_del} is used for removal.
 
-  Although that's everything what is needed from Linux kernel view, this is
+  Although that is everything what is needed from Linux kernel view, this is
   not
   enough to support \emph{udev} node creation. Each driver creates a class by
   \emph{class\_create}, frees up by \emph{class\_destroy}. Then each device is
@@ -630,8 +631,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \emph{class\_simple\_create}, \emph{class\_device\_create} and others will
   be mentioned in back-porting chapter~\ref{chap.backport}.
 
-  We choose \emph{alloc\_chrdev\_region} method, since it's
-  recommended and \emph{device\_create} as well. Further
+  We choose \emph{alloc\_chrdev\_region} method, since it is recommended and
+  \emph{device\_create} as well. Further
   character device resources are available in \cite{ldd}, chapter~3 and in
   \cite{ulk}.
 
@@ -684,7 +685,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   (described in \cite{ldd}, chapter~15) over memory block pool.
   In the first phase, the data transferred at one turn contained only one
   packet of constant length. While \emph{PowerPC} was working with higher
-  rates in this mode, we found out, that it's a bottleneck of the whole
+  rates in this mode, we found out, that it is a bottleneck of the whole
   architecture, its control bus was too slow to achieve higher transfer rates.
 
   We tried to improve this behaviour by aggregating more data packets into one
@@ -932,14 +933,14 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \begin{itemize}
     \item \textbf{load balancing} -- several readers exist and data are
       divided among them. Every single application gets distinct data and do
-      the same operation on them. It's very similar to \emph{single program
+      the same operation on them. It is very similar to \emph{single program
       multiple data}\footnote{see \url{http://en.wikipedia.org/wiki/SPMD} for
       reference} in processors theory.
     \item \textbf{multiprocessing} -- all readers want all data to do
       different tasks with them. We can approach this to \emph{multiple
       program single data}.
   \end{itemize}
-  We implement only the latter so far, but it's possible that we augment the
+  We implement only the latter so far, but it is possible that we augment the
   implementation to the former too, see future work in
   chapter~\ref{chap.future}.
 
@@ -963,7 +964,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   to avoid any potential security violation. In this case, we decide
   whether this will be implemented by the design or in the driver. The
   latter would mean data copying and hence slowdown. More investigation of how
-  much speed impact will this have should be performed but it's not trivial
+  much speed impact will this have should be performed but it is not trivial
   and also out of scope of this thesis.
 
   \subsubsection{Close And Deinitialization} After open reference count drops
@@ -990,7 +991,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   just augment the use case specification further by splitting single use case
   steps into multiple messages here. For instance \emph{mmap} from use case is
   here as two messages: \emph{mmap status page} and \emph{mmap RX space}.
-  That's because we try to be as much exact as possible to directly turn these
+  That is because we try to be as much exact as possible to directly turn these
   information into the real code in the next chapter.
 
   \paragraph{TX sequence diagram} We reflect difference of RX and TX showed
@@ -1070,7 +1071,7 @@ static struct combo6_device_ops szedata2x_ops = {
   We used term \emph{command} in the specification many times, but we haven't
   explained command passing mechanism. Although \emph{ioctl} system call was
   uttered as deprecated long time ago, nothing better was introduced so far,
-  its kernel interface has been improved and it's still widely used even in
+  its kernel interface has been improved and it is still widely used even in
   new projects. Hence we'll use it for commands passing too.
 
   We split the implementation into two separate files. One is for
@@ -1100,14 +1101,14 @@ static struct combo6_device_ops szedata2x_ops = {
   Since 64-bit operations are expensive and non-atomic on 32-bit machines,
   we try to minimize 64-bit computations as much as possible. In fact we need
   only an mmap offset and size to be 64-bit to allow spaces be bigger in sum
-  than 4\,GiB on 64-bit or 32-bit PAE\footnote{Physical Address
-  Extension, it extends paging mechanism by one table so that it's possible to
+  than 4\,GiB on 64-bit or 32-bit PAE\footnote{Physical Address Extension, it
+  extends paging mechanism by one table so that it is possible to
   address 36-bits of physical address.} enabled machines. See following
   structure descriptions and notes about 64-bit needs.
 
   \paragraph{Application-driver interface}
   We decided to pass all read-only information in status page which is
-  allocated per application on its first open. It's depicted on the top left
+  allocated per application on its first open. It is depicted on the top left
   in Figure~\ref{fig.status_page}.
 
   \begin{figure}[htb]
@@ -1123,8 +1124,8 @@ static struct combo6_device_ops szedata2x_ops = {
   requirements, only two parameters must be known -- offset and size. As
   mentioned earlier, offset is 64-bit value and so the size is. Eleven
   (indexed by 0 through 10) such pairs might be stored in the page, however we
-  use only two\footnote{Note that it's not space wasting, page size is usually
-  4\,KiB and it's enough space to reserve some entries for future purposes.},
+  use only two\footnote{Note that it is not space wasting, page size is usually
+  4\,KiB and it is enough space to reserve some entries for future purposes.},
   one for RX space, one for TX. These offsets point to so-called \emph{spaces}
   (on the right side) which might consist (exclusively ring buffer spaces do)
   of \emph{areas}. \emph{Area} is directly the ring buffer corresponding to
@@ -1135,13 +1136,13 @@ static struct combo6_device_ops szedata2x_ops = {
 
   The application then remaps all desired spaces indexed by \emph{SZE2\_MMIO}
   constants and may poll for their status in \emph{area descriptors} (another
-  status page entries). It's a structure with 64-bit offset and 32-bit size
+  status page entries). It is a structure with 64-bit offset and 32-bit size
   pointing directly to the area and flags. Flags denote if area/ring buffer
   wrap occurred and where is the next \emph{area descriptor} for the wrapped
   data.
 
   There are also sanity checks (magic numbers), version number and set values
-  for e.g. poll in the status page, it's not so important so we let reader to
+  for e.g. poll in the status page, it is not so important so we let reader to
   investigate exact descriptor structure. Status page is named as \emph{struct
   sze2\_instance\_info} in the source code.
 
@@ -1174,7 +1175,7 @@ static struct combo6_device_ops szedata2x_ops = {
   independent part. First we write module \emph{init} and \emph{exit}
   functions. We create a \emph{class} and reserve character device region
   (with at most \emph{SZEDATA2\_MAX\_MINORS}\footnote{currently the value is
-  8, but it may be altered on compile time, since it's a macro}) as described
+  8, but it may be altered on compile time, since it is a macro}) as described
   in chapter~\ref{chap.devnodes} and store a number which we got from it to
   use later in \emph{exit} function when unregistering character device.
 
@@ -1204,7 +1205,7 @@ static struct combo6_device_ops szedata2x_ops = {
   work with the buffer and also free it later), worst case is on 64-bit
   machines, where both numbers are 8-bytes, so we further have
   $100000\cdot2\cdot8=1600000$. This information might be stored in
-  $\frac{1600000}{4096}\doteq390$ pages. That's a number very close to
+  $\frac{1600000}{4096}\doteq390$ pages. That is a number very close to
   $2^{MAX\_ORDER}$\footnote{\emph{MAX\_ORDER} is maximum allowed power of 2
   to allocate via \emph{get\_free\_page}, it used to be between 5 and 20
   depending on architecture and configuration}, so we would end up in
@@ -1212,9 +1213,9 @@ static struct combo6_device_ops szedata2x_ops = {
   descriptors.
 
   Even if we're allocating ring buffer page by page, we might face
-  failures. It's because of how allocations work in memory management
+  failures. It is because of how allocations work in memory management
   subsystem. For implementation in Linux 2.4 see~\cite{gorman}, 2.6 differs
-  slightly, but it's the same in principle. Most of inactive pages is freed
+  slightly, but it is the same in principle. Most of inactive pages is freed
   even under high pressure, when priority is high. The priority is raised by
   each failure and the higher the priority is the more pages are tried to free
   (also the used ones might be swapped out if they belong to userspace). This
@@ -1336,7 +1337,7 @@ static struct combo6_device_ops szedata2x_ops = {
   32-bit.
   After posting start to control register, the code inside the command waits
   until status register is either running or idle then the \emph{start}
-  callback finishes and returns. It's possible, that hardware is locked up and
+  callback finishes and returns. It is possible, that hardware is locked up and
   it doesn't become ready in a reasonable time, so we must bound the waiting
   loop by some constant. According to a design specification, 100\,$\mu s$
   should be enough.
@@ -1349,7 +1350,7 @@ static struct combo6_device_ops szedata2x_ops = {
 
   Pointer and interrupt callbacks are simple calls of PCI space reads and
   writes, a problem arises when computing sizes of spaces between read head
-  and stored tail. When tail equals to head it's impossible to distinguish if
+  and stored tail. When tail equals to head it is impossible to distinguish if
   the buffer is empty or full. Few
   techniques with less or more overhead exist\footnote{See
   \href{http://en.wikipedia.org/wiki/Circular_buffer\#Full_.2F_Empty_Buffer_Distinction}{http://en.wikipedia.org/wiki/Circular\_buffer}
@@ -1423,7 +1424,7 @@ if (head == tail)
   \paragraph{Ioctl} \emph{unlocked\_ioctl} and \emph{compat\_ioctl} were
   introduced even in 2.6.11 kernel. Before that, merely \emph{ioctl} existed.
   We behave similarly as for \emph{compat\_ioctl}, simply call unlocked variant
-  with proper parameters. It's possible thanks to difference being just in
+  with proper parameters. It is possible thanks to difference being just in
   function prototype. Again this handler is present only in the \emph{build}
   tree.
 
@@ -1483,7 +1484,7 @@ if (head == tail)
   crash may occur), unchecked return values of functions which must be checked
   and also it helped us to prove locking correctness.
 
-  Sometimes we hit a design bug, because it's often very hard to emulate high
+  Sometimes we hit a design bug, because it is often very hard to emulate high
   traffic in simulations performed by hardware developers. This bug is in such
   case forwarded to a concrete hardware person via \emph{trac} system. After
   they solve the issue, we re-test and possibly change code if it is
@@ -1517,7 +1518,7 @@ if (head == tail)
   \paragraph{Testing} Since we changed \emph{szetest2} only internally, the
   tests in
   it must work even now except the processing is delegated to the library.
-  Its output should not change anyhow and it's checked in that manner.
+  Its output should not change anyhow and it is checked in that manner.
 
   Also userspace application may be checked by some static code analyser. Even
   \emph{sparse} may be used for that purpose, but also
@@ -1646,7 +1647,7 @@ if (head == tail)
 
   Userspace library is not kernel dependent, so it needn't be necessarily
   tested on all kernels, however because of testing program dependency on this
-  library, it's tested too. Deployment is \emph{strip}\footnote{Binaries
+  library, it is tested too. Deployment is \emph{strip}\footnote{Binaries
   are usually freed of unnecessary debugging sections and symbols not needed
   for running on UNIX systems by \emph{strip} utility (see \emph{man strip}).}
   followed by a copy to a directory shared between Liberouter machines.
