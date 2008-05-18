@@ -270,7 +270,7 @@
   mechanism in the future to address more than 4\,GiB of physical memory, see
   chapter~\ref{chap.future}.
 
-  These problems are completely avoided later in PCI-Express which communicates
+  These problems are entirely avoided later in PCI-Express which communicates
   over a serial physical layer by packets routed by switches and hubs. Each
   request or reply is a packet which may contain both 32 and 64-bit addresses
   in the packet header and whatever data in the payload.
@@ -484,15 +484,16 @@
   As we are able to set (and unset) page present bit in structures
   MMU traverses and an exception is thrown when the bit is not set while any
   of the structures is accessed, we can hook a page fault handler to this
-  path which would install missing pages.
+  path. The handler would then install the missing pages.
 
   This can be used for \emph{memory mapping} (MMAP). We register a page fault
-  function by OS interface and when user application maps some space and
+  function by operating system (OS) interface and when an user application
+  maps some space and
   accesses it, we may set up there any pages we want. According to exact
   address which was the root cause of the fault, we compute a number of page
   which should be in that particular memory place and install it there.
-  Application sees this as a transparent process and it accesses the data from
-  the installed page since that moment.
+  Application "sees" this as a transparent process and it accesses the data
+  from the installed page since that moment.
 
   \paragraph{Linux mmap interface}
   Many incompatible interfaces were introduced and removed meanwhile Linux
@@ -512,14 +513,14 @@
   helper called \emph{remap\_vmalloc\_range} for virtual memory exists even
   since kernel 2.6.18 and it remaps exclusively \emph{vmalloc\_*user} buffers.
   We'll employ
-  all these mentioned interfaces, depending on kernel we compile for, to be
-  backward compatible and to have complete functionality (and simpleness for
+  all these mentioned interfaces, depending on a kernel we compile for, to be
+  backward compatible and to provide complete functionality (and simpleness for
   later kernels).
 
   \subsubsection{Memory Mapped I/O}
   Memory map is sometimes inappropriately confused with \emph{memory mapped
   I/O} (MMIO). We are able to access device memory space in kernel by virtual
-  address by MMIO. It is achieved by mapping I/O space into kernelspace.
+  address by MMIO. It is achieved by mapping I/O space into the kernelspace.
   For example \fpga\ memory space of a \com\ card may be referred
   by a virtual address after being mapped this way.
 
@@ -539,16 +540,16 @@
 
   \section{Character Device}
   \label{chap.chardev}
-  While we are able to pass data from device to memory available only to
-  kernel via DMA so far, we still need to put the data to userspace
-  application somehow. Several ways how to achieve that exist in Linux. Most
+  While we are able to pass data from the device to a kernel memory (via DMA)
+  so far, we still need to turn over the data to an userspace application
+  somehow. There are several ways how to achieve that in Linux. Most
   of them are based on moving data through special files such as sockets,
   block and character devices.
 
   The basic and simplest idea is to \textbf{copy} the data by a processor
-  from kernel buffer to an user one. It is easy to implement and least
+  from the kernel buffer to an user one. It is easy to implement and least
   error-prone, on the other hand it is one of the slowest known methods and as
-  we need to read high bandwidth data in userspace, it is unusable in our case.
+  we need to read high speed data in userspace, it is unusable in our case.
   Memory map suits in such situation, this eliminates utilization of both
   sockets and
   block devices, since neither of them can be mapped, furthermore socket data
@@ -565,8 +566,8 @@
   szedata2 will be discussed in section~\ref{chap.code} after review of
   operations done in specification.
 
-  If the driver is loaded and requested node does not exist yet, it must be
-  created to allow access to it. It used to be created manually by userspace
+  If the driver is loaded and the requested node does not exist yet, it must
+  be created to allow access to it. It used to be created manually by userspace
   program \emph{mknod} or wrapper scripts like \emph{MAKEDEV}, however this
   was not perfect and mostly causes problems, because of the need of every
   single node creation and so some dynamic principles described later in this
@@ -581,10 +582,11 @@
   filesystem (tmpfs) on the same directory, but from its name, it does all its
   work in userspace by listening on a socket for userspace events
   (\emph{uevents}) from kernel and invoking \emph{mknod},
-  \emph{modprobe}\footnote{kernel module insertion program} and other
+  \emph{modprobe}\footnote{Kernel module insertion program.} and other
   programs.
 
-  For instance following example shows a node creation in \emph{/dev/combosix/}
+  For instance the following example shows a node creation in
+  \emph{/dev/combosix/}
   for \com\ device matched by IDs read from PCI configuration space which were
   sent by kernel in uevent. \vspace{0.5em}
 \begin{verbatim}
@@ -593,20 +595,19 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 \end{verbatim}
 \vspace{0.5em}
 
-  As device node names are random so far -- it depends on kernel PCI cards
-  enumeration exclusively (and it may vary) -- and we want numbers in names to
-  correspond with each other, e.g. to have \emph{combosix6} and
-  \emph{szedataII6} for one
-  concrete card in PCI slot 6, we need to write similar rules to generate
-  persistent and consistent naming.
+  Device node names are random so far -- they depend on the kernel PCI
+  cards enumeration exclusively (and it may vary). However we want numbers in
+  names to correspond with each other (e.g. to have \emph{combosix6} and
+  \emph{szedataII6} for one concrete card in PCI slot number~6), so we need to
+  write similar rules to generate a persistent and consistent naming.
 
   Two separate files are needed to achieve that, another one with persistent
-  rules will be created on the fly. Shell script augmenting both the persistent
-  rules and a rules file for matching the \com\ cards which runs the
-  script are described in detail in Appendix~\ref{app.udev}.
+  rules will be created "on the fly". A shell script augmenting both the
+  persistent rules and a rules file for matching the \com\ cards which
+  executes the script are described in detail in Appendix~\ref{app.udev}.
 
   \subsection{Character Device Linux Interface}
-  First step to support character devices by a driver is to allocate a
+  The first step to support character devices by a driver is to allocate a
   region of devices. This was done by \emph{register\_chrdev\_region} in the
   past since regions were statically assigned among certain drivers, nowadays
   is employed a variant for dynamic registration \emph{register\_chrdev} which
@@ -629,8 +630,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   enough to support \emph{udev} node creation. Each driver creates a class by
   \emph{class\_create}, frees up by \emph{class\_destroy}. Then each device is
   created by \emph{device\_create} and after this call \emph{udev} receives a
-  signal to create a node. Node is deleted after \emph{device\_destroy}. Both
-  these functions are created in class namespace, hence the class must be
+  signal to create a node. The node is deleted after \emph{device\_destroy}.
+  Both these functions are created in class namespace, hence the class must be
   unconditionally created before and freed after \emph{device\_*} calls.
   This API evolved even in 2.6 Linux kernel and is probably most unstable one
   in a scope of this thesis. Many function variants appeared, many changed
@@ -643,7 +644,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   character device resources are available in \cite{ldd}, chapter~3 and in
   \cite{ulk}.
 
-  \section{NetCOPE Hardware And Szedata2 Design}
+  \section{NetCOPE Hardware And szedata2 Design}
   \label{chap.netcope}
   As we slightly mentioned in the introduction, all Liberouter projects are
   based on \com\ cards. They contain Xilinx \emph{field-programmable
@@ -656,9 +657,9 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   under each link listed on \ncope\ specification page.
 
   The project was started in the middle of 2006 and currently we have a
-  functional and tested prototype with 4 network interfaces\footnote{a new
-  hardware with 2 interfaces but with modern bus (PCIe) is prepared and tested
-  now}. Its universal design allows
+  functional and tested prototype with 4 network interfaces\footnote{A new
+  hardware with 2 interfaces but with modern bus (PCI-Express) is prepared and
+  tested now.}. Its universal design allows
   involving it in multiple areas such as network traffic filtering, routing
   packets, intrusion detection and others -- it depends on firmware,
   so-called \emph{design}, which is loaded into the FPGA.
@@ -680,7 +681,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 %  \end{figure}
 
   \subsection{szedata2}
-  Szedata2 is one of designs, the abbreviation stands for \emph{straight
+  \sze\ is one of the designs, the abbreviation stands for \emph{straight
   zero copy data} in the meaning of avoid copying data actively by processor
   from memory to the application and vice versa. The name was chosen after its
   predecessor szedata version 1.
@@ -688,8 +689,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   \subsubsection{Design Specification}
   Both szedata versions run in \emph{FPGA} on \ncope\ architecture.
   Version 1 utilizes \emph{PowerPC} as a DMA controller -- program running
-  on that processor used to transfer data by scatter-gather DMA method
-  (described in \cite{ldd}, chapter~15) over memory block pool.
+  on that processor used to transfer data by \emph{scatter-gather DMA} method
+  (described in~\cite{ldd}, chapter~15) over memory block pool.
   In the first phase, the data transferred at one turn contained only one
   packet of constant length. While \emph{PowerPC} was working with higher
   rates in this mode, we found out, that it is a bottleneck of the whole
@@ -697,12 +698,13 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   We tried to improve this behaviour by aggregating more data packets into one
   transfer block and we redefined data structure too -- data are now
-  transferred in a packet of variable length with modified header in
+  transferred in a packet of a variable length with modified header in
   comparison to the older one.
   We had to redesign also the program running on the card a bit and define the
   packet structure in the specification.
   
-  Packet header includes two sizes: segment size and header size. The former
+  The packet header includes two sizes: segment size and header size. The
+  former
   is size of whole segment, i.e. size of the header, padding and data in sum,
   while the latter is size of optional part of segment containing some control
   information. These control data are placed directly after the header,
@@ -747,14 +749,14 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   64-bit systems, so that the pointers are represented by 8 bytes each. Since
   we allocate the descriptor memory on a page basis too, it allows us to have
   only $\frac{4096}{8}=512$ pointers to ring pages which gives
-  $512\cdot4096=2$\,MiB sized ring buffer. This is not enough, so we
+  $512\cdot4096=2$\,MiB sized ring buffer. This was not enough, so we
   introduced two kinds of descriptor entries. One is still a direct pointer to
   a single ring buffer page, the other one is a pointer to the next descriptor
   table. To distinguish them, we take to advantage of all page addresses being
   zeroed in low 12~bits (see \cite{gorman}, chapter~3) by using these few bits
   for flags. Pointers to the next descriptor table read by the hardware are
   logically or-ed with~1. We call these pointers \emph{type 1} in
-  Figure~\ref{fig.ring}, ring buffer page pointers are denoted as
+  Figure~\ref{fig.ring}, the ring buffer page pointers are denoted as
   \emph{type 0}, and for illustration we also connect ring buffer pages with
   dashed \emph{virtual link}.
 
@@ -768,7 +770,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   \paragraph{Registers and address space}
   The last thing we need to cover before implementation is how we declare
-  communication channel between driver and newly specified design. For the
+  communication channel between the driver and the newly specified design. For
+  the
   convenience of MMIO, we define design address space as a memory area. Every
   DMA engine has its own subspace with its controlling registers within this
   area. Up to 16 engines are supported for future purposes, we use only 2 so
@@ -779,20 +782,21 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     \item start, end and size registers -- ring buffer state pointers, they
       are current head and tail and size of whole buffer
     \item control and status registers -- used to instruct the design and check
-      actual state
+      the actual state
     \item interrupt registers -- timeout, position or both may be used for
-      interrupt generation; position is triggered when one of ring buffer
-      registers reaches value stored in position register
+      interrupt generation; the position interrupt is triggered when one of
+      ring buffer registers reaches value stored in position register
   \end{enumerate}
 
   As the DMA engine needs to have information about ring buffer before it
-  starts working, registers groups 1. and 2. shall be set prior to sending
+  starts working, register groups number 1. and 2. shall be set prior to
+  sending
   \emph{start} command to control register 3. Interrupt registers 4. are
   optional, they may be set and changed on the fly. Concrete steps of hardware
   initialization and deinitialization will be described in the driver
   specification in chapter~\ref{chap.spec}.
 
-  After successful launch of the engine, we just need to update tail
+  After a successful launch of the engine, we just need to update tail
   pointers for reception after we process data and head for transmission
   after we write data to the ring buffer. Any other processing is implemented
   in the engine and we needn't to care about it.
@@ -808,8 +812,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
 
   Development is scheduled and planned with use of Gantt
   charts\footnote{\url{http://en.wikipedia.org/wiki/Gantt_chart}} available in
-  Liberouter \emph{trac} system at
-  \url{https://www.liberouter.org/trac/netcope/wiki/}. One task is rigidly
+  Liberouter \emph{trac} (NetCOPE subsection) system. One task is rigidly
   dependent on the other so every interested party should finish on
   schedule otherwise whole project would stall. To make sure we will finish
   it on time we included fund of time for each task into the Gantt chart.
@@ -821,9 +824,9 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   sections also interleaved with testing. Since the requirements and models
   usually aren't complete (some mistakes and missing features are found) we'll
   reedit them and will go on with next iteration. These steps will be repeated
-  until we get complete code.
+  until we get a complete code.
 
-  Finished result must be integrated to the rest of the project into
+  Finished result must be integrated to the rest of the project into a
   versioning system and successfully verified to run reliably including
   performance tests and even after then may be deployed on machines. Also
   documentation should be provided as a result of development process. This
@@ -1300,12 +1303,15 @@ static struct combo6_device_ops szedata2x_ops = {
   in \emph{read\_data} and \emph{write\_data} in the test application.
 
   \subsection{Phase II -- Hardware Dependent Code}
-  After successful testing of the base, we started construction of hardware
+  After successful testing of the base, we start construction of the hardware
   dependent part. The design was built meanwhile the specification and first
-  part implementation and is fully working now. The code we build up here will
-  be a bridge between currently finished szedata2 core and \emph{combo6} base.
+  part implementation and is fully working now. Note that the design was
+  developed by a Liberouter hardware group out of scope of this thesis, hence
+  we don't mention its development process.
 
-  To be able to cooperate with the hardware behind the base, the driver needs
+  The code we build up here will be a bridge between the currently finished
+  szedata2 core and the \emph{combo6} base. To be able to cooperate with the
+  hardware behind the base, the driver needs
   to know constants understood by the hardware. They are described in the
   hardware specification and are transcribed to a header file named
   \emph{hw.h}.
@@ -1570,14 +1576,21 @@ if (head == tail)
   as expected. However, we do only basics measurements in the scope of this
   thesis, complex tests with reference numbers will be measured by Liberouter
   testers group, since they have appropriate tools and enough knowledge how to
-  test throughput in predicative manner.
+  test throughput in a predicative manner.
 
-  Above all we are interested in RX direction, because we have a machine
+  Also we should keep an eye on a stability while performing the tests, since
+  this sort of traffic may provoke situations which we are not able to
+  evoke in any other way. These measurements may be helpful in finding so far
+  hidden bugs and we found out, that we reveal few in the design and hence we
+  could further improve the stability.
+
+  In testing we are interested especially in RX direction, because we have a
+  machine
   which can generate high traffic on the ethernet and is fully programmable by
   scripts. \emph{Spirent Communication AX/4000}\footnote{Visit Spirent
   homepage at \url{http://www.spirent.com} to see AX/4000 product sheet.} is
   a~broadband test system we use for stress tests.
-  The scripts are available merely in Tcl shell (\emph{tclsh}), their
+  The scripts are available merely for a Tcl shell (\emph{tclsh}), scripts'
   documentation is available exclusively on internal \emph{trac}
   system\footnote{\url{https://www.liberouter.org/trac/tests/wiki/dokumentaceKTestum}}.
 
@@ -1586,41 +1599,79 @@ if (head == tail)
   are a series of memoranda encompassing new research, innovations, and
   methodologies applicable to Internet technologies (cited from
   \url{http://en.wikipedia.org/wiki/Request_for_Comments}).} including header
-  and checksum), 512 and
-  1518 (maximal frame length) on \emph{szedata} 1 and 2 and compare results
-  also with \emph{Endace DAG} cards intended to be deployed in the
-  same area as our cards with szedata design.
-
-  Also this sort of traffic may provoke situations which we are not able to
-  evoke in any other way. So these measurements are helpful in finding so far
-  hidden bugs. We found out, that we revealed few in design and hence we
-  could further improve the stability.
+  and checksum), 512 and 1518 (maximal frame length) on \emph{szedata} 1 and 2
+  and compare results with other solutions. Firstly, we try to compare with
+  \emph{Endace DAG} cards intended to be deployed in the same area as our
+  cards with szedata design. Secondly, we will do measurement of standard
+  Intel gigabit card working on the kernel networking stack.
 
   \paragraph{Measurements} To gather some statistics about incoming data, we
   must program some utility which would measure time, incoming packets and
-  their volume. With use of the time, we can count packets per second and
+  their volume for szedata2. With use of the time, we can count packets per
+  second and
   also average packet length. Conveniently we might augment \emph{szetest2}
   application by adding few lines among other yet implemented testing code.
   
   This yields a tool which beside operation with pointers can do some basic
   measurements and report numbers we may build statistics from. We need also
-  capture traffic with former design, so we augment similar program,
-  \emph{szetest}, by same changes.
+  capture traffic with former design, so we augment program for szedata
+  version 1, \emph{szetest}, by same changes.
 
-  \paragraph{Results} After we gain some results, we must average the values
-  to have at least basically correct statistics. Computed values are enlisted
+  \paragraph{Configurations} The Spirent is a multiport device and its third
+  port is currently connected to \emph{cabernet.liberouter.org}, where we
+  perform the tests. \emph{cabernet} is a machine with eight Xeon
+  E5335 cores at 2\,GHz and 4\,GiB of memory. Both kernel and user environments
+  are 32-bit. A \comx\ card with c610.05.0b \ncope\ PCI bridge version is
+  installed in a PCI-X slot. A \sze\ design from May~12 2008 (minor version 0)
+  is loaded in the FPGA.
+
+  The test is performed by sending 10\,000\,000 packets from the Spirent via
+  tclshell. The only variable is length. This line starts 64\,B sized packets
+  generation on the Spirent:
+  \vspace{0.5em}
+\begin{verbatim}
+sendPackets -bandwidth 100 -port 3 -count 10000000 \
+    -IPsrc 192.168.2.1 -length 64
+\end{verbatim}
+  \vspace{0.5em}
+  Our changed szetest2 (and for szedata tests also szetest) then gives us
+  results every second:
+  \vspace{0.5em}
+\begin{verbatim}
+2015231 packets (128974824 B, avg 80 B per packet) per second
+\end{verbatim}
+  \vspace{0.5em}
+  Note the 80\,B per packet average. Every packet is prepended with a header.
+  The header here is 16 bytes. 4 bytes (two 16-bit numbers) are sizes, the
+  resting 12 bytes are medium access control data (previously denoted also as
+  a hardware data). We subtract these values in the test application before
+  adding it to the counters to not obfuscate the statistics.
+
+  % http://www.liberouter.org/flowmon/reports/report-20070715-F-0001.pdf
+
+  Intel cards performance was tested on machines with Intel Core 2 Duo E6850
+  processor running at 3\,GHz and 2\,GiB of installed memory. These machines
+  run fully in long (64-bit) mode. Cards themselves
+  are Intel Corporation 82566DM-2 gigabit adapters. Results were gained by
+  \emph{netperf}\footnote{\url{http://www.netperf.org/netperf/NetperfPage.html}}
+  utility (version 2.4.4) over TCP stream.
+
+  There is no DAG configuration we tested on. \emph{DAG} card values in the
+  following comparison are taken from \emph{Endace} Capture Performance
+  document\cite{dag}. 
+
+  \paragraph{Results} After we gain the results, we must average the values
+  to have a correct statistics. Computed values are enlisted
   in the table in Figure~\ref{fig.measures_tab}. Their graphic representation
   then on chart in Figure~\ref{fig.measures_gr}. 
-  \emph{DAG} card values in the following comparison are taken from
-  \emph{Endace} Capture Performance document\cite{dag} and should be
-  considered rather as a theoretical limit of the cards.
 
   \begin{figure}[htb]
     \begin{center}
       \begin{tabular}{|l|r|r|r|} \hline
 \textbf{Packet length (B)}&\textbf{64}&\textbf{512}&\textbf{1518}\\ \hline
-\emph{Szedata}	& 96		& 770		& 987		\\ \hline
-\emph{Szedata2}	& 991		& 992		& 991		\\ \hline
+\emph{szedata}	& 96		& 770		& 987		\\ \hline
+\emph{szedata2}	& 991		& 992		& 991		\\ \hline
+\emph{Intel}	& 777		& 936		& 936		\\ \hline
 \emph{DAG}	& 1000		& 1000		& 1000		\\ \hline
       \end{tabular}
       \caption{Measurements, table, in Mbit/s}
@@ -1630,7 +1681,7 @@ if (head == tail)
 
   \begin{figure}[hbt]
     \begin{center}
-      \includegraphics[width=9cm]{images/measure}
+      \includegraphics[width=10cm]{images/measure}
       \caption{Measurements, chart}
       \label{fig.measures_gr}
     \end{center}
