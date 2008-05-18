@@ -94,6 +94,7 @@
 \newcommand{\lbr}{\emph{Liberouter}}
 \newcommand{\com}{\emph{COMBO6}}
 \newcommand{\comx}{\emph{COMBO6x}}
+\newcommand{\come}{\emph{COMBO6e}}
 \newcommand{\fpga}{\emph{FPGA}}
 \newcommand{\dma}{\emph{DMA}}
 \newcommand{\sze}{\emph{szedata2}}
@@ -176,8 +177,8 @@
   \end{figure}
 
   This thesis is based on one of many researches that have been already done
-  under Liberouter -- \ncope\ -- which we describe in chapter
-  \ref{chap.netcope}.
+  under Liberouter -- \ncope\ -- which we describe in
+  chapter~\ref{chap.netcope}.
   In short, it's hardware platform trying to achieve universality along with
   speed and it's fully programmable. Software running on them can do fast
   transfers if it is instructed to. Drivers are usually used for this purpose.
@@ -197,7 +198,6 @@
   which testing techniques might be applied on drivers and finally comparing
   with older drivers and card softwares will be done.
 
-%\chapter{Basic terms}
   \paragraph{Linux}
   In the early stages, we decided to create a driver implementation only for
   Linux operating system. It is an operating system based on kernel which was
@@ -232,7 +232,7 @@
   \label{chap.inter}
   The first thing to explain is how data flows from devices to processor and
   main memory and particularly which types of buses are on the route from a
-  CPU to a device. Overall view may be seen in figure \ref{fig.dev_inter}.
+  CPU to a device. Overall view may be seen in Figure~\ref{fig.dev_inter}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -242,12 +242,13 @@
     \end{center}
   \end{figure}
 
-  % uvest, ze combo existuje ve variantach pro PCI, PCI-X a PCI-Express
   \subsection{PCI}
   \label{chap.pci}
   We are concerned especially in \emph{peripheral component interconnect}
-  (PCI) devices, because both \com\ card families are PCI based. Each such
-  device is physically connected to any PCI bus via PCI slot.
+  (PCI) devices, because \com\ card families are PCI based. Currently we have
+  a legacy PCI (32-bit PCI) \com\ card, \comx\ for PCI-X (64-bit PCI) and
+  \come\ based on PCI express specification (64-bit packet based PCI). Each
+  such device is physically connected to any PCI bus via PCI slot.
   PCI bus is attached to \emph{southbridge}, it communicates
   with \emph{northbridge} over internal bus and it's finally wired
   with processor via \emph{front-side bus} (FSB) and with memory. Nowadays
@@ -266,7 +267,7 @@
   but it's possible to send even 64-bit address via \emph{double} (sometimes
   \emph{dual}) \emph{address cycle} (DAC) by negotiating it and repeating SAC
   twice. The \com\ hardware supports SAC nowadays, but we plan to utilize DAC
-  mechanism in the future to address more than 4\,GiB of the memory, see
+  mechanism in the future to address more than 4\,GiB of physical memory, see
   chapter~\ref{chap.future}.
 
   These problems are completely avoided later in PCI express which communicates
@@ -282,13 +283,13 @@
   to it. Also each PCI device has its configuration space, where all the
   needed settings are stored or may be set to. This space contains information
   about who developed the device and which model it is. These data are useful
-  especially in driver area, where the drivers want to bind only to specific
-  subset of devices.
+  especially in a driver area, where the drivers want to bind only to a
+  specific subset of devices.
 
   In our scope of interest are device, vendor and their subsystem variant
-  IDs contained in this space, because these are mostly just identifiers
+  IDs contained in this space, because these are mostly merely identifiers
   designating one concrete device family. It is also helpful in userspace
-  scripts to create persistently named nodes in chapter \ref{chap.udev}.
+  scripts to create persistently named nodes in section~\ref{chap.udev}.
 
   \subsubsection{Linux PCI Support}
   PCI is well supported in Linux since it became a standard. Concrete API is
@@ -316,7 +317,7 @@
 
   On older machines, there was merely one device called \emph{DMA controller}
   (DMAC), which could become a master. Nowadays each PCI device (see also
-  Section \ref{chap.pci}) may become a master, so that it can access memory
+  Section~\ref{chap.pci}) may become a master, so that it can access memory
   directly by its own DMAC\footnote{Note that there is no common PCI DMAC, so
   if the device doesn't have one, it doesn't support DMA either.}. As we will
   see in chapter~\ref{chap.netcope}, their count is not limited to one per PCI
@@ -402,22 +403,6 @@
   called (external) fragmentation. Other tasks held memory blocks and there
   wasn't enough space in between them to return.
 
-%  See figure \ref{fig.fragmentation}
-%  for illustration.
-%
-%  Task 1 holds two memory blocks of size 2 units. Task 2
-%  allocated one block three units wide. Now, if any of the two wants to
-%  allocate block of size 4, allocation will fail, although there is
-%  enough free space in sum.
-%
-%  \begin{figure}[htb]
-%    \begin{center}
-%      \includegraphics[width=7cm]{images/fragmentation}
-%      \caption{Memory fragmentation illustration}
-%      \label{fig.fragmentation}
-%    \end{center}
-%  \end{figure}
-%
   Many algorithms were introduced to avoid this behavior, some of them are
   described in \cite{knuth_art} including buddy system employed in Linux
   kernel for in-kernel allocations of larger blocks.
@@ -549,10 +534,8 @@
   While we are able to pass data from device to memory available only to
   kernel via DMA so far, we still need to put the data to userspace
   application somehow. Several ways how to achieve that exist in Linux. Most
-  of them are based on moving data through special files
-%  \footnote{many communication channels are files, even socket creating system
-%  call returns a file descriptor passed to standard read and write functions}
-  such as sockets, block and character devices.
+  of them are based on moving data through special files such as sockets,
+  block and character devices.
 
   The basic and simplest idea is to \textbf{copy} the data by a processor
   from kernel buffer to an user one. It's easy to implement and least
@@ -571,7 +554,7 @@
   application, demanded operations are handled by the driver which has
   registered it before. It depends on what features are implemented in the
   driver and what operations are defined as an interface. Handlers for
-  szedata2 will be discussed in section \ref{chap.code} after review of
+  szedata2 will be discussed in section~\ref{chap.code} after review of
   operations done in specification.
 
   If the driver is loaded and requested node does not exist yet, it must be
@@ -596,7 +579,6 @@
   For instance following example shows a node creation in \emph{/dev/combosix/}
   for \com\ device matched by IDs read from PCI configuration space which were
   sent by kernel in uevent. \vspace{0.5em}
-%Node name is a number sent by the driver.
 \begin{verbatim}
 KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
     ATTRS{idProduct}=="c058", NAME="combosix/%n"
@@ -719,8 +701,8 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   optional padding follows and finally the packet contents (payload) with
   start aligned to 8-byte boundary (thanks to padding). Whole structure is
   padded at the and again to 8-byte boundary. We refer to this as
-  a~\emph{packet of variable length}, its format is shown in figure
-  \ref{fig.netcope_pkt}.
+  a~\emph{packet of variable length}, its format is shown in
+  Figure~\ref{fig.netcope_pkt}.
 
   \begin{figure}[hbt]
     \begin{center}
@@ -740,15 +722,15 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   we eliminate the impact of slow control bus, but we still have problems
   with packet transfers, the aggregation is too complex.
 
-  After digging through some specifications such as Intel gigabit Ethernet
-  cards\cite{intel_gbe}, drivers e.g. for Broadcom~43 wireless cards
-  and info about projects such as Endace DAG, we considered a ring buffer
-  structure as an underlying medium.
+  We performed some analyses what could be suitable underlying medium for data
+  transfers. Some graphics adapters, several networking (including wireless)
+  and video capture cards use a ring buffer structure with success. We decided
+  to utilize it too.
 
   First, we needed to create a design specification. Let's consider 10\,Gbit/s
   data flow and userspace task latency of 50\,ms. We need a buffer of size
   at least $\frac{10\cdot10^{3}\cdot0,05}{8}\doteq60$\,MiB per interface not
-  to throw incoming data away. But as we noted in chapter \ref{chap.mm}, we
+  to throw incoming data away. But as we noted in chapter~\ref{chap.mm}, we
   cannot allocate that much contiguous physical memory. This made us to split
   the buffer on the page basis and create a mechanism to cope with this.
 
@@ -764,7 +746,7 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   zeroed in low 12~bits (see \cite{gorman}, chapter~3) by using these few bits
   for flags. Pointers to the next descriptor table read by the hardware are
   logically or-ed with~1. We call these pointers \emph{type 1} in
-  figure~\ref{fig.ring}, ring buffer page pointers are denoted as
+  Figure~\ref{fig.ring}, ring buffer page pointers are denoted as
   \emph{type 0}, and for illustration we also connect ring buffer pages with
   dashed \emph{virtual link}.
 
@@ -1126,7 +1108,7 @@ static struct combo6_device_ops szedata2x_ops = {
   \paragraph{Application-driver interface}
   We decided to pass all read-only information in status page which is
   allocated per application on its first open. It's depicted on the top left
-  in figure~\ref{fig.status_page}.
+  in Figure~\ref{fig.status_page}.
 
   \begin{figure}[htb]
     \begin{center}
@@ -1180,17 +1162,14 @@ static struct combo6_device_ops szedata2x_ops = {
   waiting in the driver via \emph{poll} system call.
   Documentation in Appendix~\ref{app.doxygen} deals with this interface.
 
-  % XXX zmenit oznaceni?
-  \paragraph{Intradriver interface}
-  We've declared already, that we will split the driver into two parts.
+  \paragraph{Internal interface} We've declared already, that we will split
+  the driver into two parts.
   Interface between them is straightforward. Interrupt, tail and head pointers
   passing is needed in one direction, registration and DMA allocation in the
-  other one. This interface is described in the documentation contained in
+  other. This interface is described in the documentation contained in
   Appendix~\ref{app.kdoc}.
 
-  % XXX rict, ze uz HW funguje
-  % prehazet phase pred
-  \subsection{Hardware Independent Code, Phase I}
+  \subsection{Phase I -- Hardware Independent Code}
   As we don't have fully working design yet, we start with design
   independent part. First we write module \emph{init} and \emph{exit}
   functions. We create a \emph{class} and reserve character device region
@@ -1221,14 +1200,14 @@ static struct combo6_device_ops szedata2x_ops = {
   chapter~\ref{chap.netcope}), so if we consider four interfaces, both RX and
   TX directions and 50\,MiB sized ring buffers, we have
   $\frac{4\cdot2\cdot50\cdot2^{20}}{4096}\doteq100000$ pages for 4096\,B pages.
-  We need to store physical and virtual address for each page (to be able to
+  We need to store physical and virtual addresses for each page (to be able to
   work with the buffer and also free it later), worst case is on 64-bit
-  machines, where both numbers are 8-bytes, so that we further have
+  machines, where both numbers are 8-bytes, so we further have
   $100000\cdot2\cdot8=1600000$. This information might be stored in
   $\frac{1600000}{4096}\doteq390$ pages. That's a number very close to
   $2^{MAX\_ORDER}$\footnote{\emph{MAX\_ORDER} is maximum allowed power of 2
   to allocate via \emph{get\_free\_page}, it used to be between 5 and 20
-  depending on architecture and configuration}, so that we would end up in
+  depending on architecture and configuration}, so we would end up in
   failure if we didn't use virtual memory (\emph{vmalloc}) for those
   descriptors.
 
@@ -1302,8 +1281,8 @@ static struct combo6_device_ops szedata2x_ops = {
   userspace tests were ready yet before the implementation itself, because we
   knew from specification how it should behave and how not. Implementation is
   further programmed to satisfy all the tests\footnote{This agile method is
-  known as \emph{test driven development} (TDD), see
-  \url{http://en.wikipedia.org/wiki/Test-driven_development} for reference.}.
+  known as \emph{test driven development} (TDD), for reference see
+  \url{http://en.wikipedia.org/wiki/Test-driven_development}.}.
 
   Tests for all implemented character device hooks are in \emph{szetest2.c}
   see for example \emph{test\_mmap} which tests correctness of \emph{mmap} by
@@ -1312,11 +1291,11 @@ static struct combo6_device_ops szedata2x_ops = {
   data from ring buffer or to it respectively. These checks are implemented
   in \emph{read\_data} and \emph{write\_data} in the test application.
 
-  \subsection{Hardware Dependent Code, Phase II}
+  \subsection{Phase II -- Hardware Dependent Code}
   After successful testing of the base, we started construction of hardware
   dependent part. The design was built meanwhile the specification and first
-  part implementation. The code we build up here will be a bridge between
-  currently finished szedata2 core and \emph{combo6} base.
+  part implementation and is fully working now. The code we build up here will
+  be a bridge between currently finished szedata2 core and \emph{combo6} base.
 
   To be able to cooperate with the hardware behind the base, the driver needs
   to know constants understood by the hardware. They are described in the
@@ -1359,8 +1338,8 @@ static struct combo6_device_ops szedata2x_ops = {
   until status register is either running or idle then the \emph{start}
   callback finishes and returns. It's possible, that hardware is locked up and
   it doesn't become ready in a reasonable time, so we must bound the waiting
-  loop by some constant. According to design specification, 100\,$\mu$s should
-  be enough.
+  loop by some constant. According to a design specification, 100\,$\mu s$
+  should be enough.
 
   \emph{Stop} callback is implemented in similar manner, except the fact we
   wait one whole second until DMA transfers get completed. When this timeout
@@ -1387,7 +1366,7 @@ if (head == tail)
     return size - 1;
 \end{verbatim}
 
-  \subsection{Back-porting To Older Kernels, Phase III}
+  \subsection{Phase III -- Back-porting To Older Kernels}
   \label{chap.backport}
   So far the implementation has been run and tested exclusively on later
   kernels (2.6.24-rc8-mm1\footnote{release candidate with Andrew Morton's
@@ -1452,7 +1431,8 @@ if (head == tail)
   know this is most variable API in 2.6. Let's summarize what happened during
   2.6 development in following points:
   \begin{CompactItemize}
-    \item \textbf{between 2.6.2 and 2.6.13} -- \emph{sysfs} created and
+    \item \textbf{between 2.6.2 and 2.6.13} -- \emph{sysfs} filesystem
+      created and
       \emph{class\_simple} defined in 2.6.2; \emph{class\_simple\_create}
       and \emph{class\_simple\_device\_add} are used (with their destroy
       opposites) to operate with classes and devices
@@ -1465,7 +1445,8 @@ if (head == tail)
       changed prototype, it may have two parents reference in it (one
       \emph{device} and one \emph{class\_device}).
     \item \textbf{after 2.6.18} -- \emph{device\_create} should be used
-      instead of \emph{class\_device\_create}. \emph{class\_device\_create}
+      instead of \emph{class\_device\_create}. The older
+      \emph{class\_device\_create}
       is going to be removed soon with \emph{class\_device} which is
       considered deprecated nowadays.
   \end{CompactItemize}
@@ -1483,7 +1464,7 @@ if (head == tail)
 
   Next steps usually lead to a static analysis of C language. Over hundred both
   commercial and free tools for this purpose exist\footnote{Non-complete list
-  of checkers is on Wikipedia at
+  of checkers is on Wikipedia at \\
   \url{http://en.wikipedia.org/wiki/List_of_tools_for_static_code_analysis}.},
   one of the tools, \emph{sparse}, was designed directly for Linux kernel
   driver development needs. The checking is included in kernel makefile system
@@ -1539,10 +1520,11 @@ if (head == tail)
   Its output should not change anyhow and it's checked in that manner.
 
   Also userspace application may be checked by some static code analyser. Even
-  \emph{sparse} may be used for that purpose, but also \emph{lint} successors
-  such as \emph{splint}. This helped us to fix some mostly coding style and
-  non-intrusive errors.
-  % XXX vite lint and splint
+  \emph{sparse} may be used for that purpose, but also
+  \emph{lint}\footnote{\url{http://en.wikipedia.org/wiki/Lint_programming_tool}}
+  successors such as
+  \emph{splint}\footnote{\url{http://en.wikipedia.org/wiki/Splint_(programming_tool)}}.
+  This helped us to fix some mostly coding style and non-intrusive errors.
 
   \subsection{Final Code}
   \label{chap.final}
@@ -1592,7 +1574,11 @@ if (head == tail)
   system\footnote{\url{https://www.liberouter.org/trac/tests/wiki/dokumentaceKTestum}}.
 
   We are about to test three distinct packet lengths: 64 (minimal ethernet
-  frame length according to its RFC including header and checksum), 512 and
+  frame length according to its RFC\footnote{Request For Comments documents
+  are a series of memoranda encompassing new research, innovations, and
+  methodologies applicable to Internet technologies (cited from
+  \url{http://en.wikipedia.org/wiki/Request_for_Comments}).} including header
+  and checksum), 512 and
   1518 (maximal frame length) on \emph{szedata} 1 and 2 and compare results
   also with \emph{Endace DAG} cards intended to be deployed in the
   same area as our cards with szedata design.
@@ -1615,10 +1601,8 @@ if (head == tail)
 
   \paragraph{Results} After we gain some results, we must average the values
   to have at least basically correct statistics. Computed values are enlisted
-  in the table in figure~\ref{fig.measures_tab}. Their graphic representation
-  then on chart in figure~\ref{fig.measures_gr}. In spite of we borrowed
-  a \emph{DAG} card for testing purposes, we must not make public numbers from
-  its measurement to not violate \emph{Endace} conditions. Hence values
+  in the table in Figure~\ref{fig.measures_tab}. Their graphic representation
+  then on chart in Figure~\ref{fig.measures_gr}. 
   \emph{DAG} card values in the following comparison are taken from
   \emph{Endace} Capture Performance document\cite{dag} and should be
   considered rather as a theoretical limit of the cards.
@@ -1698,7 +1682,7 @@ if (head == tail)
   development itself. After all we were able to do integration testing when we
   finished whole module.
 
-  Finally, developed module was compared with other available products
+  Finally, developed module was compared with other available solutions
   orienting similarly in network environment. Measurements provided by
   an external vendor were compared with our solutions and whole package of
   drivers and library was deployed on Liberouter machines.
@@ -1719,7 +1703,7 @@ if (head == tail)
   allocations by setting DMA mask. Memory management then return pages with
   physical addresses complying with the address mask.
   \item
-  Next, it would be great to have ability to use \sze\ design also in a
+  It would be worth to have an ability to use the \sze\ design also in a
   standard network adapter mode, i.e. with use of kernel networking stack.
   This needs slight changes of \emph{hw.c} and rewriting whole hardware
   independent part -- conversion from character device data passing to socket
