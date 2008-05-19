@@ -166,7 +166,7 @@
   for high traffic networks. After some time, this idea was augmented to other
   network usages such as network filtering and monitoring. All these functions
   run on \com\ family PCI cards (see Figure~\ref{fig.combo6} for
-  illustration).
+  illustration, the photo is taken from official Liberouter web).
 
   \begin{figure}[tb]
     \begin{center}
@@ -663,6 +663,9 @@ KERNEL=="combosix*", ATTRS{idVendor}=="18ec" \
   involving it in multiple areas such as network traffic filtering, routing
   packets, intrusion detection and others -- it depends on firmware,
   so-called \emph{design}, which is loaded into the FPGA.
+
+  Schema of \ncope\ hardware may be seen in Figure~\ref{fig.netcope_hw} (it is
+  sourced from Liberouter web).
 
   \begin{figure}[htb]
     \begin{center}
@@ -1630,6 +1633,11 @@ if (head == tail)
   capture traffic with former design, so we augment program for szedata
   version 1, \emph{szetest}, by same changes.
 
+  Intel cards need special program for capturing raw \emph{packet capture}
+  (pcap) interface. Conveniently such tool already existed as a one of testers
+  utilities. We need only extend it for per-second counting. Again this may be
+  done in the same manner as previous two cases.
+
   \paragraph{Configurations} The Spirent is a multiport device. One of its
   ports was connected to a machine where we performed the tests. The machine
   is equipped with eight Xeon
@@ -1651,7 +1659,7 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
   results every second:
   \vspace{0.5em}
 \begin{verbatim}
-2015231 packets (128974824 B, avg 80 B per packet) per second
+1482421 packets (94875000 B, avg 80 B per packet) per second
 \end{verbatim}
   \vspace{0.5em}
   Note the 80\,B per packet average. Every packet is prepended with a header.
@@ -1662,50 +1670,64 @@ sendPackets -bandwidth 100 -port 3 -count 10000000 \
 
   % http://www.liberouter.org/flowmon/reports/report-20070715-F-0001.pdf
 
-  Intel cards performance was tested on machines with Intel Core 2 Duo E6850
-  processor running at 3\,GHz and 2\,GiB of installed memory. These machines
-  run fully in long (64-bit) mode. Cards themselves
-  are Intel Corporation 82566DM-2 gigabit adapters. Results were gained by
-  \emph{netperf}\footnote{\url{http://www.netperf.org/netperf/NetperfPage.html}}
-  utility (version 2.4.4) over TCP stream.
+  Intel cards performance was tested on a machine with the same configuration.
+  We just use other Spirent's port.
 
-  There is no DAG configuration we tested on. \emph{DAG} card values in the
-  following comparison are taken from \emph{Endace} Capture Performance
-  document\cite{dag}. 
+  There is no \emph{DAG} configuration we tested on. \emph{DAG} card values
+  are taken from \emph{Endace} Capture Performance document\cite{dag} in the
+  following comparison.
 
   \paragraph{Results} After we gain the results, we must average the values
   to have a correct statistics. Computed values are enlisted
   in the table in Figure~\ref{fig.measures_tab}. Their graphic representation
-  then on chart in Figure~\ref{fig.measures_gr}. 
+  then on charts in Figures~\ref{fig.measures_gr} and \ref{fig.measures_gr1}.
+  Note the division into two columns. Since we measured both packet sizes and
+  packet count, we might enlist both of them for better comparison. Units are
+  megabits per second (Mbps) and thousand packets per second (kpps).
 
   \begin{figure}[htb]
     \begin{center}
-      \begin{tabular}{|l|r|r|r|} \hline
-\textbf{Packet length (B)}&\textbf{64}&\textbf{512}&\textbf{1518}\\ \hline
-\emph{szedata}	& 96		& 770		& 987		\\ \hline
-\emph{szedata2}	& 991		& 992		& 991		\\ \hline
-\emph{Intel}	& 777		& 936		& 936		\\ \hline
-\emph{DAG}	& 1000		& 1000		& 1000		\\ \hline
+      \begin{tabular}{|l|r|r|r|r|r|r|r|} \hline
+\textbf{Packet length (B)} & \multicolumn{2}{|c|}{\textbf{64}} &
+	\multicolumn{2}{|c|}{\textbf{512}} &
+	\multicolumn{2}{|c|}{\textbf{1518}} \\ \hline
+		& Mbps	& kpps	& Mbps	& kpps	& Mbps	& kpps	\\ \hline
+\emph{Intel}	& 348	& 725.0	& 954	& 234.9	& 983	& 81.2	\\ \hline
+\emph{szedata}	& 96	& 187.5	& 770	& 188.0	& 987	& 81.2	\\ \hline
+\emph{szedata2}	& 759	& 1482.4& 961 	& 234.6	& 987	& 81.2	\\ \hline
+\emph{DAG}	& 761	& 1488.1& 962	& 235.0	& 987	& 81.2	\\ \hline
       \end{tabular}
-      \caption{Measurements, table, in Mbps}
+      \caption{Measurements, table}
       \label{fig.measures_tab}
     \end{center}
   \end{figure}
 
   \begin{figure}[hbt]
     \begin{center}
-      \includegraphics[width=10cm]{images/measure}
-      \caption{Measurements, chart}
+      \includegraphics[width=11cm]{images/measure}
+      \caption{Measurements, chart, megabits per second}
       \label{fig.measures_gr}
     \end{center}
   \end{figure}
 
+  \begin{figure}[hbt]
+    \begin{center}
+      \includegraphics[width=11cm]{images/measure1}
+      \caption{Measurements, chart, kilo-packets per second}
+      \label{fig.measures_gr1}
+    \end{center}
+  \end{figure}
+
+  \emph{DAG} values are computed as a theoretical limit allowed by Ethernet
+  (see below), since \emph{Endace} claim 100\% throughput in their paper.
+
   We see rapid improvement especially when receiving short packets.
-  Performance
-  of \sze\ in comparison with non-aggregated previous version is more than ten
-  times higher and if we consider margin at 1000\,Mbps as a theoretical
-  limit, we approached almost maximum feasible throughput on 1\,Gbit Ethernet
-  with it.
+  Performance of \sze\ in comparison with non-aggregated previous version is
+  several times higher. According to \cite{spirent}, we almost achieved limit
+  of 1\,Gbit Ethernet due to frame sizing and overhead of underlying data.
+  Maximum rate for 64\,B frames is 1\,488\,095 (761\,Mbps), for 512\,B,
+  234\,962 (962\,Mbps) and finally for 1518\,B it is 81\,274 frames per second
+  (986\,Mbps).
 
   \section{Maintenance}
   Drivers for all designs and card types are deployed on each machine and
