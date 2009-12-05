@@ -5,7 +5,7 @@ pdf: teze.pdf
 ps: teze.ps
 bib: teze.bbl
 
-teze.dvi: teze.tex
+teze.dvi: teze.tex FORCE
 
 teze.tex: teze.bbl
 
@@ -26,3 +26,7 @@ teze.tex: teze.bbl
 
 clean:
 	rm -f teze.{pdf,dvi,toc,aux,log,bbl,blg,ps,out}
+
+FORCE:
+
+.PHONY: FORCE
