@@ -155,42 +155,70 @@ to be world number two in code analysis.
 \paragraph{Open-source}
 All the mentioned tools till now are commercial products without an access to
 their source code. However there are also many open-source tools available.
-First, let me mention \textsc{Lint} derivatives. \textsc{Lint} used to find
-suspicious and non-portable code constructs. Mostly, they are currently
-reported by a compiler during a compilation phase, so that \textsc{Lint} is
-not used anymore.
+First, let me mention \textsc{Lint} derivatives. They belong to the
+\emph{first static analysis tools} used whatsoever. \textsc{Lint} used to find
+suspicious and non-portable code constructs. Mostly, the checks are currently
+superseded by compilers which perform the checking during standard compilation
+phase, so that \textsc{Lint} is not used anymore.
 
 There was also a popular successor \textsc{LCLint}~\cite{lclint} later renamed
 to \textsc{Splint}. The development stalls for more than five
 years\footnote{\url{http://www.cs.virginia.edu/pipermail/%
 splint-discuss/2007-July/000994.html}} now though. Again \textsc{LCLint}
 performs many checks which are done by compiler nowadays. Besides that, it can
-catch buffer overflow vulnerabilities. It also interprets annotated code and
-tries to avoid false positives that way (it allows turning on more checks
-which would generate many false positives without the annotations).
+catch buffer overflow vulnerabilities. It also interprets \emph{annotated
+code} and tries to avoid false positives that way (it allows turning on more
+checks which would generate many false positives without the annotations).
 
+Later, tools dedicated for a \emph{single purpose or project} emerged.
 Specifically for the Linux kernel purposes, \textsc{Sparse}~\cite{sparse} was
-developed. For example it watches pointer usage on user- and kernel-space
-interface (they don't have to be intermixed) or uses of remapped io memory
+developed.  For example it watches pointer usage on user- and kernel-space
+interface (they don't have to be intermixed) or uses of remapped I/O memory
 (have to be dereferenced via special helpers) and similar, kernel specific,
-properties. \textsc{Sparse} is widely used by kernel developers and many
-sparse errors fixed in each kernel release cycle\footnote{Over 20 of sparse
-errors were fixed (since 2.6.31) in 2.6.32.}.
+properties.  All the mentioned has no use other than in the kernel.
+\textsc{Sparse} is widely used by kernel developers and many sparse errors are
+fixed in each kernel release cycle\footnote{For instance, over 20 of sparse
+errors were fixed (since 2.6.31) in 2.6.32.}. Let me note, that since this
+tool is able to check whole kernel, it is thus capable to parse most of GNU~C
+extensions described in \cite{gcc}.
 
-Static checkers are not only dedicated programs. \textsc{clang} \cite{clang}
-compiler contains built-in non-configurable static analyzer. With a use of
-internal compiler structures, it looks for typical programming errors like
-buffer overruns, using of deprecated (insecure) functions, some sort of memory
-leaks etc.
+From a different point of view, static checkers need not to be only
+\emph{dedicated programs}. \textsc{clang} \cite{clang} compiler contains a
+built-in non-configurable static analyzer. With a use of internal compiler
+structures, it looks for typical programming errors like buffer overruns,
+using of deprecated (insecure) functions, a sort of memory leaks etc.
 
-To the best of my knowledge the most known code-checking tool for Java is
-\textsc{FindBugs}~\cite{findbugs}. \textsc{FindBugs} is capable to find
-hundreds types\footnote{\url{http://www.ibm.com/developerworks/%
-java/library/j-findbug1/}} of errors in whole Java project. 
+All previous open-source tools are configurable only to some extent. There is
+no way of specifying new check but changing the sources.
+\textsc{Uno}~\cite{uno} is a \emph{fully configurable} tool. It allows user to
+specify for what type of bugs should the checker look for. Of course there are
+predefined ones (e.g. use of uninitialized variables), but they can be easily
+augmented.
 
-\vskip 2cm \noindent
-\textsc{Uno}~\cite{uno}
-clang
+Still, some tools are hard to use. There is one exception called
+\textsc{FindBugs}~\cite{findbugs}. To the best of my knowledge it is the most
+known code-checking tool for Java sources. \textsc{FindBugs} is capable to
+find hundreds types\footnote{\url{http://www.ibm.com/developerworks/%
+java/library/j-findbug1/}} of errors in whole Java project. It has a
+\emph{graphical user interface} (GUI) and in fact it is a single button tool.
+
+\paragraph{Stanse} I slightly described \stan\ in the introduction. It is
+developed at ITI by J. Obdržálek, J. Slabý and M. Trtík (alphabetical order,
+I'll describe my role later) with a help of master students. For the ease of
+programming, the tool is written mostly in Java. Some parts are pure C and the
+rest (scripts) uses \textsc{Perl}.
+
+\stan\ tries to pick all the pros from previously named tools and also add
+some novelty. It consists of three checkers.
+\begin{itemize}
+\item AutomatonChecker -- technique used also in \textsc{Coverity}
+\item ThreadChecker -- Jan Kučera's master thesis
+\item ReachabilityChecker -- short checker (200 lines of code) to perform
+statements reachability analysis to reveal unintentional dead code.
+\end{itemize}
+
+I didn't mention what type of code analysis all the tools support. \stan\
+performs simple (CFG binding) inter-procedural analysis.
 
 \begin{figure}[htb]
 \begin{center}
@@ -207,7 +235,7 @@ Inter- &
 \textsc{Klocwork} & no   &    ?         &    ?    & yes        & C, C++, C\#, Java \\
 \textsc{Splint}	  & yes  & no           & no      & no         & C \\
 \textsc{Sparse}   & yes  & no           & yes     & no         & C \\
-\textsc{clang}	  & yes  & no           & no      & no         & C, Obj-C \\
+\textsc{clang}	  & yes  & no           & no      & no         & C, C++, Obj-C \\
 \textsc{Uno}	  & yes  & yes          & no      & ?          & C \\
 \textsc{Stanse}	  & yes  & yes          & yes     & yes        & C \\
 \textsc{FindBugs} & yes  & no           & yes     & ?          & Java \\
@@ -215,8 +243,6 @@ Inter- &
 \caption{Overview and comparison of described tools}
 \end{center}
 \end{figure}
-
-\paragraph{Stanse} \stan\ is
 
 \subsection{Symbolic Execution}
 \label{current-se}
