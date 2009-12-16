@@ -16,10 +16,10 @@ teze.tex: teze.bbl
 	latex $(patsubst %.bib,%.tex,$<)
 	@rm -f teze.{pdf,dvi,ps}
 
-%.pdf: %.tex
+%.pdf: %.tex FORCE
 	pdflatex $<
 
-%.ps: %.tex
+%.ps: %.tex FORCE
 	pslatex $<
 	dvips $(subst .tex$,.dvi,$<) -o$@
 	rm $(subst .tex$,.dvi,$<)
