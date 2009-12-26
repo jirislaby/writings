@@ -18,7 +18,8 @@
 \setcounter{tocdepth}{2}
 
 \lstset{tabsize=2,numbers=left,showstringspaces=false,breaklines=true,
-        breakatwhitespace=true,escapeinside={(*@}{@*)},frame=l}
+        breakatwhitespace=true,escapeinside={(*@}{@*)},frame=l,
+	basicstyle=\scriptsize}
 
 \addtolength{\oddsidemargin}{0.2in}
 \addtolength{\evensidemargin}{0in}
@@ -186,7 +187,7 @@ interface (they must not be intermixed) or uses of remapped I/O memory
 fixed in each kernel release cycle\footnote{For instance, over 20 of sparse
 errors were fixed (since 2.6.31) in 2.6.32.}. Let me note, that since this
 tool is able to check whole kernel, it is capable to parse most of GNU~C
-extensions described in \cite{gcc}.
+extensions described in~\cite{gcc}.
 
 From a different point of view, static checkers need not to be only
 \emph{dedicated programs}. \textsc{Clang}~\cite{clang} compiler contains a
@@ -243,7 +244,7 @@ statement.
 \end{itemize}
 
 The inter-procedural analysis implemented in \stan\ binds together a CFG node
-of a call and CFG of called function. Summaries computation similar to
+of a call and CFG of called function. A summaries computation similar to
 \textsc{Metal} is yet to be implemented.
 
 \paragraph{Stanse Framework} \stan\ is not only a checker. It provides
@@ -252,6 +253,8 @@ CFG are available to the programmer. For the convenience \stan\ offers
 traversal functions over these structures. Also unified error reporting is
 exposed, so that checker programmers have to implement only relevant parts of
 their new checker. A good example is ReachabilityChecker.
+
+HOW DOES STANSE DIFFER IN COMPARISON WITH METAL?
 
 \begin{figure}[htb]
 \begin{center}
@@ -319,29 +322,47 @@ few details: (a) we use XML for patterns notation (excludes meta-compilation
 and target language dependency); (b) the inter-procedural analysis is performed
 only per file, but, thanks to that, in a path-sensitive way.
 
-\subsubsection{Symbolic Execution}
+\subsection{Symbolic Execution}
 \label{current-se}
 So far I have not described one special code interpretation method called
 symbolic execution. As mentioned in the Introduction, it is based on
-\cite{select}.
+\cite{select}. The principle is that chosen variables are tracked symbolically
+rather than concretely.
 
 \begin{figure}[htb]
 \begin{center}
 \begin{lstlisting}[language=C]
-y = read()
-y = 2 * y
-if (y == 12)
-	fails()
-print("OK")
+x = random();
+if (x < 8) (*@\label{lst_symb1}@*)
+	lock();
+compute();
+if (x < 8) (*@\label{lst_symb2}@*)
+	unlock();
 \end{lstlisting}
 \caption{Symbolic execution example}
 \label{fig.symbolic}
 \end{center}
 \end{figure}
 
-aa
-\\[1cm] \noindent
-\textsc{Klee}~\cite{klee}, \textsc{Pex}~\cite{pex}
+Let us consider the imaginary code in Figure~\ref{fig.symbolic}. \texttt{x} is
+initialized to some random integer value and tested at lines \ref{lst_symb1}
+and \ref{lst_symb2} for the same condition (\texttt{x < 8}). If \texttt{x} was
+not handled symbolically, the execution might run through the true branch
+(\texttt{lock}) first and then through the false one (no \texttt{unlock}).
+This would generate a locking imbalance error in the code even though it's a
+clear false positive.
+
+Now, if we handled \texttt{x} symbolically and store the path condition
+\texttt{x < 8} at line \ref{lst_symb1}, the executor is not allowed to
+traverse the code via the false branch at line~\ref{lst_symb2} since the path
+condition would be violated. Hence the code is properly executed such that
+either the lock is both locked and unlocked or not touched at all.
+
+\subsection{Current Tools} Symbolic execution was already successfully
+deployed in software testing.
+
+\textsc{Exe}~\cite{exe}, \textsc{Klee}~\cite{klee}, \textsc{Dart}~\cite{dart},
+\textsc{Pex}~\cite{pex}
 
 \subsection{Related Work}
 \paragraph{Model Checking} Opposing to checkers, model checking (MC) tries to
@@ -355,7 +376,7 @@ precise models. On the other hand, it reports no false positive errors.
 \newpage
 
 \section{Dissertation Thesis Intent}
-IT'D BE TOO LONG, DELETE DETAILS
+IT'D BE TOO LONG, MOVE OR DELETE THE DETAILS
 \\[1cm] \noindent
 As mentioned in the introduction, the intention is to apply symbolic execution
 on a kernel. Dissertation thesis should contain all the steps needed to
@@ -391,7 +412,19 @@ Instrumented code: asserts, \texttt{\_\_chk\_user\_ptr}
 \subsection{Finding Error Patterns}
 Marek's dissertation, fallback to \textsc{Klee} (we have source code).
 
-Expected Results; Schedule for Further Development; Expected Outcomes
+Expected Results; Expected Outcomes
+
+\subsection{Schedule}
+I plan to finish my Ph.D. studies by dissertation defence in the term spring
+2012, i.e. after 8 terms of doctoral studies. Here comes the expected schedule
+of my work during the following terms.
+\begin{itemize}
+\item spring 2010 -- \stan\ papers submission, dissertation topic defense,
+	examination
+\item autumn 2011 -- fully working prototype of symbolic executor on kernel
+	which is capable of finding errors
+\item spring 2012 -- dissertation finishing and defense
+\end{itemize}
 
 \newpage
 
@@ -405,9 +438,10 @@ Expected Results; Schedule for Further Development; Expected Outcomes
 \section{Summary of Study Results}
 \label{results}
 During the first year of doctoral study I studied papers with results of past
-researches in the area of static analysis. Also I read through some literature
-about static analysis and compilers.
+researches in the area of code analysis and testing. Also I read through some
+literature about static analysis and compilers.
 
 Under \emph{ITI}, we developed \stan, a static analysis tool written in Java.
+We are currently in the process of submission of two papers about \stan.
 
 \end{document}
