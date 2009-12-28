@@ -39,7 +39,7 @@
      \logo SL
 
      \vspace{2cm}
-     {\bf\huge Symbolic execution on OS kernels}\\[0.8in]
+     {\bf\huge Automatic Symbolic Execution on OS Kernels}\\[0.8in]
 
      {\sc\large Dissertation Thesis Topic}\\[0.4in]
 
@@ -93,9 +93,9 @@ in this area.
 
 To the best of my knowledge nobody has ever tried to apply symbolic execution
 on an operation system kernel (further only \emph{kernel}). This task
-incorporates not only the execution
-itself, but some kind of code preparation, compilation, linking and dynamic
-linking. These terms will be discussed further in the text.
+incorporates not only the execution itself, but some kind of code preparation,
+compilation, linking and dynamic linking. These terms will be discussed
+further in the text.
 
 \subsection{Justification}
 Symbolic execution has shown its power in finding errors in userspace
@@ -325,7 +325,7 @@ only per file, but, thanks to that, in a path-sensitive way.
 \subsection{Symbolic Execution}
 \label{current-se}
 So far I have not described one special code interpretation method called
-symbolic execution. As mentioned in the Introduction, it is based on
+symbolic execution (SE). As mentioned in the Introduction, it is based on
 \cite{select}. The principle is that chosen variables are tracked symbolically
 rather than concretely.
 
@@ -358,11 +358,116 @@ traverse the code via the false branch at line~\ref{lst_symb2} since the path
 condition would be violated. Hence the code is properly executed such that
 either the lock is both locked and unlocked or not touched at all.
 
-\subsection{Current Tools} Symbolic execution was already successfully
-deployed in software testing.
+\subsection{Current Status of SE}
+Symbolic execution was already successfully deployed in software testing. The
+very first tools with SE were \textsc{Exe}~\cite{exe} and
+\textsc{Dart}~\cite{dart}.
 
-\textsc{Exe}~\cite{exe}, \textsc{Klee}~\cite{klee}, \textsc{Dart}~\cite{dart},
-\textsc{Pex}~\cite{pex}
+\paragraph{Dart and Pex} \textsc{Dart} is designed to use SE in cooperation
+with standard (concrete) execution on a processor. This principle, first
+mentioned in~\cite{first_symb_dyn}, is used here to generate tests which are
+then used for testing, as they are intended to cover as much code as possible.
+This leads to almost 100\,\% code coverage\footnote{The problem is undecidable
+in general, approximations may lead to imprecision.} and hence it generates
+tests for almost all possible code paths. \textsc{Dart} works on the top of C
+language.
+
+In detail, \textsc{Dart} first scans the source code by simple static analysis
+tool to find so-called \emph{interface}. It is a description of external
+program inputs such as input specified by user at command-line (parameters of
+top-level functions, e.g. of \texttt{main}), external functions etc. This
+interface is then used as a potential symbolic input.
+
+Once the interface is known, a \emph{test driver} is created. It is a small
+code hunk written in C which represents the interface. It initializes
+top-level function parameters with random values and also implements external
+functions found in the previous step. The stubs return random values as well.
+
+With all the code known, \textsc{Dart} starts SE, initially with random input.
+Since it wants to cover both true and false branches of every branching, it
+executes the code repeatedly with the input corresponding to the opposite
+branch. To demonstrate it on our example in Figure~\ref{fig.symbolic},
+consider \textsc{Dart} goes through the true branch first time, i.e. with path
+condition \texttt{x < 8}. Next time it will add \texttt{x >= 8} to a path
+condition and generates the program input accordingly to cover even the false
+branch.
+
+Sometimes it may be infeasible for several reasons\footnote{Non-linearity in
+expressions, dereferences of user-provided pointers etc.} to obtain some values
+symbolically. In such a situation \textsc{Dart} falls back to the value from
+dynamic execution. In this case, testing completeness is lost.
+
+\textsc{Pex}~\cite{pex} is a successor of \textsc{Dart} working with .NET
+applications. The same as \textsc{Dart}, \textsc{Pex} executes the code
+dynamically and statically in parallel. Its difference lays in parametrization
+of tests specified by a user here. It might seem similar to the standard unit
+testing known from \emph{extreme programming}, but exactly the parametrization
+makes the difference.
+
+Each method (test itself) has several parameters, which specify inputs. Let us
+have a look at example taken from~\cite{pex}:
+\begin{lstlisting}[language=Java]
+public void TestAdd(int capacity, object element) {
+	ArrayList a = new ArrayList(capacity);
+	a.Add(element);
+	Assert.IsTrue(a[0] == element);
+}
+\end{lstlisting}
+With standard unit testing, one would need to specify several objects and
+capacities to test \texttt{ArrayList} implementation. However, given
+\texttt{TestAdd}, \textsc{Pex} will exercise all \texttt{capacity} and
+\texttt{element} combinations which branches \texttt{ArrayList} implementation
+differently and possibly thus cover more code.
+
+\paragraph{Cute} Also \textsc{Cute}~\cite{cute} is based on parallel execution
+principle. However it tries to address pointer parameters of test functions.
+A structure behind the pointer is represented as \emph{memory graph} and its
+contents is changed according to branches with pointer accesses in the code.
+
+E.g. if the code contains \texttt{if (ptr->member == 1)}, \textsc{Cute} will
+construct random memory map for the first time. Secondly the map will contain
+1 on the \texttt{ptr->member} position (or some integer other than 1 in case
+the random input was 1).
+
+%Pex:
+%   Several improvements have been proposed recently to improve the scalability
+%   of dynamic symbolic execution, by making it compositional [11,19], and
+%   demand-
+%   driven [19,8]. We are working on related improvements in Pex [1] with
+%   encour-
+%   aging early results.
+
+\paragraph{Exe and Klee} On the other hand, a tool from Engler et al. called
+\textsc{Exe}~\cite{exe} executes the code only symbolically. Key
+improvements in \textsc{Exe} to SE includes constraint caching, independent
+constraint optimization, bitvector arithmetic, and tracking indirect memory
+accesses symbolically.
+
+\textsc{Exe} works as follows. It natively (on OS level) forks the checking
+process on each branch and each children walks the true or false branch
+respectively.
+
+Queries to their SMT solver are cached and optimized as much as possible,
+since solvers take most of the time needed for checking.
+
+Many of the mentioned cons were fixed in \textsc{Klee}~\cite{klee}.
+
+\paragraph{Sage} \textsc{Sage}~\cite{sage} is specific in that it symbolically
+executes native x86 assembly. Immediate pro is that it does not need source
+code. The program is linked in a standard way and all code is available. What
+is worse are the instruction themselves. According to Intel processor
+manual~\footnote{Available at \url{intel.com}}, there is over XXX instructions
+which must be supported by the tool. And with new processors, this count
+grows.
+
+\subsubsection{LLVM}
+LLVM~\cite{llvm} present itself as a compiler future. The support of languages
+in it is huge. Currently, C, C++, Obj-C, Ocaml, Java and others are supported.
+The toolkit contains well-described intermediate language.
+
+This framework was used in \textsc{Klee}. Unfortunately the C support is not
+complete. GNU C compiler is still a superset of both llvm-gcc and clang in
+what language constructs are supproted.
 
 \subsection{Related Work}
 \paragraph{Model Checking} Opposing to checkers, model checking (MC) tries to
