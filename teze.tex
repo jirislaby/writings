@@ -92,7 +92,7 @@ Section \ref{current-se} is deserved for detailed description of the work done
 in this area.
 
 To the best of my knowledge nobody has ever tried to apply symbolic execution
-on an operation system kernel (further only \emph{kernel}). This task
+on an operation system kernel (further only \emph{kernel}) -- WRONG. This task
 incorporates not only the execution itself, but some kind of code preparation,
 compilation, linking and dynamic linking. These terms will be discussed
 further in the text.
@@ -121,7 +121,7 @@ Comparison of Key Results}
 Static analysis is a form of software testing and/or finding errors. It
 incorporates many branches such as \emph{model checking} and \emph{abstract
 interpretation}. Further in the text I will aim specifically at abstract
-interpretation, because it is a field of my doctoral study.
+interpretation, because it is a main field of my doctoral study.
 
 \subsection{Abstract Interpretation}
 Abstract interpretation is a relatively old approach, first summarized and
@@ -212,11 +212,12 @@ find hundreds types\footnote{\url{http://www.ibm.com/developerworks/%
 java/library/j-findbug1/}} of errors in whole Java project. It has a
 \emph{graphical user interface} (GUI) and in fact it is a single button tool.
 
-\paragraph{Stanse} I slightly described \stan\ in the introduction. It is
-developed at ITI by J. Obdržálek, J. Slabý and M. Trtík (alphabetical order,
-I will describe my role later in Chapter~\ref{results}) with a help of master
-students. For the ease of programming, the tool is written mostly in Java.
-Some parts are pure C and the rest (scripts) needs \textsc{Perl}.
+\paragraph{Stanse}\label{stanse} I slightly described \stan\ in the
+introduction. It is developed at ITI by J. Obdržálek, J. Slabý and M. Trtík
+(alphabetical order, I will describe my role later in Chapter~\ref{results})
+with a help of master students. For the ease of programming, the tool is
+written mostly in Java.  Some parts are pure C and the rest (scripts) needs
+\textsc{Perl}.
 
 \stan\ tries to pick all the pros from previously named tools and also adds
 some novelty. Namely, it is a fully configurable open-source tool, able to
@@ -225,36 +226,45 @@ inter-procedural analysis.
 
 It consists of three checkers:
 \begin{itemize}
-\item AutomatonChecker -- technique based on finite automata. I will describe
-it in more detail in Chapter~\ref{automata}.
-\item ThreadChecker -- Jan Kučera developed the checker in the scope of his
-master thesis. The checker looks for thread-creation functions and statically
-follows the threads. Namely, it watches lock operations and builds
+\item \textbf{AutomatonChecker} -- technique based on finite automata. I will
+describe it in more detail in Chapter~\ref{automata}.
+\item \textbf{ThreadChecker} -- Jan Kučera developed the checker in the scope
+of his master thesis. The checker looks for thread-creation functions and
+statically follows the threads. Namely, it watches lock operations and builds
 \emph{locksets}~\cite{lockset}, represented as resource allocation graphs
 (RAG). The checker combines RAGs of all threads and tries to find cycles
 there. If it is successful with the search, an error is reported\footnote{For
 example one report is available at \url{http://lkml.org/lkml/2009/4/14/527}.}.
-\item ReachabilityChecker -- It is a short checker (under 200 lines of code)
-which performs reachability analysis of statements to reveal unintentional
-dead code. It catches errors like omitted semicolons after the if condition,
-so that the branching is not done properly\footnote{Such bad behaviour was
-fixed e.g. by \url{http://patchwork.kernel.org/patch/56386/}.} (\texttt{if
-(cond)\underline{;} true\_statement;}). The true branch here would be an empty
-statement.
+\item \textbf{ReachabilityChecker} -- It is a short checker (under 200 lines
+of code) which performs reachability analysis of statements to reveal
+unintentional dead code. It catches errors like omitted semicolons after the
+if condition, so that the branching is not done properly\footnote{Such bad
+behaviour was fixed e.g. by \url{http://patchwork.kernel.org/patch/56386/}.}
+(\texttt{if (cond)\underline{;} true\_statement;}). The true branch here would
+be an empty statement.
 \end{itemize}
 
-The inter-procedural analysis implemented in \stan\ binds together a CFG node
-of a call and CFG of called function. A summaries computation similar to
-\textsc{Metal} is yet to be implemented.
+The code is in \stan\ handled by inter-procedural analysis. The implemented
+binds together a CFG node of a call and CFG of called function. A summaries
+computation similar to \textsc{Metal} is yet to be implemented.
+
+On the other hand, \stan\ is not bound to a single language, not even
+to a single compiler version (cf. \textsc{Metal}). It also allows users to
+specify single Makefile and the rest is left on the tool. It creates a
+filelist automatically while make build system runs. Then it performs checking
+on all the files.
+
+Inspired by \textsc{FindBugs}, everything, what can be done on a command line
+is also available in the \stan\ GUI. It renders the tool into one-button
+checker.
 
 \paragraph{Stanse Framework} \stan\ is not only a checker. It provides
 easily extensible framework for checking. All code structures such as AST and
 CFG are available to the programmer. For the convenience \stan\ offers
-traversal functions over these structures. Also unified error reporting is
-exposed, so that checker programmers have to implement only relevant parts of
-their new checker. A good example is ReachabilityChecker.
-
-HOW DOES STANSE DIFFER IN COMPARISON WITH METAL?
+traversal functions over these structures as well. Also unified error
+reporting is exposed, so that checker programmers have to implement only
+relevant parts of their new checker. A good example of simplicity is
+ReachabilityChecker.
 
 \begin{figure}[htb]
 \begin{center}
@@ -309,6 +319,7 @@ state.
 
 \begin{figure}[htb]
 \begin{center}
+% 60 %
 \input{auto_mem.pspdftex}
 \end{center}
 \caption{Automaton representation of memory pointers with transitions
@@ -322,7 +333,7 @@ few details: (a) we use XML for patterns notation (excludes meta-compilation
 and target language dependency); (b) the inter-procedural analysis is performed
 only per file, but, thanks to that, in a path-sensitive way.
 
-\subsection{Symbolic Execution}
+\subsubsection{Symbolic Execution}
 \label{current-se}
 So far I have not described one special code interpretation method called
 symbolic execution (SE). As mentioned in the Introduction, it is based on
@@ -331,6 +342,7 @@ rather than concretely.
 
 \begin{figure}[htb]
 \begin{center}
+\begin{tabular}{c} % listing refuses to be in the center otherwise
 \begin{lstlisting}[language=C]
 x = random();
 if (x < 8) (*@\label{lst_symb1}@*)
@@ -339,6 +351,7 @@ compute();
 if (x < 8) (*@\label{lst_symb2}@*)
 	unlock();
 \end{lstlisting}
+\end{tabular}
 \caption{Symbolic execution example}
 \label{fig.symbolic}
 \end{center}
@@ -357,6 +370,8 @@ Now, if we handled \texttt{x} symbolically and store the path condition
 traverse the code via the false branch at line~\ref{lst_symb2} since the path
 condition would be violated. Hence the code is properly executed such that
 either the lock is both locked and unlocked or not touched at all.
+
+The next chapter will cover evolution of SE and current state of the art.
 
 \subsection{Current Status of SE}
 Symbolic execution was already successfully deployed in software testing. The
@@ -395,7 +410,7 @@ branch.
 Sometimes it may be infeasible for several reasons\footnote{Non-linearity in
 expressions, dereferences of user-provided pointers etc.} to obtain some values
 symbolically. In such a situation \textsc{Dart} falls back to the value from
-dynamic execution. In this case, testing completeness is lost.
+dynamic execution. In this case, testing completeness is of course lost.
 
 \textsc{Pex}~\cite{pex} is a successor of \textsc{Dart} working with .NET
 applications. The same as \textsc{Dart}, \textsc{Pex} executes the code
@@ -421,13 +436,14 @@ differently and possibly thus cover more code.
 
 \paragraph{Cute} Also \textsc{Cute}~\cite{cute} is based on parallel execution
 principle. However it tries to address pointer parameters of test functions.
-A structure behind the pointer is represented as \emph{memory graph} and its
+A structure behind the pointer is represented as a \emph{memory graph} and its
 contents is changed according to branches with pointer accesses in the code.
 
-E.g. if the code contains \texttt{if (ptr->member == 1)}, \textsc{Cute} will
-construct random memory map for the first time. Secondly the map will contain
-1 on the \texttt{ptr->member} position (or some integer other than 1 in case
-the random input was 1).
+For example if the code contains \texttt{if (ptr->member == 1)}, for the first
+time, \textsc{Cute} will construct random memory map for structure behind
+\texttt{ptr}. Second, the map will contain 1 on the \texttt{ptr->member}
+position (or some integer other than 1 in case the random input was 1
+already).
 
 %Pex:
 %   Several improvements have been proposed recently to improve the scalability
@@ -437,37 +453,152 @@ the random input was 1).
 %   encour-
 %   aging early results.
 
-\paragraph{Exe and Klee} On the other hand, a tool from Engler et al. called
-\textsc{Exe}~\cite{exe} executes the code only symbolically. Key
-improvements in \textsc{Exe} to SE includes constraint caching, independent
-constraint optimization, bitvector arithmetic, and tracking indirect memory
-accesses symbolically.
+\paragraph{Exe and Klee} Contrary to the previous work, a tool from Engler et
+al. called \textsc{Exe}~\cite{exe} executes the code solely symbolically.
+\textsc{Exe} works as follows.
 
-\textsc{Exe} works as follows. It natively (on OS level) forks the checking
-process on each branch and each children walks the true or false branch
-respectively.
+User \emph{specifies variables} which should be handled symbolically by
+\texttt{make\_symbolic} function. This is further compiled by \texttt{exe-cc}
+compiler and later compiled along with the code by standard compiler.
 
-Queries to their SMT solver are cached and optimized as much as possible,
-since solvers take most of the time needed for checking.
+Before the compilation, each branch, assignment and expression from the
+original code must be \emph{instrumented}. It has two reasons. First,
+operands of these operations are checked whether they should be handled
+symbolically (at least one operand is symbolic) or as in uninstrumented code
+(all are concrete). Second, each branch contains a \texttt{fork} call to
+(natively, on OS level) split the execution.
 
-Many of the mentioned cons were fixed in \textsc{Klee}~\cite{klee}.
+Each cloned child contains negated last element from path condition and hence
+walks the true or false branch respectively.
 
-\paragraph{Sage} \textsc{Sage}~\cite{sage} is specific in that it symbolically
-executes native x86 assembly. Immediate pro is that it does not need source
-code. The program is linked in a standard way and all code is available. What
-is worse are the instruction themselves. According to Intel processor
-manual~\footnote{Available at \url{intel.com}}, there is over XXX instructions
-which must be supported by the tool. And with new processors, this count
-grows.
+With the instrumentation described, resulting binary is normally \emph{run}.
+It may finish either by standard way (\texttt{main} returned, \texttt{exit}
+called etc.) or with an error (crash, \texttt{assert} parameter is false,
+\textsc{Exe} detected an error such as zero division, \ldots). In all cases
+inputs corresponding to each path constraint are dumped. When from the latter
+case, it is an "input of death" in their language.
+
+They designed also their own tailor-made solver. This allows \textsc{Exe} to
+perform certain operations and optimizations which cannot be done by other
+tools when using external solvers. \textsc{Exe}'s key improvements are
+constraint caching, independent constraint optimization, bitvector arithmetic,
+and tracking indirect memory accesses symbolically. This allows them to
+speedup checking significantly, since solvers take huge amount of time from
+checking procedure. See~\cite{exe} for technical details.
+
+With this tool, apart from others, they checked three filesystems in Linux
+kernel by writing special block device which injected "corrupted" filesystem
+structure. They were also successful in finding bugs in firewall
+implementations/interpreters of BSD and Linux.
+
+However there is still one notable bottleneck in the algorithm: \texttt{fork}.
+It does not belong to the fastest system calls. Hence
+\textsc{Klee}~\cite{klee}, next Engler's work, tries to tackle this
+disadvantage.
+
+Instead of \texttt{fork}, they wrote their own process scheduler. There is one
+immediate outcome -- scheduling is in their hands and can thus be parametrized
+and tuned. Created children are scheduled by heuristics to not unroll infinite
+loops and to cover as much code as possible early.
+
+Another improvements in \textsc{Klee} are further simplification of path
+conditions before solving, the solving itself and also lower memory
+consumption targeted by condensed representation of created children.
+Intermediate representation is changed too, LLVM is used for symbolic
+execution. LLVM is described in more detail in Section~\ref{llvm}.
+
+\textsc{Klee} is distributed with a C library implementation so that external
+C functions are not black boxes anymore. Those which cannot be found are tried
+to be run dynamically with reconstructed environment and parameters back from
+symbolic path constraints. If that fails too, \textsc{Klee} refuses to check
+the program and forces user to specify sources of that unknown function.
+
+Similar to \textsc{Exe}, it dumps input for programs for every possible code
+branch, allowing 100\,\% code coverage.
+
+With a use of these methods, they were able to find three severe bugs in
+\textsc{Coreutils}, the package of tools used daily on most Linux machines.
+
+\paragraph{Sage} All previous work was based on some intermediate language
+representation. \textsc{Sage}~\cite{sage} is unique in that it symbolically
+executes native x86 instructions. Immediate advantage is that it need not
+source code. The program is linked in a standard way and all code is
+available. This allows even close-source code to be exercised.
+
+What is worse are the instruction themselves. According to the Intel processor
+manual\footnote{Available at \url{intel.com}.}, there is almost 400 basic
+instructions. Most of them has to be supported by the tool\footnote{Some are
+often omitted in the implementations. For instance floating point operations
+have no support, since checkers do not track floating point variables
+either.}. And with new processors, this count grows.
+
+One more \textsc{Sage} novelty is \emph{generational search} which maximizes
+number of generated inputs on each execution. It creates inputs for each
+negated component of a path constraint at once. I.e. if the path condition was
+$a \wedge b \wedge c$ and first run satisfies all of them (true branches),
+next run will generate inputs with $!a$, $a \wedge !b$ and $a \wedge b \wedge
+!c$ path conditions at once (if satisfiable indeed).
 
 \subsubsection{LLVM}
-LLVM~\cite{llvm} present itself as a compiler future. The support of languages
-in it is huge. Currently, C, C++, Obj-C, Ocaml, Java and others are supported.
-The toolkit contains well-described intermediate language.
+\label{llvm}
+LLVM~\cite{llvm} seems to be a future of compilers. The support of languages
+in it is already huge. Currently, C, C++, Obj-C, Ocaml, Java are supported.
+Others are planned, it is a matter of implementing a front-end.
 
-This framework was used in \textsc{Klee}. Unfortunately the C support is not
-complete. GNU C compiler is still a superset of both llvm-gcc and clang in
-what language constructs are supproted.
+There is a specially designed instruction set which every front-end should
+compile into. The set is reduced, with only tens of instructions. As it is
+language-independent, it allows several language-independent optimizations.
+
+The language may be also emitted to a file (as plain text or bytecode), so
+that it can be used arbitrarily e.g. for symbolic execution. A big advantage
+is that LLVM framework provides also libraries for LLVM code traversing. This
+renders symbolic execution parser quite easy, only few instructions have to be
+supported.
+
+Although this may seem perfect, inline assembly crashes whole idea of few
+instructions. The assembly is hard-copied from source code to the LLVM code
+and hence tools have to take care of it properly. A simple solution is to
+ignore it altogether, however for kernel, it may lead to inconsistencies due
+to high inline assembly occurrence rate.
+
+What is worse, none of contemporary C front-ends (llvm-gcc and clang) is
+capable of parsing kernel code seamlessly. GNU C compiler is still a superset
+of both of them in what language constructs are supported. I personally
+reported two bugs from this area in a hope of fixing. Both of them are a
+matter of unsupported inline assembly operations which are used in kernel.
+
+Still, LLVM turns out to be eligible choice nowadays because it is under heavy
+development with release schedules. Hence it looks like missing features will
+be added in near future.
+
+In addition, this framework was used in \textsc{Klee}. Hence, due to
+licensing, it may be freely obtained at LLVM site.
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{l|cccll}
+\multirow{2}{*}{Tool name} &
+a &
+b &
+c &
+\multirow{2}{*}{Base} &
+\multirow{2}{*}{Languages} \\
+%Tool name    & Open & Confi-  & Batch   & Base   & Languages
+	      &      &         &         &        & \\ \hline
+\textsc{Dart} &      &         &         & CIL~\cite{cil} & C \\
+\textsc{Pex}  &      &         &         & .NET   & .NET \\
+\textsc{Cute} &      &         &         & CIL    & C \\
+\textsc{Exe}  &      &         &         &        & C \\
+\textsc{Klee} &      &         &         & LLVM   & C\footnotemark \\
+\textsc{Sage} &      &         &         & x86    & n/a\footnotemark \\
+\end{tabular}
+\caption{Overview and comparison of symbolic tools.}
+\end{center}
+\end{figure}
+\footnotetext{Likely it may be extended to an arbitrary language supported by
+LLVM framework.}
+\footnotetext{Not applicable. Everything which was compiled to a x86 binary
+may be checked.}
 
 \subsection{Related Work}
 \paragraph{Model Checking} Opposing to checkers, model checking (MC) tries to
@@ -548,5 +679,28 @@ literature about static analysis and compilers.
 
 Under \emph{ITI}, we developed \stan, a static analysis tool written in Java.
 We are currently in the process of submission of two papers about \stan.
+
+\subsection{My Work On Stanse}
+I've already mentioned earlier, when describing its internals, in~\ref{stanse}
+that my work on \stan\ will be revealed. The following list is intended for
+exactly that purpose:
+\begin{itemize}
+\item \textbf{buildsystem support}
+\item \textbf{compiler} -- generating AST, CFG, code splitting speedup
+\item \textbf{UnitManager} -- streaming of code (dropping unnecessary structures)
+\item \textbf{ReachabilityChecker} -- finds unreachable statements
+\item \textbf{checker specification} -- mostly for kernel: locking,
+memory, atomicity and operation pairing; but also augmented memory one for
+userspace
+\item \textbf{kernel checking} -- tune up \stan\ for kernel (e.g. workarounds
+for some code constructs, added some time constraints), apply that and report
+errors
+\item \textbf{false positive detectors} -- many killers of false positive
+generated by \stan\ when run on kernel
+\item \textbf{web interface} -- easy access for generated errors
+\item helped Marek to implement some features, so-called feature requests to
+his code
+\item and many bugfixing
+\end{itemize}
 
 \end{document}
