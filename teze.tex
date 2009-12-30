@@ -285,6 +285,11 @@ reporting is exposed, so that checker programmers have to implement only
 relevant parts of their new checker. A good example of simplicity is
 ReachabilityChecker.
 
+\subsection{Tools Summary}
+Figure~\ref{fig_static_comp} depicts an overview of described tools.
+\emph{Configurable} there means, again, that new checks may be added to the
+tool without a need of source code update.
+
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{l|ccccl}
@@ -307,9 +312,8 @@ Inter- &
 \multicolumn{6}{l}{\footnotesize $^*$\textsc{Clang} is still under heavy
 development, its GNU C support is incomplete.} \\
 \end{tabular}
-\caption{Overview and comparison of described tools. \emph{Configurable} here
-means, again, that new checks may be added to the tool without a need of
-source code update.}
+\caption{Overview and comparison of described tools.}
+\label{fig_static_comp}
 \end{center}
 \end{figure}
 
@@ -335,6 +339,12 @@ The automaton creates another report on memory leak, i.e. valid memory is lost
 by another allocation (the bottom-down arrow in the right). Note that for
 simplicity the automaton does not cover the case of allocation from NULL
 state.
+
+Much code behavior may be described by automata. \stan\ contains thorough
+automata descriptions for memory, locking (lock, unlock, try\_lock, nested
+locks up to 5 levels), operation pairing (mostly for reference counting) and
+atomic functions (ones make atomic contexts, others de-atomize, they should be
+balanced).
 
 \begin{figure}[htb]
 \begin{center}
@@ -453,6 +463,19 @@ capacities to test \texttt{ArrayList} implementation. However, given
 \texttt{element} combinations which branches \texttt{ArrayList} implementation
 differently. In turn it covers more code.
 
+\textsc{Pex}, with one of its later extensions (\cite{pex_ddse}), may look at
+the source code differently. Unlike generating tests for all possible paths,
+a location to explore may be known in advance. One example for all is
+\texttt{assert} and its location is easily obtainable from the code. In such
+situations a \emph{demand-driven analysis} may be incorporated. This approach
+reduces time spent by analysis significantly, because paths which leads to the
+target are really taken into computations.
+
+The very same paper also mentions \emph{compositional} analysis. It uses
+already mentioned summaries to represent functions behaviour, so that
+functions with same environment (same constraints on parameters and heap) are
+not executed twice. A value returned in previous run is used instead.
+
 \paragraph{Cute} Also \textsc{Cute}~\cite{cute} is based on parallel execution
 principle. However it tries to address pointer parameters of test functions.
 A structure behind the pointer is represented as a \emph{memory graph} and its
@@ -463,14 +486,6 @@ time, \textsc{Cute} will construct random memory map for structure behind
 \texttt{ptr}. Second, the map will contain 1 on the \texttt{ptr->member}
 position (or some integer other than 1 in case the random input was 1
 already).
-
-%Pex:
-%   Several improvements have been proposed recently to improve the scalability
-%   of dynamic symbolic execution, by making it compositional [11,19], and
-%   demand-
-%   driven [19,8]. We are working on related improvements in Pex [1] with
-%   encour-
-%   aging early results.
 
 \paragraph{Exe and Klee} Contrary to the previous work, a tool from Engler et
 al. called \textsc{Exe}~\cite{exe} executes the code solely symbolically.
@@ -508,7 +523,8 @@ checking procedure. See~\cite{exe} for technical details.
 With this tool, apart from others, they checked three filesystems in Linux
 kernel by writing special block device which injected "corrupted" filesystem
 structure. They were also successful in finding bugs in firewall
-implementations/interpreters of BSD and Linux.
+implementations/interpreters of BSD and Linux. This problematics is also
+covered in Section~\ref{exe_kernel}.
 
 However there is still one notable bottleneck in the algorithm: \texttt{fork}.
 It does not belong to the fastest system calls. Hence
@@ -596,6 +612,25 @@ be added in the near future.
 In addition, this framework was used in \textsc{Klee}. Hence, due to
 licensing, it may be freely obtained at LLVM site.
 
+\paragraph{Toolkit} I decided to use LLVM as a base for my dissertation and
+hence I will briefly introduce the toolkit here. Current stable version is
+2.6, all facts drawn here are with regard to this release.
+
+From the beginning, compilers have a \texttt{--emit-llvm} parameter which
+gives us a LLVM code. Each file will be generated to a separate file. However
+it is still possible to have the code all-in-one. For that purpose
+\texttt{llvm-link} and \texttt{llvm-ld}. They differ only in details. When all
+files are linked together it is one single LLVM code which external tools
+accept as input.
+
+The input is handled through LLVM framework. It is written and exported in C,
+C++ and Ocaml languages which designates the tool to be written in one of
+those languages.
+
+\subsubsection{Summary}
+Similar to static analyzers before, Figure~\ref{fig_se_comparison} draws a
+comparison of described SE tools.
+
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{l|cccll}
@@ -625,17 +660,87 @@ arbitrary language supported by LLVM framework.} \\
 compiled to a x86 binary may be checked.}
 \end{tabular}
 \caption{Overview and comparison of symbolic tools.}
+\label{fig_se_comparison}
 \end{center}
 \end{figure}
 
+\subsection{Kernel Checking Status}
+\textsc{Sparse}
+
+T. Ball and S. Rajamani. Automatically validating temporal safety properties
+of interfaces. In SPIN 2001 Workshop on Model Checking of Software, May 2001.
+
+M. Musuvathi and D.  R. Engler. Model checking large network protocol
+implementations.
+
+\subsubsection{Exe and Kernel}
+\label{exe_kernel}
+\textsc{Exe} was used for testing picked parts of Linux kernel. Specifically,
+three filesystems were checked in~\cite{exe_fs}. A disadvantage of
+\textsc{Exe} is that it has to run as a standard system process to be
+clone-able by \texttt{fork} (compare to the description earlier). They tried
+to exempt pieces of code relevant to the filesystem and use them in userspace
+first, but they failed. It is because the code was still dependent on the rest
+of the kernel in some way\footnote{Either environment, assembly, allocators or
+other peculiar issues.}.
+
+Finally they felt back to an
+UML\footnote{\url{user-mode-linux.sourceforge.net.}} adaptation. It runs as a
+userspace process which exactly matches \textsc{Exe}'s needs. The adaptation
+is a reuse of their past work on kernel Model Checking (see
+Section~\ref{mc_kernel}).
+
+There was still a problem to cope with. Minimal input to a filesystem is
+16\,MiB. The solution is to handle the filesystem image symbolically only
+on demand. I.e. when the kernel asks for a block, it is made symbolic. This
+allows the tool to run quickly, as relevant metadata are stored only in few
+blocks.
+
 \subsection{Related Work}
-\paragraph{Model Checking} Opposing to checkers, model checking (MC) tries to
-\emph{prove}, that checked programs satisfy a particular property according
+Static analysis is indeed a wide area and I have not named all tools and
+algorithms currently available and known. This section provides quick overview
+of other approaches and techniques.
+
+\paragraph{Dynamic Testing}
+Dynamic testing was here since first programs were written. They are fed by
+random inputs, a kind of black-box testing~\cite{random1,random2,random3}.
+Unit testing is a clear opposite. Programmer tries to use the knowledge of
+what the code does and writes a testbed for his implementation to test as many
+paths as possible.
+
+Programmers often instrument their code with conditional (debug-only) fault
+injections. For example allocators may return an error instead of returning
+correctly allocated memory even if there is enough of memory. It helps to
+cover corner cases in the code.
+
+Specifications may reveal many bugs when converted to grammars and utilized to
+generate inputs like in~\cite{grammar1,grammar2,grammar3}.
+
+\paragraph{Model Checking} Opposing to checkers, model checking (MC) tries
+to \emph{prove}, that checked programs satisfy a particular property according
 to specification. We are not trying to achieve such goals, because MC (a)
 suffers from state space explosion and hence lasts long often; (b) need
 precise models. On the other hand, it reports no false positive errors.
 
-\textsc{Blast}, \textsc{Slam}
+A comprehensive overview of Microsoft MC tools with further links and
+technical details about \textsc{Slam} and \textsc{SDV} is in~\cite{slam}. It
+has found many errors in Windows Device Drivers. \textsc{Slam}-based tool that
+is supplied with lazy abstraction is \textsc{Blast}~\cite{blast}. A model
+there is very coarse at the beginning and is narrowed even after it is
+necessary and only at places which needs that. It lowers time and space spent
+on run.
+
+The two were picked of plenty abstraction-based model checkers because of
+summary papers provided. Reader will be directed for further reading there.
+
+There exist many of execution-based tools. Let us mention
+\textsc{Spin}~\cite{spin}, a widely used formal verification tool in present.
+
+\paragraph{Kernel and Model Checking} \label{mc_kernel} Similarly to
+Section~\ref{exe_kernel}, three filesystem implementations were verified. This
+time with a use of MC in~\cite{mc_kernel_fs}. Linux TCP/IP stack was under MC
+algorithms inspection in~\cite{mc_kernel_ip}. Both works are based upon
+a~\cite{cmc}.
 
 \newpage
 
@@ -669,6 +774,8 @@ Linking: \texttt{llvm-link}
 
 Linking against unknown functions vs. userspace: \textsc{Klee}'s~\cite{klee}
 solution; functions written in assembler
+
+replace optimized memcpy, strcpy 
 
 \subsection{Specifying Error Patterns}
 Instrumented code: asserts, \texttt{\_\_chk\_user\_ptr}
