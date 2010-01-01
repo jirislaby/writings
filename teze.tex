@@ -177,17 +177,21 @@ catch buffer overflow vulnerabilities. It also interprets \emph{annotated
 code} and tries to avoid false positives that way (it allows turning on more
 checks which would, without the annotations, generate many false positives).
 
+\label{sparse}
 Later, tools dedicated for a \emph{single purpose or project} emerged.
 Specifically for the Linux kernel purposes, \textsc{Sparse}~\cite{sparse} was
 developed.  For example it watches pointer usage on user- and kernel-space
-interface (they must not be intermixed) or uses of remapped I/O memory
-(have to be dereferenced via special helpers) and similar -- kernel specific
--- properties. All the mentioned has no use other than in the kernel.
-\textsc{Sparse} is widely used by kernel developers and many sparse errors are
-fixed in each kernel release cycle\footnote{For instance, over 20 of sparse
-errors were fixed (since 2.6.31) in 2.6.32.}. Let me note, that since this
-tool is able to check whole kernel, it is capable to parse most of GNU~C
-extensions described in~\cite{gcc}.
+interface (they must not be interweaved) or uses of remapped I/O memory (has
+to be dereferenced via special helpers) and similar, kernel specific,
+properties. All the mentioned has no use other than in the kernel.
+\textsc{Sparse} is widely used by kernel developers and many \textsc{Sparse}
+errors are fixed in each kernel release cycle\footnote{For instance, over 20
+of \textsc{Sparse} errors were fixed (since 2.6.31) in 2.6.32.}. Let me note,
+that since this tool is able to check whole kernel, it is capable to parse
+most of GNU~C extensions described in~\cite{gcc}. It is distributed with a
+system that intercepts build process (\texttt{make}) and is able to eavesdrop
+command-line for compiler.  This is then used to preprocess sources and check
+them in the next step.
 
 From a different point of view, static checkers need not to be only
 \emph{dedicated programs}. \textsc{Clang}~\cite{clang} compiler contains a
@@ -209,8 +213,9 @@ Still, some tools are hard to use. There is one exception called
 \textsc{FindBugs}~\cite{findbugs}. To the best of my knowledge it is the most
 known code-checking tool for Java sources. \textsc{FindBugs} is capable to
 find hundreds types\footnote{\url{http://www.ibm.com/developerworks/%
-java/library/j-findbug1/}} of errors in whole Java project. It has a
-\emph{graphical user interface} (GUI) and in fact it is a single button tool.
+java/library/j-findbug1/}} of errors in whole Java project. Its advantage is a
+sophisticated \emph{graphical user interface} (GUI) and which turns the tool
+in a single button tool.
 
 \paragraph{Stanse}\label{stanse} I slightly described \stan\ in the
 Introduction. It is developed at ITI by J. Obdržálek, J. Slabý and M. Trtík
@@ -612,9 +617,9 @@ be added in the near future.
 In addition, this framework was used in \textsc{Klee}. Hence, due to
 licensing, it may be freely obtained at LLVM site.
 
-\paragraph{Toolkit} I decided to use LLVM as a base for my dissertation and
-hence I will briefly introduce the toolkit here. Current stable version is
-2.6, all facts drawn here are with regard to this release.
+\paragraph{Toolkit} I decided to use LLVM as an intermediate representation in
+my dissertation and hence I will briefly introduce the toolkit here. Current
+stable version is 2.6, all facts drawn here are with regard to this release.
 
 From the beginning, compilers have a \texttt{--emit-llvm} parameter which
 gives us a LLVM code. Each file will be generated to a separate file. However
@@ -745,32 +750,25 @@ a~\cite{cmc}.
 \newpage
 
 \section{Dissertation Thesis Intent}
-IT'D BE TOO LONG, MOVE OR DELETE THE DETAILS
-\\[1cm] \noindent
 As mentioned in the Introduction, the intention is to apply symbolic execution
 on a kernel. Dissertation thesis should contain all the steps needed to
 perform the execution to find errors in the code. From processing the code
 (compilation) towards recognizing error patterns specified by user and
-reporting them. Now I will go into details of each phase and describe the idea
-behind.
+reporting them. All in an automatic manner, without a need of long
+establishing a testbed. Now I will go into details of each phase and describe
+the ideas behind.
 
-\subsection{Code processing}
+\subsection{Code Processing}
 For the convenience of users, we want to support makefile build system to
 obtain source code file list. Method used in \stan\ may be reused for this
-purpose to some extent. It originates from the way how
-\textsc{Sparse}~\cite{sparse} tool was designed. In fact it is simple
-interception of a compiler command-line invoked by the build system. It then
-runs original, real, compiler with proper arguments (to satisfy a build
-system).
+purpose to some extent. It originates from the way how \textsc{Sparse} was
+designed (cf. Section~\ref{sparse}). However instead of direct checking, and
+because of LLVM being chosen to be a base of the work, LLVM bytecode will be
+a secondary output from this phase.
 
-Even though in \stan\ we only store the intercepted command-line into a single
-file, this will not suffice for our new symbolic approach. We need to link 
-
-Compilation gnome: \textsc{LLVM}~\cite{llvm}
-
-Compilation problems: inlined assembly, 
-
-Linking: \texttt{llvm-link}
+In addition, similar to \stan, a list of files is obtained as well. The list
+will be helpful when linking all files into a single LLVM file. This is the
+last necessary step in Code Processing.
 
 Linking against unknown functions vs. userspace: \textsc{Klee}'s~\cite{klee}
 solution; functions written in assembler
@@ -782,6 +780,9 @@ Instrumented code: asserts, \texttt{\_\_chk\_user\_ptr}
 
 \subsection{Finding Error Patterns}
 Marek's dissertation, fallback to \textsc{Klee} (we have source code).
+
+The tool should be as much automatic as possible. Unlike in \textsc{Exe},
+where programmers need to set up a virtualization testbed.
 
 Expected Results; Expected Outcomes
 
