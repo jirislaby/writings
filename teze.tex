@@ -63,14 +63,55 @@
 \setcounter{page}{1}
 
 \section{Introduction}
-TO BE REWRITTEN ACCORDING TO THE BODY
-\\[1cm] \noindent
-Static analysis is currently considered to be a powerful approach used for
-finding errors in a source code. The first real application was performed by
-Engler et al. in \textsc{Metal}~\cite{metal} in 2000.
+Most presently available computer programs are a result of human work. This
+often means that complex software contains errors. It is known that the later
+an error is found in the development cycle the higher cost of the fix is.
 
-Static analysis might have a form of finding some patterns in the code in some
-specified manner (similarly to \textsc{Metal}) or test cases generation which
+Hence to lower the cost of distributed software, developer companies started
+to produce tools for evading errors in the later development phases. Today,
+there also compete many companies, which aim solely at finding bugs.
+
+During the years of bugfinding tools development, several techniques emerged.
+In principle, code can be checked with and without a need of being really
+executed on a processor. This divides the techniques to \emph{static} (do not
+run) and \emph{dynamic} (they do). If course, each further contains
+subcategories covering specific testing needs.
+
+By a dynamic technique, programs are usually exposed to attacks of inputs and
+are expected to sustain the attack, correctly finish their task and exit.
+Dynamic testing ensures no false positives, since the code is run in real-time
+with real data. Thanks to this and other factors, it is very common testing
+nowadays.
+
+Standing on the opposite side, static code analysis is currently also
+considered to be a powerful approach used for finding errors in a source code.
+Although it is not new technique, the first real application was performed by
+Engler et al. in \textsc{xgcc}~\cite{metal} even in 2000.
+
+The analysis might have a form of proving properties of mathematical
+finite-state models (Model Checking), checking of programmer's properties
+specified in special code constructs (assertions), abstract the code and try
+to verify properties on the abstraction (Abstract Interpretation, AI) and
+others. The thesis is exactly in the scope of AI. Obviously, there will be
+some problems connected to AI, the thesis will tackle one of them, as will be
+seen later.
+
+The abstraction approximates behaviour of a system for easier checking. For
+example checking whether there is an assignment of $\pi$ to some variable, the
+analyzer simply looks for assignments and $\pi$. Any other code is irrelevant
+and may be ignored. In the best case, all the unneeded details of the system
+are thrown away.
+
+However, usually the abstraction is not as good as that and checking becomes
+unsound often. As a response, false positives start to occur.  They might be
+beaten either by revisiting the error, generating input and pass that to the
+system dynamically or finally, narrowing the abstraction. On the other hand,
+the computation may last too long and seem to never finish.  That might mean
+that the abstraction is too detailed, so it should be widened to lose more
+details.
+
+finding some patterns in the code in some
+specified manner (similarly to \textsc{xgcc}) or test cases generation which
 try to cover the most of the code (covering both true and false branches of
 each branching).
 
@@ -136,16 +177,22 @@ computing a fixpoint.
 Cousots laid down the foundation for others, however the principle was brought
 to interest even after 2000. It was thanks to work of Engler et al. on a meta
 compilation based technique described in~\cite{metacomp}. System developers
-there specify properties of the system in \textsc{Metal}~\cite{metal} language,
+there specify properties of the system in \textsc{metal}~\cite{metal} language,
 compile it into internal representation and the tool applies the specification
 on all executable paths in a particular function. Violation of the
 specification on a path is then reported as error.
+
+The compiler used for compilation of \textsc{metal} is GNU C compiler
+(\textsc{gcc}) 3.1.1 with their extensions -- \textsc{xgcc}\footnote{Homepage
+at \url{http://www.cs.stevens.edu/~wbackes/xGCC/index.html}.}. It redefines
+\textsc{gcc}'s internal code representation, data types and applies the
+analysis on that modified structure.
 
 By improving the technique\footnote{According to the press release at
 \href{http://www.coverity.com/html/press_story04_02_02_05.html}%
 {http://www.coverity.com/html/press\_story04\_02\_02\_05.html}, it produces
 less false positives, can run in parallel on the code and contains a
-statistical engine.} they developed a commercial derivation of \textsc{Metal}
+statistical engine.} they developed a commercial derivation of \textsc{xgcc}
 named \textsc{Coverity Prevent}~\cite{coverity}, the current world leader in
 static analysis, according to developers. Currently it analyses many
 production systems including the Linux kernel on a daily
@@ -160,13 +207,14 @@ Klocwork products are able to parse Java and C\# programs as well. They seem
 to be world number two in code analysis.
 
 \paragraph{Open-source}
-All the mentioned tools till now are commercial products without an access to
-their source code. However there are also many open-source tools available.
-First, let me mention \textsc{Lint} derivatives. They belong to the
-\emph{first static analysis tools} used whatsoever. \textsc{Lint} used to find
-suspicious and non-portable code constructs. Mostly, the checks are currently
-superseded by compilers which perform the checking during standard compilation
-phase, so that there is no reason to use \textsc{Lint} anymore.
+Apart from \textsc{xgcc}, all the mentioned tools till now are commercial
+products without an access to their source code. However there are also many
+open-source tools available.  First, let me mention \textsc{Lint} derivatives.
+They belong to the \emph{first static analysis tools} used whatsoever.
+\textsc{Lint} used to find suspicious and non-portable code constructs.
+Mostly, the checks are currently superseded by compilers which perform the
+checking during standard compilation phase, so that there is no reason to use
+\textsc{Lint} anymore.
 
 There was also a popular successor \textsc{LCLint}~\cite{lclint} later renamed
 to \textsc{Splint}. The development stalls for more than five
@@ -274,7 +322,7 @@ CFG of a called function. A summaries computation similar to~\cite{metal} is
 yet to be implemented.
 
 Strictly speaking, \stan\ is not bound to a single language, not even
-to a single compiler version (cf. \textsc{Metal}). The language frontend may
+to a single compiler version (cf. \textsc{xgcc}). The language frontend may
 be easily changed thanks to modular structure of whole tool.
 
 Inspired by \textsc{FindBugs}, everything what can be done on a command line
@@ -329,7 +377,7 @@ interpretation in some of them.
 
 \subsubsection{Automata}
 \label{automata}
-\textsc{Metal} uses state machines (SM) as an abstraction. The machine specifies
+\textsc{xgcc} uses state machines (SM) as an abstraction. The machine specifies
 some rules which should ever hold for the code. See Figure~\ref{fig.auto_mem}
 for example of SM representing states of pointers. Transitions are performed
 by code matching against patterns (alloc, free etc.).
@@ -361,8 +409,8 @@ performed by memory operations.}
 \label{fig.auto_mem}
 \end{figure}
 
-For complete report on \textsc{Metal} internals, see~\cite{metal}. \stan's
-AutomataChecker is largely influenced by \textsc{Metal}'s technique except for
+For complete report on \textsc{xgcc} internals, see~\cite{metal}. \stan's
+AutomataChecker is largely influenced by \textsc{xgcc}'s technique except for
 few details: (a) we use XML for patterns notation (excludes meta-compilation
 and target language dependency); (b) the inter-procedural analysis is performed
 only per file, but, thanks to that, in a path-sensitive way.
@@ -604,11 +652,11 @@ ignore it altogether, however for kernel, it may lead to inconsistencies due
 to high inline assembly occurrence rate.
 
 What is worse, none of contemporary C front-ends (\texttt{llvm-gcc} and
-\texttt{clang}) is capable of parsing kernel code seamlessly. GNU C compiler
-(\texttt{gcc}) is still a superset of both of them in what language constructs
-are supported. I personally already reported two bugs from this area in a hope
-of fixing. Both of them are a matter of unsupported inline assembly operations
-found in kernel.
+\texttt{clang}) is capable of parsing kernel code seamlessly. \textsc{gcc} is
+still a superset of both of them in what language constructs are supported. I
+personally already reported two bugs from this area in a hope of fixing. Both
+of them are a matter of unsupported inline assembly operations found in
+kernel.
 
 Still, LLVM turns out to be eligible choice nowadays because it is under heavy
 development with release schedules. Hence it looks like missing features will
@@ -758,7 +806,7 @@ reporting them. All in an automatic manner, without a need of long
 establishing a testbed. Now I will go into details of each phase and describe
 the ideas behind.
 
-\subsection{Code Processing}
+\paragraph{Code Processing}
 For the convenience of users, we want to support makefile build system to
 obtain source code file list. Method used in \stan\ may be reused for this
 purpose to some extent. It originates from the way how \textsc{Sparse} was
@@ -770,21 +818,48 @@ In addition, similar to \stan, a list of files is obtained as well. The list
 will be helpful when linking all files into a single LLVM file. This is the
 last necessary step in Code Processing.
 
-Linking against unknown functions vs. userspace: \textsc{Klee}'s~\cite{klee}
-solution; functions written in assembler
+Unlike in userspace, the generated kernel image should contain all functions
+called from the inside. Unfortunately, some of them are in assembly, the same
+as their sources. The thesis will solve this problem. Optimized functions like
+\texttt{memcpy} and \texttt{strcpy} should be replaced by non-optimized ones
+to have easier SE.
 
-replace optimized memcpy, strcpy 
+Further, some primitive inlined assembly should be handled as well. In the
+sequel, calls like \texttt{put\_user}, \texttt{get\_user} should be recognized
+either on assembly level or handled even in preprocessor. They make sure that
+user's pointer is correct and hence the tool should check if they are used on
+a user- and kernel-space boundary every time.
 
-\subsection{Specifying Error Patterns}
-Instrumented code: asserts, \texttt{\_\_chk\_user\_ptr}
+\paragraph{Specifying Error Patterns}
+The tool should be fully configurable the same as \stan. It should contain a
+system for specifying the patterns. There should be utilities to support
+asserted code, instrumentation, specifying specially handled functions, like
+\texttt{put\_user} and a definition of what to check for in them all.
 
-\subsection{Finding Error Patterns}
-Marek's dissertation, fallback to \textsc{Klee} (we have source code).
+Some of well-known pattern should be already predefined for the ease of use.
 
-The tool should be as much automatic as possible. Unlike in \textsc{Exe},
-where programmers need to set up a virtualization testbed.
+Pattern should be distributed in one with definition of bad behavior. It means
+for example using user's pointer without the functions specified above.
 
-Expected Results; Expected Outcomes
+\paragraph{Finding Error Patterns}
+When the patterns and definitions are ready, the tool has to able to find them
+in the code and report an error, when some violation occurs. The base for this
+should be either \textsc{Klee} or better the Marek Trtik's dissertation. He
+plans to come up with faster algorithm and its open-source implementation. Let
+us \textsc{Klee} consider as a fallback due to its speed, as it is not
+primarily used for finding bugs, but rather a high code coverage.
+
+The drawn process should be as much automatic as possible. Unlike in
+\textsc{Exe}, where programmers need to set up a userspace virtual machine and
+write his own drivers as a disk simulation. The tool should recognize .
+
+Most functions in each driver might run concurrently. The dissertation should
+cover implementation of support for threads and some properties which should
+be checked for them.
+
+Even it is SE, there still might be false positives, techniques used in
+\textsc{xgcc} should be incorporated in the solution, since they allow to
+lower false positive rate.
 
 \subsection{Schedule}
 I plan to finish my Ph.D. studies by dissertation defence in the term spring
@@ -792,9 +867,12 @@ I plan to finish my Ph.D. studies by dissertation defence in the term spring
 of my work during the following terms.
 \begin{itemize}
 \item spring 2010 -- \stan\ papers submission, dissertation topic defense,
-	examination
-\item autumn 2011 -- fully working prototype of symbolic executor on kernel
-	which is capable of finding errors
+examination, working code processing
+\item autumn 2010 -- working on SE being implemented on the top of the code
+\item spring 2011 -- the tool should be able to work with patterns and find
+simple violations
+\item autumn 2011 -- fully working prototype of automatic symbolic executor on
+kernel which is capable to find errors
 \item spring 2012 -- dissertation finishing and defense
 \end{itemize}
 
