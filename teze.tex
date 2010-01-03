@@ -91,10 +91,10 @@ Engler et al. in \textsc{xgcc}~\cite{metal} even in 2000.
 The analysis might have a form of proving properties of mathematical
 finite-state models (Model Checking), checking of programmer's properties
 specified in special code constructs (assertions), abstract the code and try
-to verify properties on the abstraction (Abstract Interpretation, AI) and
-others. The thesis is exactly in the scope of AI. Obviously, there will be
-some problems connected to AI, the thesis will tackle one of them, as will be
-seen later.
+to verify properties on the abstraction (Abstract Interpretation) and
+others. The thesis is exactly in the scope of Abstract Interpretation.
+Obviously, there will be some problems connected to it and the thesis will
+tackle one of them, as will be seen later.
 
 The abstraction approximates behaviour of a system for easier checking. For
 example checking whether there is an assignment of $\pi$ to some variable, the
@@ -103,68 +103,114 @@ and may be ignored. In the best case, all the unneeded details of the system
 are thrown away.
 
 However, usually the abstraction is not as good as that and checking becomes
-unsound often. As a response, false positives start to occur.  They might be
+unsound often. As a response, false positives start to occur. They might be
 beaten either by revisiting the error, generating input and pass that to the
 system dynamically or finally, narrowing the abstraction. On the other hand,
-the computation may last too long and seem to never finish.  That might mean
+the computation may last too long and seem to never finish. That might mean
 that the abstraction is too detailed, so it should be widened to lose more
-details.
+details. For these operations a formalization exists and will be mentioned in
+Section~\ref{cousot}.
 
-finding some patterns in the code in some
-specified manner (similarly to \textsc{xgcc}) or test cases generation which
-try to cover the most of the code (covering both true and false branches of
-each branching).
+With some level of abstraction settled, an analysis method over abstraction is
+still to be chosen. Some chose to find patterns in the code in some specified
+manner (similarly to \textsc{xgcc}), others sticked to test cases generation
+which try to cover the most of the code (covering both true and false branches
+of each branching).
 
-Many tools were developed based on either approach however they are commercial
-with closed source code, limited in what they can do or both. We are currently
-working under Institute of Theoretical Informatics at the Faculty of
-Informatics on a free (open-source) tool called \stan. It aims at finding
-errors with a use of static analysis.
+Many tools were developed based on either approach, the methodologies may be
+also intertwined to produce better results. Further, some add another
+principles such as symbolic execution. Section~\ref{tools} introduces a reader
+to the methods and their use in currently known mainstream tools.
 
-\subsection{Symbolic Execution}
-One method of static analysis, \emph{Symbolic execution} is currently widely
-used for checking code properties. It stems from~\cite{select} and many
-studies tried to apply the principle on a variety of userspace programs.
-\textsc{Klee}~\cite{klee} primarily aims at tests generation that would cover
-as many program instructions as possible. \textsc{Pex}~\cite{pex} uses
-symbolic execution in cooperation with standard execution on processor
-to address program coverage as well, but from another point of view.
-Section \ref{current-se} is deserved for detailed description of the work done
-in this area.
+\paragraph{Symbolic Execution}
+Now, let us aim at \emph{Symbolic Execution} (SE). SE uses external theory
+solvers to decide whether some paths in the code are feasible. Thus it
+eliminates many false positives, because they are often caused by traversing
+infeasible paths in the code. Static checker not based on SE usually have
+minimal chances to catch such behavior except matching patterns in consequent
+branching.
 
-To the best of my knowledge nobody has ever tried to apply symbolic execution
-on an operation system kernel (further only \emph{kernel}) -- WRONG. This task
-incorporates not only the execution itself, but some kind of code preparation,
-compilation, linking and dynamic linking. These terms will be discussed
-further in the text.
+Many studies tried to apply the principle on a variety of userspace programs.
+First symbolic executors primarily aimed at tests generation that would cover
+as many program instructions as possible (\textsc{Exe}, \textsc{Klee}). The
+tests are then run dynamically, which has already mentioned advantages.
+Concurrently, some researches started to employ SE in cooperation with
+concrete execution on a processor to address program coverage as well, but
+from another point of view (\textsc{Dart}, \textsc{Pex}, \textsc{Cute}).
+See Section~\ref{current-se}, which is deserved for detailed description of
+the work done in this area.
 
-\subsection{Justification}
-Symbolic execution has shown its power in finding errors in userspace
-programs. The idea of applying the approach to the kernel is straightforward
-extension, however it is not as easy task as it might seem. The kernel needs
-to be processed, the result then executed and checked for some properties.
-All of
-\begin{itemize}
-\item processing the kernel code,
-\item finding the right properties to check and
-\item finding them in the processed result
-\end{itemize}
-was not done by anybody yet. The dissertation should lead to complete
-implementation of the mentioned and finding errors with minimum false
-positives.
+Although \textsc{Exe} already experimented with applying SE on parts of an
+operation system kernel (further only \emph{kernel}), to the best of my
+knowledge nobody ever executed kernel in a fully-automatic manner without a
+necessity of configuring large testbed.
 
-\paragraph{Dissertation Thesis Intent; Methods of Solving the Problem;
-Comparison of Key Results}
+The task of SE to be run on a kernel incorporates not only the execution
+itself, but some kind of code preparation, compilation and linking. These
+terms will be discussed further in the text (Section~\ref{llvm}) and also in
+the thesis intent (Section~\ref{intent}).
+
+\subsection{Intention of Thesis}
+Symbolic execution has shown its power in finding errors in userspace programs
+in the past decade. The idea of applying the approach to the kernel is
+straightforward extension, however it is not as easy task as it might seem.
+For successful SE kernel analysis few basic steps are necessary: (a)
+processing the kernel code, (b) finding the right properties to check, (c)
+finding them in the processed result and (d) verify if they hold. This process
+is depicted in Figure~\ref{fig_code_process}.
+
+\begin{figure}[htb]
+\begin{center}
+\input{code_process.pspdftex}
+\caption{Code checking procedure}
+\label{fig_code_process}
+\end{center}
+\end{figure}
+
+There are already many tools we can use as a base for each of the step.
+\textsc{Exe} was successful in all three for picked parts of the kernel.
+Mostly the parts were not subject to a user input or special instructions.
+There is still a missing tool which would run SE on kernel thoroughly and
+independent on sybsystem. Also the tools (\textsc{Exe} including) also do not
+use portable intermediate languages or other part of system (e.g. solver).
+
+The dissertation should lead to a complete implementation of the mentioned and
+finding errors with minimum false positives. All of that with minimal input of
+user (except additional checking properties) and with forward portability to
+not be blocked by underneath layers (solvers, languages, front-ends) and their
+versions in the future.
+
+%\paragraph{Methods of Solving the Problem; Comparison of Key Results}
+\paragraph{Thesis Base} There is a wide set of tools for static analysis
+already out there. By now, we\footnote{at Institute of Theoretical Informatics
+at the Faculty of Informatics} contributed a free (open-source) tool called
+\stan. Some of its parts will be a start-point for a SE tool. For example
+batch execution overtaken from \textsc{Sparse}, specifying properties from
+\textsc{xgcc} and graphical interface inspired by \textsc{FindBugs}. \stan\
+and its functionality is characterized in Section~\ref{stanse}.
+
+This is not enough, since \stan\ is not an executor. Hence e.g. \textsc{Klee}
+and its well-portable code processing may be reused with a limited support of
+x86 assembly presented in \textsc{Sage}.
+
+Unfortunately some principles were captured in papers, but their
+implementation is not freely available. It is because they were implemented in
+commercial tools. These methods should be either avoided or reimplemented
+under some permissive license.
+
+Of course, the main ideas of presented techniques will be covered in the next
+chapter.
 
 \newpage
 
 \section{Report on Current Results}
-Static analysis is a form of software testing and/or finding errors. It
-incorporates many branches such as \emph{model checking} and \emph{abstract
-interpretation}. Further in the text I will aim specifically at abstract
-interpretation, because it is a main field of my doctoral study.
+Static analysis is a form of software testing and/or finding errors. The
+introduction already divided testing into many branches. Let us aim
+specifically at abstract interpretation further in the text, because it is a
+main field of my doctoral study.
 
 \subsection{Abstract Interpretation}
+\label{cousot}
 Abstract interpretation is a relatively old approach, first summarized and
 formalized by Cousot \& Cousot in~\cite{cousot} in 1977. There they specify a
 formal model used in interpretation to (a) construct a correct abstraction of
@@ -174,6 +220,7 @@ in general undecidable, hence they also define narrowing and widening
 techniques if the system of equations does not approach convergence when
 computing a fixpoint.
 
+\label{tools}
 Cousots laid down the foundation for others, however the principle was brought
 to interest even after 2000. It was thanks to work of Engler et al. on a meta
 compilation based technique described in~\cite{metacomp}. System developers
@@ -417,10 +464,10 @@ only per file, but, thanks to that, in a path-sensitive way.
 
 \subsubsection{Symbolic Execution}
 \label{current-se}
-So far I have not described one special code interpretation method called
-symbolic execution (SE). As mentioned in the Introduction, it is based on
-\cite{select}. The principle is that chosen variables are tracked symbolically
-rather than concretely.
+So far I have not described in detail one special code interpretation method
+called symbolic execution. As mentioned in the Introduction, it stems
+from~\cite{select}. The principle is that chosen variables are tracked
+symbolically rather than concretely.
 
 \begin{figure}[htb]
 \begin{center}
@@ -798,6 +845,7 @@ a~\cite{cmc}.
 \newpage
 
 \section{Dissertation Thesis Intent}
+\label{intent}
 As mentioned in the Introduction, the intention is to apply symbolic execution
 on a kernel. Dissertation thesis should contain all the steps needed to
 perform the execution to find errors in the code. From processing the code
