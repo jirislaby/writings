@@ -64,58 +64,62 @@
 
 \section{Introduction}
 Most presently available computer programs are a result of human work. This
-often means that complex software contains errors. It is known that the later
-an error is found in the development cycle the higher cost of the fix is.
+often means that more complex software contains errors. It is known that the
+later an error is found in the development cycle the higher cost of the fix
+is.
 
-Hence to lower the cost of distributed software, developer companies started
-to produce tools for evading errors in the later development phases. Today,
-there also compete many companies, which aim solely at finding bugs.
+Hence to lower the cost of distributed software, software developing companies
+started to produce tools for pruning errors in early development stages.
+Today, there also compete many companies aiming solely at finding bugs.
 
 During the years of bugfinding tools development, several techniques emerged.
 In principle, code can be checked with and without a need of being really
 executed on a processor. This divides the techniques to \emph{static} (do not
-run) and \emph{dynamic} (they do). If course, each further contains
+run) and \emph{dynamic} (they do). Of course, each of them further contains
 subcategories covering specific testing needs.
 
-By a dynamic technique, programs are usually exposed to attacks of inputs and
-are expected to sustain the attack, correctly finish their task and exit.
-Dynamic testing ensures no false positives, since the code is run in real-time
-with real data. Thanks to this and other factors, it is very common testing
-nowadays.
+Within a scope of dynamic technique, programs are usually exposed to attacks
+of inputs and are expected to sustain the attack, correctly finish their task
+and exit correctly (i.e. either successfully or with error reported). Dynamic
+testing ensures no false positives, since the code is run in real-time with
+real data. Thanks to this and other factors such as easy setup and
+performance of single test, it is very common testing nowadays.
 
-Standing on the opposite side, static code analysis is currently also
+While standing on the opposite side, static code analysis is currently also
 considered to be a powerful approach used for finding errors in a source code.
 Although it is not new technique, the first real application was performed by
 Engler et al. in \textsc{xgcc}~\cite{metal} even in 2000.
 
 The analysis might have a form of proving properties of mathematical
-finite-state models (Model Checking), checking of programmer's properties
-specified in special code constructs (assertions), abstract the code and try
-to verify properties on the abstraction (Abstract Interpretation) and
-others. The thesis is exactly in the scope of Abstract Interpretation.
-Obviously, there will be some problems connected to it and the thesis will
-tackle one of them, as will be seen later.
+finite-state models known as \emph{Model Checking}, checking of programmer's
+properties specified in special code constructs, i.e. \emph{checking
+assertions}, abstract the code and try to verify properties on the
+abstraction, so-called \emph{Abstract Interpretation} and others. My
+dissertation thesis will be exactly in the scope of Abstract Interpretation.
+Obviously, there are some problems connected to it and the thesis will tackle
+one sort of them, as will be seen later.
 
 The abstraction approximates behaviour of a system for easier checking. For
-example checking whether there is an assignment of $\pi$ to some variable, the
-analyzer simply looks for assignments and $\pi$. Any other code is irrelevant
-and may be ignored. In the best case, all the unneeded details of the system
-are thrown away.
+example checking whether there is an assignment of $\pi$ to a variable no
+matter where, the analyzer simply looks for assignments and $\pi$. Any other
+code is irrelevant and may be ignored in the abstraction. In the best case,
+all the unneeded details of the system are thrown away and only relevant parts
+remain.
 
 However, usually the abstraction is not as good as that and checking becomes
 unsound often. As a response, false positives start to occur. They might be
 beaten either by revisiting the error, generating input and pass that to the
 system dynamically or finally, narrowing the abstraction. On the other hand,
-the computation may last too long and seem to never finish. That might mean
+the computation may last too long and seem to never finish. It might mean
 that the abstraction is too detailed, so it should be widened to lose more
 details. For these operations a formalization exists and will be mentioned in
-Section~\ref{cousot}.
+Section~\ref{cousot}. The thesis will be based on the top of that work.
 
 With some level of abstraction settled, an analysis method over abstraction is
 still to be chosen. Some chose to find patterns in the code in some specified
 manner (similarly to \textsc{xgcc}), others sticked to test cases generation
-which try to cover the most of the code (covering both true and false branches
-of each branching).
+which try to cover the most of the code (executing both true and false
+branches of each branching).
 
 Many tools were developed based on either approach, the methodologies may be
 also intertwined to produce better results. Further, some add another
@@ -124,11 +128,13 @@ to the methods and their use in currently known mainstream tools.
 
 \paragraph{Symbolic Execution}
 Now, let us aim at \emph{Symbolic Execution} (SE). SE uses external theory
-solvers to decide whether some paths in the code are feasible. Thus it
-eliminates many false positives, because they are often caused by traversing
-infeasible paths in the code. Static checker not based on SE usually have
-minimal chances to catch such behavior except matching patterns in consequent
-branching.
+solvers to decide whether (statically) executed paths in the code are
+feasible. Thus it eliminates many false positives, because they are often
+caused by traversing infeasible paths in the code. Static checker not based on
+SE usually have minimal chances to catch such behavior except matching
+patterns in consequent branching and it does not work well e.g. for
+with switched operands (\texttt{if (a < b)} equals to \texttt{if (b > a)}) and
+similar.
 
 Many studies tried to apply the principle on a variety of userspace programs.
 First symbolic executors primarily aimed at tests generation that would cover
@@ -154,10 +160,13 @@ the thesis intent (Section~\ref{intent}).
 Symbolic execution has shown its power in finding errors in userspace programs
 in the past decade. The idea of applying the approach to the kernel is
 straightforward extension, however it is not as easy task as it might seem.
-For successful SE kernel analysis few basic steps are necessary: (a)
-processing the kernel code, (b) finding the right properties to check, (c)
-finding them in the processed result and (d) verify if they hold. This process
-is depicted in Figure~\ref{fig_code_process}.
+The same as for userspace programs, for successful SE kernel analysis few
+basic steps are also necessary: (a) processing the kernel code, (b) finding
+the right properties to check, (c) finding them in the processed result and
+(d) verify if they hold. This process is depicted in
+Figure~\ref{fig_code_process}. The dashed line there shows a dependence of
+specification on the source code. Patterns to find (as a part of point (c))
+usually need to be specified in some representation of intermediate language.
 
 \begin{figure}[htb]
 \begin{center}
@@ -167,39 +176,55 @@ is depicted in Figure~\ref{fig_code_process}.
 \end{center}
 \end{figure}
 
-There are already many tools we can use as a base for each of the step.
-\textsc{Exe} was successful in all three for picked parts of the kernel.
-Mostly the parts were not subject to a user input or special instructions.
-There is still a missing tool which would run SE on kernel thoroughly and
-independent on sybsystem. Also the tools (\textsc{Exe} including) also do not
-use portable intermediate languages or other part of system (e.g. solver).
+There are already many pieces of tools which can be used as a base for each of
+the drawn step. \textsc{Exe} was successful in all four for picked parts of
+the kernel. But mostly the parts were not subject to a user input or special
+instructions. There is still no tool which would run SE on kernel thoroughly
+and independent on sybsystem. Also the tools (\textsc{Exe} including) also do
+not use portable intermediate languages or other part of system (e.g. solver).
 
-The dissertation should lead to a complete implementation of the mentioned and
-finding errors with minimum false positives. All of that with minimal input of
-user (except additional checking properties) and with forward portability to
-not be blocked by underneath layers (solvers, languages, front-ends) and their
-versions in the future.
+To fill this space, the dissertation should lead to a complete implementation
+of the mentioned points and should find errors with minimum false positives.
+All of that with minimal input of user (except specification of additional
+checking properties) and with forward portability to not be blocked by
+underneath layers (solvers, languages, front-ends) and their versions in the
+future.
 
-%\paragraph{Methods of Solving the Problem; Comparison of Key Results}
+Specifically, the dissertation should aim at checking user's input and check
+whether there are proper tests, so that it cannot be used for exploiting or
+crashing the system rather easy. The input may come from several sites. There
+are many exploits known to abuse system calls such as
+in~\cite{exploit_vmsplice,exploit_proto_ops,exploit_tun}\footnote{See other
+reports at \url{http://nvd.nist.gov}.}. Similarly, writes to special files or
+even remotely by sending packets with special structure over network may be
+abused for attacks. The attacks often leads to gaining administrator
+privileges on the local system or for a system crash -- the denial of service.
+
+In other words, finding security holes should be its primary aim to disallow
+the described attack as much as possible. At that phase, the tool will not
+be limited to check user input only, but also well-known errors (such as
+NULL-pointer dereferences) inside the kernel.
+
 \paragraph{Thesis Base} There is a wide set of tools for static analysis
 already out there. By now, we\footnote{at Institute of Theoretical Informatics
-at the Faculty of Informatics} contributed a free (open-source) tool called
-\stan. Some of its parts will be a start-point for a SE tool. For example
-batch execution overtaken from \textsc{Sparse}, specifying properties from
-\textsc{xgcc} and graphical interface inspired by \textsc{FindBugs}. \stan\
-and its functionality is characterized in Section~\ref{stanse}.
+at the Faculty of Informatics} contributed by a free (open-source) tool called
+\stan. Some of its parts will be a start-point for a SE tool developed in the
+scope of the thesis. For example all of batch execution overtaken from
+\textsc{Sparse}, specifying properties from \textsc{xgcc} and graphical
+interface inspired by \textsc{FindBugs} may be reused from \stan. \stan\ and
+its functionality is characterized in Section~\ref{stanse}.
 
-This is not enough, since \stan\ is not an executor. Hence e.g. \textsc{Klee}
-and its well-portable code processing may be reused with a limited support of
-x86 assembly presented in \textsc{Sage}.
+This is not enough, since \stan\ is not an symbolic executor. Hence e.g.
+\textsc{Klee} and its well-portable code processing may be ported with a
+limited support of x86 assembly presented in \textsc{Sage}.
 
 Unfortunately some principles were captured in papers, but their
 implementation is not freely available. It is because they were implemented in
 commercial tools. These methods should be either avoided or reimplemented
 under some permissive license.
 
-Of course, the main ideas of presented techniques will be covered in the next
-chapter.
+Of course, the main ideas of techniques presented in these paragraphs will be
+covered in the next chapter.
 
 \newpage
 
@@ -803,38 +828,43 @@ of other approaches and techniques.
 
 \paragraph{Dynamic Testing}
 Dynamic testing was here since first programs were written. They are fed by
-random inputs, a kind of black-box testing~\cite{random1,random2,random3}.
-Unit testing is a clear opposite. Programmer tries to use the knowledge of
-what the code does and writes a testbed for his implementation to test as many
-paths as possible.
+random inputs, a kind of black-box testing in~\cite{random1,random2,random3}
+or unit-tested. It is a clear opposite. A programmer tries to use the
+knowledge of what the code does and writes tests for his implementation to
+test as many paths as possible and for each unit/module.
 
-Programmers often instrument their code with conditional (debug-only) fault
-injections. For example allocators may return an error instead of returning
-correctly allocated memory even if there is enough of memory. It helps to
-cover corner cases in the code.
+Sometimes, programmers instrument their code with conditional (debug-only)
+fault injections. For example allocators return an error instead of correctly
+allocated memory even if there is enough of memory. It helps to cover corner
+cases in the code.
 
-Specifications may reveal many bugs when converted to grammars and utilized to
-generate inputs like in~\cite{grammar1,grammar2,grammar3}.
+Some code have specification created during the development cycle. They may
+reveal many bugs when converted to grammars and utilized to generate inputs
+like in~\cite{grammar1,grammar2,grammar3}.
 
 \paragraph{Model Checking} Opposing to checkers, model checking (MC) tries
 to \emph{prove}, that checked programs satisfy a particular property according
 to specification. We are not trying to achieve such goals, because MC (a)
 suffers from state space explosion and hence lasts long often; (b) need
-precise models. On the other hand, it reports no false positive errors.
+precise models. On the other hand, it reports no false positive errors if the
+model is precise enough.
 
-A comprehensive overview of Microsoft MC tools with further links and
+A comprehensive overview of Microsoft's MC tools with further links and
 technical details about \textsc{Slam} and \textsc{SDV} is in~\cite{slam}. It
-has found many errors in Windows Device Drivers. \textsc{Slam}-based tool that
-is supplied with lazy abstraction is \textsc{Blast}~\cite{blast}. A model
+has found many errors in Windows Device Drivers. A \textsc{Slam}-based tool
+that is supplied with lazy abstraction is \textsc{Blast}~\cite{blast}. A model
 there is very coarse at the beginning and is narrowed even after it is
 necessary and only at places which needs that. It lowers time and space spent
 on run.
 
-The two were picked of plenty abstraction-based model checkers because of
+The two were picked from plenty of abstraction-based model checkers because of
 summary papers provided. Reader will be directed for further reading there.
 
-There exist many of execution-based tools. Let us mention
-\textsc{Spin}~\cite{spin}, a widely used formal verification tool in present.
+Instead of direct MC, some tools generate a source code from the original
+sources and a temporal model. The generated code represents a part of temporal
+model, so it is compiled and run. For a representative of this category, let
+us mention \textsc{Spin}~\cite{spin}, presently a widely used formal
+verification tool with many MC improvements.
 
 \paragraph{Kernel and Model Checking} \label{mc_kernel} Similarly to
 Section~\ref{exe_kernel}, three filesystem implementations were verified. This
@@ -950,7 +980,6 @@ exactly that purpose:
 \item \textbf{buildsystem support}
 \item \textbf{compiler} -- generating AST, CFG, code splitting speedup
 \item \textbf{UnitManager} -- streaming of code (dropping unnecessary structures)
-\item \textbf{ReachabilityChecker} -- finds unreachable statements
 \item \textbf{checker specification} -- mostly for kernel: locking,
 memory, atomicity and operation pairing; but also augmented memory one for
 userspace
@@ -959,6 +988,7 @@ for some code constructs, added some time constraints), apply that and report
 errors
 \item \textbf{false positive detectors} -- many killers of false positive
 generated by \stan\ when run on kernel
+\item \textbf{ReachabilityChecker} -- finds unreachable statements
 \item \textbf{web interface} -- easy access for generated errors
 \item helped Marek to implement some features, so-called feature requests to
 his code
