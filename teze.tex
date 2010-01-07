@@ -39,7 +39,7 @@
      \logo SL
 
      \vspace{2cm}
-     {\bf\huge Automatic Symbolic Execution on OS Kernels}\\[0.8in]
+     {\bf\huge Automatic Bugfinding Techniques on Linux Kernel}\\[0.8in]
 
      {\sc\large Dissertation Thesis Topic}\\[0.4in]
 
@@ -245,8 +245,9 @@ in general undecidable, hence they also define narrowing and widening
 techniques if the system of equations does not approach convergence when
 computing a fixpoint.
 
+\subsection{Current Tools Overview}
 \label{tools}
-Cousots laid down the foundation for others, however the principle was brought
+Cousots laid down the foundation for others, but the principle was brought
 to interest even after 2000. It was thanks to work of Engler et al. on a meta
 compilation based technique described in~\cite{metacomp}. System developers
 there specify properties of the system in \textsc{metal}~\cite{metal} language,
@@ -270,10 +271,11 @@ static analysis, according to developers. Currently it analyses many
 production systems including the Linux kernel on a daily
 basis\footnote{\url{http://marc.info/?l=linux-kernel&m=125856033627134&w=2}}.
 
-Programming languages supported by the mentioned Engler's tools are C and C++.
+Programming languages supported by the mentioned Engler's tools are C, C++,
+C\# and Java.
 
-Aside from Engler's work, Klocwork~\cite{klocwork} started to develop their
-bug-finding static analysis tools in 2003. Currently they, as same as
+Aside from Engler's work, Klocwork started to develop their bug-finding static
+analysis tools (\cite{klocwork}) in 2003. Currently they, as same as
 Coverity, find errors in many production projects. In addition to C/C++,
 Klocwork products are able to parse Java and C\# programs as well. They seem
 to be world number two in code analysis.
@@ -300,18 +302,17 @@ checks which would, without the annotations, generate many false positives).
 \label{sparse}
 Later, tools dedicated for a \emph{single purpose or project} emerged.
 Specifically for the Linux kernel purposes, \textsc{Sparse}~\cite{sparse} was
-developed.  For example it watches pointer usage on user- and kernel-space
-interface (they must not be interweaved) or uses of remapped I/O memory (has
-to be dereferenced via special helpers) and similar, kernel specific,
-properties. All the mentioned has no use other than in the kernel.
-\textsc{Sparse} is widely used by kernel developers and many \textsc{Sparse}
-errors are fixed in each kernel release cycle\footnote{For instance, over 20
-of \textsc{Sparse} errors were fixed (since 2.6.31) in 2.6.32.}. Let me note,
-that since this tool is able to check whole kernel, it is capable to parse
-most of GNU~C extensions described in~\cite{gcc}. It is distributed with a
-system that intercepts build process (\texttt{make}) and is able to eavesdrop
-command-line for compiler.  This is then used to preprocess sources and check
-them in the next step.
+developed.  For example it reports use of zero as a \texttt{NULL} pointer,
+casts which truncate constants and other, kernel specific, properties (see
+Section~\ref{sparse-detail}. All the mentioned has no use other than in the
+kernel. \textsc{Sparse} is widely used by kernel developers and many
+\textsc{Sparse} errors are fixed in each kernel release cycle\footnote{For
+instance, over 20 of \textsc{Sparse} errors were fixed (since 2.6.31) in
+2.6.32.}. Let me note, that since this tool is able to check whole kernel, it
+is capable to parse most of GNU~C extensions described in~\cite{gcc}. It is
+distributed with a system that intercepts build process (\texttt{make}) and is
+able to eavesdrop command-line for compiler.  This is then used to preprocess
+sources and check them in the next step.
 
 From a different point of view, static checkers need not to be only
 \emph{dedicated programs}. \textsc{Clang}~\cite{clang} compiler contains a
@@ -744,9 +745,9 @@ stable version is 2.6, all facts drawn here are with regard to this release.
 From the beginning, compilers have a \texttt{--emit-llvm} parameter which
 gives us a LLVM code. Each file will be generated to a separate file. However
 it is still possible to have the code all-in-one. For that purpose
-\texttt{llvm-link} and \texttt{llvm-ld}. They differ only in details. When all
-files are linked together it is one single LLVM code which external tools
-accept as input.
+\texttt{llvm-link} and \texttt{llvm-ld} exist and differ only in details.
+When all files are linked together it is one single LLVM code which external
+tools accept as input.
 
 The input is handled through LLVM framework. It is written and exported in C,
 C++ and Ocaml languages which designates the tool to be written in one of
@@ -761,18 +762,16 @@ comparison of described SE tools.
 \begin{tabular}{l|cccll}
 \multirow{2}{*}{Tool name} &
 Mixed &
-b &
-c &
 \multirow{2}{*}{Base} &
 \multirow{2}{*}{Languages} \\
-%Tool name    & Mixed    & Confi-  & Batch   & Base   & Languages
-	      & analysis &         &         &        & \\ \hline
-\textsc{Dart} & yes      &         &         & CIL~\cite{cil} & C \\
-\textsc{Pex}  & yes      &         &         & .NET   & .NET \\
-\textsc{Cute} & yes      &         &         & CIL    & C \\
-\textsc{Exe}  & yes/no$^*$ &         &         & n/a$^\dagger$ & C \\
-\textsc{Klee} & no       &         &         & LLVM   & C$^\ddagger$ \\
-\textsc{Sage} & no       &         &         & x86    & n/a$^\circ$ \\
+%Tool name    & Mixed    & Base   & Languages
+	      & analysis & \\ \hline
+\textsc{Dart} & yes      & CIL~\cite{cil} & C \\
+\textsc{Pex}  & yes      & .NET   & .NET \\
+\textsc{Cute} & yes      & CIL    & C \\
+\textsc{Exe}  & yes/no$^*$ & n/a$^\dagger$ & C \\
+\textsc{Klee} & no       & LLVM   & C$^\ddagger$ \\
+\textsc{Sage} & no       & x86    & n/a$^\circ$ \\
 \hline
 \multicolumn{6}{l}{\footnotesize $^*$It does not ask concrete execution about
 unreasonable constraints,} \\
@@ -790,19 +789,29 @@ compiled to a x86 binary may be checked.}
 \end{figure}
 
 \subsection{Kernel Checking Status}
-\textsc{Sparse}
+\label{sparse-detail}
+It was already stated in the Section~\ref{sparse}, that kernel is already
+being checked by static tools, namely by \textsc{Sparse}. Few simple examples
+of checks were given in that section too. Above that the tool can watch
+pointer usage on user- and kernel-space interface, since they must not be
+interweaved, or uses of remapped I/O memory which has to be dereferenced via
+special helpers. A complete list is available in \textsc{Sparse}'s manual
+(\texttt{man}) page.
 
-T. Ball and S. Rajamani. Automatically validating temporal safety properties
-of interfaces. In SPIN 2001 Workshop on Model Checking of Software, May 2001.
-
-M. Musuvathi and D.  R. Engler. Model checking large network protocol
-implementations.
+There was also a thesis~\cite{kernel_master_thesis}, in which they use
+concurrent processes for modeling kernel behaviour in some special cases.
+It was successful in checking whether resources such as interrupts and queued
+works are properly initialized before their use.
 
 \subsubsection{Exe and Kernel}
 \label{exe_kernel}
-\textsc{Exe} was used for testing picked parts of Linux kernel. Specifically,
-three filesystems were checked in~\cite{exe_fs}. A disadvantage of
-\textsc{Exe} is that it has to run as a standard system process to be
+The approaches above were not based on SE and often generate false positives
+or does not report real errors due to their property of dropping them because
+of high false positive rate in particular cases.
+
+Even \textsc{Exe} was used for testing picked parts of Linux kernel.
+Specifically, three filesystems were checked in~\cite{exe_fs}. A disadvantage
+of \textsc{Exe} is that it has to run as a standard system process to be
 clone-able by \texttt{fork} (compare to the description earlier). They tried
 to exempt pieces of code relevant to the filesystem and use them in userspace
 first, but they failed. It is because the code was still dependent on the rest
@@ -821,7 +830,7 @@ on demand. I.e. when the kernel asks for a block, it is made symbolic. This
 allows the tool to run quickly, as relevant metadata are stored only in few
 blocks.
 
-\subsection{Related Work}
+\subsection{Other and Related Work}
 Static analysis is indeed a wide area and I have not named all tools and
 algorithms currently available and known. This section provides quick overview
 of other approaches and techniques.
@@ -902,9 +911,9 @@ as their sources. The thesis will solve this problem. Optimized functions like
 \texttt{memcpy} and \texttt{strcpy} should be replaced by non-optimized ones
 to have easier SE.
 
-Further, some primitive inlined assembly should be handled as well. In the
-sequel, calls like \texttt{put\_user}, \texttt{get\_user} should be recognized
-either on assembly level or handled even in preprocessor. They make sure that
+Further, some primitive inlined assembly should be handled as well. As a
+result, calls like \texttt{put\_user}, \texttt{get\_user} should be recognized
+either on an assembly level or handled even in preprocessor. They make sure that
 user's pointer is correct and hence the tool should check if they are used on
 a user- and kernel-space boundary every time.
 
@@ -922,14 +931,15 @@ for example using user's pointer without the functions specified above.
 \paragraph{Finding Error Patterns}
 When the patterns and definitions are ready, the tool has to able to find them
 in the code and report an error, when some violation occurs. The base for this
-should be either \textsc{Klee} or better the Marek Trtik's dissertation. He
+should be either \textsc{Klee} or better the Marek Trtík's dissertation. He
 plans to come up with faster algorithm and its open-source implementation. Let
 us \textsc{Klee} consider as a fallback due to its speed, as it is not
 primarily used for finding bugs, but rather a high code coverage.
 
-The drawn process should be as much automatic as possible. Unlike in
+The process above should be as much automatic as possible. Unlike in
 \textsc{Exe}, where programmers need to set up a userspace virtual machine and
-write his own drivers as a disk simulation. The tool should recognize .
+write his own drivers as a disk simulation. The tool should recognize the
+patterns in the code in an automatic way.
 
 Most functions in each driver might run concurrently. The dissertation should
 cover implementation of support for threads and some properties which should
@@ -951,7 +961,7 @@ examination, working code processing
 simple violations
 \item autumn 2011 -- fully working prototype of automatic symbolic executor on
 kernel which is capable to find errors
-\item spring 2012 -- dissertation finishing and defense
+\item spring 2012 -- dissertation write-up and defense
 \end{itemize}
 
 \newpage
@@ -969,7 +979,7 @@ During the first year of doctoral study I studied papers with results of past
 researches in the area of code analysis and testing. Also I read through some
 literature about static analysis and compilers.
 
-Under \emph{ITI}, we developed \stan, a static analysis tool written in Java.
+At \emph{ITI}, we developed \stan, a static analysis tool written in Java.
 We are currently in the process of submission of two papers about \stan.
 
 \subsection{My Work On Stanse}
@@ -990,8 +1000,6 @@ errors
 generated by \stan\ when run on kernel
 \item \textbf{ReachabilityChecker} -- finds unreachable statements
 \item \textbf{web interface} -- easy access for generated errors
-\item helped Marek to implement some features, so-called feature requests to
-his code
 \item and many bugfixing
 \end{itemize}
 
