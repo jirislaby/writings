@@ -130,12 +130,12 @@ generation. The test cases try to cover the most of the code (executing both
 true and false branches of each branching).
 
 Many tools were developed based on either approach, the methodologies may be
-also intertwined to produce better results. Further, some add another
-principles such as symbolic execution. Section~\ref{tools} introduces a reader
-to the methods and their use in currently known mainstream tools.
+also intertwined to produce better results. Section~\ref{tools} introduces a
+reader to the methods and their use in currently known mainstream tools.
 
-\paragraph{Symbolic Execution}
-Now, let us aim at \emph{Symbolic Execution} (SE). SE uses external theory
+\paragraph{Symbolic Execution} Besides the mixing of the techniques above,
+some add another principles such as \emph{Symbolic Execution} (SE). Currently,
+it seems to be a promising code analysis form. SE uses external theory
 solvers to decide whether (statically) executed paths in the code are
 feasible. Thus it eliminates many false positives, because they are often
 caused by traversing infeasible paths in the code. Static checkers not based
@@ -145,7 +145,7 @@ operations with switched operands (\texttt{if (a < b)} equals to \texttt{if (b
 > a)}) and similar.
 
 Many studies tried to apply the principle on a variety of userspace programs.
-First symbolic executors primarily aimed at tests generation that would cover
+First symbolic executors mostly aimed at tests generation that would cover
 as many program instructions as possible (\textsc{Exe}, \textsc{Klee}). The
 tests are then run dynamically, which has already mentioned advantages.
 Concurrently, some researches started to employ SE in cooperation with
@@ -157,14 +157,32 @@ the work done in this area.
 Although \textsc{Exe} already experimented with applying SE on parts of an
 operation system kernel (further only \emph{kernel}), to the best of my
 knowledge nobody ever executed kernel in a fully-automatic manner without a
-necessity of configuring large testbed.
+necessity of configuring a large testbed.
 
 The task of SE to be run on a kernel incorporates not only the execution
 itself, but some kind of code preparation, compilation and linking. These
 terms will be discussed further in the text (Section~\ref{llvm}) and also in
 the thesis intent (Section~\ref{intent}).
 
-\subsection{Intention of Thesis}
+\subsection{Kernel Code}
+Deduced from the topic title, the thesis will primarily aim at checking the
+kernel code. However, the code is very specific in few ways and needs special
+handling. If we do not count virtual machines\footnote{Section~\ref{exe_kernel}
+mentions their use for kernel checking, but we do not think it is the best way
+as we will see later.}, the very difference is probably that it does not run
+as a regular task.
+
+It has several consequences: (a) it cannot be stopped and restarted at will,
+(b) it cannot be forked to run multiple kernels in parallel and (c) when run
+dynamically, it crashes whole system if something bad occurs during testing.
+
+From the source code perspective, the kernel is similar to user applications,
+but with an advantage. The kernel source code is self-containing. All
+functions are present and may be found on demand. This may help the analysis
+in that there are no black boxes to deal with.
+
+Special care should be taken even on what to check in the kernel. The most
+interesting properties are to check whether inputs may crash the whole system.
 Input passed down to the kernel may come from several sites. Most of them are
 untrustworthy and must be properly checked for bogus data. There are many
 exploits known to abuse \emph{system calls} this way such as
@@ -175,9 +193,11 @@ remotely may be abused for attacks. The attacks often lead to gaining
 administrator privileges on the local system or to a system crash -- the
 denial of service.
 
-Specifically, the dissertation should aim at checking user's input and check
-whether there are proper tests in the code, so that it cannot be used for
-exploiting or crashing the system rather easy.
+\subsection{Intention of Thesis}
+The previous paragraphs mentioned what can injected data from user cause to
+the kernel. The dissertation should aim at the input from user or hardware
+(network) and check whether there are proper tests in the code, so that it
+cannot be used for exploiting or crashing the system rather easy.
 
 In other words, finding security holes should be dissertation's primary aim to
 disallow the described attacks as much as possible. At that phase, the tool
@@ -209,8 +229,8 @@ each of the drawn step. \textsc{Exe} was successful in all four for picked
 parts of the kernel. But mostly the parts are not subject to a user input or
 special instructions. There is still no tool that would run SE on a kernel
 thoroughly and independently on sybsystem. Also the tools (\textsc{Exe}
-including) do not use portable intermediate languages or other parts of
-system (e.g. solver).
+including) do not use portable intermediate languages or other parts of the
+system (e.g. a solver).
 
 To fill this gap, the dissertation should lead to a complete implementation
 of the mentioned points and should find errors with minimum false positives
@@ -237,9 +257,6 @@ Unfortunately some principles were captured in papers, but their
 implementation is not freely available. It is because they were implemented
 only in commercial tools. These methods should be either avoided or
 reimplemented under some permissive license.
-
-%Of course, the main ideas of techniques presented in these paragraphs will be
-%covered in the next chapter.
 
 \newpage
 
@@ -339,11 +356,11 @@ All previous open-source tools are configurable only to some extent. There is
 no way of specifying a new check except changing the sources.
 \textsc{Uno}~\cite{uno} is a \emph{fully configurable} tool. It allows user to
 specify for what type of bugs should the checker look for. Of course there are
-predefined ones (e.g. use of uninitialized variables), but they can be easily
-augmented. \textsc{Uno} is the only open-source tool from these with a support
-of \emph{inter-procedural analysis}. Unfortunately its parser does not even
-support full ANSI C99~\cite{ansi_c}\footnote{Minimal input to demonstrate that
-is \texttt{\_Bool b;}.}.
+predefined ones (for illustration a use of uninitialized variables), but they
+can be easily augmented. \textsc{Uno} is the only open-source tool from these
+with a support of \emph{inter-procedural analysis}. Unfortunately its parser
+does not even support full ANSI C99~\cite{ansi_c}\footnote{Minimal input to
+demonstrate that is \texttt{\_Bool b;}.}.
 
 Still, some tools are hard to use. There is one exception called
 \textsc{FindBugs}~\cite{findbugs}. To the best of my knowledge it is the most
@@ -485,10 +502,10 @@ for example of SM representing states of pointers in C. Transitions are
 performed by a code matching against patterns (\texttt{alloc}, \texttt{free}
 etc.).
 
-For instance, if the automaton is in the initial/freed (I/F) state and there
-is a pointer dereference in the code, the error state is reached and the
-incident reported. From I/F, there are also two allocation arcs. It is
-because the allocation may fail, so to cover the both cases.
+For illustration, if the automaton is in the initial/freed (I/F) state and
+there is a pointer dereference in the code, the error state is reached and the
+incident reported. From I/F, there are also two allocation arcs. It is because
+the allocation may fail, so to cover the both cases.
 
 Aside from dereferences, the automaton reports an error when memory is leaked.
 In this case a valid memory is lost by another allocation (the bottom-down
@@ -795,7 +812,7 @@ briefly introduce the toolkit here. Current stable version is 2.6, all facts
 drawn here are with regard to this release.
 
 To obtain a LLVM code, compilers understand a \texttt{--emit-llvm} parameter.
-Although the LLVM code is generated in a separate file for each source file,
+Although the LLVM code is generated to a separate file for each source file,
 it is still possible to have the code all-in-one. For that purpose
 \texttt{llvm-link} and \texttt{llvm-ld} exist and differ only in details.
 When all files are linked together it is one single LLVM code which external
@@ -870,11 +887,17 @@ virtually runs kernel as a userspace process which exactly matches
 \textsc{Exe}'s needs. The adaptation is a reuse of their past work on a kernel
 Model Checking (see Section~\ref{mc_kernel}).
 
-There was still a problem to cope with. Minimal input for checked filesystems
-was 16\,MiB. The solution is to handle the filesystem image symbolically only
-on demand. I.e. when the kernel asks for a block, it is made symbolic. This
-allows the tool to run quickly, as relevant metadata are stored only in few
-blocks.
+However, the use of virtual machine has a severe limitation. Many
+virtualizations do not allow direct access to the hardware. Hence, when
+performing a check similar to \textsc{Exe}, drivers for the hardware cannot be
+exercised.
+
+On the other hand, when focused to hardware independent parts, \textsc{Exe}
+showed that it may work. But there was still a problem they had to cope with.
+Minimal input for checked filesystems was 16\,MiB. The solution is to handle
+the filesystem image symbolically only on demand. I.e. when the kernel asks
+for a block, it is made symbolic. This allows the tool to run quickly, as
+relevant metadata are stored only in few blocks.
 
 \subsection{Other and Related Work}
 Static analysis is indeed a wide area. This section provides quick overview
@@ -939,83 +962,87 @@ as interrupts and queued works are properly initialized before their use.
 
 \section{Dissertation Thesis Intent}
 \label{intent}
-As mentioned in the Introduction, the intention is to apply static analysis on
-a kernel, possibly with a use of symbolic execution. Dissertation thesis
-should contain all the steps needed to perform the analysis to find errors in
-the code. From processing the code (compilation) towards recognizing error
-patterns specified by user and reporting them. All in an automatic manner,
-without a need of long establishing of a testbed and with minimal user's
-input. Now I will go into details of each phase and describe the ideas behind.
+As mentioned in the Introduction, the intention is to apply static analysis to
+the Linux kernel, possibly with a use of symbolic execution. Dissertation
+thesis should contain all the steps needed to perform the analysis to find
+errors in the code. From processing the code (compilation) towards recognizing
+error patterns specified by user and reporting them. All in an automatic
+manner, without a need of long establishing of a testbed like with
+\textsc{Exe}.
 
-\paragraph{Code Processing}
-For the convenience of users, we want to support makefile build system to
-obtain source code file list. Method used in \stan\ may be reused for this
-purpose to some extent. It originates from the way how \textsc{Sparse} was
-designed (cf. Section~\ref{sparse}). However instead of direct checking, and
-because of LLVM being chosen to be a base of the work, LLVM bytecode will be
-a secondary output from this phase.
+Since I plan to finish my doctoral studies in the \emph{Computer Systems and
+Technologies} programme, the main output will be a fully working open-source
+tool performing the bug-finding on the Linux kernel. As far as I know, there
+is no such tool that would perform automatically the following steps: (a) take
+kernel source codes with build system as input, (b) compile and link all the
+sources into portable and machine independent intermediate language (LLVM)
+without user intervention and (c) apply analyses that have low false positive
+rate.
 
-In addition, similar to \stan, a list of files is obtained as well. The list
-will be helpful when linking all files into a single LLVM file. This is the
-last necessary step in source code processing.
-
-Unlike in userspace, the generated kernel image should contain all functions
-called from the inside. Unfortunately, some of them are in assembly, the same
-as their sources. The thesis will solve this problem. Optimized functions like
-\texttt{memcpy} and \texttt{strcpy} should be replaced by non-optimized ones
-to have easier SE.
+In addition, there are problems yet to be solved. In spite of the generated
+kernel image contains all functions called from the inside, some of them are
+in assembly, inherited from their sources. The thesis will solve this problem,
+at least for selected functions. Optimized functions like \texttt{memcpy} and
+\texttt{strcpy} must be replaced by non-optimized ones (written in C) for
+easier analysis -- the more code is in the LLVM code the less assembly has to
+be specially handled by the analysis.
 
 Further, some primitive inlined assembly should be handled as well. As a
 result, calls like \texttt{put\_user}, \texttt{get\_user} should be recognized
 either on an assembly level or handled even in the preprocessor. They make
-sure that user's pointer is correct and hence the tool should check if they
-are used on a user- and kernel-space boundary properly and every time.
+sure that user's pointer is correct. That means the tool should check if
+they are used on a user- and kernel-space boundary properly and every time.
 
-\paragraph{Specifying Error Patterns}
-The tool should be fully configurable the same as \stan. It should contain a
-system for specifying the patterns. There should be utilities to support
-asserted code, instrumentation, specifying specially handled functions like
-\texttt{put\_user} and a definition of what to check for in them all.
+Some of the problems may be tackled down by known solutions already. \stan\ 
+contains build system support, it need to be adjusted to generate LLVM though.
+As well as compilation, the configuration present in \stan\ may be adopted.
+Additionally utilities to support asserted code, instrumentation (if needed),
+specification of specially handled functions like \texttt{put\_user} and
+definition of what to check in them all need to be added.
 
-Some of well-known patterns should be already predefined for the ease of use
-and quick start.
+Some of well-known patterns will be already predefined for the ease of use
+and demonstration of what the tool can do.
 
-Patterns should be distributed along with a definition of bad behaviour. It
-means for example that the functions for user pointer specified above
-(patterns) stand side by side with a dereference of user pointer (bad
-behaviour).
-
-\paragraph{Finding Error Patterns}
-When the patterns and definitions are ready, the tool has to able to find them
-in the code and report an error, when some violation occurs. For the SE based
-approach, the base for the tool should be either \textsc{Klee} or better the
-Marek Trtík's dissertation. He plans to come up with faster algorithm and its
-open-source implementation. Let us \textsc{Klee} consider as a fallback due to
-its speed, as it is not primarily used for finding bugs, but rather for a high
-code coverage.
-
-The process above should be as much automatic as possible. Unlike in
-\textsc{Exe}, where programmers need to set up a userspace virtual machine and
-write their own drivers as a disk simulation. The tool should recognize the
-patterns in the code in an automatic way.
+\paragraph{Code Analysis} We have not considered how to handle the LLVM code
+further. It was already mentioned, that SE is a promising technique. If the SE
+is the technique actually used in the tool, \textsc{Klee} or better the Marek
+Trtík's dissertation may be used as executors and error minors. Marek plans to
+come up with a faster algorithm than in \textsc{Klee}. \textsc{Klee} is
+considered only as a fallback due to its speed, as it is not primarily used
+for finding bugs, but rather for a high code coverage.
 
 Based on the fact, that the functions in the kernel might be called from
-different contexts and after different kind of events, major part of them might
-run concurrently. The dissertation will investigate possibilities of handling
-concurrent threads and find properties which may be checked there.
+different contexts and on response to different kind of events, major part of
+them might run concurrently. I am going to investigate possibilities of
+handling concurrent threads and find properties which may be checked there.
 
-After binding all the work together, even with use of SE, there still might be
-false positives. Thesis will aim at pruning them and consider techniques used
-e.g. in \textsc{xgcc}, because they allow to lower false positive rate in the
-order of magnitude.
+In principle, even with a use of SE, there still might be false positives.
+Thesis will aim at pruning them and consider techniques used for example in
+\textsc{xgcc}, because they allow to lower false positive rate in the order of
+magnitude.
 
-A possible approach may be also to compare two consequent results from two
-different versions of the kernel. I.e. when the initial version is checked and
-false positives marked by user, it is highly likely, that the later version
-contains the same false positives. Ability for matching errors between two
-versions (lines and function names may change) may prune more false positives
-and would not bother user with the same reports repeatedly. We think this
-was never implemented yet.
+A possible approach to bite false positives may be also to compare two
+consequent results from two different versions of the kernel. I.e. when the
+initial version is checked and false positives marked by user, it is highly
+likely, that the later version contains the same false positives. Ability for
+matching errors between two versions (lines and function names may change) may
+prune more false positives and would not bother user with the same reports
+repeatedly. I think this was never implemented yet.
+
+\paragraph{Collaboration} The tool development will not be a task for singles.
+An additional help from bachelor/master's students will be needed. Hence
+particular parts may lead to theses under my leadership. A good example may be
+investigating whether machine learning may be used for recognition of false
+positives in checker results.
+
+Further, because of our limited knowledge of the Linux kernel (it is a wide
+area), the tool will be discussed with kernel developers and possibly improved
+by their ideas. Specifically, it may help even in the enterprise kernel
+development. It means a cooperation with commercial subjects on improving the
+tool and checking their products before they are released.
+
+And last but not least, if there appear groups dealing with a similar problem,
+the cooperation will be helpful reciprocally.
 
 \subsection{Schedule}
 I plan to finish my Ph.D. studies by dissertation defence in the term spring
