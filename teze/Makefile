@@ -1,0 +1,32 @@
+TEX=latex
+
+all: teze.dvi
+pdf: teze.pdf
+ps: teze.ps
+bib: teze.bbl
+
+teze.dvi: teze.tex FORCE
+
+teze.tex: teze.bbl
+
+%.bbl: %.bib
+	latex $(patsubst %.bib,%.tex,$<)
+	bibtex $(subst .bib$,,$<)
+	latex $(patsubst %.bib,%.tex,$<)
+	latex $(patsubst %.bib,%.tex,$<)
+	@rm -f teze.{pdf,dvi,ps}
+
+%.pdf: %.tex FORCE
+	pdflatex $<
+
+%.ps: %.tex FORCE
+	pslatex $<
+	dvips $(subst .tex$,.dvi,$<) -o$@
+	rm $(subst .tex$,.dvi,$<)
+
+clean:
+	rm -f teze.{pdf,dvi,toc,aux,log,bbl,blg,ps,out}
+
+FORCE:
+
+.PHONY: FORCE
