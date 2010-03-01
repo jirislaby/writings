@@ -229,19 +229,26 @@ else
   \heading{Automaton Checker}
   \begin{itemize}
   \item Uses \emph{state automata} to describe erroneous behavior.
-  \item Finds locking, memory, reference count and other errors.
-  \begin{itemize}
-    \item Whatever can be described by SM can be also checked.
-  \end{itemize}
-  \item Highly variable thanks to XML configuration.
-  \begin{itemize}
-    \item Basic userspace configurations provided.
-    \item Kernel ones available too.
-  \end{itemize}
   \end{itemize}
   \begin{center}
     \input{locking.pspdftex}
   \end{center}
+
+  \pause
+
+  \begin{itemize}
+  \item Finds locking, memory, reference count and other errors.
+  \begin{itemize}
+    \item Whatever can be described by SM can be also checked.
+    \item E.g. lock imbalances, nested locking, AB-BA deadlocks, NULL
+      dereferences, sleep inside atomic, resource leaks etc.
+  \end{itemize}
+  \item Highly variable thanks to XML configuration.
+  \begin{itemize}
+    \item Basic userspace configurations provided.
+    \item Kernel ones available too (differ in function names defined).
+  \end{itemize}
+  \end{itemize}
 \end{frame}
   
 \begin{frame}
@@ -302,9 +309,52 @@ else
   \end{lstlisting}
 \end{frame}
 
+\begin{frame}[fragile]
+  \frametitle{Worked Example}
+  Having the configuration above and a project:
+  \begin{center}
+  \begin{tabular}{|l|l|} \hline
+  Source (\texttt{my.c}) & \texttt{Makefile} \\ \hline \hline
+  \begin{lstlisting}[language=C]
+void bad_locking(struct mutex *my_lock,
+                 int cond)
+{
+  mutex_lock(my_lock);
+  if (cond)
+    mutex_lock(my_lock);
+}
+  \end{lstlisting}
+  &
+  \begin{lstlisting}[language=make]
+CFLAGS=-Wall -O2
+CC=gcc
+
+all: my.o
+  \end{lstlisting} \\ \hline
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \textsc{Stanse} can find bugs: \\
+{\scriptsize\texttt{%
+\textcolor{red}{\$ stanse -c AutomatonChecker:conf.xml $--$makefile
+'Makefile'} \\
+\pause
+Error(s) found: \\
+my.o.preproc, line 6: $\{$AutomatonChecker of conf.xml$\}$ in function 'bad\_locking' double lock [traces: 1] \\
+trace [locations: 4] \\
+start[file: my.o.preproc, line: 4] \\
+middle[file: my.o.preproc, line: 5] \\
+middle[file: my.o.preproc, line: 5] \\
+end[my\_lock][file: my.o.preproc, line: 6] \\
+}}
+
+\end{frame}
+
 \begin{frame}
 \frametitle{Tools comparison}
-
+\heading{There are many tools available, some of them are compared here}
 \begin{tabular}{l|ccccl}
 \multirow{2}{*}{Tool name} &
 Open- &
@@ -341,26 +391,28 @@ even implement full C99.} \\
 
   \pause
   \medskip
+
   \heading{Linux kernel}\\
-  Over 70 of the following kind of errors:
+  Over 70 of the following kind of errors (reported and fixed):
   \begin{itemize}
-  \item unreachable code
-  \item pointer usage violations
-  \item locking discipline errors
+  \item Pointer usage violations
+  \item Locking discipline errors
     \begin{itemize}
-    \item i.e. potential real-world deadlocks
+    \item I.e. potential real-world deadlocks (an example follows).
     \end{itemize}
-  \item function pairing
+  \item Function pairing
     \begin{itemize}
-    \item e.g. get\_cpu/put\_cpu, interrupt disable/enable, etc.
+    \item E.g. get\_cpu/put\_cpu, interrupt disable/enable, etc.
     \end{itemize}
+  \item Unreachable code
   \end{itemize}
 
   \pause
   \medskip
+
   \heading{Other code}
   \begin{itemize}
-  \item CESNET (Czech backbone) project.
+  \item CESNET (Czech backbone) project developing HW accelerators.
   \item Small libraries/tools (acl, attr).
   \end{itemize}
 \end{frame}
@@ -386,8 +438,8 @@ static int set_lock_status(struct hotplug_slot *hotplug_slot,
 }
   \end{lstlisting}
 
-  Taken from Linux v2.6.28, \\
-  \texttt{drivers/pci/hotplug/pciehp\_core.c}.
+  Source: \texttt{\small linux-2.6.28/drivers/pci/hotplug/pciehp\_core.c} \\
+  Trigger: \texttt{\small echo '1' > /sys/bus/pci/slots/.../lock} twice in 1s
 
   \pause
   \bigskip
@@ -395,53 +447,40 @@ static int set_lock_status(struct hotplug_slot *hotplug_slot,
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{False Positives}
-  \begin{itemize}
-  \item Oscillating between 30 and 70\%.
-  \item Stemming out of:
-  \begin{itemize}
-    \item Wrongly specified checkers.
-    \begin{itemize}
-      \item Too simple/naive automata.
-    \end{itemize}
-    \item All real errors evicted, only FP remains.
-    \item Inappropriate (non-sophisticated) techniques.
-  \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
 \begin{frame}[fragile]
-  \frametitle{Fighting FP}
+  \frametitle{False Positives}
+  Oscillating between 30 and 70\% -- depending on checker and source codes,
+  but quite high.
+
+  \medskip
+  \pause
+
+  \heading {Fighting FP}
   \begin{itemize}
   \item Improving configuration.
   \begin{itemize}
-    \item The quality is important and reflects directly in FP ratio.
-    \item Bugs in the configuration.
+    \item The quality is important and alters directly the FP-to-bugs ratio.
+      \begin{itemize}
+      \item Too naive automata results in high FP ratio.
+      \end{itemize}
+    \item Prune bugs in the configuration proper.
     \item Tune-up based on previous results.
   \end{itemize}
-  
-  \item FP detectors are Java code finding certain patterns.
+\pause
+  \item FP detectors: a Java code finding certain patterns.
   \begin{itemize}
-    \item For example tracking of condition \texttt{cond}:
+    \item E.g. leaks of memory pointer by globals are mostly a FP.
   \end{itemize}
-  \end{itemize}
-  \begin{lstlisting}[language=C]
-  if (cond) lock();
-  if (cond) unlock();
-  \end{lstlisting}
-
+\pause
+  \item Better or new analyses/checkers.
   \begin{itemize}
-  \item And of course better analyses/checkers.
-  \begin{itemize}
-    \item E.g. those based on symbolic execution.
+    \item Inappropriate (non-sophisticated) techniques.
+      \begin{itemize}
+      \item E.g. no bugs of such type present in the code.
+      \end{itemize}
+    \item Symbolic execution or simple simulation to ensure the
+      paths are reachable.
   \end{itemize}
-  \end{itemize}
-
-  \heading{Execute traces?}
-  \begin{itemize}
-  \item Executing error traces to ensure the paths are reachable.
   \end{itemize}
 
 \end{frame}
@@ -451,7 +490,7 @@ static int set_lock_status(struct hotplug_slot *hotplug_slot,
   \heading{Points-to analysis (Master's thesis)}
   \begin{itemize}
   \item Improves knowledge about values in pointers for more exact analyses.
-  \item Memory checker will know which pointers points to the same objects.
+  \item Memory checker knows which pointers point to the same objects.
   \end{itemize}
 
   \pause
@@ -479,10 +518,10 @@ static int set_lock_status(struct hotplug_slot *hotplug_slot,
   \heading{Symbolic execution}
   \begin{itemize}
   \item Part of Marek's and my dissertation.
-  \item Needn't be part of Stanse.
+  \item Needn't be part of \textsc{Stanse}.
     \begin{itemize}
-    \item Still not decided whether it will be "Stanse 2.0" or a stand-alone
-      tool.
+    \item Not decided whether it will be "\textsc{Stanse} 2.0" or a
+      stand-alone tool.
     \end{itemize}
   \end{itemize}
 \end{frame}
@@ -525,7 +564,8 @@ static int set_lock_status(struct hotplug_slot *hotplug_slot,
 \begin{frame}
   \frametitle{Conclusion}
   \begin{itemize}
-  \item Stanse is still in the \emph{early phase} (read: still much work to do).
+  \item \textsc{Stanse} is still in the \emph{early phase} (read: still much
+    work to do).
     \begin{itemize}
     \item There is work in progress.
     \end{itemize}
