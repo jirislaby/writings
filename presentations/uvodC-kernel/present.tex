@@ -1,0 +1,194 @@
+% vim: ai sw=2
+
+\documentclass[handout,xcolor=dvipsnames]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice. 
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[Stanse] % (optional, use only with long paper titles)
+{Výlet do jádra Linuxu}
+
+% \subtitle
+% {Include Only If Paper Has a Subtitle}
+
+\author[J. Slabý]{\emph{Jiří~Slabý}}
+
+\institute[FI] % (optional, but mostly needed)
+{Fakulta Informatiky, Masarykova Univerzita}
+
+\date[17. 5. 2010, Brno]{Brno, 17. května 2010}
+
+\subject{Theoretical Computer Science}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Osnova přednášky}
+  \begin{itemize}
+  \item Úvod do světa jádra
+  \item Rozdíly uživatelské programy vs. jádro
+  \item Základy programování jádra
+  \item Příklady (alokace, komunikace s procesy)
+  \item Závěr
+  \item Navazuje: přednáška R. Krejčího
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úvod}
+  \begin{itemize}
+  \item Co je to jádro OS?
+  \begin{itemize}
+  \item Prostředník mezi procesy a HW
+  \item Ovládá a zpřístupňuje jej
+  \end{itemize}
+  \item Běží ve speciálním režimu
+  \item Programování vyžaduje specifické znalosti (jako každé jiné)
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Proč umět programovat jádro?}
+  \begin{itemize}
+  \item Nový hardware (žádné ovladače)
+  \item Starý hardware (špatné ovladače)
+  \item Nová funkcionalita (lepší plánovač, síťový stack, atd.)
+  \item Oprava chyb
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Rozdíly proces vs. jádro}
+  \heading{Proces}
+  \begin{itemize}
+  \item Knihovny
+  \begin{itemize}
+  \item \emph{libc} (standardní funkce typu \texttt{printf}, \texttt{strlen},
+    \texttt{memset}, \ldots)
+  \item Ostatní -- přidávající funckionalitu (\emph{boost}, \emph{pthread},
+    \ldots)
+  \end{itemize}
+  \item Oddělený paměťový prostor
+  \begin{itemize}
+  \item Procesy se neovlivňují, pakliže to nebylo explicitně povoleno -- zápis
+    na adresu mimo alokovaných/mapovaných zabije aplikaci (a jen ji).
+  \end{itemize}
+  \item Počáteční funkce \texttt{main}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Jádro}
+  \begin{itemize}
+  \item Nic z výše uvedeného
+  \item \emph{Chyba v jádře způsobí pád systému}
+  \item Některé funkce reimplementovány
+  \begin{itemize}
+  \item \texttt{printf} jako \texttt{printk} v Linuxu, \texttt{printf} v
+    BSD
+  \end{itemize}
+  \item Žádná aritmetika s pohyblivou desetinnou čárkou apod.
+  \end{itemize}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Linuxové jádro}
+  \begin{itemize}
+  \item Monolit
+  \begin{itemize}
+  \item Avšak dovoluje přidávat (přilinkovat) kód ve formě modulů
+  \end{itemize}
+  \item Využívá (pouze) 2 vrstvy zabezpečení
+  \begin{itemize}
+  \item Uživatelský prostor -- kontrolované vykonávání instrukcí
+  \item Prostor jádra -- neomezené vykonávání
+  \item Na x86 odpovídá privilege ring 0 a ring 3
+  \end{itemize}
+  \item Počáteční funkce definovaná makrem \texttt{module\_init}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Modul "Ahoj světe"}
+  \begin{lstlisting}[language=C]
+#include <linux/module.h>
+
+static int my_init(void)
+{
+  printk("Ahoj svete?\n");
+  return 0;
+}
+
+static void my_exit(void)
+{
+  printk("Ahoj svete!\n");
+}
+
+module_init(my_init);
+module_exit(my_exit);
+  \end{lstlisting}
+  \heading{Automaton Checker}
+  \begin{itemize}
+  \item Uses \emph{state automata} to describe erroneous behavior.
+  \end{itemize}
+  \begin{center}
+%    \input{locking.pspdftex}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Discussion}
+  \begin{center} \huge
+  Thank you for your attention! \\[2.4em]
+  Questions?
+  \end{center}
+\end{frame}
+
+\end{document}
+
