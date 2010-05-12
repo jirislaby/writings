@@ -101,8 +101,8 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Rozdíly proces vs. jádro}
-  \heading{Proces}
+  \frametitle{Rozdíly program vs. jádro}
+  \heading{Program (v C)}
   \begin{itemize}
   \item Knihovny
   \begin{itemize}
@@ -114,7 +114,7 @@
   \item Oddělený paměťový prostor
   \begin{itemize}
   \item Procesy se neovlivňují, pakliže to nebylo explicitně povoleno -- zápis
-    na adresu mimo alokovaných/mapovaných zabije aplikaci (a jen ji).
+    na adresu mimo alokovaných/mapovaných zabije aplikaci.
   \end{itemize}
   \item Počáteční funkce \texttt{main}
   \end{itemize}
@@ -125,7 +125,7 @@
   \heading{Jádro}
   \begin{itemize}
   \item Nic z výše uvedeného
-  \item \emph{Chyba v jádře způsobí pád systému}
+  \item \emph{Chyba v jádře často působí pád systému}
   \item Některé funkce reimplementovány
   \begin{itemize}
   \item \texttt{printf} jako \texttt{printk} v Linuxu, \texttt{printf} v
@@ -135,27 +135,40 @@
   \end{itemize}
 \end{frame}
 
-
 \begin{frame}
   \frametitle{Linuxové jádro}
+  \heading{Kód}
   \begin{itemize}
-  \item Monolit
+  \item GNU C
   \begin{itemize}
-  \item Avšak dovoluje přidávat (přilinkovat) kód ve formě modulů
+  \item \texttt{gcc} alespoň 3.4.2
   \end{itemize}
-  \item Využívá (pouze) 2 vrstvy zabezpečení
+  \item Modulární
+  \item Víceméně pevně daný styl
   \begin{itemize}
-  \item Uživatelský prostor -- kontrolované vykonávání instrukcí
-  \item Prostor jádra -- neomezené vykonávání
-  \item Na x86 odpovídá privilege ring 0 a ring 3
+  \item Tzv. \emph{CodingStyle}
   \end{itemize}
-  \item Počáteční funkce definovaná makrem \texttt{module\_init}
+  \item Neobsahuje boot-strap
+  \begin{itemize}
+  \item Práce pro GRUB, (E)LILO, QEMU, apod.
+  \item Provedou zavedení do paměti a skok do funkce \texttt{start\_kernel}
+  \end{itemize}
+  \item Linkuje se do jednoho celku -- monolit
+  \begin{itemize}
+  \item Volání přímo (žádné předávání zpráv ve smyslu mikrojádra)
+  \item Avšak dovoluje přidávat (přilinkovat) za běhu kód ve formě modulů
+  \end{itemize}
+  \item Počáteční funkci ("main") souboru definuje makro \texttt{module\_init}
+  \item Příklad
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]
   \frametitle{Modul "Ahoj světe"}
+  \begin{center}
+  \begin{tabular}{|c|c|} \hline
+  code.c & Makefile \\ \hline
   \begin{lstlisting}[language=C]
 #include <linux/module.h>
 
@@ -172,21 +185,73 @@ static void my_exit(void)
 
 module_init(my_init);
 module_exit(my_exit);
+  \end{lstlisting} &
+  \begin{lstlisting}[language=XML]
+KDIR=/lib/modules/$(shell uname -r)/build
+KBUILD=$(MAKE) -C $(KDIR) M=$(PWD)
+
+obj-m := code.o
+
+default:
+  $(KBUILD) modules
+  \end{lstlisting} \\ \hline
+  \end{tabular}
+
+  \pause
+
+  \begin{tabular}{|c|c|}
+  \begin{lstlisting}[language=XML]
+# insmod code.ko
+# dmesg|tail -1
+Ahoj svete?
+  \end{lstlisting} &
+  \begin{lstlisting}[language=XML]
+# rmmod code
+# dmesg|tail -1
+Ahoj svete!
   \end{lstlisting}
-  \heading{Automaton Checker}
-  \begin{itemize}
-  \item Uses \emph{state automata} to describe erroneous behavior.
-  \end{itemize}
-  \begin{center}
-%    \input{locking.pspdftex}
+  \end{tabular}
   \end{center}
 \end{frame}
 
 \begin{frame}
-  \frametitle{Discussion}
+  \frametitle{Linuxové jádro}
+
+  \heading{Chování}
+  \begin{itemize}
+  \item Velká část je řízena událostmi (event-driven)
+  \begin{itemize}
+  \item Přerušení od HW, požadavky uživatele, komunikace modulů, atd.
+  \item Implicitní souběžnost kódu
+  \end{itemize}
+  \item 2 úrovně zabezpečení
+  \begin{itemize}
+  \item \emph{Uživatelský prostor} -- kontrolované vykonávání instrukcí
+  \item \emph{Prostor jádra} -- neomezené vykonávání (kód může cokoliv)
+  \item Na x86 odpovídá privilege ring 0 a 3
+  \end{itemize}
+  \item Několik kontextů vykonávání kódu
+  \begin{itemize}
+  \item \emph{Proces} -- proces zavolá jádro (čtení souboru)
+  \item \emph{Prerušení} -- kontext právě přerušeného procesu (síť hlásí paket)
+  \item \emph{Měkké přerušení} -- taktéž, ale prerušení jsou povolena (časovač)
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Diskuze}
   \begin{center} \huge
-  Thank you for your attention! \\[2.4em]
-  Questions?
+  Děkuji za pozornost! \\[1.8em]
+  Dotazy?
+  \end{center}
+
+  \pause
+  \bigskip
+
+  \begin{center} \large
+  Přivítejme Radka Krejčího s navazující přednáškou.
   \end{center}
 \end{frame}
 
