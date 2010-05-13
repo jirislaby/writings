@@ -68,7 +68,7 @@
   \begin{itemize}
   \item Úvod do světa jádra
   \item Rozdíly uživatelské programy vs. jádro
-  \item Základy programování jádra
+  \item Základní principy jádra
   \item Příklady (alokace, komunikace s procesy)
   \item Závěr
   \item Navazuje: přednáška R. Krejčího
@@ -158,7 +158,7 @@
   \item Avšak dovoluje přidávat (přilinkovat) za běhu kód ve formě modulů
   \end{itemize}
   \item Počáteční funkci ("main") souboru definuje makro \texttt{module\_init}
-  \item Příklad
+  \item Příklad:
   \end{itemize}
 
 \end{frame}
@@ -214,43 +214,218 @@ Ahoj svete!
 \end{frame}
 
 \begin{frame}
-  \frametitle{Linuxové jádro -- chování}
+  \frametitle{Linuxové jádro -- chování I.}
 
   \heading{2 úrovně zabezpečení}
   \begin{itemize}
   \item \emph{Uživatelský prostor} -- kontrolované vykonávání instrukcí
   \item \emph{Prostor jádra} -- neomezené vykonávání (kód může cokoliv)
-  \item Na x86 odpovídá privilege ring 0 a 3
+  \item Na x86 odpovídá privilege ring 0 a 3 -- podpora CPU
+  \item \textbf{Větší důraz na bezpečnost}
   \end{itemize}
 
   \pause
+  \medskip
 
   \heading{Několik kontextů vykonávání kódu}
   \begin{itemize}
-  \item \emph{Proces} -- proces zavolá jádro (čtení souboru)
-  \item \emph{Prerušení} -- kontext právě přerušeného procesu (síť hlásí paket)
-  \item \emph{Měkké přerušení} -- taktéž, ale prerušení jsou povolena (časovač)
+  \item \emph{Proces} -- proces zavolá jádro
+  \item \emph{Prerušení} -- kontext právě přerušeného procesu
+  \item V kontextu přerušení nelze spát
+  \begin{itemize}
+  \item Má za sebou cizí proces
+  \item Přerušení jsou zakázána -- není, kdo by proces vzbudil
+  \end{itemize}
+  \item Obecněji atomický (zahrnuje spinlocky) vs. neatomický
+  \item \textbf{Pozor na to, co se kde (ne)může volat}
   \end{itemize}
 
-  \pause
+\end{frame}
 
-  \begin{itemize}
-  \item Velká část je řízena událostmi (event-driven)
-  \begin{itemize}
-  \item Přerušení od HW, požadavky uživatele, komunikace modulů, atd.
-  \item Důsledek: implicitní souběžnost kódu (viz dále)
-  \end{itemize}
-  \end{itemize}
-
-  \pause
-
-  \begin{itemize}
-  \item Specifická alokace paměti
+\begin{frame}
+  \frametitle{Linuxové jádro -- chování II.}
+  \heading{Specifická alokace paměti}
   \begin{itemize}
   \item Stránkový alokátor (\texttt{alloc\_page})
   \item SLAB alokátor (\texttt{kmalloc})
   \item Alokace a namapování do virtuální paměti (\texttt{vmalloc})
+  \item \textbf{Paměť není souvislá}
   \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Řízení událostmi (event-driven)}
+  \begin{itemize}
+  \item Přerušení od HW, požadavky uživatele, komunikace modulů, atd.
+  \item Důsledek: implicitní souběžnost kódu (viz dále)
+  \item \textbf{Je nutné zachovat pořadí vykonání instrukcí?}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{center}
+  \heading{Copak se takhle dá programovat?}
+
+  \pause
+  \smallskip
+
+  Dá.
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Souběžnost kódu I.}
+  \heading{Multitasking a problémy s ním spojené} \\
+  Příklad: 2 procesy provádějící následující
+  \begin{lstlisting}[language=C]
+a = 2;
+a = a - a;
+  \end{lstlisting}
+  Může být a různé od 0?
+
+  \pause
+  \medskip
+
+  Ano (jeden z mnoha chybných souběhů):
+  \begin{center}
+  \begin{tabular}{ll}
+PROCES 1 & PROCES 2 \\ \hline
+  \begin{lstlisting}[language=XML]
+store 2, a
+load a, reg1
+<context switch>  ->
+
+
+
+
+load a, reg2      <-
+sub reg1, reg2
+store reg1, a
+  \end{lstlisting} &
+  \begin{lstlisting}[language=XML]
+
+
+store 2, a
+load a, reg1
+load a, reg2
+sub reg1, reg2
+store reg1, a
+<context switch>
+# 2 - 0
+# a je 2
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Souběžnost kódu II.}
+  \heading{Řešení}
+  \begin{itemize}
+  \item Zámky
+  \begin{itemize}
+  \item Vytvoří kritickou sekci
+  \item 2 procesy nemohou vstoupit do kritické sekce (až na semafory)
+  \end{itemize}
+
+  \item Jádro poskytuje několik typů zámků
+  \begin{itemize}
+  \item \emph{mutex} -- spící, nevytváří atomický kontext, lze v něm spát
+  \item \emph{semafor} -- podobný mutexu, obsahuje počítadlo, je zanořitelný
+  \item \emph{spinlock} -- nespící (busy-waiting), atomický
+  \item \emph{BKL} -- zastaralý, hrubozrnný, nepoužívat
+  \item A další, speciální\ldots
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+  \smallskip
+
+  Náš kód tedy má vypadat takto:
+  \begin{lstlisting}[language=C]
+spin_lock(&my_lock);
+a = 2;
+a = a - a;
+spin_unlock(&my_lock);
+  \end{lstlisting}
+
+  \pause
+  \smallskip
+
+  Co když přijde po \texttt{a\,=\,2} přerušení obsahující stejný kód?
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Souběžnost kódu III.}
+  \begin{center}
+  \includegraphics[width=\textheight]{deadlock}
+  \end{center}
+  \begin{itemize}
+  \item Deadlock
+  \begin{itemize}
+  \item Jádro je řeší ignorováním
+  \item Spoléhá na programátora, že nenastanou
+  \end{itemize}
+  \end{itemize}
+  {\tiny Foto: Internet}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Souběžnost kódu IV.}
+  \heading{V našem příkladě}
+  \begin{center}
+  \begin{tabular}{ll}
+PROCES & PŘERUŠENÍ \\ \hline
+  \begin{lstlisting}[language=XML]
+spin_lock(&my_lock);
+a = 2;
+<interrupt>     ->
+<deadlock>
+  \end{lstlisting} &
+  \begin{lstlisting}[language=XML]
+
+
+spin_lock(&my_lock);
+<deadlock>
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \heading{Řešení 2}
+  \begin{itemize}
+  \item Na základě kontextu se používají různé formy spinlocků
+  \begin{itemize}
+  \item Obecně zákaz přerušení na aktuálním CPU
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Tedy výsledek:
+  \begin{lstlisting}[language=C]
+spin_lock_irq(&my_lock);
+a = 2;
+a = a - a;
+spin_unlock_irq(&my_lock);
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace s uživatelským prostorem}
+  \begin{itemize}
+  \item \emph{syscall}, \emph{int 80}, \emph{vsyscall}, \emph{vdso}
+  \item skok do jádra
+  \item 
   \end{itemize}
 
 \end{frame}
@@ -259,6 +434,22 @@ Ahoj svete!
   \frametitle{Závěr}
   \begin{itemize}
   \item Jádro se v mnoha ohledech liší od programů
+  \begin{itemize}
+  \item Někdy to může vypadat, že stejná je jen syntax
+  \end{itemize}
+  \item Paralelismus není vždy výhra
+  \begin{itemize}
+  \item Pro vývojáře spíše naopak
+  \end{itemize}
+  \item Komunikace s uživateli je náročná
+  \begin{itemize}
+  \item Uživatelé jsou zlí
+  \end{itemize}
+  \end{itemize}
+
+  \medskip
+
+  \begin{itemize}
   \item Zaujalo vás téma?
   \begin{itemize}
   \item Mnoho projektů, kde se lze s jádrem utkat
