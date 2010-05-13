@@ -40,7 +40,7 @@
 	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
 	commentstyle=\color{blue}}
 
-\title[Stanse] % (optional, use only with long paper titles)
+\title[Linux Kernel] % (optional, use only with long paper titles)
 {Výlet do jádra Linuxu}
 
 % \subtitle
@@ -66,11 +66,9 @@
 \begin{frame}
   \frametitle{Osnova přednášky}
   \begin{itemize}
-  \item Úvod do světa jádra
-  \item Rozdíly uživatelské programy vs. jádro
-  \item Základní principy jádra
-  \item Příklady (alokace, komunikace s procesy)
-  \item Závěr
+  \item Úvod do světa jádra, rozdíly
+  \item Paralelismus
+  \item Komunikace jádro $\leftrightarrow$ uživatelský prostor
   \item Navazuje: přednáška R. Krejčího
   \end{itemize}
 \end{frame}
@@ -276,10 +274,18 @@ Ahoj svete!
 
 \end{frame}
 
+
+\begin{frame}
+  \frametitle{Část 2}
+  \begin{center}
+  {\huge Paralelismus}
+  \end{center}
+\end{frame}
+
 \begin{frame}[fragile]
   \frametitle{Souběžnost kódu I.}
   \heading{Multitasking a problémy s ním spojené} \\
-  Příklad: 2 procesy provádějící následující
+  Příklad: 2 procesy provádějící následující kód
   \begin{lstlisting}[language=C]
 a = 2;
 a = a - a;
@@ -421,13 +427,50 @@ spin_unlock_irq(&my_lock);
 \end{frame}
 
 \begin{frame}
-  \frametitle{Komunikace s uživatelským prostorem}
+  \frametitle{Část 3}
+  \begin{center}
+  {\huge Komunikace \\[0.8em] jádro $\leftrightarrow$ uživatelský prostor}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace I.}
+  \begin{center}
+  \includegraphics[width=6cm]{proces-jadro}
+  \end{center}
   \begin{itemize}
-  \item \emph{syscall}, \emph{int 80}, \emph{vsyscall}, \emph{vdso}
-  \item skok do jádra
-  \item 
+  \item Základní forma komunikace: volání funkcí
+  \item Jádro nelze volat přímo
+  \begin{itemize}
+  \item Důvod: dvě úrovně zabezpečení
+  \end{itemize}
+  \item Nutno provést přepnutí privilegií (obsah registrů)
+  \begin{itemize}
+  \item Tzv. system call (syscall)
+  \end{itemize}
   \end{itemize}
 
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace II.}
+  \heading{1. speciální instrukcí procesoru}
+  \begin{itemize}
+  \item Na x86 \emph{int} (80) nebo \emph{syscall}, na ia64 \emph{break},
+  na arm \emph{swi} atd.
+  \item Princip vesměs stejný
+  \begin{itemize}
+  \item Přeruší se vykonávání (podobné IRQ z HW)
+  \item Uloží se registry
+  \item Začne se vykonávat kód jádra
+  \end{itemize}
+  \item 
+  \item Nepatří mezi nejrychlejší operace
+  \end{itemize}
+
+  \begin{itemize}
+  \item \emph{vsyscall}, \emph{vdso}
+  \end{itemize}
 \end{frame}
 
 \begin{frame}
