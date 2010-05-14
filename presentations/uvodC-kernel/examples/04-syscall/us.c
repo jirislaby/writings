@@ -8,13 +8,14 @@ int main(void)
 	static const char str[] = "Ahoj\n";
 	long result;
 
+	/* ssize_t write(int fd, const void *buf, size_t count); */
 	asm volatile("syscall" :
-			"=a" (result) : /* result in RAX */
+		/*RAX*/	"=a" (result) :		/* result (written count) */
 		/* calling sequence for syscalls: */
-		/*RAX*/	"a" (__NR_write),
-		/*RDI*/	"D" (STDOUT_FILENO),
-		/*RSI*/	"S" (str),
-		/*RDX*/	"d" (sizeof(str)) :
+		/*RAX*/	"a" (__NR_write),	/* syscall number */
+		/*RDI*/	"D" (STDOUT_FILENO),	/* file descriptor */
+		/*RSI*/	"S" (NULL),		/* buffer */
+		/*RDX*/	"d" (sizeof(str)) :	/* count */
 			"memory", "cc", "r11", "cx"); /* side effects */
 
 	printf("Vysledek: %ld\n", result);

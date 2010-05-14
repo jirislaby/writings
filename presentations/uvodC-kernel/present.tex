@@ -1,6 +1,6 @@
 % vim: ai sw=2
 
-\documentclass[handout,xcolor=dvipsnames]{beamer}
+\documentclass[xcolor=dvipsnames]{beamer}
 
 \let\Oldemph\emph
 \renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
@@ -290,7 +290,7 @@ Ahoj svete!
 a = 2;
 a = a - a;
   \end{lstlisting}
-  Může být a různé od 0?
+  Může být \texttt{a} různé od 0?
 
   \pause
   \medskip
@@ -436,17 +436,20 @@ spin_unlock_irq(&my_lock);
 \begin{frame}
   \frametitle{Komunikace I.}
   \begin{center}
-  \includegraphics[width=6cm]{proces-jadro}
+  \includegraphics[width=4cm]{proces-jadro}
   \end{center}
   \begin{itemize}
   \item Základní forma komunikace: volání funkcí
+  \item Co se děje, když se z programu zavolá \texttt{fwrite}?
+  \begin{itemize}
+  \item \texttt{fwrite} je funkce \emph{libc}
+  \item Vnitřní buffery, volání \texttt{write}
+  \item \texttt{write} je (stále) funkce \emph{libc}
+  \item Nyní nutno volat funkci jádra
+  \end{itemize}
   \item Jádro nelze volat přímo
   \begin{itemize}
   \item Důvod: dvě úrovně zabezpečení
-  \end{itemize}
-  \item Nutno provést přepnutí privilegií (obsah registrů)
-  \begin{itemize}
-  \item Tzv. system call (syscall)
   \end{itemize}
   \end{itemize}
 
@@ -454,23 +457,106 @@ spin_unlock_irq(&my_lock);
 
 \begin{frame}
   \frametitle{Komunikace II.}
-  \heading{1. speciální instrukcí procesoru}
   \begin{itemize}
-  \item Na x86 \emph{int} (80) nebo \emph{syscall}, na ia64 \emph{break},
-  na arm \emph{swi} atd.
+  \item Nutno provést přepnutí privilegií (obsah registrů)
+  \begin{itemize}
+  \item Tzv. system call (syscall)
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \heading{1) speciální instrukcí procesoru}
+  \begin{itemize}
+  \item Na x86 \emph{int} (80), \emph{sysenter} nebo \emph{syscall},
+  na ia64 \emph{break} nebo \emph{epc}, na ARM \emph{swi} atd.
   \item Princip vesměs stejný
   \begin{itemize}
   \item Přeruší se vykonávání (podobné IRQ z HW)
   \item Uloží se registry
-  \item Začne se vykonávat kód jádra
-  \end{itemize}
-  \item 
+  \item Začne se vykonávat kód jádra\pause
+  \item Provede se potřebné volání
+  \item Obnoví se skoro všechny registry (a oprávnění)
+  \item Pokračuje se ve vykonávání programu
+  \end{itemize}\pause
   \item Nepatří mezi nejrychlejší operace
+  \begin{itemize}
+  \item Vylepšené instrukce: \emph{sysenter}, \emph{syscall}, \emph{epc}
+  \end{itemize}
+  \item Příklad
   \end{itemize}
 
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace III.}
+  Do jádra jsme se dostali, co dál?
   \begin{itemize}
-  \item \emph{vsyscall}, \emph{vdso}
+  \item V jednom z registrů je číslo syscallu
+  \item Jádro v tabulce zjistí adresu funkce a zavolá ji
+  \item Ta si zkontroluje (zdroj chyb) a zkopíruje vstupy
+  \item Pro \texttt{write} se zavolá odpovídající souborový systém
+  \item Do jednoho z registrů se zapíše návratová hodnota
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Komunikace IV.}
+  \heading{2) skokem do speciálního prostoru}
+  \begin{itemize}
+  \item Tzv. virtuální syscally
+  \item \emph{vsyscall} (zastaralé) a \emph{vdso}
+  \item Zdrojový kód v jádře v arch/.../\{vdso,vsyscall\}*
+  \item Zvláštní dynamická knihovna
+  \begin{itemize}
+  \item Je na speciálně označené stránce v jádře
+  \item Při skoku sem, zvýšena privilegia
+  \end{itemize}
+  \item Takto implementováno několik málo volání
+  \begin{itemize}
+  \item V závislosti na arch, např. \texttt{gettimeofday}, \texttt{getcpu}
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{lstlisting}[language=XML]
+$ ldd /bin/true
+linux-vdso.so.1 =>  (0x00007fffbe3ff000)
+libc.so.6 => /lib64/libc.so.6 (0x00007facbe6e8000)
+/lib64/ld-linux-x86-64.so.2 (0x00007facbea48000)
+$ cat /proc/self/maps
+...
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Komunikace V.}
+  \heading{3) ostatní formy komunikace}
+  \begin{itemize}
+  \item Syscally trochu jinak
+  \begin{itemize}
+  \item Nelze pro každou funkcionalitu/ovladač přidat jeden syscall
+  \item Ovladače vytváří \texttt{/dev/*} zařízení
+  \item Nad nimi se používá \texttt{open/read/write/ioctl/.../close}
+  \item \texttt{ioctl} je rozšíreným způsobem komunikace
+  \end{itemize}
+  \begin{lstlisting}[language=C]
+int ioctl(int fd, int command, unsigned long arg);
+  \end{lstlisting}\pause
+  \item Sdílená paměť
+  \begin{itemize}
+  \item Producer-consumer
+  \item Uživatel vidí i na data např. od síťové karty
+  \item Bez kopírování dat
+  \item Pozor na koherentnost dat!
+  \begin{itemize}
+  \item Některé architektury používají bounce buffery
+  \end{itemize}
+  \end{itemize}
+  \end{itemize}
+
 \end{frame}
 
 \begin{frame}
