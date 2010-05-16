@@ -4,16 +4,9 @@
 #include <string.h>
 #include <unistd.h>
 
-int main(int argc, char **argv)
+int main(void)
 {
 	char *str;
-
-	if (argc >= 2) {
-		str = (char *)strtoul(argv[1], NULL, 0);
-		printf("Tisknu obsah na adrese %p:\n", str);
-		puts(str);
-		return 0;
-	}
 
 	str = malloc(sizeof("Ahoj") + 1);
 	assert(str);

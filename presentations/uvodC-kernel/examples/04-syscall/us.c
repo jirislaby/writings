@@ -14,7 +14,7 @@ int main(void)
 		/* calling sequence for syscalls: */
 		/*RAX*/	"a" (__NR_write),	/* syscall number */
 		/*RDI*/	"D" (STDOUT_FILENO),	/* file descriptor */
-		/*RSI*/	"S" (NULL),		/* buffer */
+		/*RSI*/	"S" (str),		/* buffer */
 		/*RDX*/	"d" (sizeof(str)) :	/* count */
 			"memory", "cc", "r11", "cx"); /* side effects */
 

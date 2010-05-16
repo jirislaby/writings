@@ -34,11 +34,11 @@ static int my_init(void)
 
 	str = my_find_addr(pid, addr);
 
-	printk(KERN_DEBUG "Retezec je: %s\n", str);
+	printk("Retezec je: %s\n", str);
 
 	put_page(virt_to_page(str));
 	
-	return -EIO;
+	return 0;
 }
 
 static void my_exit(void)
