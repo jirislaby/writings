@@ -1,7 +1,7 @@
 KDIR=/lib/modules/$(shell uname -r)/build
 KBUILD=$(MAKE) -C $(KDIR) M=$(PWD)
 
-obj-m := code.o
+obj-m := krecek.o
 
 default:
 	$(KBUILD) modules

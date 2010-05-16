@@ -8,7 +8,7 @@ static DEFINE_TIMER(tim, timer_f, 0, 0);
 
 static void timer_f(unsigned long unused)
 {
-	printk(KERN_DEBUG "%s: %s\n", __func__, current->comm);
+	printk("%s: %s\n", __func__, current->comm);
 	mod_timer(&tim, jiffies + HZ);
 }
 
