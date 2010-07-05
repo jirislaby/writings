@@ -1,0 +1,115 @@
+\appendix
+\chapter{Wiki dokumentace}
+  \section{NetBSD LKMs}
+  \subsection{Compilation of NetBSD loadable kernel modules}
+  \begin{itemize}
+    \item Update your tree from liberouter CVS. For further info touching this,
+      consult CVS wiki page.
+    \item Download and untar \emph{syssrc.tgz} \nbsd\ kernel archive from
+      net\-bsd.org. \textbf{This step is unnecessary, if \emph{/usr/src/sys} is
+      present.}
+    \item Set \emph{S} environment variable, if you want to build against
+      different kernel, i. e. not \emph{/usr/src/sys}.
+    \item Enter into \emph{sys\_sw/drivers/netbsd} local CVS repository
+      directory.
+    \item Now you can see directories for each module such as cespcr, combo6,
+      cge\ldots
+    \item Enter to one of these directories and run \emph{make}. Module you
+      chose should be compiled cleanly now.
+  \end{itemize}
+  Note: If you want to compile them all, just type \emph{make} in
+  \emph{sys\_sw/dri\-vers/netbsd} directory.
+  \subsection{Working with LKMs}
+  \subsubsection{Loading LKMs}
+  You need to have write permissions to \emph{/dev/lkm}, i. e. in most cases you
+  need to be
+  root. Then, loading modules is the easiest pie, it is sufficient to execute
+  \emph{modload <module>.o}. For \com\ cards you need \emph{cesplx} base
+  module, for \comx\ on the other hand, \emph{cespcr}. Next, load \emph{combo6}
+  module and after all
+  modules that satisfies your needs, e. g. \emph{cge.o}, \emph{cgc.o}, and so
+  on and you are ready to try your best:
+\begin{verbatim}
+modload cesplx.o; modload combo6.o; modload cge.o;
+<load_driver_netbsd>; ping
+\end{verbatim}
+  Related: \emph{man lkm}, \emph{man modload}
+  \subsubsection{Unloading LKMs}
+  is not so harder in fact. \emph{modunload} is used for this operation. There
+  is one thing you have to keep on your mind, children have to be detached
+  before calling \emph{modunload} and unloading have to be done in reverse
+  order than loading. Additionally modules to be unloaded are written without
+  \emph{.o} suffix:
+\begin{verbatim}
+csboot -D; modunload cge; modunload combo6;
+modunload cesplx
+\end{verbatim}
+  Related: \emph{man modunload}
+  \section{NetBSD testing}
+  \subsection{How to test projects and how to check them}
+  \subsubsection{csid}
+  simply execute \emph{csid} and check the result
+
+  \subsubsection{checking NIC}
+  \begin{itemize}
+    \item move to the directory with NIC design
+    \item execute \emph{./load\_driver\_netbsd} to load a design to the card
+    \item now, if loading is complete and card is ready (script also sets IP
+      addresses, check with \emph{ifconfig -a}), you can test, if packets are
+      flowing through and coming back with \emph{ping} (see below using ping)
+    \item if problem occurs, check IP addresses and set with
+      \emph{ifconfig <device> inet <address>/<mask>}, e. g. \emph{ifconfig
+      cge0e0 inet 10.0.0.1/24} and ensure yourself, that machine connected to
+      your device has different address with the same mask, i. e.
+      \emph{10.0.0.2/24} in our example for instance
+    \item check with \emph{tcpdump} (see below using tcpdump), if you want to
+      know, whether packets flow through or not, just in case if you are not
+      sure
+  \end{itemize}
+
+  \subsubsection{checking NIFIC}
+  \begin{itemize}
+    \item obtain a CVS clone (see CVS wiki page)
+    \item move to \emph{liberouter} directory and execute \emph{./setup} to
+      configure the tree
+    \item go into \emph{vhdl\_design/projects/nific4\_1Gb/sw} directory under
+      CVS tree
+    \item execute \emph{make} there to compile the stuff
+    \item \emph{cd tests} and \emph{./load\_driver\_netbsd} to put the design
+      into the card and boot it
+    \item now, the card should behave as an ordinary ethernet card
+    \item you can test it similar to NIC section
+  \end{itemize}
+  Related: man ifconfig, man ping
+  \subsection{Working with LKMs}
+  See Working with LKMs in NetBSD LKMs section.
+  \subsection{Using ping}
+  If you want to test quickly, if everything is OK, you can simply use
+  \emph{ping}.
+  It supports \emph{-f} command option to tell ping send as much pack\-ets as
+  possible. Ping then writes one dot for sent packet and one backspace
+  character for the received (that returns back) one. After catch of a signal
+  (ctrl+c, kill\ldots) ping would show you a statistics about packets.
+  Next useful options are \emph{-i <time>} and \emph{-c <count>}, so that you
+  can use it with \emph{nohup} to test over night without being still logged
+  in with command such as
+\begin{verbatim}
+nohup ping -i .1 -c 1000000 <address>
+\end{verbatim}
+  Output of this command is stored in \emph{nohup.out} by default. \\[2mm]
+  Related: man ping, man nohup
+
+  \subsection{Using tcpdump}
+  See \emph{man tcpdump} for complete list of options. The important one is
+  \emph{-i <device>}, so if you want to see packets flowing through
+  \emph{eth0}, you can easily achieve this by execution of \emph{tcpdump -i
+  eth0}. There are also other options: to restrict view only to some specific
+  packets use command line option such as \emph{host}, \emph{port}, e. g.
+\begin{verbatim}
+tcpdump -i eth0 port 80
+\end{verbatim}
+  will write on stdout only packets that are related to http connection.
+  Another useful option is \emph{-w <file>}, which generates file from catched
+  packets (\emph{<file>} may be \uv - for stdout) to use it later for
+  \emph{tcpdump}'s (\emph{tcpdump -r}) or \emph{tcpreplay}'s input. \\[2mm]
+  Related: man tcpdump, man tcpreplay

@@ -1,0 +1,548 @@
+\documentclass[final,11pt]{fithesis}
+
+\usepackage[utf8x]{inputenc}
+\usepackage[czech]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{graphicx}
+
+\thesistitle{PowerPC v~FPGA na kartách COMBO6}
+\thesissubtitle{Bakalářská práce}
+\thesisstudent{Jiří Slabý}
+\thesisadvisor{Ing. Jiří Novotný}
+
+\thesiswoman{false}
+\thesisfaculty{fi}
+\thesisyear{jaro 2006}
+
+\hyphenation{net-bsd}
+\hyphenation{net-flow}
+\hyphenation{flow-mon}
+
+\newcommand{\uv}[1]{\quotedblbase#1"}
+\newcommand{\com}{\emph{COMBO6}}
+\newcommand{\comx}{\emph{COMBO6x}}
+\newcommand{\nbsd}{\emph{NetBSD}}
+\newcommand{\ppc}{\emph{PowerPC}}
+\newcommand{\nflow}{\emph{NetFlow}}
+\newcommand{\nic}{\emph{NIC}}
+\newcommand{\fpga}{\emph{FPGA}}
+\newcommand{\dma}{\emph{DMA}}
+
+\begin{document}
+\FrontMatter
+\ThesisTitlePage
+\begin{ThesisDeclaration}
+  \DeclarationText
+  \AdvisorName
+\end{ThesisDeclaration}
+\begin{ThesisThanks}
+  Na místě k~tomuto určeném bych rád vzdal díky především rodičům za jejich
+  podporu a nesmírnou trpělivost, dále pak vedoucímu této práce, Ing. Jiřímu
+  Novotnému a projektu Liberouter, který umožnil tuto práci zaštítit a jehož
+  členové mi ochotně poskytovali rady a také, v~neposlední řadě, autorům
+  knihy Linux Driver Development\cite{ldd3}, jež mi předala základy
+  programování jader.
+\end{ThesisThanks}
+\begin{ThesisAbstract}
+  Práce je zaměřena na vývoj ovladačů v~otevřeném prostředí operačního systému
+  \nbsd. Mimo jiné si klade za cíl tento průběh zachytit a popsat stádia
+  vývoje. Její stěžejní výsledek by měl být kompletní ovladač s~podporou
+  \dma\ přenosů a následné otestování jeho funkčnosti pomocí pasivní sondy
+  \nflow. Měla by se také zabývat zdokumentováním postupů, kterými lze
+  dosáhnout funkčního stavu, aby jej mohli používat i ostatní uživatelé.
+\end{ThesisAbstract}
+\begin{ThesisKeyWords}
+  NetBSD, ovladač, LKM, modul, DMA, COMBO6, COMBO6x, NIX, NetFlow, FlowMon,
+  Liberouter
+\end{ThesisKeyWords}
+
+\MainMatter
+\tableofcontents
+\chapter{Úvod}
+  \section{Uvedení do problému}
+  V~novodobém civilizovaném světě se jen stěží dá nalézt místo, kam ještě
+  nezasáhly moderní komunikační prostředky a technologie. To s~sebou nese i
+  jisté problémy, které je nutné řešit a přitom obnovovat či navazovat na
+  starší, osvědčené, technologie. Za tímto účelem vznikají různá sdružení a
+  projekty, které připravují cestu k~nástupu těchto moderních
+  vymožeností. \\ \indent
+  Projekt \emph{Liberouter}\cite{lbr} je aktivita \emph{CESNETu} vyvíjená
+  na rozvoj a rozšíření
+  moderních komunikačních metod spolu s~podporou nejnovějších
+  protokolů\footnote{protokol je ustanovení přesných pravidel komunikace mezi
+  dvěma systémy}. Jako jeden z~prostředků byla vyvinuta všestranně využitelná
+  karta \com\ a její novější obdoba \comx, na níž bude
+  v~tomto textu upře\-na větší pozornost.
+  X verze karty se liší především v~tom, že má svůj vlastní procesor,
+  kam lze přenést část zátěže. Samo sebou tento rozdíl přinesl změ\-nu
+  komunikace mezi kartou a ovladačem v~jádře. Řešení tohoto problému je skryto
+  pod názvem bakalářské práce, o průběhu jeho řešení, obecné struktuře a
+  výstavbě pojednává text v~následujících kapitolách. \\ \indent
+  Cílem ovšem také bylo zdokumentovat vytvoření
+  ovladačů a jejich použití, což jsme mohli provést do rozbíhajících
+  se Internetových stránek wikipedie.
+  \section{Struktura dokumentu}
+  V~první části je čtenář seznámen s~významnými pojmy a zkratkami, na které
+  může v~textu narazit. Programové vybavení, které bylo nezbytné použít
+  následuje v~další kapitole. Následně se dočteme bližší informace o struktuře
+  a uspořádání ovladačů, což je nezbytné objasnit pro další kapitolu, kde je
+  již samotná problematika a její konkrétní řešení. Funkčnost ověříme
+  v~dalším textu, věnovanému testování. A jako poslední zmíníme
+  vytvořenou dokumentaci a celý text uzavřeme shrnutím ukrytém v~závěru.
+
+\chapter{Důležité pojmy}
+  V~práci se budeme setkávat se zkratkami a pojmy, které nejsou až tak zcela
+  běžné a ne každý zná jejich přesný význam, proto bychom jim v~této sekci měli
+  věnovat několik slov pro lepší orientaci v~textu.
+  \section{Prostor jádra, uživatelský prostor}
+  Moderní operační systémy jsou založeny na myšlence mít několik odlišných
+  paměťových prostorů. Nejčastěji je možné vidět dva, přesto
+  jich některé dnešní architektury implementují více. Jeden prostor je
+  čistě pro potřeby jádra a druhý pro běh uživatelských programů. To přináší
+  řadu obtíží, které nejsou předmětem našeho zkoumání, přesto na pojmy
+  z~nadpisu několikrát v~textu narazíme, proto bychom měli vědět, oč se tedy
+  jedná. \\ \indent
+  Moderní procesory mají v~sobě vestavěný aparát, jenž umožňuje přepínat méně
+  či více kontrolované stavy běhu kódu. Zatímco kód v~prostoru jádra běží
+  v~nejméně omezeném režimu -- je tedy dovoleno přímo přistupovat na hardware a
+  k~systémovým prostředkům, uživatelský kód je spuštěn v~režimu, kde tyto
+  přístupy povoleny nejsou z~logického důvodu -- bezpečnosti. Dalším rozdílem
+  je odlišnost adresních prostorů, proměnná programu v~obou prostorech má
+  jinou masku adresy, laicky řečeno není možné získat paměť v~odlišných
+  prostorech s~podobnou adresou. Při každém požadavku z~uživatelského prostoru
+  do prostoru jádra musíme zkopírovat data, která jsou nám předávána z~jednoho
+  prostoru do druhého, aby k~nim mohlo být přistupováno obyčejným postupem.
+  \section{IRQ, přerušení}
+  Přerušení je událost vznikající asynchronně při různých
+  příležitostech, ke
+  kterým kupříkladu patří oznámení příchozího paketu, oznámení z~disku o
+  připravenosti dat nebo prosté upozornění o ukončení přenosu z~jedné paměti do
+  druhé (viz další sekci). Na úrovni hardware existuje programovatelný řadič
+  přerušení (PIC, programmable interrupt controller), který zmíněnou práci
+  obstarává. Karta \comx, se kterou pracujeme, obsahuje i PIC.
+  \section{DMA}
+  \emph{Bus Master} je mechanizmus, který ovládá a přenáší data z~jednoho místa
+  architektury na druhé, uveďme příklad načítání částí obsahu disku do
+  paměťových modulů. Na některých výpočetních modelech obstarává tuto činnost
+  přímo procesor, což je univerzální, leč velmi pomalá metoda. Spolu
+  s~vývojem výpočetní techniky se stále častěji naráželo na problém omezenosti
+  výkonu procesoru, a tak byly vynalézány různé cesty ke zrychlení nebo
+  odklonu výpočtů z~procesoru. \\ \indent
+  Tato myšlenka byla navržena, uskutečněna
+  a vývojáři mohli využít jednoduchou formu \emph{Bus Masteringu} -- \dma,
+  zkratka pocházející z~anglického \emph{Direct Memory Access} (přímý
+  přístup do paměti), ovládané ze
+  samostatného \dma\ řadiče. Jeho práce spočívá v~přenášení dat mezi
+  různými kouty architektury bez zásahu procesoru (až na nastavení počátečního
+  a oznámení konečného stavu), což samozřejmě přináší
+  obrovské zrychlení, na druhou stranou s~sebou nese jistá omezení, jejichž
+  zkoumání není opět předmětem této práce. \\ \indent
+  \section{NetBSD}
+  \nbsd\cite{nbsd}, otevřený operační systém BSD typu vznikající
+  v~počátku 90. let z~\emph{BSD} verze 4.3 za přispění \emph{Networking/2}
+  balíku
+  a \emph{386BSD} si již od začátku kladl několik
+  podmínek mezi které patří promyšlenost, kvalita, stabilita kódu a hlavně
+  také jeho přenositelnost. To je i naším záměrem -- napsat kvalitní a
+  odladěný funkční celek, který bude v~budoucnu lehce rozšiřitelný. \\ \indent
+  Již v~\nbsd\ verze 1.0 lze spatřit zmínky o nahratelných modulech do jádra
+  (LKM\footnote{Loadable kernel module}). Jsou to
+  samostatné binární soubory, které je možné určitým postupem nahrát do jádra
+  (jak, to se dozvíme v~pozdějším textu) a běží také v~jeho prostoru.
+  Jejich přínos je v~jednoduchosti přidání funkcionality do jádra bez nutnosti
+  překladu celého jádra a následného restartu systému. Náš cíl proto bude
+  vytvoření ovladačů, které lze takto jednoduchým způsobem do jádra přidat,
+  abychom mohli tyto výhody modulů využívat.
+  \section{COMBO6}
+  Hlavním cílem vytvoření \com\ karet byla myšlenka poskytnout
+  vývojářům otevřený hardware v~podobném smyslu jako pracují s~otevřeným
+  programovým vybavením. Srdce \com\ \emph{PCI} karty se skládá z~jednoho nebo
+  několika \fpga\footnote{Field Programmable Gate Array, programovatelné
+  hradlové pole} čipů, pamětí a ostatních prvků (napájení, vstupně-výstupní
+  čipy, konektory\ldots). \fpga\ obsažené na kartě lze přeprogramovat ve velmi
+  krátkém čase v~řádu milisekund,
+  flexibilita karty je tedy vysoká, a proto mají tyto karty rozsáhlý okruh
+  použití. \\ \indent
+  Na kartě \com\ je Xilinx \fpga\ (Virtex II), konektor na DDR paměti a jako 
+  rozhraní mezi sběrnicí \emph{PCI} a kartou zde slouží čip \emph{PLX}
+  (\emph{PCI9054})
+  s~pevně daným mikrokódem. Do něho jsou napojeny součástky karty, aby ovladač
+  v~operačním systému mohl přes tento čip přistupovat do paměťových prostorů
+  karty. Dodejme, že součástky sem připojené nemusí být jen fyzické, ale je
+  možné vytvářet i virtuální zařízení. \\ \indent
+  Na \com\ kartu je dále napojena deska s~rozhraním, v~závislosti na něm má
+  karta odlišné vlastnosti. Například, připojíme-li desku \emph{COMBO-4MTX},
+  získáme 4 ethernetová rozhraní s~konektory na metalické vedení. Další
+  přídavné karty jsou \emph{COMBO-4SFP} (zdířky až na 4 SFP klece pro GE
+  metalické nebo optické konektory), \emph{COMBO-4SFPRO} (4 SFP pro GE nebo
+  OC48), \emph{COMBO-2XFP} a jiné. Všechna tato přípojná zařízení mají opět
+  programovatelné hradlové pole, některá s~vlastním procesorem. \\ \indent
+  Do těchto polí se nahrává design (někdy též firmware), přeložený kód psaný
+  VHDL jazykem. Pro každý účel, pro nějž může karta sloužit, jsou vytvořeny
+  samostatné designy a k~nim i odlišné ovladače (u \comx\ i \ppc\ programy),
+  jak uvidíme později. Nahrávání do tohoto prostoru obstarává mikroprogram
+  v~\emph{CPLD} oblasti -- načítá a vkládá sem data tekoucí z~operačního
+  systému. \\ \indent
+  Nastavíme-li tyto komponenty do funkčního stavu, využijeme kartu jako
+  vysokorychlostní (až 10\,Gbps) zařízení zapojené do sítě, kde se může chovat
+  aktivně jako výkonný směrovač paketů, filtr nebo jiné zařízení, pro které
+  existuje design, popřípadě pasivně, kdy pouze naslouchá a
+  vyhodnocuje toky sítí a může nám poskytnutím výsledků z~těchto měření
+  napomoci vyřešit problémy se sítí či zjistit úzká hrdla našich spojení.
+  \begin{figure}[h] 
+    \begin{center}
+      \includegraphics[width=12cm]{combo-sfpro} 
+      \caption{COMBO-4SFPRO přídavná karta}
+    \end{center}
+  \end{figure}
+  \section{COMBO6x}
+  Nevýhodou u starších \com\ karet byla nemožnost jakkoliv změnit program
+  v~\emph{PLX} čipu, což do jisté míry omezuje jejich flexibilitu. Tento
+  nedostatek vývojáři hardware odstranili záměnou této komponenty za Virtex~II
+  s~\emph{PCI core} (někdy nazývané \emph{PCI-X}), obsahující další \ppc\
+  procesor, do jehož instrukční paměti si
+  můžeme nahrát libovolný námi vytvořený a přeložený program, který bude mít
+  na starosti provádění datových přenosů jako jeho předchůdce. Rozdíl
+  výrazně pocítíme v~rychlosti přenosu dat mezi paměťovými oblastmi karty a
+  pamětí architektury, jelikož námi napsaný specifický program připraví data a
+  až poté vyvolá přerušení, u staršího modelu bylo přerušení voláno (a bylo
+  nutné obsloužit) vícekrát pro jediný přenos. Takto ušetřený čas se zřejmě
+  projeví na výkonu. \\ \indent
+  Změn doznalo i hlavní \fpga\ karty, nyní jsou v~něm
+  zabudované 2 \ppc\ procesory, které také pomáhají navýšit výkon, který
+  jsme ovšem doposud na \nbsd\ nemohli využít. Přesto, že karta obsahuje
+  alespoň 3 (připomeňme, že i deska rozhraní jej může obsahovat) procesory,
+  je třeba přenechat výpočetně náročné operace na procesoru architektury,
+  abychom výhody těchto procesorů neztratili složitými výpočty. \\ \indent
+  K~\emph{PCI core} procesoru jsou připojeny všechny prvky karty ze stejného
+  důvodu, jako u \com. Neliší se ani v~nutnosti připojit jednu z~externích
+  přídavných karet, má-li sloužit ke zpracování paketů. V~opačném případě
+  můžeme procesorů využít k~výpočtům (jako koprocesory). \\ \indent
+  Protože je tato karta novinkou, neexistují pro ní ovladače pro operační
+  systém \nbsd, naším úkolem je vytvořit je. Jak jsme při vytváření ovladačů
+  postupovali se dočteme v~další kapitole.
+  \begin{figure}[h] 
+    \begin{center}
+      \includegraphics[width=11cm]{pci_arch}
+      \caption{COMBO6x schematicky}
+      \includegraphics[width=11cm]{combo6x} 
+      \caption{COMBO6x karta}
+    \end{center}
+  \end{figure}
+  \section{FlowMon, NetFlow}
+  \nflow\ je pasivní zařízení k~monitorování sítě schopné shromáždit
+  dynamická data IP\footnote{Internet Protocol, viz RFC (Request For Comments)
+  791} toků, proudu dat v~jednom směru. Identifikace je tvořena podle 5
+  informací z~toku -- zdrojová a cílová adresa, zdrojový a cílový
+  port, typ protokolu 3. vrstvy, typ služby a nakonec číslo logického rozhraní.
+  Tuto sondu lze využít více způsoby, můžeme s~její pomocí zjistit
+  problémy se sítí, vytíženost, dále můžeme detekovat pokusy o útoky, které
+  mají za následek nefunkční služby a další. \\ \indent
+  \emph{FlowMon}\cite{nflow} je jeden z~projektů Liberouteru implementující
+  \nflow. Jeho funkčnost je založena na \com\ (\comx) technologii, má svůj
+  samostatný design a je na nás, abychom vytvořili ovladač i pro tento design.
+  V~jeho schopnostech je držet v~paměti až 65 tisíc toků a později informace o
+  těchto tocích předat do externích sběračů (Collector na obrázku) jako balíky
+  v~\emph{NetFlow v9}\cite{rfc3954} formátu.
+  \begin{figure}[h] 
+    \begin{center}
+      \label{flow}
+      \includegraphics[width=12cm]{netflow} 
+      \caption{Průchod dat v~\nflow}
+    \end{center}
+  \end{figure}
+  \section{Použité nástroje}
+  Zdrojové a jiné texty každého rozsáhlejšího projektu musejí být více či méně
+  dozorovány a spravovány. K~tomuto účelu se používají nástroje
+  s~rozmanitými možnostmi, jakými jsou \emph{CVS} (Concurrent Versions System),
+  \emph{SVN} (Subversion), \emph{GIT} (hloupý sledovač obsahu) a další.
+  Ani \emph{Liberouter} nemůže zůstat
+  v~tomto směru pozadu, zde k~tomuto účelu v~současné době slouží první
+  jmenovaný systém -- \emph{CVS}. \\ \indent
+  Nedílnou součástí při vytváření binárních souborů jsou překladače a vybavení,
+  které usnadňuje práci s~nimi. Jako překladač slouží \emph{GNU C (gcc)} a
+  jako nástroj, který jej spouští \emph{BSD make}. Oba mohly být jednoduše
+  zapojeny do
+  jednoho velkého funkčního celku za pomocí skriptovacích jazyků, ať už
+  samotného příkazového řádku \emph{bash} či mezi programátory rozšířeného
+  jazyka \emph{perl}.\\ \indent
+  K~úpravě textových souborů sloužil editor \emph{vim}. Ten dokáže spouštět i
+  výše uvedené nástroje, proto jsme je mohli pomocí klávesových zkratek volat
+  současně s~ostatními účelovými utilitami vyvinutými samotnými
+  vývojáři projektu. \\ \indent
+  V~sekci testování využijeme také programy zacházející se síťovými
+  rozhraními. Jednak budeme chtít zachytávat pakety v~síti pomocí
+  \emph{tcpdump}, ty pak s~přispěním \emph{ethereal} roztřídit a zkontrolovat,
+  jednak do sítě potřebujeme pakety posílat a je nutné je
+  nějakým programem generovat, použijeme \emph{dnet}. \\ \indent
+  Jako shrnutí by mohl být tento výčet dostatečný, na závěr můžeme jen
+  zmínit operační systémy použité při vývoji. Je samozřejmé, že vývoj probíhal
+  na systému \nbsd, jako referenční systém (sloužil jako zdroj informací a
+  prostředek k~odladění různých nástrojů, ke generaci paketů) byl využit
+  Linux.
+
+\include{driv}
+
+\chapter{Testování}
+  Další prací je ověření funkčnosti, to je zjistit, zda jsou pakety opravdu
+  vysílány a přijímány a jsou-li
+  správné, nepoškozené. Je jistě mnoho způsobů, jak to ověřit, ale my k~tomuto
+  účelu můžeme elegantně využít výše zmíněného projektu FlowMon. Resp. tuto
+  sondu lze použít k~ověření vysílání, příjem ověříme jednoduše
+  programem, který zjistí, zda data, která jádro přijalo jsou námi očekávané.
+  \section{Konstrukce NetFlow ovladače}
+  \nflow\ je schopen zachytit a vyhodnotit pakety, což je přesně to, co pro
+  ověření vysílání potřebujeme -- spustíme jej na protilehlé straně
+  připojení. K~tomu, abychom jej mohli využít, je třeba opět vytvořit ovladač
+  nad tímto designem, čemuž se budeme věnovat v~této sekci.
+  \ppc\ program je převzatý \nic\ program a jsou odstraněny části zodpovědné za
+  posílání paketů, jelikož \nflow\ je pasivní a nepotřebuje (a neumí) pakety
+  posílat. Přijímací část spolu s~okolním kódem zůstane zachována až na změnu
+  ukazatelů v~prostoru designu, který má každý design vlastní a odebráním části
+  pro příjem na více portech -- \nflow\ dovoluje přijímat pouze na jednom
+  portu. \\ \indent
+  I v~tomto případě převezmeme základy z~\nic\ ovladače. Odstraníme sekce
+  odpovídající za vysílání
+  paketů a upravíme podle toho i inicializační funkci. Další věcí je
+  odstranění víceportového příjmu, což v~sobě nese pouhou redukci struktury,
+  kde se místo pole čtyř nastavení použije jen jedno jediné. \\ \indent
+  Podstatným rozdílem je předávání paketů do uživatelského prostoru. V~tomto
+  případě nevyužijeme tradičního síťového rozhraní, nýbrž přenos bude probíhat
+  přes
+  mapování prostoru jádra do prostoru uživatelského, a to pomocí metody
+  \emph{memory map} (zkráceně \emph{mmap}). Protože je tímto způsobem \nflow\
+  implementované v~systému Linux, bylo by nešťastné volit jinou variantu, což
+  by mělo zajisté za následek přepis některých vrstev v~uživatelském prostoru.
+  My se pouze inspirujeme touto vrstvou v~Linuxu a vytvoříme ji tak, aby byla
+  funkční i v~\nbsd. Tímto
+  vytváříme další modul se jménem \emph{scampi}, jenž má své místo těsně nad
+  ovladačem \emph{combo6}.
+  \section{Implementace}
+  \subsection{Scampi}
+  Scampi vrstva předávající pakety z~designové vrstvy do
+  uživatelského prostoru přes speciální soubor je nezbytná pro další práci,
+  proto s~její vývojem začneme jako první.
+  Operace implementované nad speciálním souborem jsou \emph{open}, \emph{close},
+  \emph{ioctl}, \emph{poll}, a \emph{mmap}. První dvě zmíněné jsou
+  samozřejmostí, zde vytvoříme pro každý samostatně spuštěný program vlastní
+  strukturu, ve které
+  si udržujeme stav a fronty paketů pro tuto konkrétní instanci. \emph{Ioctl}
+  implementujeme standardním způsobem, nastavují a čtou se odsud různá
+  nastavení, probíhá zde ovládání. Její zkrácené tělo napíšeme následovně:
+\begin{verbatim}
+switch (cmd) {
+case SCAMPI_IOCTL_START:
+    return scampi_start(cfile);
+case SCAMPI_IOCTL_STOP:
+    return scampi_stop(cfile);
+...
+default:
+    return (ENXIO);
+}
+\end{verbatim}
+  Další jmenované, \emph{poll} slouží ke zjištění, zda jsou připravena data,
+  to se dozvíme přečteme-li proměnnou s~počtem paketů ve frontě. Pokud
+  přesáhne určitý počet, oznámíme uživatelskému prostoru připravenost vrácením
+  příslušné hodnoty. \\ \indent
+  Pomocí \emph{mmap} metody lze z~ovladače přečíst takřka všechna data, je
+  rozdělena na pět prostorů, které lze namapovat, např. popis paketů, jejich
+  datové části a podobně. Tato funkce je využívaná především k~získávání
+  dat a informací o paketech. \\ \indent
+  Již několikrát jsme zmínili pojem fronta, definujeme je pomocí jedné
+  z~možných implementací v~jádře \nbsd\ -- \emph{TAILQ}. Je to dvojitě zřetězený
+  seznam, který nám dovolí odebrat element z~kteréhokoliv místa fronty bez
+  nutnosti tuto frontu procházet. My ji využijeme hned několikrát, udržujeme
+  si totiž frontu volných paketů k~použití, používaných, zablokovaných
+  a naplněných paketů, paketů, které jsou určeny konkrétní instanci programu,
+  blokované
+  pakety instance programu a na závěr frontu zásobníků bloků, které jsme při
+  inicializaci ovladače připravili. Všechny tyto fronty nastavujeme pomocí
+  \emph{TAILQ\_INIT} makra v~nějaké funkci ovladače. Jednak tak činíme přímo
+  po vložení ovladače, jednak při otevírání speciálních souborů. \\ \indent
+  Zbývající obsah ovladače se týká operací s~těmito frontami, funkce, které
+  přesunují pakety z~jedné fronty do druhé jsou volány v~závislosti na
+  situaci. Některé volá ovladač, aby získal volný paket (fronta volných paketů)
+  či tento paket vrací naplněný (fronta naplněných paktů), jiné uživatelský
+  program přes \emph{ioctl}, kde si je označuje,
+  aby nemohly být použity (fronta zablokovaných paketů). Tímto získáváme tyto
+  funkce rozhraní:
+  \begin{itemize}
+    \item scampi\_device\_alloc -- vytvoří instanci \emph{scampi\_device}
+      struktury, naplní ji a připraví oblasti pro \emph{mmap}
+    \item scampi\_device\_free -- uvolní místa vytvořená první funkcí
+    \item scampi\_device\_alloc\_pci -- připraví oblasti \dma, a nastaví
+      ukazatele
+    \item scampi\_device\_free\_pci -- protichůdná funkce k~předchozí
+    \item scampi\_device\_register, scampi\_device\_unregister -- tímto
+      oznamujeme designovým ovladačem připravenost
+    \item scampi\_device\_get\_packet -- voláme při žádosti o paket, funkce
+      odebírá z~fronty volných paketů a přidá do používaných
+    \item scampi\_device\_put\_packet -- paket vrácený funkcí \emph{get}
+      tímto voláním vkládáme z~používaných do naplněných
+    \item scampi\_device\_detach\_packet -- přesun z~naplněných do
+      prázdných
+    \item scampi\_device\_down -- pro budoucí použití
+    \item scampi\_device\_lock, scampi\_device\_lock\_irq -- slouží
+      k~zamčení obsahu paměti jako obrana proti chybám souběhu
+      (angl. \emph{race condition}) v~různých kontextech
+    \item scampi\_device\_unlock, scampi\_device\_unlock\_irq -- odemkne
+      předtím zablokovaný zámek
+    \item scampi\_device\_carrier\_on, scampi\_device\_carrier\_off --
+      prozatím nevyužity, oznamují detekci nosné
+  \end{itemize}
+  Tento výpis není kompletní, další funkce, jako start a ukončení zařízení a
+  jim podobné funkce lze spouštět pře \emph{ioctl} volání, ty již ale
+  neexportujeme do prostoru jádra, jsou volány čistě z~uživatelského
+  prostoru. \\ \indent
+  Při průběžném testování narážíme na problém. Pokud uživatelský program žádá
+  zamknutí skupiny paketů, provedeme tuto operaci v~pořádku. Následně, když
+  tyto pakety uvolňujeme z~fronty v~cyklu, na konci tohoto cyklu je fronta
+  prázdná. Pokud se ale pokusíme do této prázdné fronty přidat paket, fronta
+  bude stálé prázdná, naopak v~jiné, předem neurčité, frontě přibude paket.
+  Tuto maličkost ošetříme
+  podmínkou -- testem na prázdnost fronty. Je-li fronta prázdná, nastavíme ji
+  znovu pomocí \emph{TAILQ\_INIT} a tím jsme problém vyřešili.
+  \subsection{NetFlow}
+  Začněme zase obsluhou přerušení, protože zde práce ovladače začíná. Přečteme
+  stavový registr a při úspěchu začneme přijímat pakety ve funkci
+  \emph{netflow\_recv}. \nflow\ design má v~prostoru \fpga\ uloženy dva
+  ukazatele, jeden ukazuje pozici, kde jsou přijaté pakety (\emph{wrptr})
+  z~rozhraní, druhý (\emph{rdptr}) do něj zapisuje ovladač a je to ukazatel
+  na pozici, která už byla přečtena. Pokud se tyto dvě
+  hodnoty rovnají, nemáme práci a skončíme. V~opačném případě postupně
+  čteme záznamy z~prostoru karty a předáváme je \emph{scampi} vrstvě. Pro
+  každý přečtený paket zvýšíme jeden z~ukazatelů a celý proces
+  opakujeme dokud
+  máme práci, čili opět testujeme na rovnost zmíněné dva ukazatele. Cyklus
+  vypadá takto (některé části vynechány a vyjádřeny na intuitivní úrovni):
+\begin{verbatim}
+while (wrptr != rdptr) {
+    pkt = scampi_get_packet();
+    if (pkt != NULL) {
+        pkt->desc->if_index = ifc;
+        pkt->desc->hh_size = hw_item_size;
+        pkt->desc->size = 0;
+        pkt->desc->status = SCAMPI_PACKET_STATUS_OK;
+
+        ptr = (u_int32_t *)pkt->virt;
+        for (ofs = 0; ofs < hw_item_size; ofs += 4)
+            *ptr++ = netflow_read_4(sc,
+                    NETFLOW_ITEM(rdptr, ofs);
+        scampi_put_packet(pkt);
+    } else
+        printf("cannot get a free packet\n");
+    rdptr = (rdptr + 1) % hw_items;
+}
+\end{verbatim}
+  Dodejme, že \emph{netflow\_read\_4} obstarává fyzické čtení z~paměťového
+  prostoru karty o velikosti 32 bitů.
+  \begin{figure}[h] 
+    \begin{center}
+      \includegraphics[height=8cm]{nflow} 
+      \caption{Ovladač znázorněný diagramem}
+    \end{center}
+  \end{figure}
+  \section{Proces testování}
+  Máme implementovaný a funkční ovladač, začneme s~testovacími pracemi.
+  Protože naše snaha byla napojit cestu jádra stejně jako na systému Linux,
+  není třeba změn v~uživatelských programech a můžeme je tedy ihned využít
+  k~testování. Postup
+  zprovoznění není nijak odlišný až na způsob načtení ovladačů. Pomocí výše
+  popsaného postupu tak učiníme za pomocí nástroje \emph{modload} a následné
+  kroky jsou jen nahraní designu, připojení designového ovladače a
+  inicializace \nflow\ sondy s~přispěním \emph{netflowctl\_ph1}, jak se můžeme
+  dočíst ve zprávě CESNETu\cite{nflow} o \nflow. \\ \indent
+  V~tento okamžik je sonda připravena a nám nezbývá, než začít vysílat pakety
+  na opačné straně spojení, kde máme další \comx\ kartu a v~kooperaci
+  s~ní běží náš druhý ovladač pro \nic. Samozřejmě si musíme určit, jaká data
+  chceme a budeme posílat. Jako nejlepší se v~tomto případě jeví nespojovaný
+  proud \emph{UDP}\footnote{User Datagram Protocol} datagramů. K~jeho
+  vygenerování můžeme použít například nástroj \emph{dnet}, který umožňuje
+  sestavit paket od nejhornější datové vrstvy, až po vrstvu etherenetovou.
+  Celý takto vygenerovaný paket pošleme jako surová data (řekneme jádru, aby
+  nepřidával žádné informace, ale přímo tato data poslal ovladači) a ovladač
+  je takto přenese po spojujícím médiu (metalické spojení, optické
+  vlákno\ldots) k~sondě, kde proud dat vyhodnotíme. \\ \indent
+  Generace paketů probíhá v~následující smyčce (\emph{bash} skript):
+\begin{verbatim}
+ip=10.0.10.1; mac=01:02:03:04:05:06
+while [ 1 ]; do
+    dnet udp sport 7 dport 7 < text | \
+    dnet ip proto udp src ${ip} dst 255.255.255.255 | \
+    dnet eth src ${mac} dst ff:ff:ff:ff:ff:ff | \
+    dnet send c6eth00
+done
+\end{verbatim}
+  Do souboru \emph{text} jsme si předtím uložili dostatečně objemná data (cca
+  800 bajtů), dáme jej na vstup prvního příkazu, který vytváří \emph{UDP}
+  datagram, jehož zdrojový a cílový port jsou 7. Tento datagram obalujeme
+  v~dalším příkazu do \emph{IP} se zdrojovou a cílovou adresou, které vidíme
+  (255.255.255.255 je limitovaná všesměrová adresa). Další vrstvou v~síťovém
+  uspořádání je etheretový rámec, ten vytvoříme v~poslední řádce cyklu
+  (\emph{ff:ff:ff:ff:ff:ff} má podobný význam jako všesměrová adresa
+  \emph{IP} vrstvy) a ten nakonec celý vložíme do rozhraní. \\ \indent
+  Takto nekonečně generujícím skriptem vytváříme síťový provoz. Ten
+  zachytává sonda a pomocí exporteru přeposílá na přijímač (sekce \ref{flow}),
+  kde \emph{tcpdump} ukládá toky do souboru. Po dostatečně dlouhou dobu
+  (několik hodin) necháme takto systémy pracovat. Po dvou hodinách usuzujeme,
+  že nám vzniklý 50\,MiB soubor postačuje. \\ \indent
+  Takto vygenerovaný soubor otevřeme v~programu \emph{ethereal}
+  a vidíme, že naše ovladače
+  fungují, že je vygenerovaný provoz na jedné straně \nic\ ovladačem vysílán a
+  druhým (\nflow) ovladačem na straně druhé přijímán a zpracován. \\ \indent
+  Zbývá nám ověřit správnost poslední části, příjem paketů \nic\ ovladačem.
+  Jednoduše, pomocí kontrolních součtů v~\emph{UDP} hlavičce dostatečně
+  dlouhého
+  datagramu (velikost generovaná pomocí \emph{dnet} postačuje), ověříme, zda je
+  přijímací část v~pořádku. Na straně s~\comx\ kartou spustíme opět naši
+  nekonečnou smyčku a pakety jí generovanými zachytíme do souboru opět pomocí
+  \emph{tcpdump}. Otevřeme tento výstupní soubor v~\emph{etherealu} a použijeme
+  jeho filtry. Nastavíme zobrazovat jen ty pakety, kterým nesouhlasí
+  kontrolní součet. Docílíme toho příkazem \emph{udp.checksum\_bad == 1} do
+  pole filtr a ihned po potvrzení vidíme, že z~okna zmizely všechny pakety,
+  což značí jejich nepoškozenost a to jsme měli ukázat. Na následujících
+  obrázcích lze oba soubory z~testů vidět načtené v~programu.
+  \begin{figure}[h] 
+    \begin{center}
+      \includegraphics[width=10cm]{ereal-nflow} 
+      \caption{\emph{Ethereal} s~načteným výstupem \emph{tcpdump}, \nflow}
+      \includegraphics[width=10cm]{ereal-nic} 
+      \caption{\emph{Ethereal} s~načteným výstupem \emph{tcpdump}, \nic}
+    \end{center}
+  \end{figure}
+
+\chapter{Dokumentace}
+  Nedílnou součástí každého programového vybavení je dobrá a pro uživatele
+  srozumitelná dokumentace. Pomineme-li komentování samotného kódu pro ostatní
+  vývojáře pro lepší orientaci, je třeba vytvořit popis postupů kterými
+  uživatelé navodí funkční stav ovladačů. Stranou ponecháme také vytvoření
+  manuálových stránek pro vytvořená rozhraní. \\ \indent
+  Je jistě mnoho způsobů, jak dokumentaci vytvářet. My použijeme dnes masivně
+  se rozvíjející systém dokumentování -- MediaWiki, který je možné znát
+  například z~projektu Wikipedia, pro nějž byl tento systém původně navržen a
+  vytvořen. Jeho výhodou je, že může změny dělat kdokoliv a ostatní uživatelé
+  vidí změny okamžitě (jsou vystavené v~síti Internet). \\ \indent
+  Jednak je nutné zdokumentovat překlad modulů, aby si je každý mohl vytvořit,
+  dojde-li k~nějaké změně, jednak je třeba popsat způsob načítání ovladačů, je
+  třeba uvést pořadí, popřípadě parametry či možná úskalí. Tyto
+  aspekty můžeme shlédnout v~původním znění v~příloze práce, písmeno A.
+
+\chapter{Závěr}
+  Během vytváření práce jsme navrhli strukturu ovladačů pro operační systém
+  NetBSD, shrnuli jsme si základy principu fungování takovýchto ovladačů a
+  poté tuto strukturu využili a vytvořili tři funkční
+  ovladače. Mimo jiné jsme se seznámili s~principem fungování \emph{Bus Master
+  DMA} přenosů a poté i tato forma přenosu dat byla použita. Práce
+  samozřejmě zahrnovala i testování vytvořené práce, my jsme k~tomuto účelu
+  využili stávajícího projektu \emph{FlowMon}, pro nějž byl určen jeden
+  z~ovladačů. Při této práci jsme souběžně vytvořili
+  dokumentaci uživatelům, aby si mohli námi vytvořený kód lehce zprovoznit,
+  popřípadě i přeložit.
+
+\bibliographystyle{plain} 
+\bibliography{bc} 
+
+\include{app}
+
+\end{document}
