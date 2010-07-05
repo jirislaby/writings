@@ -1,0 +1,94 @@
+% vim: textwidth=78 ai spell spelllang=en
+\documentclass[10pt]{llncs}
+\usepackage{color}
+\usepackage{url}
+\usepackage{xspace}
+\usepackage{graphicx}
+\usepackage{listings}
+
+\newcommand\Color[2]{\textcolor{#1}{#2}}
+\newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
+\newcommand\todo[1]{\nb{\Color{red}{#1}}}
+
+\newcommand\st{\textsc{Stanse}\xspace}
+
+\begin{document}
+
+\title{Reducing Error Count Found in Different Source Versions}
+\author{Ji\v{r}\'\i~Slab\'y}
+\institute{Faculty of Informatics, Masaryk University, Brno, Czech Republic
+\email{xslaby@fi.muni.cz}}
+
+\maketitle
+
+\begin{abstract}
+  With a use of contemporary static analysis tools, many errors are found in
+  source codes. Here, we introduce a mechanism to prevent recurring of
+  perpetual errors which were not fixed yet or false positives which are
+  likely to be present with its source code for very long time. We discuss
+  what mechanisms can be used to determine such errors and demonstrate them on
+  output from \st run on the Linux kernel.
+\end{abstract}
+
+\section{Introduction}
+Recently, many new static analysis tools emerged (for example
+\cite{coverity,findbugs,sparse}) with a potential of finding many
+long-standing errors in the source code. We also contributed by our tool
+called \st \cite{stanse}.
+
+Mostly the problem with these tools is that they produce a long list of errors
+with false-positives included. There is a little what can be done about that
+in one specific release of sources (from the repetitive-error perspective).
+But it becomes a burden when the developers should check the very same subset
+of reported errors every single release of the product. In this case, when
+such a tool is run on projects with short release cycle, it is possible to
+recognize (a) the errors which were reported in earlier version and were not
+fixed yet and (b) false positives which nobody wish to see again and again.
+
+
+
+One of the projects with the requirements satisfied is surely the Linux
+kernel. Its release cycle (between major versions, e.g.
+2.6.34$\rightarrow$2.6.35) is relatively short 
+
+\paragraph{Error Format}
+Before we start with the methodology, we first have to know what the output
+of the tools look like to be able to proceed to details. Even though the error
+formatting practices differ tool by tool, in common they contain the source
+file name where the error lays with exact line too.
+
+The report also carries an information about what kind of error is that and
+possibly what module (checker) generated that. Eventually some tools report
+another fields like a line column, but this is irrelevant for further
+considerations.
+
+In the end, the entry (error) in the report list $RL$ is a tuple $E$ (e.g.
+in a database as we will see later) such as:
+\begin{center}
+$E = (file, line, checker, error\_description) \in RL$
+\end{center}
+
+\section{Methodology}
+Be a start point two lists of errors $RL_1$ and $RL_2$ generated from two
+different versions of the same project. $RL_1$ corresponds to an older
+version, $RL_2$ to a newer one respectively.
+
+\subsection{Simple Solution}
+The simplest approach is just to compare each tuple from $RL_2$ to entries in
+$RL_1$ and having the result $RL=\{x|x\in RL_2 \wedge x \notin RL_1\}$.
+
+\subsection{SCM Solution}
+
+Use git log.
+
+\section{Evaluation}
+We exercised our algorithm on the errors found in the Linux kernel by \st.
+
+\section*{Acknowledgements}
+The author is supported by the research centre Institute for Theoretical
+Computer Science (ITI), project No. 1M0545.
+
+\bibliographystyle{plain}
+\bibliography{inter-errors}
+
+\end{document}
