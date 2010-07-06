@@ -9,7 +9,7 @@
 \usepackage{listings}
 
 \lstset{tabsize=2,showstringspaces=false,breaklines=true,breakatwhitespace=true,
-	escapeinside={(*@}{@*)},basicstyle=\scriptsize}
+	escapeinside={(*@}{@*)},basicstyle=\footnotesize}
 
 \newcommand\Color[2]{\textcolor{#1}{#2}}
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
@@ -218,11 +218,11 @@ RL^{simple}_2=\{x|x\in RL_2 \wedge x \notin RL_1\}
 
 Obviously there are several problems tightly connected to this approach.
 First, not all the tuple elements are preserved over source revisions. Namely
-\textit{line} element changes extensively version by version. To make this
-technique defunct, it is actually enough to add or remove single (even empty)
-line to/from the file\footnote{Technically, if the analyzer works on the
-preprocessed code, it is enough that somebody changes any included file,
-because the preprocessed output is shifted by the change as a whole.}.
+for example \textit{line} element changes extensively version by version. To
+make this technique defunct, it is actually enough to add or remove single
+(even empty) line to/from the file\footnote{Technically, if the analyzer works
+on the preprocessed code, it is enough that somebody changes any included
+file, because the preprocessed output is shifted by the change as a whole.}.
 
 Second, this solution can introduce false-negatives. Consider a code in
 Figure~\ref{fig:fp_simple} on the left side where there is a bug in locking.
@@ -247,20 +247,49 @@ Use git log.
 \section{Evaluation}
 \label{sec:eval}
 We exercised our algorithm on the errors found in the Linux kernel by \st. The
-errors are represented in an XML form by default. But as we wanted to have a
-convenient way for combining and querying the data, we decided to use
-databases and some SQL language for accessing the data.
+two versions we considered are 2.6.35-rc3-next20100618 and
+2.6.35-rc4-next20100706, further referred only as -rc3 and -rc4 respectively.
+That means a development versions where there are over 300 thousand lines
+changed in 2654 files between them in 18 days. There are no changes in
+configuration of the kernel (besides newly added drivers, which were ignored)
+and neither of our tool.
 
+The errors reported by \st are represented in an XML form by default. But as
+we wanted to have a convenient way for combining and querying the data, we
+decided to use databases and some SQL language for accessing the data.
 Although there exists infrastructures for combining XML and SQL like SQL/XML
 \cite{sqlxml}, we sticked to a simple database system, more concretely to
-\textsc{SQLite} which stores and references databases as single files stored
-somewhere on a backing store.
+\textsc{SQLite} \cite{sqlite} which stores and references databases as single
+files somewhere on a backing store.
 
-We wrote a script to transform the XML into a \textsc{SQLite} database file,
-so that we are able to use SQL language supported by that machine.
+To achieve the goal, we wrote a Perl script to transform the XML into a
+\textsc{SQLite} database file. Despite each report list resides in a separate
+database file, it is not a problem because \textsc{SQLite} allows combining
+even tables from different databases in its SQL. Thus we can easily reference
+errors from two versions and store the result into the third\footnote{The
+reason for this is that our web frontend works on a version-per-file basis and
+needs no changes with this approach.}.
 
 \subsection{Using Simple Solution}
-This refers back to the Simple Solution presented in Section~\ref{sec:simple}.
+First, we will have a look on the \emph{Simple Solution} presented in
+Section~\ref{sec:simple}. 
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|l|c|c|c|c|c|} \hline
+          & \textbf{-rc4} & \textbf{-rc4$^{s}$} & \textbf{\%} &
+	  \textbf{-rc4$^{SCM}$} & \textbf{\%}               \\ \hline
+Atomicity &      &                 &    &              &    \\ \hline
+Locking   &      &                 &    &              &    \\ \hline
+Memory    &      &                 &    &              &    \\ \hline
+Pairing   &      &                 &    &              &    \\ \hline
+Sum       & 600  & 50              &    &              &    \\ \hline
+\end{tabular}
+\end{center}
+\label{tab:res}
+\caption{Errors count using none, simple and advanced solution (-rc3 shown
+only for comparison)}
+\end{table}
 
 \subsection{Using SCM Solution}
 
