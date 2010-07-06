@@ -1,10 +1,15 @@
 % vim: textwidth=78 ai spell spelllang=en
-\documentclass[10pt]{llncs}
+\documentclass{acm_proc_article-sp}
+\usepackage[utf8x]{inputenc}
+\usepackage[final]{hyperref}
 \usepackage{color}
 \usepackage{url}
 \usepackage{xspace}
 \usepackage{graphicx}
 \usepackage{listings}
+
+\lstset{tabsize=2,showstringspaces=false,breaklines=true,breakatwhitespace=true,
+	escapeinside={(*@}{@*)},basicstyle=\scriptsize}
 
 \newcommand\Color[2]{\textcolor{#1}{#2}}
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
@@ -14,74 +19,157 @@
 
 \begin{document}
 
-\title{Reducing Error Count Found in Different Source Versions}
-\author{Ji\v{r}\'\i~Slab\'y}
-\institute{Faculty of Informatics, Masaryk University, Brno, Czech Republic
-\email{xslaby@fi.muni.cz}}
+\title{Eliminating Repetitive Errors Found in Consecutive Source Releases}
+
+\numberofauthors{1}
+
+\author{
+Ji\v{r}\'\i~Slab\'y\\
+	\affaddr{Faculty of Informatics}\\
+	\affaddr{Botanická 68a}\\
+	\affaddr{Brno, Czech Republic}\\
+	\email{xslaby@fi.muni.cz}
+}
 
 \maketitle
 
 \begin{abstract}
-  With a use of contemporary static analysis tools, many errors are found in
-  source codes. Here, we introduce a mechanism to prevent recurring of
-  perpetual errors which were not fixed yet or false positives which are
-  likely to be present with its source code for very long time. We discuss
-  what mechanisms can be used to determine such errors and demonstrate them on
-  output from \st run on the Linux kernel.
+With a use of contemporary static analysis tools, many errors are found in
+source codes. We introduce a mechanism to prevent recurring of perpetual
+errors found by the tools in different source releases. The mechanism aims
+especially at those errors which were not fixed yet or are false-positives
+which will likely be present with its source code forever. We discuss what
+algorithms can be used to determine such errors and demonstrate them on output
+from \st run on the Linux kernel.
 \end{abstract}
 
 \section{Introduction}
 Recently, many new static analysis tools emerged (for example
 \cite{coverity,findbugs,sparse}) with a potential of finding many
-long-standing errors in the source code. We also contributed by our tool
-called \st \cite{stanse}.
+long-standing errors in the source code. Mostly the problem with these tools
+is that they produce a very long list of errors. The reason is much sources
+present in the project (more potential places for errors) and/or
+false-positives which are not about to be fixed. From the recurring error
+perspective, there is a little what can be done about that in one specific
+release of sources. But it becomes a burden when the developers would have to
+check the very same subset of reported errors every single release of the
+product.
 
-Mostly the problem with these tools is that they produce a long list of errors
-with false-positives included. There is a little what can be done about that
-in one specific release of sources (from the repetitive-error perspective).
-But it becomes a burden when the developers should check the very same subset
-of reported errors every single release of the product. In this case, when
-such a tool is run on projects with short release cycle, it is possible to
-recognize (a) the errors which were reported in earlier version and were not
-fixed yet and (b) false positives which nobody wish to see again and again.
+In this case, when such an analyzer is run on a project with short release
+cycle, it is possible to recognize (a) the errors which were reported in an
+earlier version and were not fixed yet\footnote{There are many reasons for
+this including slow responses to error reports from maintainers.} and (b)
+false positives which nobody wishes to see again and again.
 
+Although it may seem that there are almost no requirements on the project when
+we want to use this technique, it is not that easy. Not only the fast
+development and quick releases of new versions is a precondition, but also
+rigid structure of files so that they don't fluctuate over the source tree.
+Further, a thorough development methodology which does not allow developers to
+perform inappropriate moves of code parts between files every release and so
+on. Every change should have its reason, otherwise the change won't be
+accepted by the project management.
 
+One of the projects with the requirements above satisfied is the Linux kernel
+for sure. Its release cycle between major versions (e.g.
+2.6.33$\rightarrow$2.6.34) is relatively short, oscillating between 11-13
+weeks. The changes coming into the tree are not accepted unless appropriately
+reasoned, reviewed and merged by subtree maintainers and finally accepted by
+L. Torvalds. Also, developers are mostly not allowed to shuffle with sources
+arbitrarily over the tree, every class of drivers has its own, predetermined,
+directory.
 
-One of the projects with the requirements satisfied is surely the Linux
-kernel. Its release cycle (between major versions, e.g.
-2.6.34$\rightarrow$2.6.35) is relatively short 
+We already mentioned that there are many static analysis tools out there. To
+have a fully operational tool working on the Linux kernel, \st \cite{stanse},
+a tool developed at the Faculty of Informatics, is used specifically in this
+paper. It contains a base with C parser, error reporting facility, user
+interface, points-to analysis module and application programming interface for
+checkers. A checker is a module which gets the parser output and reports
+errors back to the base which are in turn presented to a user. Currently there
+are four checkers implemented, in this paper we are interested exclusively in
+the \textsc{AutomatonChecker} which is able to find errors described by finite
+automata.
 
-\paragraph{Error Format}
+The paper is organized as follows. First, in Section~\ref{sec:motiv} we will
+see why the technique is important and what benefits it brings, then
+Section~\ref{sec:method} introduces the technique itself with possible
+extensions and finally we evaluate it with a use of \st output collected from
+the Linux kernel in Section~\ref{sec:eval}.
+
+\section{Motivating Example}
+\label{sec:motiv}
+Before we dive into the details of the algorithms in the
+Section~\ref{sec:method}, consider the following piece of code extracted
+(slightly manually macro-expanded for clarity) from
+\texttt{lib/locking-selftest.c} obtained from the Linux kernel:
+\begin{center}
+\begin{lstlisting}[language=C]
+static DEFINE_SPINLOCK(lock_A);
+...
+static void double_unlock_spin(void) {
+  spin_lock(&lock_A);
+  spin_unlock(&lock_A);
+  spin_unlock(&lock_A);
+}
+\end{lstlisting}
+\end{center}
+
+The \texttt{double\_unlock\_spin} function is
+intended for exercising a mechanism for automatic dynamic locking violations
+tracking present in the kernel\footnote{So-called \textsc{LockDep}, more
+information are available at \url{http://lwn.net/Articles/185605/}.}. Thus it is
+impossible to change or "fix" the code to be correct from the automaton point
+of view.  Hence it is an error (a kind of false positive) which will be with
+this part of sources forever.
+
+We did a complete review of errors found in the Linux 2.6.27. All
+false-positives were marked accordingly and true errors reported (some with
+appropriate patches). Then we tried to perform the analysis even on release
+candidate kernels (only a week gap), and when inspecting these versions, we
+found out that many of the errors are of the similar kind as this example,
+i.e. cannot be fixed or were already reported but not fixed yet.
+
+To tackle down this problem, we present an algorithm to match errors from
+consecutive code releases to avoid repetition of errors presented to
+developers. Thus lowering the burden exposed to them when walking through the
+error list from newer versions.
+
+\section{Methodology}
+\label{sec:method}
 Before we start with the methodology, we first have to know what the output
-of the tools look like to be able to proceed to details. Even though the error
-formatting practices differ tool by tool, in common they contain the source
-file name where the error lays with exact line too.
+of the tools look like, especially what a \st's output is. Even though the
+error formatting practices differ tool by tool, in common they contain the
+source file name where the error lays with exact line too. The report also
+carries an information about what kind of error is that and possibly what
+module (checker) generated that. Eventually some tools report another fields
+like a line column, but this is irrelevant for further considerations.
 
-The report also carries an information about what kind of error is that and
-possibly what module (checker) generated that. Eventually some tools report
-another fields like a line column, but this is irrelevant for further
-considerations.
-
-In the end, the entry (error) in the report list $RL$ is a tuple $E$ (e.g.
+In the end, the entry (error) in a list of reports $RL$ is a tuple $E$ (e.g.
 in a database as we will see later) such as:
 \begin{center}
 $E = (file, line, checker, error\_description) \in RL$
 \end{center}
 
-\section{Methodology}
 Be a start point two lists of errors $RL_1$ and $RL_2$ generated from two
 different versions of the same project. $RL_1$ corresponds to an older
 version, $RL_2$ to a newer one respectively.
 
+Now, we want to eliminate such tuples $E$, that correspond to the same error.
+How the "same error" can be handled is described in the following subsections.
+
 \subsection{Simple Solution}
 The simplest approach is just to compare each tuple from $RL_2$ to entries in
-$RL_1$ and having the result $RL=\{x|x\in RL_2 \wedge x \notin RL_1\}$.
+$RL_1$ and having the result:
+\begin{center}
+$RL_{2a}=\{x|x\in RL_2 \wedge x \notin RL_1\}$
+\end{center}
 
 \subsection{SCM Solution}
 
 Use git log.
 
 \section{Evaluation}
+\label{sec:eval}
 We exercised our algorithm on the errors found in the Linux kernel by \st.
 
 \section*{Acknowledgements}
