@@ -43,9 +43,15 @@ algorithms can be used to determine such errors and demonstrate them on output
 from \st run on the Linux kernel.
 \end{abstract}
 
+\category{D.2.4}{Software}{Software Engineering}[Software/Program Verification]
+
+\terms{Algorithms}
+
+\keywords{Static analysis, error pruning, consecutive version errors}
+
 \section{Introduction}
 Recently, many new static analysis tools emerged (for example
-\cite{coverity,findbugs,sparse}) with a potential of finding many
+\cite{coverity,java_bugfinding,sparse}) with a potential of finding many
 long-standing errors in the source code. Mostly the problem with these tools
 is that they produce a very long list of errors. The reason is much sources
 present in the project (more potential places for errors) and/or
@@ -55,11 +61,14 @@ release of sources. But it becomes a burden when the developers would have to
 check the very same subset of reported errors every single release of the
 product.
 
-In this case, when such an analyzer is run on a project with short release
-cycle, it is possible to recognize (a) the errors which were reported in an
-earlier version and were not fixed yet\footnote{There are many reasons for
-this including slow responses to error reports from maintainers.} and (b)
-false positives which nobody wishes to see again and again.
+In this case, when such an analyzer is run on a project with release cycle
+short enough, it would be convenient to recognize (a) the errors which were
+reported in an earlier version and were not fixed yet\footnote{There are many
+reasons for this including slow responses to error reports from maintainers.
+An example of this is at \url{http://lkml.org/lkml/2009/9/23/221} which had to
+be sent three times and was merged even after 3 months.} and (b)
+false-positives because they are persistent in time and nobody wishes to see
+them again and again in every upcoming released version.
 
 Although it may seem that there are almost no requirements on the project when
 we want to use this technique, it is not that easy. Not only the fast
@@ -96,11 +105,46 @@ Section~\ref{sec:method} introduces the technique itself with possible
 extensions and finally we evaluate it with a use of \st output collected from
 the Linux kernel in Section~\ref{sec:eval}.
 
+\begin{figure*}[tb]
+\begin{center}
+\begin{tabular}{|c|c|} \hline
+Older version & Newer version \\ \hline \hline
+\begin{lstlisting}[language=C]
+static DEFINE_SPINLOCK(my_lock1);
+static DEFINE_SPINLOCK(my_lock2);
+static void fun(int in) {
+  spin_lock(&my_lock1);
+  if (in)
+    return;
+  spin_unlock(&my_lock1);
+}
+.
+.
+\end{lstlisting} &
+\begin{lstlisting}[language=C]
+static DEFINE_SPINLOCK(my_lock);
+static DEFINE_SPINLOCK(my_lock2);
+static void fun(int a) {
+  spin_lock(&my_lock1);
+  if (a) {
+    spin_unlock(&my_lock2);
+    return;
+  }
+  spin_unlock(&my_lock1);
+}
+\end{lstlisting} \\ \hline
+\end{tabular}
+\end{center}
+\caption{Illustration of false-negative introduced by the \emph{Simple
+Solution}}
+\label{fig:fp_simple}
+\end{figure*}
+
 \section{Motivating Example}
 \label{sec:motiv}
 Before we dive into the details of the algorithms in the
 Section~\ref{sec:method}, consider the following piece of code extracted
-(slightly manually macro-expanded for clarity) from
+(and also slightly manually macro-expanded for clarity) from
 \texttt{lib/locking-selftest.c} obtained from the Linux kernel:
 \begin{center}
 \begin{lstlisting}[language=C]
@@ -114,25 +158,32 @@ static void double_unlock_spin(void) {
 \end{lstlisting}
 \end{center}
 
-The \texttt{double\_unlock\_spin} function is
-intended for exercising a mechanism for automatic dynamic locking violations
-tracking present in the kernel\footnote{So-called \textsc{LockDep}, more
-information are available at \url{http://lwn.net/Articles/185605/}.}. Thus it is
-impossible to change or "fix" the code to be correct from the automaton point
-of view.  Hence it is an error (a kind of false positive) which will be with
-this part of sources forever.
+The \texttt{double\_unlock\_spin} function intentionally breaks the proper
+locking policy. The \texttt{lock\_A} is locked and then unlocked twice, thus
+leaving the lock in an inconsistent state. However, in this case, it is the
+sole purpose of the function. It is intended for exercising a mechanism for
+automatic dynamic locking violations tracking present in the
+kernel\footnote{So-called \textsc{LockDep}, more information are available at
+\url{http://lwn.net/Articles/185605/}.}. Thus it is impossible to change or
+"fix" the code to be correct from the point of view of an automaton which
+tracks lock states and watches the policy is not violated. Hence it is an
+error (a kind of false positive) which will be with this part of sources
+forever.
 
-We did a complete review of errors found in the Linux 2.6.27. All
-false-positives were marked accordingly and true errors reported (some with
-appropriate patches). Then we tried to perform the analysis even on release
-candidate kernels (only a week gap), and when inspecting these versions, we
-found out that many of the errors are of the similar kind as this example,
-i.e. cannot be fixed or were already reported but not fixed yet.
+We did a complete review of errors reported in the Linux 2.6.27 to sort out
+which of those are false-positives. All false-positives were marked
+accordingly and true errors reported to corresponding code maintainers (some
+with appropriate patches). Then we tried to perform the analysis more often,
+even on release candidate kernels in a weekly period only, and when inspecting
+these candidate versions, we found out that many of the errors are of the
+similar kind like this example, i.e. cannot be fixed or were already reported
+but not fixed yet for some reason.
 
 To tackle down this problem, we present an algorithm to match errors from
 consecutive code releases to avoid repetition of errors presented to
-developers. Thus lowering the burden exposed to them when walking through the
-error list from newer versions.
+developers in error lists. Thus lowering the burden exposed to them when
+walking through the error list generated from later versions. To the best of
+our knowledge there is no white paper describing a similar technique.
 
 \section{Methodology}
 \label{sec:method}
@@ -146,9 +197,9 @@ like a line column, but this is irrelevant for further considerations.
 
 In the end, the entry (error) in a list of reports $RL$ is a tuple $E$ (e.g.
 in a database as we will see later) such as:
-\begin{center}
-$E = (file, line, checker, error\_description) \in RL$
-\end{center}
+\begin{displaymath}
+E = (file, line, checker, error\_description) \in RL
+\end{displaymath}
 
 Be a start point two lists of errors $RL_1$ and $RL_2$ generated from two
 different versions of the same project. $RL_1$ corresponds to an older
@@ -158,11 +209,36 @@ Now, we want to eliminate such tuples $E$, that correspond to the same error.
 How the "same error" can be handled is described in the following subsections.
 
 \subsection{Simple Solution}
+\label{sec:simple}
 The simplest approach is just to compare each tuple from $RL_2$ to entries in
-$RL_1$ and having the result:
-\begin{center}
-$RL_{2a}=\{x|x\in RL_2 \wedge x \notin RL_1\}$
-\end{center}
+$RL_1$ and obtaining this result:
+\begin{equation} \label{eq:simple}
+RL^{simple}_2=\{x|x\in RL_2 \wedge x \notin RL_1\}
+\end{equation}
+
+Obviously there are several problems tightly connected to this approach.
+First, not all the tuple elements are preserved over source revisions. Namely
+\textit{line} element changes extensively version by version. To make this
+technique defunct, it is actually enough to add or remove single (even empty)
+line to/from the file\footnote{Technically, if the analyzer works on the
+preprocessed code, it is enough that somebody changes any included file,
+because the preprocessed output is shifted by the change as a whole.}.
+
+Second, this solution can introduce false-negatives. Consider a code in
+Figure~\ref{fig:fp_simple} on the left side where there is a bug in locking.
+The function \texttt{fun} omits to unlock \texttt{my\_lock1} depending on the
+input parameter \texttt{in}. Given this error is reported to the maintainer of
+the code, he tries to fix it. Unfortunately, he fixes it wrong (the right side
+of the Figure) and adds a new error by unlocking a wrong lock, but still being
+on the same line.
+
+In the end both of the cases the entry will look the same in the report list:
+\begin{displaymath}
+E=(file.c, 6, AutomatonChecker, Locking\_imbalance)
+\end{displaymath}
+Inconveniently, the outcome of this is that the second error is hidden from
+programmer when the \emph{Simple Solution} is used because $x \notin RL_1$
+from the equation~(\ref{eq:simple}) does not hold.
 
 \subsection{SCM Solution}
 
@@ -170,7 +246,28 @@ Use git log.
 
 \section{Evaluation}
 \label{sec:eval}
-We exercised our algorithm on the errors found in the Linux kernel by \st.
+We exercised our algorithm on the errors found in the Linux kernel by \st. The
+errors are represented in an XML form by default. But as we wanted to have a
+convenient way for combining and querying the data, we decided to use
+databases and some SQL language for accessing the data.
+
+Although there exists infrastructures for combining XML and SQL like SQL/XML
+\cite{sqlxml}, we sticked to a simple database system, more concretely to
+\textsc{SQLite} which stores and references databases as single files stored
+somewhere on a backing store.
+
+We wrote a script to transform the XML into a \textsc{SQLite} database file,
+so that we are able to use SQL language supported by that machine.
+
+\subsection{Using Simple Solution}
+This refers back to the Simple Solution presented in Section~\ref{sec:simple}.
+
+\subsection{Using SCM Solution}
+
+\section{Conclusion}
+We presented an algorithm for pruning errors which are reported repeatedly
+from consecutive versions of a software project by static analysis tools.
+The method was implemented and then evaluated on the Linux kernel.
 
 \section*{Acknowledgements}
 The author is supported by the research centre Institute for Theoretical
