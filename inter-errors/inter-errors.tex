@@ -209,8 +209,8 @@ How the "same error" can be handled is described in the following subsections.
 
 \subsection{Simple Solution}
 \label{sec:simple}
-The simplest approach is just to compare each tuple from $RL_2$ to entries in
-$RL_1$ and obtaining this result:
+The most straightforward approach of defining sameness is just to compare each
+tuple from $RL_2$ to entries in $RL_1$ and obtaining this result:
 \begin{equation} \label{eq:simple}
 RL^{simple}_2=\{x|x\in RL_2 \wedge x \notin RL_1\}
 \end{equation}
@@ -239,9 +239,24 @@ Inconveniently, the outcome of this is that the second error is hidden from
 programmer when the \emph{Simple Solution} is used because $x \notin RL_1$
 from the equation~(\ref{eq:simple}) does not hold.
 
-\subsection{SCM Solution}
+\subsection{Advanced Solution}
+This is not the only issue introduced by the \emph{Simple Solution}. But let
+us fix it first. The issue only means that \textit{line} is not expressive
+enough to describe what is really in the code. Instead of looking at line
+number, we can fetch the particular \textit{line} from \textit{file} and store
+it in a newly-defined tuple:
+\begin{displaymath}
+E=(file,line\_contents,checker,error\_description)
+\end{displaymath}
+This will solve the false-negative described above, because
+\textit{line\_contents} differs and so the condition $x \notin RL_1$ does
+hold.
 
-Use git log.
+In spite of that, there are still issues caused by code shuffling both on a
+in-file (functions reordering) and in-tree (file move/rename) bases. This
+means the \textit{file} and/or \textit{line} component of the original tuple
+changes while leaving the rest (i.e. the error type and description) of the
+tuple untouched.
 
 \section{Evaluation}
 \label{sec:eval}
@@ -255,7 +270,10 @@ and neither of our tool.
 
 The errors reported by \st are represented in an XML form by default. But as
 we wanted to have a convenient way for combining and querying the data, we
-decided to use databases and some SQL language for accessing the data.
+decided to use databases and some SQL language for accessing the data. The
+reason is also to easily represent the tuples. This way, a tuple is simply a
+row in a database table.
+
 Although there exists infrastructures for combining XML and SQL like SQL/XML
 \cite{sqlxml}, we sticked to a simple database system, more concretely to
 \textsc{SQLite} \cite{sqlite} which stores and references databases as single
@@ -265,37 +283,82 @@ To achieve the goal, we wrote a Perl script to transform the XML into a
 \textsc{SQLite} database file. Despite each report list resides in a separate
 database file, it is not a problem because \textsc{SQLite} allows combining
 even tables from different databases in its SQL. Thus we can easily reference
-errors from two versions and store the result into the third\footnote{The
-reason for this is that our web frontend works on a version-per-file basis and
-needs no changes with this approach.}.
+errors from two versions and store the result into the third.
+
+Having separate databases for each list allowed us fast deployment in our web
+frontend, because it works on a version-per-file basis and needed thus no
+changes with this approach.
 
 \subsection{Using Simple Solution}
-First, we will have a look on the \emph{Simple Solution} presented in
-Section~\ref{sec:simple}. 
+First, we will have a look at the \emph{Simple Solution} presented in
+Section~\ref{sec:simple}. Overall, the results are summarized in
+Table~\ref{tab:res}. The \emph{Atomicity} (e.g. forbidden sleeps inside atomic
+context), \emph{Locking} (omitted unlocks, double locks, etc.),
+\emph{Memory} (NULL dereferences, dangling pointers and so on) and
+\emph{Pairing} (grabbed resource not given back to the system for example)
+rows correspond to the errors found by the
+\textsc{AutomatonChecker}\footnote{The errors found by \st (with their
+description) may be seen at \url{http://stanse.fi.muni.cz/bugs.html}.}. They
+demonstrate, as expected, that it does not matter on which type of errors the
+technique is used. The reduction ratio is more or less the same.
+
+We also expressed the reduction in percents. There are two columns with them,
+the first when -rc4 with \emph{Simple Solution} is used, the latter for
+\emph{Advanced Solution} being used.
+
+For this solution, the SQL query, sort and insert command used is as follows:
+\begin{lstlisting}{language=SQL}
+ATTACH DATABASE "35-rc3.db" AS old;
+ATTACH DATABASE "35-rc4.db" AS new;
+INSERT INTO errors (checker, importance, error, file, line)
+  SELECT checker, importance, error, file, line FROM new.errors WHERE
+  file || line || checker || error NOT IN
+    (SELECT file || line || checker || error FROM old.errors);
+\end{lstlisting}
+The two error collections are attached as \emph{new} and \emph{old} and used
+in the query. The || token stands for string catenation.
+
+The table also contains a column for brute force approach which is even more
+naive than the \emph{Simple Solution}. The query above is changed so that line
+number is completely removed. In this case we may lose some new bugs, i.e.
+have even more false-negative than earlier, but it still seems to be enough in
+cases where \st is run on after each kernel release -- on a daily basis.
+
+Time by time (e.g. each version release), the more sophisticated methods
+should be used to not lose real bugs.
 
 \begin{table}
 \begin{center}
-\begin{tabular}{|l|c|c|c|c|c|} \hline
+\begin{tabular}{|l|r|c|c|c|c|c|} \hline
           & \textbf{-rc4} & \textbf{-rc4$^{s}$} & \textbf{\%} &
-	  \textbf{-rc4$^{SCM}$} & \textbf{\%}               \\ \hline
-Atomicity &      &                 &    &              &    \\ \hline
-Locking   &      &                 &    &              &    \\ \hline
-Memory    &      &                 &    &              &    \\ \hline
-Pairing   &      &                 &    &              &    \\ \hline
-Sum       & 600  & 50              &    &              &    \\ \hline
+	  \textbf{-rc4$^{b}$} & \textbf{-rc4$^{a}$} & \textbf{\%} \\ \hline
+Atomicity & 23   &                 &    &              &    \\ \hline
+Locking   & 179  &                 &    &              &    \\ \hline
+Memory    & 217  &                 &    &              &    \\ \hline
+Pairing   & 81   &                 &    &              &    \\ \hline
+Summary   & 500  & 50              &    &              &    \\ \hline
 \end{tabular}
 \end{center}
+\caption{Errors count using none, simple and advanced solutions.
+-rc4$^{s}$ expresses the \emph{Simple Solution}, while -rc4$^{a}$ stands for
+the \emph{Advanced Solution}.}
 \label{tab:res}
-\caption{Errors count using none, simple and advanced solution (-rc3 shown
-only for comparison)}
 \end{table}
 
-\subsection{Using SCM Solution}
+\subsection{Using Advanced Solution}
+As we already noted, the results are presented for this algorithm in
+Table~\ref{tab:res} as well.
 
 \section{Conclusion}
 We presented an algorithm for pruning errors which are reported repeatedly
-from consecutive versions of a software project by static analysis tools.
-The method was implemented and then evaluated on the Linux kernel.
+from consecutive versions of a software project by static analysis tools. We
+introduced two variants of the algorithm that may be used and reasoned what it
+can lead to when only the simpler one is engaged.
+
+The method was implemented and then evaluated on the Linux kernel. We found
+out that the need of walking through the errors is rapidly lowered by the
+algorithm and thus the person-hours needed are reduced, hence potentially
+the overall cost of the product being checked.
 
 \section*{Acknowledgements}
 The author is supported by the research centre Institute for Theoretical
