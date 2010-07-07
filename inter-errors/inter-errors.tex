@@ -46,7 +46,8 @@ from \st run on the Linux kernel.
 
 \terms{Algorithms}
 
-\keywords{Static analysis, error pruning, consecutive version errors}
+\keywords{Static analysis, error pruning, consecutive version errors,
+iterative analysis}
 
 \section{Introduction}
 Recently, many new static analysis tools emerged (for example
@@ -107,7 +108,7 @@ the Linux kernel in Section~\ref{sec:eval}.
 \begin{figure*}[tb]
 \begin{center}
 \begin{tabular}{|c|c|} \hline
-Older version & Newer version \\ \hline \hline
+\textbf{Older Version} & \textbf{Newer Version} \\ \hline \hline
 \begin{lstlisting}[language=C]
 static DEFINE_SPINLOCK(my_lock1);
 static DEFINE_SPINLOCK(my_lock2);
@@ -181,8 +182,10 @@ but not fixed yet for some reason.
 To tackle down this problem, we present an algorithm to match errors from
 consecutive code releases to avoid repetition of errors presented to
 developers in error lists. Thus lowering the burden exposed to them when
-walking through the error list generated from later versions. To the best of
-our knowledge there is no white paper describing a similar technique.
+walking through the error list generated from later versions. Apparently every
+error from each iteration has to be fixed, otherwise it is lost forever. To
+the best of our knowledge there is no white paper describing a similar
+technique.
 
 \section{Methodology}
 \label{sec:method}
@@ -199,20 +202,24 @@ in a database as we will see later) such as:
 \begin{displaymath}
 E = (file, line, checker, error\_description) \in RL
 \end{displaymath}
+where \textit{file} and \textit{line} correspond to the location of the error
+found by \textit{checker} analyzer which  presents the error as
+\textit{error\_description}.
 
-Be a start point two lists of errors $RL_1$ and $RL_2$ generated from two
-different versions of the same project. $RL_1$ corresponds to an older
-version, $RL_2$ to a newer one respectively.
+Be a start point two lists of errors (sets of tuples) $RL_1$ and $RL_2$
+generated from two different versions of the same project. $RL_1$ corresponds
+to an older version, $RL_2$ to a newer one respectively.
 
-Now, we want to eliminate such tuples $E$, that correspond to the same error.
-How the "same error" can be handled is described in the following subsections.
+Now, we want to eliminate such tuples $E \in RL_2$, that correspond to the
+same error in $RL_2$. How the "same error" can be handled differently is
+described in the following subsections.
 
 \subsection{Simple Solution}
 \label{sec:simple}
 The most straightforward approach of defining sameness is just to compare each
 tuple from $RL_2$ to entries in $RL_1$ and obtaining this result:
 \begin{equation} \label{eq:simple}
-RL^{simple}_2=\{x|x\in RL_2 \wedge x \notin RL_1\}
+RL^{filtered}_2=\{x|x\in RL_2 \wedge x \notin RL_1\}
 \end{equation}
 
 Obviously there are several problems tightly connected to this approach.
@@ -240,33 +247,96 @@ programmer when the \emph{Simple Solution} is used because $x \notin RL_1$
 from the equation~(\ref{eq:simple}) does not hold.
 
 \subsection{Advanced Solution}
-This is not the only issue introduced by the \emph{Simple Solution}. But let
-us fix it first. The issue only means that \textit{line} is not expressive
-enough to describe what is really in the code. Instead of looking at line
-number, we can fetch the particular \textit{line} from \textit{file} and store
-it in a newly-defined tuple:
+\label{sec:adv}
+The issue noted above is not the only introduced by the \emph{Simple
+Solution}. Before we solve that particular one, we will look into two more
+issues caused by \textit{line} and \textit{file} components. Both of them are
+caused by code shuffling, the former because of functions reordering, the
+latter because of file moves/renames.
+
+Although it may be an issue for some projects, we did not find it worth
+the effort to fix it in our code intended mainly for kernel sources checking,
+because it happens there very rarely. In any case, we propose a solution here.
+
+Obviously, we still need to match \textit{line} and \textit{file} components
+of an error tuple $E \in RL_2$ to tuples in $RL_1$. We can achieve
+\textit{file} to match by modern \emph{Software Configuration Management}
+(SCM) that is able to track renames. A perfect example of such system is
+\texttt{git} \cite{git}. Given the two releases as tags, the files changed are
+output and renamed files marked with "\texttt{=>}" when special option
+(\texttt{-M} in this case) passed. For example when renaming \texttt{old.c} to
+\texttt{new.c} the changes output then looks like:
+\begin{lstlisting}[language=sh]
+$ git diff --stat -M oldrev..newrev
+1       0       old.c => new.c
+\end{lstlisting}
+where the numbers at start may be silently ignored.
+
+The downside is that the query cannot be executed solely in the database
+machine anymore. It has to be encapsulated in some script to dig out the
+information from the repository and build up a special insert-select query
+one-by-one. This is exactly the reason why it is not feasible for our needs.
+
+The \textit{line} case may be worked out similarly, but even with more
+machinery, because simple statistics about files are not enough now. The
+script has to be taught to understand the changes as being presented by SCMs,
+so-called \emph{diffs}. Then, with the previous information about file
+renames, it can compute accurately the old and new \textit{file} and
+\textit{line} to be included in appropriate queries. As a result we only get
+rid of false-positives from our point of view, since we no more repeat already
+reported errors.
+
+Now, we focus back on problems which are more of our interest when checking
+the kernel, where the false-positives rate of repetitive errors is very low
+(single to tens). (Not that the described methods cannot be used in
+conjunction with the following.) For our needs, it is enough to avoid the
+problem with false-negatives mentioned earlier to just stay on the safe side.
+
+The issue designates that \textit{line} is not expressive enough to describe
+what is really in the code. Instead of looking at the line number, we fetch
+the particular \textit{line} from \textit{file} and store it in a
+newly-defined tuple:
 \begin{displaymath}
-E=(file,line\_contents,checker,error\_description)
+E=(file,line,line\_contents,checker,error\_description)
 \end{displaymath}
-This will solve the false-negative described above, because
+This solved the problem in every case we have seen, because
 \textit{line\_contents} differs and so the condition $x \notin RL_1$ does
 hold.
 
-In spite of that, there are still issues caused by code shuffling both on a
-in-file (functions reordering) and in-tree (file move/rename) bases. This
-means the \textit{file} and/or \textit{line} component of the original tuple
-changes while leaving the rest (i.e. the error type and description) of the
-tuple untouched.
+%Additionally, assuming the \textit{line\_contents} is filled in by the
+%script converting XMLs to databases and the name of the second column
+%\textit{line} is left as is and not changed to \textit{line\_contents}, the
+%very gain with this solution is that the queries need not be changed in any
+%way.
+%
+\begin{table*}[tb]
+\begin{center}
+\begin{tabular}{|l|r||r|r||r||r|r|} \hline
+          & \textbf{none} & \textbf{simple} & \textbf{RR} (\%) &
+	  \textbf{brutal} & \textbf{advanced} & \textbf{RR} (\%) \\ \hline
+Atomicity        & 23  & 11  & 52.2 & 0  & 11  & 52.2 \\ \hline
+Locking          & 179 & 64  & 64.3 & 5  & 64  & 64.3 \\ \hline
+Memory           & 217 & 55  & 74.7 & 11 & 55  & 74.7 \\ \hline
+Pairing          & 81  & 11  & 86.5 & 0  & 11  & 86.5 \\ \hline
+\textbf{Summary} & 500 & 141 & 71.8 & 16 & 141 & 71.8 \\ \hline
+\end{tabular}
+\end{center}
+\caption{Error count using none, simple, brute-force and advanced solutions
+respectively. \emph{RR} stands for \emph{Reduction Ratio} and is explicitly
+stated only for simple and advanced.}
+\label{tab:res}
+\end{table*}
 
 \section{Evaluation}
 \label{sec:eval}
 We exercised our algorithm on the errors found in the Linux kernel by \st. The
 two versions we considered are 2.6.35-rc3-next20100618 and
-2.6.35-rc4-next20100706, further referred only as -rc3 and -rc4 respectively.
-That means a development versions where there are over 300 thousand lines
-changed in 2654 files between them in 18 days. There are no changes in
-configuration of the kernel (besides newly added drivers, which were ignored)
-and neither of our tool.
+2.6.35-rc4-next20100706\footnote{-next is a special development branch with
+all unstable features being merged every day.}, further referred only as -rc3+
+and -rc4+ respectively. That means a development versions where there are over
+300 thousand lines changed in 2654 files between them in 18 days. There are no
+changes in configuration of the kernel (besides newly added drivers, which
+were ignored) and neither of our tool.
 
 The errors reported by \st are represented in an XML form by default. But as
 we wanted to have a convenient way for combining and querying the data, we
@@ -274,20 +344,21 @@ decided to use databases and some SQL language for accessing the data. The
 reason is also to easily represent the tuples. This way, a tuple is simply a
 row in a database table.
 
-Although there exists infrastructures for combining XML and SQL like SQL/XML
+Although there exist infrastructures for combining XML and SQL like SQL/XML
 \cite{sqlxml}, we sticked to a simple database system, more concretely to
 \textsc{SQLite} \cite{sqlite} which stores and references databases as single
 files somewhere on a backing store.
 
-To achieve the goal, we wrote a Perl script to transform the XML into a
+To achieve the goal, we wrote a Perl script to transform the XML into an
 \textsc{SQLite} database file. Despite each report list resides in a separate
-database file, it is not a problem because \textsc{SQLite} allows combining
-even tables from different databases in its SQL. Thus we can easily reference
-errors from two versions and store the result into the third.
+database file now, it is not a problem because \textsc{SQLite} allows
+combining even tables from different databases in its SQL. Thus we can easily
+reference errors from two versions and store the result into the third as we
+will see later.
 
 Having separate databases for each list allowed us fast deployment in our web
-frontend, because it works on a version-per-file basis and needed thus no
-changes with this approach.
+frontend too, because it works on a version-per-file basis and needed no
+extra changes with this approach.
 
 \subsection{Using Simple Solution}
 First, we will have a look at the \emph{Simple Solution} presented in
@@ -298,13 +369,21 @@ context), \emph{Locking} (omitted unlocks, double locks, etc.),
 \emph{Pairing} (grabbed resource not given back to the system for example)
 rows correspond to the errors found by the
 \textsc{AutomatonChecker}\footnote{The errors found by \st (with their
-description) may be seen at \url{http://stanse.fi.muni.cz/bugs.html}.}. They
-demonstrate, as expected, that it does not matter on which type of errors the
-technique is used. The reduction ratio is more or less the same.
+description) may be seen at \url{http://stanse.fi.muni.cz/bugs.html}.}.
 
-We also expressed the reduction in percents. There are two columns with them,
-the first when -rc4 with \emph{Simple Solution} is used, the latter for
-\emph{Advanced Solution} being used.
+We also expressed the reduction in percents (further \emph{Reduction Ratio}).
+It designates how many errors were pruned and is computed as:
+\begin{displaymath}
+100-\frac{100\cdot reduced\_count}{original\_count}
+\end{displaymath}
+There are two columns containing them, the first when -rc4+ with \emph{Simple
+Solution} is considered, the latter for \emph{Advanced Solution} being used.
+
+Unexpectedly, they demonstrate, that it does matter on which type of errors
+the technique is used; the reduction ratio oscillates much. We have no direct
+explanation for that. After we walked through the errors, we realized that no
+pattern can be deduced from them. However we can only think that there is none
+at best.
 
 For this solution, the SQL query, sort and insert command used is as follows:
 \begin{lstlisting}{language=SQL}
@@ -318,47 +397,45 @@ INSERT INTO errors (checker, importance, error, file, line)
 The two error collections are attached as \emph{new} and \emph{old} and used
 in the query. The || token stands for string catenation.
 
-The table also contains a column for brute force approach which is even more
-naive than the \emph{Simple Solution}. The query above is changed so that line
-number is completely removed. In this case we may lose some new bugs, i.e.
-have even more false-negative than earlier, but it still seems to be enough in
-cases where \st is run on after each kernel release -- on a daily basis.
+The table also contains a column for brute-force approach which is even more
+naive than the \emph{Simple Solution}. The query above is changed so that the
+line number is completely removed. In this case we may lose some new bugs,
+i.e.  have even more false-negative than earlier, but it still seems to be
+enough in cases where \st is run on after each kernel release -- on a daily
+basis and that's exactly the use case of this variant.
 
-Time by time (e.g. each version release), the more sophisticated methods
-should be used to not lose real bugs.
-
-\begin{table}
-\begin{center}
-\begin{tabular}{|l|r|c|c|c|c|c|} \hline
-          & \textbf{-rc4} & \textbf{-rc4$^{s}$} & \textbf{\%} &
-	  \textbf{-rc4$^{b}$} & \textbf{-rc4$^{a}$} & \textbf{\%} \\ \hline
-Atomicity & 23   &                 &    &              &    \\ \hline
-Locking   & 179  &                 &    &              &    \\ \hline
-Memory    & 217  &                 &    &              &    \\ \hline
-Pairing   & 81   &                 &    &              &    \\ \hline
-Summary   & 500  & 50              &    &              &    \\ \hline
-\end{tabular}
-\end{center}
-\caption{Errors count using none, simple and advanced solutions.
--rc4$^{s}$ expresses the \emph{Simple Solution}, while -rc4$^{a}$ stands for
-the \emph{Advanced Solution}.}
-\label{tab:res}
-\end{table}
+Either way, we can see that we eliminated 359 (71.8\,\%) and with brute-force
+even 484 (96.8\,\%) errors which are out of developers' attention now.
 
 \subsection{Using Advanced Solution}
-As we already noted, the results are presented for this algorithm in
-Table~\ref{tab:res} as well.
+We presented the results along with the previous ones in Table~\ref{tab:res}
+as well. The values are collected from the case where \textit{line\_contents}
+is taken into account along with \textit{line} as described in
+Section~\ref{sec:adv}.
+
+For our testing sample, the numbers are exactly the same. This means that in
+these two particular versions, the \emph{Simple Solution} generated safe
+results which need not always be the case. With our tool this threat is
+mitigated, because the preprocessed output is not taken as a whole, but
+includes, which might change the line numbers more often is not a part of
+checking process, not even in the reported lines.
+
+%XXX shits? ^^^ vvv
+%and in fact, it is exactly brute-force
+%solution where false-negatives are gone.
 
 \section{Conclusion}
 We presented an algorithm for pruning errors which are reported repeatedly
 from consecutive versions of a software project by static analysis tools. We
-introduced two variants of the algorithm that may be used and reasoned what it
-can lead to when only the simpler one is engaged.
+introduced two variants of the algorithm that may be used and we reasoned what
+it can lead to when only the simpler one is engaged. Given two different
+versions, the technique renders an arbitrary analysis into the iterative
+version.
 
 The method was implemented and then evaluated on the Linux kernel. We found
-out that the need of walking through the errors is rapidly lowered by the
-algorithm and thus the person-hours needed are reduced, hence potentially
-the overall cost of the product being checked.
+out that the need of walking through the errors is rapidly lowered with the
+algorithm by three quarters and thus the person-hours needed otherwise are
+reduced. Hence potentially the overall cost of the product being checked.
 
 \section*{Acknowledgements}
 The author is supported by the research centre Institute for Theoretical
