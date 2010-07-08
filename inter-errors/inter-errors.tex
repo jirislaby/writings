@@ -22,10 +22,9 @@
 
 \numberofauthors{1}
 
-\author{
-Ji\v{r}\'\i~Slab\'y\\
+\author{Ji\v{r}\'\i~Slab\'y\\
 	\affaddr{Faculty of Informatics}\\
-	\affaddr{Botanická 68a}\\
+	\affaddr{Botanick\'{a} 68a}\\
 	\affaddr{Brno, Czech Republic}\\
 	\email{xslaby@fi.muni.cz}
 }
@@ -50,60 +49,86 @@ from \st run on the Linux kernel.
 iterative analysis}
 
 \section{Introduction}
-Recently, many new static analysis tools emerged (for example
-\cite{coverity,java_bugfinding,sparse}) with a potential of finding many
-long-standing errors in the source code. Mostly the problem with these tools
-is that they produce a very long list of errors. The reason is much sources
-present in the project (more potential places for errors) and/or
-false-positives which are not about to be fixed. From the recurring error
-perspective, there is a little what can be done about that in one specific
-release of sources. But it becomes a burden when the developers would have to
-check the very same subset of reported errors every single release of the
-product.
+Recently, many static analysis tools emerged with a potential of finding many
+long-standing errors in the source code. Some of the tools are open-source and
+may be used for arbitrary projects~\cite{klee,java_bugfinding,pex,sparse}, some
+are commercial, but still check some picked open sources~\cite{coverity} and
+some fully commercial~\cite{klocwork}.
 
-In this case, when such an analyzer is run on a project with release cycle
-short enough, it would be convenient to recognize (a) the errors which were
-reported in an earlier version and were not fixed yet\footnote{There are many
-reasons for this including slow responses to error reports from maintainers.
-An example of this is at \url{http://lkml.org/lkml/2009/9/23/221} which had to
-be sent three times and was merged even after 3 months.} and (b)
-false-positives because they are persistent in time and nobody wishes to see
-them again and again in every upcoming released version.
+These tools are based on a diverse set of algorithms, but in common, they find
+bugs, including false-positives; again with different ratio. When a checked
+project consists of million lines of code, the error list grows, because the
+project has more potential places for errors. And also more false-positives
+may be reported for the same reason.
+
+When a project is checked only once or even periodically but after a long
+time, mostly it means the sources changed much in the meantime and the
+reported errors are different between the checking runs as well. So there
+is a little what can be done about the excessive error count, hence all of
+them need be inspected (and fixed) manually.
+
+On the other hand, when the project is checked on a regular basis, say daily
+or weekly, the code is not changed that much. Then, the reported set of errors
+almost does not vary and it becomes a burden for developers who would
+have to check the very same subset of reported errors every day/week. And
+given false-positives are not about to be fixed in the code at all, the chance
+to avoid them is low.
+
+In these cases, when an analyzer is run on a project with release cycle short
+enough, it would be convenient to recognize (a) the errors which were reported
+in an earlier version and were not fixed yet\footnote{There are many reasons
+for this including slow responses to error reports from maintainers.  An
+example of this is at \url{http://lkml.org/lkml/2009/9/23/221} which had to be
+sent three times and was merged even after 3 months.} and (b) false-positives
+because they are persistent in time and nobody wishes to see them again and
+again in every upcoming released version.
 
 Although it may seem that there are almost no requirements on the project when
-we want to use this technique, it is not that easy. Not only the fast
-development and quick releases of new versions is a precondition, but also
-rigid structure of files so that they don't fluctuate over the source tree.
-Further, a thorough development methodology which does not allow developers to
-perform inappropriate moves of code parts between files every release and so
-on. Every change should have its reason, otherwise the change won't be
-accepted by the project management.
+we want to design a technique dealing with this, the assumption is not
+strictly correct. Not only the fast development resulting in quick releases of
+new versions is a precondition, but also rigid structure of files so that they
+do not fluctuate over the source tree much. We will see that low file
+fluctuation is not a blocker for this approach too. Further, a thorough
+development methodology which does not allow developers to perform
+inappropriate moves of code parts among files in every release and so on.  In
+other words, every change should have its reason, otherwise the change will
+not be accepted by the project management.
 
-One of the projects with the requirements above satisfied is the Linux kernel
-for sure. Its release cycle between major versions (e.g.
+One of the projects satisfying the requirements above is the Linux kernel for
+sure. Its release cycle between two major versions (e.g.
 2.6.33$\rightarrow$2.6.34) is relatively short, oscillating between 11-13
-weeks. The changes coming into the tree are not accepted unless appropriately
-reasoned, reviewed and merged by subtree maintainers and finally accepted by
-L. Torvalds. Also, developers are mostly not allowed to shuffle with sources
-arbitrarily over the tree, every class of drivers has its own, predetermined,
-directory.
+weeks~\cite{linuxdev}. The changes coming into the tree are not accepted
+unless appropriately reasoned, reviewed and merged by subtree maintainers and
+finally accepted by L. Torvalds. Also, developers are mostly not allowed to
+shuffle with sources arbitrarily over the tree, every class of drivers has its
+own, predetermined, directory. Above that, changes without strong reasoning
+are rejected.
 
 We already mentioned that there are many static analysis tools out there. To
 have a fully operational tool working on the Linux kernel, \st \cite{stanse},
 a tool developed at the Faculty of Informatics, is used specifically in this
 paper. It contains a base with C parser, error reporting facility, user
-interface, points-to analysis module and application programming interface for
-checkers. A checker is a module which gets the parser output and reports
-errors back to the base which are in turn presented to a user. Currently there
-are four checkers implemented, in this paper we are interested exclusively in
-the \textsc{AutomatonChecker} which is able to find errors described by finite
-automata.
+interface, points-to analysis module and application programming interface
+(API) for checkers. A checker is a module which gets the parser output and
+reports errors back to the base which in turn presents them to a user.
+Currently, there are four checkers implemented, in this paper we are interested
+exclusively in the \textsc{AutomatonChecker} which is able to find errors
+in behaviour described by finite automata (such as in
+Figure~\ref{fig:automaton}).
+
+\begin{figure}[tb]
+\begin{center}
+\input{automaton.pspdftex}
+\end{center}
+\caption{Automaton for locking}
+\label{fig:automaton}
+\end{figure}
 
 The paper is organized as follows. First, in Section~\ref{sec:motiv} we will
 see why the technique is important and what benefits it brings, then
 Section~\ref{sec:method} introduces the technique itself with possible
-extensions and finally we evaluate it with a use of \st output collected from
-the Linux kernel in Section~\ref{sec:eval}.
+extensions and finally, we evaluate it in Section~\ref{sec:eval} with a use of
+\st's output collected from the Linux kernel.
 
 \begin{figure*}[tb]
 \begin{center}
@@ -159,11 +184,12 @@ static void double_unlock_spin(void) {
 \end{center}
 
 The \texttt{double\_unlock\_spin} function intentionally breaks the proper
-locking policy. The \texttt{lock\_A} is locked and then unlocked twice, thus
-leaving the lock in an inconsistent state. However, in this case, it is the
-sole purpose of the function. It is intended for exercising a mechanism for
-automatic dynamic locking violations tracking present in the
-kernel\footnote{So-called \textsc{LockDep}, more information are available at
+locking policy expressed by automaton in Figure~\ref{fig:automaton}. The
+\texttt{lock\_A} is locked and then unlocked twice, thus leaving the lock in
+an inconsistent state. However, in this case, it is the sole purpose of the
+function. It is intended for exercising a mechanism for automatic dynamic
+locking violations tracking present in the kernel\footnote{So-called
+\textsc{LockDep}, more information are available at
 \url{http://lwn.net/Articles/185605/}.}. Thus it is impossible to change or
 "fix" the code to be correct from the point of view of an automaton which
 tracks lock states and watches the policy is not violated. Hence it is an
@@ -402,7 +428,7 @@ naive than the \emph{Simple Solution}. The query above is changed so that the
 line number is completely removed. In this case we may lose some new bugs,
 i.e.  have even more false-negative than earlier, but it still seems to be
 enough in cases where \st is run on after each kernel release -- on a daily
-basis and that's exactly the use case of this variant.
+basis and that is exactly the use case of this variant.
 
 Either way, we can see that we eliminated 359 (71.8\,\%) and with brute-force
 even 484 (96.8\,\%) errors which are out of developers' attention now.
