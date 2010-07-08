@@ -184,53 +184,53 @@ static void double_unlock_spin(void) {
 \end{center}
 
 The \texttt{double\_unlock\_spin} function intentionally breaks the proper
-locking policy expressed by automaton in Figure~\ref{fig:automaton}. The
+locking policy expressed by automaton (in Figure~\ref{fig:automaton}). The
 \texttt{lock\_A} is locked and then unlocked twice, thus leaving the lock in
 an inconsistent state. However, in this case, it is the sole purpose of the
-function. It is intended for exercising a mechanism for automatic dynamic
+function. It is intended for exercising the dynamic mechanism for automatic
 locking violations tracking present in the kernel\footnote{So-called
-\textsc{LockDep}, more information are available at
+\textsc{LockDep}, more information are available in article at
 \url{http://lwn.net/Articles/185605/}.}. Thus it is impossible to change or
-"fix" the code to be correct from the point of view of an automaton which
-tracks lock states and watches the policy is not violated. Hence it is an
-error (a kind of false positive) which will be with this part of sources
-forever.
+"fix" the code in any way to be correct from the point of view of the
+automaton in Figure~\ref{fig:automaton}. Hence it is an error (a kind of false
+positive) which will be with this part of sources forever.
 
-We did a complete review of errors reported in the Linux 2.6.27 to sort out
-which of those are false-positives. All false-positives were marked
-accordingly and true errors reported to corresponding code maintainers (some
-with appropriate patches). Then we tried to perform the analysis more often,
-even on release candidate kernels in a weekly period only, and when inspecting
-these candidate versions, we found out that many of the errors are of the
-similar kind like this example, i.e. cannot be fixed or were already reported
-but not fixed yet for some reason.
+We investigated how often this case occurs while bugs are being found.  We
+started with a complete review of errors reported in the Linux 2.6.27 and
+sorted out which of those are false-positives. They were marked accordingly
+and true errors reported to corresponding code maintainers (some with
+appropriate patches). Then, the analysis was performed more often, even on
+release candidate kernels, approximately in a weekly period. When inspecting
+these versions, we found out that many of the errors are of the similar kind
+like the example above, i.e. cannot be fixed or were already reported but not
+fixed yet for some reason.
 
 To tackle down this problem, we present an algorithm to match errors from
-consecutive code releases to avoid repetition of errors presented to
-developers in error lists. Thus lowering the burden exposed to them when
-walking through the error list generated from later versions. Apparently every
-error from each iteration has to be fixed, otherwise it is lost forever. To
-the best of our knowledge there is no white paper describing a similar
-technique.
+consecutive code releases to avoid repetition of errors given to developers in
+error lists. Thus lowering the burden exposed to them when walking through the
+error list generated from later versions. Apparently every error from each
+iteration has to be fixed, otherwise it is lost once for ever.  To the best of
+our knowledge there is no white paper describing a similar technique.
 
 \section{Methodology}
 \label{sec:method}
 Before we start with the methodology, we first have to know what the output
-of the tools look like, especially what a \st's output is. Even though the
+of the tools look like, especially what the \st's output is. Even though the
 error formatting practices differ tool by tool, in common they contain the
 source file name where the error lays with exact line too. The report also
 carries an information about what kind of error is that and possibly what
 module (checker) generated that. Eventually some tools report another fields
-like a line column, but this is irrelevant for further considerations.
+like a line column, but this is irrelevant for further considerations, because
+in principle, the extension can be done easily.
 
-In the end, the entry (error) in a list of reports $RL$ is a tuple $E$ (e.g.
-in a database as we will see later) such as:
-\begin{displaymath}
+We consider a list of reports $RL$ to be a set of entries (errors) $E$. The
+error is represented as a tuple for reasons stated later and looks like
+in (\ref{eq:edef}). \textit{file} and \textit{line} both correspond to the
+location of the error described in \textit{error\_description} and found by
+\textit{checker}.
+\begin{equation} \label{eq:edef}
 E = (file, line, checker, error\_description) \in RL
-\end{displaymath}
-where \textit{file} and \textit{line} correspond to the location of the error
-found by \textit{checker} analyzer which  presents the error as
-\textit{error\_description}.
+\end{equation}
 
 Be a start point two lists of errors (sets of tuples) $RL_1$ and $RL_2$
 generated from two different versions of the same project. $RL_1$ corresponds
@@ -466,6 +466,8 @@ reduced. Hence potentially the overall cost of the product being checked.
 \section*{Acknowledgements}
 The author is supported by the research centre Institute for Theoretical
 Computer Science (ITI), project No. 1M0545.
+
+\newpage
 
 \bibliographystyle{plain}
 \bibliography{inter-errors}
