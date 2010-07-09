@@ -226,59 +226,67 @@ in principle, the extension can be done easily.
 We consider a list of reports $RL$ to be a set of entries (errors) $E$. The
 error is represented as a tuple for reasons stated later and looks like
 in (\ref{eq:edef}). \textit{file} and \textit{line} both correspond to the
-location of the error described in \textit{error\_description} and found by
-\textit{checker}.
+location of the error found by \textit{checker} and described in
+\textit{error\_description}.
 \begin{equation} \label{eq:edef}
 E = (file, line, checker, error\_description) \in RL
 \end{equation}
 
-Be a start point two lists of errors (sets of tuples) $RL_1$ and $RL_2$
-generated from two different versions of the same project. $RL_1$ corresponds
-to an older version, $RL_2$ to a newer one respectively.
+Now, we can have a starting point two lists of errors (sets of tuples) $RL_1$
+and $RL_2$ generated from two distinct versions of the same project. $RL_1$
+corresponds to an older version, $RL_2$ to a newer one respectively.
 
-Now, we want to eliminate such tuples $E \in RL_2$, that correspond to the
-same error in $RL_2$. How the "same error" can be handled differently is
-described in the following subsections.
+Having the lists, we want to eliminate such tuples $E \in RL_2$ which
+correspond to the same error in $RL_1$. We note the result of elimination as
+$RL^{filtered}_2$. Next, the "same error" term is not precisely defined here.
+The following subsections will define it differently, based on actual needs.
 
 \subsection{Simple Solution}
 \label{sec:simple}
 The most straightforward approach of defining sameness is just to compare each
-tuple from $RL_2$ to entries in $RL_1$ and obtaining this result:
+tuple from $RL_2$ to entries in $RL_1$ and obtaining the result
+(\ref{eq:simple}).
 \begin{equation} \label{eq:simple}
 RL^{filtered}_2=\{x|x\in RL_2 \wedge x \notin RL_1\}
 \end{equation}
 
 Obviously there are several problems tightly connected to this approach.
-First, not all the tuple elements are preserved over source revisions. Namely
-for example \textit{line} element changes extensively version by version. To
-make this technique defunct, it is actually enough to add or remove single
-(even empty) line to/from the file\footnote{Technically, if the analyzer works
-on the preprocessed code, it is enough that somebody changes any included
-file, because the preprocessed output is shifted by the change as a whole.}.
+First, not all the tuple elements are preserved over source revisions. Namely,
+an example is \textit{line} component changing extensively version by version.
+To make this technique defunct, it is actually enough that somebody adds or
+removes a single (even empty) line to/from the file which the error is
+reported in\footnote{Technically, if the analyzer works on the preprocessed
+code, it is enough that somebody changes any included file, because the
+preprocessed output is shifted by the change as a whole.}.
 
 Second, this solution can introduce false-negatives. Consider a code in
 Figure~\ref{fig:fp_simple} on the left side where there is a bug in locking.
 The function \texttt{fun} omits to unlock \texttt{my\_lock1} depending on the
-input parameter \texttt{in}. Given this error is reported to the maintainer of
-the code, he tries to fix it. Unfortunately, he fixes it wrong (the right side
-of the Figure) and adds a new error by unlocking a wrong lock, but still being
-on the same line.
+input parameter \texttt{in}. This error is reported to the maintainer of the
+code and they try to fix it. Unfortunately, they change the code wrong (the
+right side of the Figure) and add a new error caused by unlocking a wrong
+lock.
 
-In the end both of the cases the entry will look the same in the report list:
+This would not matter unless it is on the same line. In this case it is not so
+in the end both of the cases the entry will look the same in the report list:
 \begin{displaymath}
 E=(file.c, 6, AutomatonChecker, Locking\_imbalance)
 \end{displaymath}
 Inconveniently, the outcome of this is that the second error is hidden from
 programmer when the \emph{Simple Solution} is used because $x \notin RL_1$
-from the equation~(\ref{eq:simple}) does not hold.
+from the equation~(\ref{eq:simple}) does not hold, hence the error will not
+appear in $RL^{filtered}_2$.
 
 \subsection{Advanced Solution}
 \label{sec:adv}
 The issue noted above is not the only introduced by the \emph{Simple
 Solution}. Before we solve that particular one, we will look into two more
 issues caused by \textit{line} and \textit{file} components. Both of them are
-caused by code shuffling, the former because of functions reordering, the
-latter because of file moves/renames.
+caused by code shuffling, the former because of code reordering (e.g. to avoid
+forward declarations and define the function or variable prior their use), the
+latter because of file moves/renames (subsystem restructuring etc.).
+
+XXX
 
 Although it may be an issue for some projects, we did not find it worth
 the effort to fix it in our code intended mainly for kernel sources checking,
@@ -398,7 +406,7 @@ rows correspond to the errors found by the
 description) may be seen at \url{http://stanse.fi.muni.cz/bugs.html}.}.
 
 We also expressed the reduction in percents (further \emph{Reduction Ratio}).
-It designates how many errors were pruned and is computed as:
+It designates how many errors were pruned and is computed the standard way as:
 \begin{displaymath}
 100-\frac{100\cdot reduced\_count}{original\_count}
 \end{displaymath}
