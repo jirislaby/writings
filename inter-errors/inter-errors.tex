@@ -26,7 +26,7 @@
 	\affaddr{Faculty of Informatics}\\
 	\affaddr{Botanick\'{a} 68a}\\
 	\affaddr{Brno, Czech Republic}\\
-	\email{xslaby@fi.muni.cz}
+	\email{slaby@fi.muni.cz}
 }
 
 \maketitle
@@ -73,29 +73,29 @@ or weekly, the code is not changed that much. Then, the reported set of errors
 almost does not vary and it becomes a burden for developers who would
 have to check the very same subset of reported errors every day/week. And
 given false-positives are not about to be fixed in the code at all, the chance
-to avoid them is low.
+to avoid them is low except removing the files listed from the next to-check
+list.
 
-XXX what if files removed from to-check lists?
-
-In these cases, when an analyzer is run on a project with release cycle short
-enough, it would be convenient to recognize (a) the errors which were reported
-in an earlier version and were not fixed yet\footnote{There are many reasons
-for this including slow responses from maintainers to error reports. An
-example of this is at \url{http://lkml.org/lkml/2009/9/23/221} which had to be
-sent three times and was merged even after 3 months.} and (b) false-positives
-because they are persistent in time and nobody wishes to see them again and
-again in every upcoming released version checks.
+In the cases of repetitive analyses, when an analyzer is run on a project with
+release cycle short enough, it would be convenient to recognize (a) the errors
+which were reported in an earlier version and were not fixed
+yet\footnote{There are many reasons for this including slow responses from
+maintainers to error reports. An example of this is at
+\url{http://lkml.org/lkml/2009/9/23/221} which had to be sent three times and
+was merged even after 3 months.} and (b) false-positives because they are
+persistent in time and nobody wishes to see them again and again in every
+upcoming released version checks.
 
 Although it may seem that there are almost no requirements on the project when
 we want to design a technique dealing with (a) and (b), the assumption is not
 strictly correct. Not only the fast development resulting in quick releases of
 new versions is a precondition, but also rigid structure of files so that they
-do not fluctuate over the source tree much. We will see that low file
+do not fluctuate over the source tree much. We will see that a low file
 fluctuation is not a blocker for this approach too. Further, a thorough
 development methodology which does not allow developers to perform
-inappropriate moves of code parts among files in every release and so on.  In
-other words, every change should have its reason, otherwise the change will
-not be accepted by the project management.
+inappropriate moves of code parts among files in every release is required and
+so on.  In other words, every change should have its reason, otherwise the
+change will not be accepted by the project management.
 
 One of the projects satisfying the requirements above is the Linux kernel for
 sure. Its release cycle between two major versions (e.g.
@@ -108,15 +108,15 @@ own, predetermined, directory. Above that, changes without strong reasoning
 are rejected.
 
 We already mentioned that there are many static analysis tools out there. To
-have a fully operational tool working on the Linux kernel, \st \cite{stanse},
-a tool developed at the Faculty of Informatics, is used specifically in this
-paper. It contains a base with C parser, error reporting facility, user
-interface, points-to analysis module and application programming interface
-(API) for checkers. A checker is a module which gets the parser output and
-reports errors back to the base which in turn presents them to a user.
-Currently, there are four checkers implemented, in this paper we are interested
-exclusively in the \textsc{AutomatonChecker} which is able to find errors
-in behaviour described by finite automata (such as in
+work with a fully operational tool capable to be applied to the Linux kernel,
+\st \cite{stanse}, a tool developed at the Faculty of Informatics, is used
+specifically in this paper. It contains a base with C parser, error reporting
+facility, user interface, points-to analysis module and application
+programming interface (API) for checkers. A checker is a module which gets the
+parser output and reports errors back to the base which in turn presents them
+to a user.  Currently, there are four checkers implemented, in this paper we
+are interested exclusively in the \textsc{AutomatonChecker} which is able to
+find errors in behaviour described by finite automata (such as in
 Figure~\ref{fig:automaton}).
 
 \begin{figure}[tb]
@@ -128,7 +128,7 @@ Figure~\ref{fig:automaton}).
 \end{figure}
 
 The paper is organized as follows. First, in Section~\ref{sec:motiv} we will
-see why the technique is important and what benefits it brings, then
+see why the technique is important for us and what benefits it brings, then
 Section~\ref{sec:method} introduces the technique itself with possible
 extensions and finally, we evaluate it in Section~\ref{sec:eval} with a use of
 \st's output collected from the Linux kernel.
@@ -187,7 +187,7 @@ static void double_unlock_spin(void) {
 \end{center}
 
 The \texttt{double\_unlock\_spin} function intentionally breaks the proper
-locking policy expressed by automaton (in Figure~\ref{fig:automaton}). The
+locking policy expressed by the automaton in Figure~\ref{fig:automaton}. The
 \texttt{lock\_A} is locked and then unlocked twice, thus leaving the lock in
 an inconsistent state. However, in this case, it is the sole purpose of the
 function. It is intended for exercising the dynamic mechanism for automatic
@@ -202,29 +202,30 @@ We investigated how often this case occurs while bugs are being found.  We
 started with a complete review of errors reported in the Linux 2.6.27 and
 sorted out which of those are false-positives. They were marked accordingly
 and true errors reported to corresponding code maintainers (some with
-appropriate patches). Then, the analysis was performed more often, even on
-release candidate kernels, approximately in a weekly period. When inspecting
-these versions, we found out that many of the errors are of the similar kind
-like the example above, i.e. cannot be fixed or were already reported but not
-fixed yet for some reason.
+appropriate patches). Then, the analysis started being performed more often,
+even on release candidate kernels, approximately in a weekly period. When
+inspecting these versions, we found out that many of the errors are of the
+similar kind like the example above, i.e. cannot be fixed or were already
+reported but not fixed yet for some reason.
 
 To tackle down this problem, we present an algorithm to match errors from
 consecutive code releases to avoid repetition of errors given to developers in
 error lists. Thus lowering the burden exposed to them when walking through the
-error list generated from later versions. Apparently every error from each
-iteration has to be fixed, otherwise it is lost once for ever.  To the best of
-our knowledge there is no white paper describing a similar technique.
+error list generated from later versions. Clearly, every reported error from
+each iteration has to be fixed, otherwise it is lost once for ever. To the
+best of our knowledge there is no white paper describing a similar technique.
 
 \section{Methodology}
 \label{sec:method}
-Before we start with the methodology, we first have to know what the output
-of the tools look like, especially what the \st's output is. Even though the
-error formatting practices differ tool by tool, in common they contain the
-source file name where the error lays with exact line too. The report also
-carries an information about what kind of error is that and possibly what
-module (checker) generated that. Eventually some tools report another fields
-like a line column, but this is irrelevant for further considerations, because
-in principle, the extension can be done easily.
+Before we start with the methodology, we first have to know what the actual
+output of the tools look like, especially what the \st's output is. Even
+though the error formatting practices differ tool by tool, in common they
+contain the source file name where the error is located with exact line too.
+The report also carries an information about what kind of error is that and
+possibly what module (checker) generated that. Eventually some tools report
+another fields like line column or relevance, but this is irrelevant for
+further considerations, because in principle, the extension can be done
+easily.
 
 We consider a list of reports $RL$ to be a set of entries (errors) $E$. The
 error is represented as a tuple for reasons stated later and looks like
@@ -240,9 +241,9 @@ and $RL_2$ generated from two distinct versions of the same project. $RL_1$
 corresponds to an older version, $RL_2$ to a newer one respectively.
 
 Having the lists, we want to eliminate such tuples $E \in RL_2$ which
-correspond to the same error in $RL_1$. We note the result of elimination as
-$RL^{filtered}_2$. Next, the "same error" term is not precisely defined here.
-The following subsections will define it differently, based on actual needs.
+correspond to the same error in $RL_1$. The "same error" term is not precisely
+defined here. The following subsections will define it differently, based on
+actual needs. Finally, we note the result of elimination as $RL^{filtered}_2$.
 
 \subsection{Simple Solution}
 \label{sec:simple}
@@ -270,87 +271,22 @@ code and they try to fix it. Unfortunately, they change the code wrong (the
 right side of the Figure) and add a new error caused by unlocking a wrong
 lock.
 
-This would not matter unless it is on the same line. In this case it is not so
-in the end both of the cases the entry will look the same in the report list:
+This would not matter unless it is on the same line. In this case it is not,
+so in the end both of the cases the entry will look the same in the report
+list:
 \begin{displaymath}
 E=(file.c, 6, AutomatonChecker, Locking\_imbalance)
 \end{displaymath}
 Inconveniently, the outcome of this is that the second error is hidden from
 programmer when the \emph{Simple Solution} is used because $x \notin RL_1$
 from the equation~(\ref{eq:simple}) does not hold, hence the error will not
-appear in $RL^{filtered}_2$.
+appear in $RL^{filtered}_2$ anymore.
 
-\subsection{Advanced Solution}
-\label{sec:adv}
-The issue noted above is not the only introduced by the \emph{Simple
-Solution}. Before we solve that particular one, we will look into two more
-issues caused by \textit{line} and \textit{file} components. Both of them are
-caused by code shuffling, the former because of code reordering (e.g. to avoid
-forward declarations and define the function or variable prior their use), the
-latter because of file moves/renames (subsystem restructuring etc.).
-
-XXX
-
-Although it may be an issue for some projects, we did not find it worth
-the effort to fix it in our code intended mainly for kernel sources checking,
-because it happens there very rarely. In any case, we propose a solution here.
-
-Obviously, we still need to match \textit{line} and \textit{file} components
-of an error tuple $E \in RL_2$ to tuples in $RL_1$. We can achieve
-\textit{file} to match by modern \emph{Software Configuration Management}
-(SCM) that is able to track renames. A perfect example of such system is
-\texttt{git} \cite{git}. Given the two releases as tags, the files changed are
-output and renamed files marked with "\texttt{=>}" when special option
-(\texttt{-M} in this case) passed. For example when renaming \texttt{old.c} to
-\texttt{new.c} the changes output then looks like:
-\begin{lstlisting}[language=sh]
-$ git diff --stat -M oldrev..newrev
-1       0       old.c => new.c
-\end{lstlisting}
-where the numbers at start may be silently ignored.
-
-The downside is that the query cannot be executed solely in the database
-machine anymore. It has to be encapsulated in some script to dig out the
-information from the repository and build up a special insert-select query
-one-by-one. This is exactly the reason why it is not feasible for our needs.
-
-The \textit{line} case may be worked out similarly, but even with more
-machinery, because simple statistics about files are not enough now. The
-script has to be taught to understand the changes as being presented by SCMs,
-so-called \emph{diffs}. Then, with the previous information about file
-renames, it can compute accurately the old and new \textit{file} and
-\textit{line} to be included in appropriate queries. As a result we only get
-rid of false-positives from our point of view, since we no more repeat already
-reported errors.
-
-Now, we focus back on problems which are more of our interest when checking
-the kernel, where the false-positives rate of repetitive errors is very low
-(single to tens). (Not that the described methods cannot be used in
-conjunction with the following.) For our needs, it is enough to avoid the
-problem with false-negatives mentioned earlier to just stay on the safe side.
-
-The issue designates that \textit{line} is not expressive enough to describe
-what is really in the code. Instead of looking at the line number, we fetch
-the particular \textit{line} from \textit{file} and store it in a
-newly-defined tuple:
-\begin{displaymath}
-E=(file,line,line\_contents,checker,error\_description)
-\end{displaymath}
-This solved the problem in every case we have seen, because
-\textit{line\_contents} differs and so the condition $x \notin RL_1$ does
-hold.
-
-%Additionally, assuming the \textit{line\_contents} is filled in by the
-%script converting XMLs to databases and the name of the second column
-%\textit{line} is left as is and not changed to \textit{line\_contents}, the
-%very gain with this solution is that the queries need not be changed in any
-%way.
-%
 \begin{table*}[tb]
 \begin{center}
 \begin{tabular}{|l|r||r|r||r||r|r|} \hline
-          & \textbf{none} & \textbf{simple} & \textbf{RR} (\%) &
-	  \textbf{brutal} & \textbf{advanced} & \textbf{RR} (\%) \\ \hline
+          & \textbf{none} & \textbf{simple} & \textbf{FR} (\%) &
+	  \textbf{brutal} & \textbf{advanced} & \textbf{FR} (\%) \\ \hline
 Atomicity        & 23  & 11  & 52.2 & 0  & 11  & 52.2 \\ \hline
 Locking          & 179 & 64  & 64.3 & 5  & 64  & 64.3 \\ \hline
 Memory           & 217 & 55  & 74.7 & 11 & 55  & 74.7 \\ \hline
@@ -359,10 +295,102 @@ Pairing          & 81  & 11  & 86.5 & 0  & 11  & 86.5 \\ \hline
 \end{tabular}
 \end{center}
 \caption{Error count using none, simple, brute-force and advanced solutions
-respectively. \emph{RR} stands for \emph{Reduction Ratio} and is explicitly
+respectively. \emph{FR} stands for \emph{Filter Ratio} and is explicitly
 stated only for simple and advanced.}
 \label{tab:res}
 \end{table*}
+
+\subsection{Advanced Solution}
+\label{sec:adv}
+The issue noted above is not the only introduced by the \emph{Simple
+Solution}. Before we solve that particular one, we will look into one more
+issue caused by \textit{file} component and we will also introduce a
+supporting foundation for dealing with the problems.
+
+Both \textit{line} and \textit{file} changes are caused by code shuffling, the
+former because of code reordering (e.g. to define a function or variable prior
+their use without forward declarations), the latter because of file
+moves/renames (subsystem restructuring etc.). Obviously, the problem still
+remains to be that we need to match \textit{line} and \textit{file} components
+of an error tuple $E \in RL_2$ to tuples in $RL_1$.
+
+We can achieve \textit{file} to match by modern \emph{Software Configuration
+Management} (SCM) that is able to track renames. A perfect example of such
+system is \texttt{git} \cite{git}. When the two releases are given as tags,
+the files changed are output and above that, renamed files marked with
+"\texttt{=>}" when special option passed to the SCM (\texttt{-M} in the
+\texttt{git} case). For example when \texttt{old.c} is renamed to
+\texttt{new.c} between \texttt{oldrev} and \texttt{newrev} revisions, the
+changes output then looks like the following:
+\begin{lstlisting}[language=sh]
+$ git diff --stat -M oldrev..newrev
+1       0       old.c => new.c
+\end{lstlisting}
+
+Having this output, for our purposes, we silently ignore the numbers at the
+beginning and from the rest, we extract two sets $S_{old}$ and $S_{new}$
+containing the old and new filenames respectively. We also have a renaming
+function $r_f$ which accepts a tuple as parameter such that
+$r_f(("old.c",l,c,e))="new.c"$ for each found change ($"old.c" \in S_{old}$,
+$"new.c" \in S_{new}$). In contrary, if the filename is unchanged, i.e.  $x
+\notin S_{old}$, the function is defined as $r_f(x)=first(x)$ (return the
+first component of $x$).
+
+Then we extend the function $r_f$ for tuples component-wise while using the
+same approach on other components of the tuple. For the time being, they are
+defined as $r_l=second$, $r_c=third$ and $r_e=fourth$ (just pick up the
+correct component):
+\begin{displaymath}
+new_1(x) = (r_f(x),r_l(x),r_c(x),r_e(x))
+\end{displaymath}
+Now, we define $RL_1^{new}$ in~(\ref{eq:rl_file}) and replace $RL_1$ by that
+in equation~(\ref{eq:simple}). Thus, written informally, we approach the error
+list from the older run $RL_1$ to the newer one $RL_2$ so that they can be
+compared easier.
+\begin{equation} \label{eq:rl_file}
+RL_1^{new} = \{new_1(x)|x \in RL_1\}
+\end{equation}
+
+The \textit{line} case described in the previous section may be worked out
+similarly, but even with more machinery, because $RL_2$ needs to be changed as
+well. So similarly to $RL_1^{new}$, we define $RL_2^{new} = \{new_2(x)|x \in
+RL_1\}$ where $new_2(x) = (s_f(x),s_l(x),s_c(x),s_e(x))$. In this case, $s_f$,
+$r_c=s_c$, $r_e=s_e$ are defined as pick-up functions like above. $r_f$
+remains the same from the previous definitions to have file renaming
+detection. The remaining $r_l$ and $s_l$ are defined to return 2-tuples as:
+\begin{displaymath}
+\begin{matrix}
+r_l((f,l,c,e))=(l, fetchline(oldrev,f,l)) \\
+s_l((f,l,c,e))=(l, fetchline(newrev,f,l))
+\end{matrix}
+\end{displaymath}
+
+$fetchline$ there loads the line $l$ from the file $f$ of the corresponding
+revision. Then, $RL_2^{new}$ is used instead of $RL_2$ and the filtered set is
+defined as:
+\begin{displaymath}
+RL_2^{filtered} = \{x|x \in RL_2^{new} \wedge x \notin RL_1^{new}\} \\
+\end{displaymath}
+with typical entries like:
+\begin{displaymath}
+E=(file,(line,line\_contents),checker,error\_description)
+\end{displaymath}
+
+At this point, it remains to reason, how comparison of the line contents with
+line number itself avoids the drawn problem. First, the errors are reported on
+lines which are not empty, they rather contain some meaningful code. This
+ensures, that there will be something to check against. Second, if (line, line
+contents) tuple is the same, it is an error which was reported already and
+should be in the process of fixing, i.e.  we do not include it in the filtered
+set. Finally, when the code on the line is not the same, there is a new bug
+(like in Figure~\ref{fig:fp_simple}). The \emph{Advanced Solution} is hence
+supposed to leave us on the safe side, so that no real bugs are left
+unattained after some period of time.
+
+To some extent, all the functions described here are defined generically. For
+example, we did not define $r_c$, $r_e$, $s_c$ and $s_e$ in our computations
+in some thorough way at all, but they may be redefined arbitrarily depending
+on concrete needs, including the case of different definitions of tuples.
 
 \section{Evaluation}
 \label{sec:eval}
@@ -370,8 +398,8 @@ We exercised our algorithm on the errors found in the Linux kernel by \st. The
 two versions we considered are 2.6.35-rc3-next20100618 and
 2.6.35-rc4-next20100706\footnote{-next is a special development branch with
 all unstable features being merged every day.}, further referred only as -rc3+
-and -rc4+ respectively. That means a development versions where there are over
-300 thousand lines changed in 2654 files between them in 18 days. There are no
+and -rc4+ respectively. That means development versions where there are over
+300 thousand lines changed in 2654 files between them in 18 days. We made no
 changes in configuration of the kernel (besides newly added drivers, which
 were ignored) and neither of our tool.
 
@@ -381,10 +409,10 @@ decided to use databases and some SQL language for accessing the data. The
 reason is also to easily represent the tuples. This way, a tuple is simply a
 row in a database table.
 
-Although there exist infrastructures for combining XML and SQL like SQL/XML
-\cite{sqlxml}, we sticked to a simple database system, more concretely to
-\textsc{SQLite} \cite{sqlite} which stores and references databases as single
-files somewhere on a backing store.
+Although there already exist infrastructures for combining XML and SQL like
+SQL/XML \cite{sqlxml}, we sticked to a simple database system, more concretely
+to \textsc{SQLite} \cite{sqlite} which stores and references databases as
+single files somewhere on a backing store.
 
 To achieve the goal, we wrote a Perl script to transform the XML into an
 \textsc{SQLite} database file. Despite each report list resides in a separate
@@ -405,24 +433,25 @@ context), \emph{Locking} (omitted unlocks, double locks, etc.),
 \emph{Memory} (NULL dereferences, dangling pointers and so on) and
 \emph{Pairing} (grabbed resource not given back to the system for example)
 rows correspond to the errors found by the
-\textsc{AutomatonChecker}\footnote{The errors found by \st (with their
+\textsc{AutomatonChecker} with different configuration files \footnote{The errors found by \st (with their
 description) may be seen at \url{http://stanse.fi.muni.cz/bugs.html}.}.
 
-We also expressed the reduction in percents (further \emph{Reduction Ratio}).
-It designates how many errors were pruned and is computed the standard way as:
-\begin{displaymath}
-100-\frac{100\cdot reduced\_count}{original\_count}
-\end{displaymath}
-There are two columns containing them, the first when -rc4+ with \emph{Simple
-Solution} is considered, the latter for \emph{Advanced Solution} being used.
+We also expressed the reduction in percents (\emph{Filter Ratio}).  It
+designates how many errors were pruned and is computed the standard way as
+$100-\frac{100\cdot |RL_2^{filtered}|}{|RL_2|}$. There are two columns
+containing them, the first when -rc4+ with \emph{Simple Solution} is
+considered, the latter for \emph{Advanced Solution} being used.
 
 Unexpectedly, they demonstrate, that it does matter on which type of errors
-the technique is used; the reduction ratio oscillates much. We have no direct
-explanation for that. After we walked through the errors, we realized that no
+the technique is used; the filter ratio oscillates much. We have no direct
+explanation for that. After we walked through the errors, we sort out that no
 pattern can be deduced from them. However we can only think that there is none
 at best.
 
-For this solution, the SQL query, sort and insert command used is as follows:
+For this solution, the SQL query, sort and insert command executed in the
+database which would contain the filtered set is as below. The two report
+lists are attached as \emph{new} and \emph{old} and used in the query. The ||
+token there stands for string catenation.
 \begin{lstlisting}{language=SQL}
 ATTACH DATABASE "35-rc3.db" AS old;
 ATTACH DATABASE "35-rc4.db" AS new;
@@ -431,54 +460,63 @@ INSERT INTO errors (checker, importance, error, file, line)
   file || line || checker || error NOT IN
     (SELECT file || line || checker || error FROM old.errors);
 \end{lstlisting}
-The two error collections are attached as \emph{new} and \emph{old} and used
-in the query. The || token stands for string catenation.
 
 The table also contains a column for brute-force approach which is even more
 naive than the \emph{Simple Solution}. The query above is changed so that the
 line number is completely removed. In this case we may lose some new bugs,
-i.e.  have even more false-negative than earlier, but it still seems to be
-enough in cases where \st is run on after each kernel release -- on a daily
+i.e.  have even more false-negatives than earlier, but it still seems to be
+enough in cases where \st is run after each -next kernel release -- on a daily
 basis and that is exactly the use case of this variant.
 
 Either way, we can see that we eliminated 359 (71.8\,\%) and with brute-force
 even 484 (96.8\,\%) errors which are out of developers' attention now.
 
 \subsection{Using Advanced Solution}
-We presented the results along with the previous ones in Table~\ref{tab:res}
-as well. The values are collected from the case where \textit{line\_contents}
-is taken into account along with \textit{line} as described in
-Section~\ref{sec:adv}.
+We present the results from the same setup along with the previous ones in
+Table~\ref{tab:res} too. For our testing sample, the numbers are exactly the
+same. This solution's primary aim is to generate safe results, rather than
+better results. So this means that in these two particular versions, the
+\emph{Simple Solution} generated safe enough results which technically needs
+not be always the case.
 
-For our testing sample, the numbers are exactly the same. This means that in
-these two particular versions, the \emph{Simple Solution} generated safe
-results which need not always be the case. With our tool this threat is
-mitigated, because the preprocessed output is not taken as a whole, but
-includes, which might change the line numbers more often is not a part of
-checking process, not even in the reported lines.
+We have not seen such behaviour yet though. Besides code changes, it it also
+because this threat is mitigated with our tool thanks to how the preprocessed
+output is taken. It is not taken as a whole, but includes, which might change
+the line numbers more often are not a part of the checking process, so they
+are not involved in the reported lines.
 
-%XXX shits? ^^^ vvv
-%and in fact, it is exactly brute-force
-%solution where false-negatives are gone.
+On the other hand, it does not mean this solution is useless. After we fix up
+the parser in \st, and consider whole sources, the situation might
+change. The same way where instead of \st, some other tool is used.
+
+The script used previously for converting XML to database was augmented to
+fetch and store also the line contents from the file into the database.  The
+structure of the database table was altered a bit to contain one more field.
+So, instead of storing 2-tuple of line and its contents in one column, they
+are stored in two separate ones.
+
+The SQL query used to obtain the filtered results is just enhancement of the
+former. \textit{line\_contents} is added there to appropriate places.
+
+\newpage
 
 \section{Conclusion}
 We presented an algorithm for pruning errors which are reported repeatedly
 from consecutive versions of a software project by static analysis tools. We
 introduced two variants of the algorithm that may be used and we reasoned what
-it can lead to when only the simpler one is engaged. Given two different
-versions, the technique renders an arbitrary analysis into the iterative
-version.
+it can lead to when only the simpler one is deployed. Generally, given two
+different versions, the technique renders an arbitrary analysis into the
+iterative version.
 
 The method was implemented and then evaluated on the Linux kernel. We found
 out that the need of walking through the errors is rapidly lowered with the
-algorithm by three quarters and thus the person-hours needed otherwise are
-reduced. Hence potentially the overall cost of the product being checked.
+algorithm by almost three quarters and thus the person-hours needed otherwise
+are reduced. Hence potentially the overall cost of the product being checked.
 
 \section*{Acknowledgements}
 The author is supported by the research centre Institute for Theoretical
-Computer Science (ITI), project No. 1M0545.
-
-\newpage
+Computer Science (ITI), project No. 1M0545. I thank my colleagues for their
+valuable ideas.
 
 \bibliographystyle{plain}
 \bibliography{inter-errors}
