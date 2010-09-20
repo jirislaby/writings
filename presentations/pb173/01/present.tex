@@ -97,7 +97,7 @@
   \item Semestr = 13 týdnů (28. 9. svátek)
   \item Cvičící
   \begin{itemize}
-  \item Vývoj jádra od r. 2005
+  \item Vývoj jádra od r. 2005 (NetBSD, Linux)
   \item Student FI
   \end{itemize}
   \item Cíle cvičení
@@ -114,7 +114,7 @@
   Vše potřebné na:
   {\small\url{https://minotaur.fi.muni.cz:8443/~xsvenda/docuwiki/doku.php?id=public:pb173:pb173_2010_systemlinux}}
 
-  \bigskip
+  \medskip
   \pause
 
   \begin{center}
@@ -158,7 +158,7 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Úkol první}
+  \frametitle{Úkol}
   \heading{Práce s GITem}
   \begin{enumerate}
   \item \texttt{git clone git://decibel.fi.muni.cz/\textasciitilde xslaby/pb173}
@@ -166,8 +166,9 @@
   \pause
 
   \item Změňte obsah souboru \texttt{sandbox/hello}
-  \item Zkontrolujte změny (\texttt{git diff --color})
-  \item \texttt{git commit}
+  \item Zkontrolujte změny (\texttt{git diff -\,-color})
+  \item \texttt{git commit} (správný log: suma, volný řádek, zdůvodnění, volný
+    řádek, podpis; vzor \texttt{git.kernel.org})
 
   \pause
 
@@ -213,10 +214,10 @@
 
   \heading{Hlavní rozdíly}
   \begin{itemize}
-  \item Žádné \emph{libc} (printf, strlen, malloc, \ldots), ani ostatní
-    (pthread)
-  \item \emph{Paměťový prostor}
-  \item \emph{Počáteční funkce} (main)
+  \item Žádné \emph{libc} (\texttt{printf}, \texttt{strlen}, \texttt{malloc},
+    \ldots), ani ostatní (pthread)
+  \item Ne/oddělený \emph{paměťový prostor}
+  \item \emph{Počáteční funkce} (\texttt{main})
   \item Pád systému $\Rightarrow$ pád všeho
   \end{itemize}
 \end{frame}
@@ -230,25 +231,113 @@
   \begin{itemize}
   \item Kontrola: \texttt{scripts/checkpatch.pl} (ne 100\%)
   \end{itemize}
-  \item Monolit (ale moduly)
-  \item \texttt{module\_init}
+  \item Monolit
+  \begin{itemize}
+  \item Ale moduly
   \end{itemize}
+  \item \texttt{module\_init} (=\texttt{main}), \texttt{module\_exit}
+    (=\texttt{on\_exit})
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Dokumentace}
+  \begin{itemize}
+  \item \texttt{Documentation/*}
+  \item Generovaná tamtéž (podobná \textsc{DocBook})
+  \item Kód (\url{http://lxr.linux.no/})
+  \end{itemize}
+
+  \medskip
+
+  Demo: najděte v jádře obecnou (v \texttt{lib/}) a optimalizovanou (v
+  \texttt{arch/}) implementaci \texttt{strlen}
 \end{frame}
 
 \begin{frame}
-  \frametitle{Úkol druhý}
+  \frametitle{Úkol}
+
+  \begin{enumerate}
+  \item Prozkoumejte adresář 01 z repozitáře
+  \item Doplňte výpis ,,Hello World''
+  \begin{itemize}
+    \item \texttt{printk}, \texttt{KERN\_*}
+  \end{itemize}
+  \item Přeložte a vložte do systému (\texttt{make}, \texttt{insmod})
+  \item Zkontrolujte výstup \texttt{dmesg}
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Paměť}
 
   \begin{itemize}
-  \item ss
+  \item Omezený zásobník (4k-8k)
+  \begin{itemize}
+  \item Žádná nebo malá rekurze
+  \item Jen pro malá data (\texttt{int}, malé \texttt{struct}, krátká pole,
+    \ldots)
+  \end{itemize}
+
+  \pause
+
+  \item Pracuje se stránkami (na x86 4K-1G)
+  \begin{itemize}
+  \item Nesouvislá paměť/halda
+  \item Omezená velikost alokace (fragmentace)
+  \end{itemize}
   \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Configuration}
-  \heading{Automaton Checker configuration example}
+  \frametitle{Práce s pamětí}
+
+  \begin{enumerate}
+  \item Po stránkách (makro \texttt{PAGE\_SIZE})
+  \begin{itemize}
+  \item \texttt{\_\_get\_free\_page}, \texttt{free\_page}
+  \item \texttt{get\_free\_pages}, \texttt{free\_pages} (řád)
+  \item Vracejí adresu jako \texttt{unsigned long}
+  \end{itemize}
+
+  \pause
+
+  \item Malé alokace (sta bajtů, max. až cca. 4M)
+  \begin{itemize}
+  \item \texttt{kmalloc}, \texttt{kfree}
+  \end{itemize}
+  \end{enumerate}
+
+  \pause
+
+  Alokace mají (většinou) GFP parametr. Ten určuje, co si alokátor může dovolit
+  (spát, swapovat, použít HIGHMEM, \ldots). Prozatím nám stačí
+  \texttt{GFP\_KERNEL}.
+
+  \pause
+
   \begin{lstlisting}[language=C]
-int a;
+void *mem1 = (void *)__get_free_page(GFP_KERNEL);
+void *mem2 = kmalloc(PAGE_SIZE, GFP_KERNEL);
+if (mem1 && mem2) {
+  ...
+}
+kfree(mem2);
+free_page(mem1);
   \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \begin{enumerate}
+  \item V \texttt{exit} funkci naalokujte stránku
+  \item Udělejte do ní \texttt{strcpy} ,,Bye''
+  \item Vypište jako řetězec
+  \item Uvolněte stránku
+  \end{enumerate}
 \end{frame}
 
 \end{document}
