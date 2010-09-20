@@ -1,0 +1,208 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice. 
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+% \subtitle
+% {Include Only If Paper Has a Subtitle}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{21. 9. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Úvodní informace}
+  \begin{itemize}
+  \item Semestr = 13 týdnů (28. 9. svátek)
+  \item Cvičící
+  \begin{itemize}
+  \item Vývoj jádra od r. 2005
+  \item Student FI
+  \end{itemize}
+  \item Cíle cvičení
+  \begin{itemize}
+  \item Nastínit trošku jiný model programování
+  \item Prohloubit znalosti vnitřností OS a HW
+  \end{itemize}
+  \item Ukončení: k
+  \begin{itemize}
+  \item Splnění úkolů (možno ve skupinkách)
+  \end{itemize}
+  \end{itemize}
+
+  Vše potřebné na:
+  {\small\url{https://minotaur.fi.muni.cz:8443/~xsvenda/docuwiki/doku.php?id=public:pb173:pb173_2010_systemlinux}}
+
+  \medskip
+
+  \heading{Vstupní znalosti?}
+\end{frame}
+
+\begin{frame}
+  \frametitle{S čím budeme pracovat?}
+  \begin{itemize}
+
+  \item CentOS 5.5
+
+  \item GIT
+  \begin{itemize}
+  \item Úvod do GITu zde
+  \item Podrobněji: \url{http://book.git-scm.com/}
+  \end{itemize}
+
+  \item Zdroje jádra
+  \begin{itemize}
+  \item Použijeme předinstalované z RPM (\texttt{/usr/src/kernels/})
+  \item \url{http://git.kernel.org/}
+  \end{itemize}
+
+  \item \textsc{Qemu}
+  \begin{itemize}
+  \item Ze začátku
+  \end{itemize}
+
+  \item \textsc{Combo6X} karty
+  \begin{itemize}
+  \item Později; k PCI, I/O, na přerušení, DMA
+  \item \url{http://www.liberouter.org/}
+  \end{itemize}
+
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol první}
+  \heading{Práce s GITem}
+  \begin{enumerate}
+  \item \texttt{git clone git://decibel.fi.muni.cz/\textasciitilde xslaby/pb173}
+
+  \pause
+
+  \item Změňte obsah souboru \texttt{sandbox/hello}
+  \item Zkontrolujte změny (\texttt{git diff --color})
+  \item \texttt{git commit}
+
+  \pause
+
+  \item Smažte \texttt{sandbox/hello} (\texttt{git rm})
+  \item \texttt{git commit}
+
+  \pause
+
+  \item Vygenerujte 2 patche (\texttt{git format-patch -2})
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Záplatování}
+
+  \heading{Co s patchem dále?}
+  \begin{itemize}
+  \item Poslat odpovídajícímu správci (\texttt{scripts/get\_maintainer.pl})
+  \item Poslat na ML a vystavit celý GIT strom, aby někdo provedl ,,merge''
+  \end{itemize}
+
+  \heading{Vývojový proces jádra}
+  \begin{itemize}
+  \item L. Torvalds má právo veta
+  \item Záplatováním se opravuje i přidává nová funkcionalita
+  \item Ovladače mohou být zařazeny přes \texttt{drivers/staging}
+  \begin{itemize}
+  \item Začištění, smazání nepotřebného a přesun ze staging
+  \item Správce Greg KH
+  \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Configuration}
+  \heading{Automaton Checker configuration example}
+  \begin{lstlisting}[language=C]
+int a;
+  \end{lstlisting}
+\end{frame}
+
+\end{document}
+
