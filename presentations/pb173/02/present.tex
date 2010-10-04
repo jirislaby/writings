@@ -92,10 +92,160 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Úvodní informace}
+  \frametitle{Důležité informace}
   \begin{itemize}
-  \item Semestr = 13 týdnů (28. 9. svátek)
-  \item Cvičící
+  \item Kolokvium za DÚ
+  \begin{itemize}
+  \item DÚ do příštího cvičení
+  \end{itemize}
+  \item Login/heslo
+  \begin{enumerate}
+  \item Exportované domovské adresáře $\Rightarrow$ login/login (z FI)
+  \item Jinak $\Rightarrow$ vyvoj/vyvoj
+  \end{enumerate}
+  \item Qemu obraz: \texttt{/home/local/centos.img}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace s uživatelem I.}
+  \begin{enumerate}
+  \item Voláním funkce: system call (syscall)
+  \begin{itemize}
+  \item V jádře: tabulka číslo-funkce (\texttt{unistd.h})
+  \item \texttt{syscall(\_\_NR\_write, STDOUT\_FILENO, "Test\textbackslash n",
+    5);}
+  \item Skok do jádra speciální instrukcí (x86\_64: \texttt{syscall})
+    \begin{itemize}
+    \item O skok se stará libc (\texttt{fwrite}$\rightarrow$\texttt{write}$\rightarrow$\texttt{syscall}$\rightarrow$instrukce)
+    \item Drahá operace (přepnutí kontextu)
+    \end{itemize}
+  \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_write}
+  \end{itemize}
+
+  \pause
+
+  \item Speciální syscall
+  \begin{itemize}
+  \item Bez skoku do jádra, v knihovně linkované jádrem (\texttt{vdso.so})
+  \item Několik málo jednoduchých funkcí (\texttt{gettimeofday}, \ldots)
+  \item Demo: \texttt{ldd /bin/cat}
+  \end{itemize}
+  \end{enumerate}
+
+  \pause
+  \medskip
+
+  \begin{center}
+  \heading{Každá nová funkcionalita = nový syscall}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+  Pomocí volání \texttt{syscall} spustit \texttt{/bin/date} a počkat na
+  skončení. Předtím a potom vypsat nějakou informaci.
+
+  \medskip
+
+  \begin{enumerate}
+  \item \texttt{syscall(\_\_NR\_write, \ldots, "Running date", \ldots)}
+  \item \texttt{syscall(\_\_NR\_fork)}
+    \begin{itemize}
+    \item Potomek: \texttt{syscall(\_\_NR\_execve, "/bin/date", \ldots)}
+    \end{itemize}
+  \item \texttt{syscall(\_\_NR\_wait4, \ldots)}
+  \item \texttt{syscall(\_\_NR\_write, \ldots, "date finished", \ldots)}
+  \end{enumerate}
+
+  \medskip
+
+  Je třeba znát prototypy funkcí (\texttt{man write}, \texttt{man fork},
+  \ldots).
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace s uživatelem II.}
+  \begin{enumerate}
+  \setcounter{enumi}{2}
+  \item Speciální soubory v \texttt{/dev}
+  \begin{itemize}
+  \item Komunikace přes soubor (není nutný nový syscall)
+  \item Seznam v \texttt{Documentation/devices.txt} a \texttt{/proc/devices}
+  \item Identifikované jako major a minor čísla
+    \begin{itemize}
+    \item Většinou major=ovladač, minor=zařízení (tty: 4, 0-63)
+    \end{itemize}
+  \item Blokové (disky apod.)
+    \begin{itemize}
+    \item Komunikace po blocích
+    \item Nebudeme se jimi zabývat (popsány v LDD)
+    \end{itemize}
+  \item Znakové (ostatní)
+    \begin{itemize}
+    \item Komunikace po znacích (bajtech)
+    \item Viz následující slidy
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \item Sockety, roury, \ldots
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Znaková zařízení I.}
+  \begin{itemize}
+  \item LDD3 3. a 6. kapitola
+  \item 2-3 kroky
+  \begin{enumerate}
+  \item Registrace rozsahu major+minor (\texttt{module\_init})
+    \begin{itemize}
+    \item \texttt{alloc\_chrdev\_region}, \texttt{register\_chrdev\_region},
+      \texttt{unregister\_chrdev\_region}
+    \item Přidání záznamu do \texttt{/proc/devices}
+    \end{itemize}
+  \item Registrace jednotlivých minorů (PCI, USB, \ldots \texttt{probe})
+    \begin{itemize}
+    \item \texttt{cdev\_add}, \texttt{cdev\_del}
+    \item Po odpovídajícím \texttt{mknod} lze zařízení používat
+    \end{itemize}
+  \item Podat zprávu \texttt{udev} (vytvoření \texttt{/dev/*}) -- nepovinné
+    (\texttt{probe})
+    \begin{itemize}
+    \item \texttt{device\_create}, \texttt{device\_destroy}
+    \item Předem je potřeba vytvořit \texttt{class} (\texttt{module\_init})
+    \end{itemize}
+  \end{enumerate}
+
+  \pause
+
+  \item Implementuje \texttt{open}, \texttt{close}, \texttt{read},
+    \texttt{write}, \texttt{ioctl}, \texttt{mmap}, \ldots
+  \begin{itemize}
+  \item Jsou v \texttt{struct file\_operations}
+  \item Parametr pro \texttt{cdev\_add}
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Znaková zařízení II.}
+  Stačí-li 1 zařízení (1 minor), lze použít vrstvu \texttt{misc}
+  \begin{itemize}
+  \item Dělá všechnu práci z předchozího slidu
+  \item Potřebujeme
+    \begin{itemize}
+    \item Seznam funkcí (\texttt{struct file\_operations})
+    \item Definici misc zařízení (\texttt{struct miscdevice})
+    \end{itemize}
+  \item \texttt{misc\_register}, \texttt{misc\_deregister}
+  \item Objeví se v \texttt{/proc/misc} a \texttt{/dev}
   \end{itemize}
 
 \end{frame}
@@ -103,12 +253,105 @@
 \begin{frame}
   \frametitle{Úkol}
 
+  Vytvořit misc (znakové) zařízení s obsluhou \texttt{open}, \texttt{read},
+  \texttt{write}, \texttt{release} (tj. close).
+
   \begin{enumerate}
-  \item V \texttt{exit} funkci naalokujte stránku
-  \item Udělejte do ní \texttt{strcpy} ,,Bye''
-  \item Vypište jako řetězec
-  \item Uvolněte stránku
+  \item Definice \texttt{struct file\_operations}
+  \item Vytvoření funkcí dle prototypu z \texttt{file\_operations} (nalézt v
+    lxr)
+  \begin{itemize}
+  \item Open a release s nějakým \texttt{printk}
+  \item Read a write prozatím prázdná těla
+  \item Open a release vracejí 0 (žádná chyba), read též (EOF), write
+    \texttt{count} (zapsáno vše)
+  \end{itemize}
+  \item Definice \texttt{struct miscdevice}
+  \begin{itemize}
+  \item \texttt{minor = MISC\_DYNAMIC\_MINOR}, \texttt{name},
+    \texttt{fops}
+  \end{itemize}
+  \item \texttt{misc\_register/deregister} do \texttt{module\_init/exit}
+  \item \texttt{make}, \texttt{insmod}
+  \item Vyzkoušení \texttt{cat /dev/name} (\texttt{name} je z
+    \texttt{miscdevice})
   \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Uživatelská paměť}
+  \begin{itemize}
+  \item Něco, čemu nelze věřit (NULL, ukazatel to tabulek oprávnění, \ldots)
+  \item Nutnost kontroly
+  \item \texttt{copy\_from\_user}, \texttt{copy\_to\_user}
+  \begin{itemize}
+  \item ,,\texttt{memcpy}'' s kontrolou
+  \item Vracejí počet NEzkopírovaných znaků (0=OK)
+  \end{itemize}
+  \item \texttt{get\_user}, \texttt{put\_user}
+  \begin{itemize}
+  \item Jen primitiva (\texttt{char}, \texttt{short}, \texttt{int},
+    \texttt{long})
+  \end{itemize}
+  \item Definované v \texttt{linux/uaccess.h}
+  \end{itemize}
+
+  Demo: pb173/02
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  Dopsat těla funkcí \texttt{read} a \texttt{write} tak, aby zpracovávala data.
+
+  \begin{enumerate}
+  \item \texttt{write} vypíše uživatelský buffer pomocí \texttt{printk}
+  \begin{itemize}
+  \item \texttt{copy\_from\_user} (chyba = return -EFAULT)
+  \item Ukončit zkopírovaný řetězec pomocí \textbackslash 0
+  \end{itemize}
+  \item \texttt{read} bude vracet "Ahoj"
+  \begin{itemize}
+  \item \texttt{copy\_to\_user}
+  \end{itemize}
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Datové typy}
+  \begin{itemize}
+  \item Jádro a proces může běžet s různými bitovými šířkami (32, 64-bit)
+  \item Problém s ukazateli a long proměnnými
+  \begin{itemize}
+  \item Jiná délka dat
+  \item Jiné zarovnání struktur
+  \end{itemize}
+
+  \pause
+
+  \item Jádro definuje pevné typy (z hlediska počtu bitů)
+  \begin{itemize}
+  \item \texttt{linux/types.h}
+  \item \texttt{\_\_u8}, \texttt{\_\_u16}, \texttt{\_\_u32}, \texttt{\_\_u64}
+  \item \texttt{\_\_s8}, \texttt{\_\_s16}, \texttt{\_\_s32}, \texttt{\_\_s64}
+  \item Ukazatele musí být v union s \texttt{\_\_u64}
+  \end{itemize}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+struct my {
+  __u64 flags;              unsigned long flags;
+  __s16 index; <instead of> short index;
+  union {                   void *data;
+    void *data;
+    __u64 filler;
+  };
+} my;
+read(fd, &my, sizeof(my));
+ioctl(fd, DO_SOMETHING, &my);
+  \end{lstlisting}
+
 \end{frame}
 
 \end{document}
