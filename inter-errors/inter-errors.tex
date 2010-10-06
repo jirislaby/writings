@@ -90,12 +90,9 @@ Although it may seem that there are almost no requirements on the project when
 we want to design a technique dealing with (a) and (b), the assumption is not
 strictly correct. Not only the fast development resulting in quick releases of
 new versions is a precondition, but also rigid structure of files so that they
-do not fluctuate over the source tree much. We will see that a low file
-fluctuation is not a blocker for this approach too. Further, a thorough
-development methodology which does not allow developers to perform
-inappropriate moves of code parts among files in every release is required and
-so on.  In other words, every change should have its reason, otherwise the
-change will not be accepted by the project management.
+do not fluctuate over the source tree much. It was shown in~\cite{tracking},
+used on Java code, that even a code fluctuation is not a blocker for this
+approach and it can be handled without problems.
 
 One of the projects satisfying the requirements above is the Linux kernel for
 sure. Its release cycle between two major versions (e.g.
@@ -104,17 +101,17 @@ weeks~\cite{linuxdev}. The changes coming into the tree are not accepted
 unless appropriately reasoned, reviewed and merged by subtree maintainers and
 finally accepted by L. Torvalds. Also, developers are mostly not allowed to
 shuffle with sources arbitrarily over the tree, every class of drivers has its
-own, predetermined, directory. Above that, changes without strong reasoning
-are rejected.
+own, predetermined, directory. Above that, changes without strong enough
+reasoning are rejected.
 
 We already mentioned that there are many static analysis tools out there. To
 work with a fully operational tool capable to be applied to the Linux kernel,
-\st \cite{stanse}, a tool developed at the Faculty of Informatics, is used
+\st~\cite{stanse}, a tool developed at the Faculty of Informatics, is used
 specifically in this paper. It contains a base with C parser, error reporting
 facility, user interface, points-to analysis module and application
 programming interface (API) for checkers. A checker is a module which gets the
 parser output and reports errors back to the base which in turn presents them
-to a user.  Currently, there are four checkers implemented, in this paper we
+to a user. Currently, there are four checkers implemented, in this paper we
 are interested exclusively in the \textsc{AutomatonChecker} which is able to
 find errors in behaviour described by finite automata (such as in
 Figure~\ref{fig:automaton}).
@@ -130,7 +127,8 @@ Figure~\ref{fig:automaton}).
 The paper is organized as follows. First, in Section~\ref{sec:motiv} we will
 see why the technique is important for us and what benefits it brings, then
 Section~\ref{sec:method} introduces the technique itself with possible
-extensions and finally, we evaluate it in Section~\ref{sec:eval} with a use of
+extensions and finally, we describe the implementation of the technique and
+its evaluation in Section~\ref{sec:eval} with a use of
 \st's output collected from the Linux kernel.
 
 \begin{figure*}[tb]
@@ -189,24 +187,25 @@ static void double_unlock_spin(void) {
 The \texttt{double\_unlock\_spin} function intentionally breaks the proper
 locking policy expressed by the automaton in Figure~\ref{fig:automaton}. The
 \texttt{lock\_A} is locked and then unlocked twice, thus leaving the lock in
-an inconsistent state. However, in this case, it is the sole purpose of the
-function. It is intended for exercising the dynamic mechanism for automatic
-locking violations tracking present in the kernel\footnote{So-called
-\textsc{LockDep}, more information are available in article at
-\url{http://lwn.net/Articles/185605/}.}. Thus it is impossible to change or
-"fix" the code in any way to be correct from the point of view of the
-automaton in Figure~\ref{fig:automaton}. Hence it is an error (a kind of false
-positive) which will be with this part of sources forever.
+an inconsistent, erroneous state (\emph{Error} state). However, in this case,
+it is a sole purpose of the function. It is intended for exercising the
+dynamic mechanism for automatic locking violations detection present in the
+kernel\footnote{So-called \textsc{LockDep}, more information is available in
+the article at \url{http://lwn.net/Articles/185605/}.}. Thus it is impossible
+to change or "fix" the code in any way to be correct from the point of view of
+the automaton in Figure~\ref{fig:automaton}. Hence it is an error (a kind of
+false positive) which will be with this part of sources forever.
 
-We investigated how often this case occurs while bugs are being found.  We
+We investigated how much this case occurs while bugs are being found.  We
 started with a complete review of errors reported in the Linux 2.6.27 and
 sorted out which of those are false-positives. They were marked accordingly
 and true errors reported to corresponding code maintainers (some with
 appropriate patches). Then, the analysis started being performed more often,
 even on release candidate kernels, approximately in a weekly period. When
-inspecting these versions, we found out that many of the errors are of the
-similar kind like the example above, i.e. cannot be fixed or were already
-reported but not fixed yet for some reason.
+inspecting these versions, we found out that many of the errors repeats.
+We investigated that they are of the similar kind like the example above.
+I.e. they cannot be fixed (false positive) or were already reported but not
+fixed yet for some reason (too slow communication, lack of response, \ldots).
 
 To tackle down this problem, we present an algorithm to match errors from
 consecutive code releases to avoid repetition of errors given to developers in
