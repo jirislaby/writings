@@ -5,6 +5,7 @@
 \let\Oldemph\emph
 \renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
 \newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
 
 % Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
 %
@@ -50,7 +51,7 @@
 \institute[ITI] % (optional, but mostly needed)
 {ITI, Fakulta Informatiky}
 
-\date{5. 9. 2010}
+\date{5. 10. 2010}
 
 \subject{}
 % This is only inserted into the PDF information catalog. Can be left
@@ -132,13 +133,13 @@
   \item Voláním funkce: system call (syscall)
   \begin{itemize}
   \item V jádře: tabulka číslo-funkce (\texttt{unistd.h})
-  \item \texttt{syscall(\_\_NR\_write, STDOUT\_FILENO, "Test\textbackslash n",
-    5);}
   \item Skok do jádra speciální instrukcí (x86\_64: \texttt{syscall})
     \begin{itemize}
     \item O skok se stará libc (\texttt{fwrite}$\rightarrow$\texttt{write}$\rightarrow$\texttt{syscall}$\rightarrow$instrukce)
     \item Drahá operace (přepnutí kontextu)
     \end{itemize}
+  \item \texttt{syscall(\_\_NR\_write, STDOUT\_FILENO, "Test\textbackslash n",
+    5);}
   \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_write}
   \end{itemize}
 
@@ -148,7 +149,6 @@
   \begin{itemize}
   \item Bez skoku do jádra, v knihovně linkované jádrem (\texttt{vdso.so})
   \item Několik málo jednoduchých funkcí (\texttt{gettimeofday}, \ldots)
-  \item Demo: \texttt{ldd /bin/cat}
   \end{itemize}
   \end{enumerate}
 
@@ -163,25 +163,30 @@
 
 \begin{frame}
   \frametitle{Úkol}
-  Pomocí volání \texttt{syscall} spustit \texttt{/bin/date} a počkat na
-  skončení. Předtím a potom vypsat nějakou informaci.
+  V userspace: pomocí volání \texttt{syscall} spustit \texttt{/bin/date}.
+  Předtím vypsat nějakou informaci.
 
   \medskip
 
   \begin{enumerate}
-  \item \texttt{syscall(\_\_NR\_write, \ldots, "Running date", \ldots)}
-  \item \texttt{syscall(\_\_NR\_fork)}
-    \begin{itemize}
-    \item Potomek: \texttt{syscall(\_\_NR\_execve, "/bin/date", \ldots)}
-    \end{itemize}
-  \item \texttt{syscall(\_\_NR\_wait4, \ldots)}
-  \item \texttt{syscall(\_\_NR\_write, \ldots, "date finished", \ldots)}
+  \item \texttt{syscall(\_\_NR\_write, \ldots, "Running date\textbackslash n",
+    \ldots)}
+  \item \texttt{syscall(\_\_NR\_execve, "/bin/date", \ldots)}
   \end{enumerate}
 
   \medskip
 
-  Je třeba znát prototypy funkcí (\texttt{man write}, \texttt{man fork},
-  \ldots).
+  Je třeba znát prototypy funkcí.
+  \begin{itemize}
+  \item Většinou jsou dokumentované: \texttt{man write}, \texttt{man execve}
+  \item Jinak použít lxr
+  \begin{itemize}
+  \item \texttt{sys\_fork}
+  \item \texttt{SYSCALL\_DEFINE1(rmdir, \ldots)} $\rightarrow$
+  	\texttt{sys\_rmdir}
+  \item \texttt{SYSCALL\_DEFINE3(read, \ldots)} $\rightarrow$ \texttt{sys\_read}
+  \end{itemize}
+  \end{itemize}
 
 \end{frame}
 
@@ -225,18 +230,19 @@
   \item Registrace rozsahu major+minor (\texttt{module\_init})
     \begin{itemize}
     \item \texttt{alloc\_chrdev\_region}, \texttt{register\_chrdev\_region},
-      \texttt{unregister\_chrdev\_region}
+      \texttt{unregister\_chrdev\_region} (\header{linux/fs.h})
     \item Přidání záznamu do \texttt{/proc/devices}
     \end{itemize}
   \item Registrace jednotlivých minorů (PCI, USB, \ldots \texttt{probe})
     \begin{itemize}
-    \item \texttt{cdev\_add}, \texttt{cdev\_del}
+    \item \texttt{cdev\_add}, \texttt{cdev\_del} (\header{linux/cdev.h})
     \item Po odpovídajícím \texttt{mknod} lze zařízení používat
     \end{itemize}
   \item Podat zprávu \texttt{udev} (vytvoření \texttt{/dev/*}) -- nepovinné
     (\texttt{probe})
     \begin{itemize}
     \item \texttt{device\_create}, \texttt{device\_destroy}
+      (\header{linux/device.h})
     \item Předem je potřeba vytvořit \texttt{class} (\texttt{module\_init})
     \end{itemize}
   \end{enumerate}
@@ -246,7 +252,7 @@
   \item Implementuje \texttt{open}, \texttt{close}, \texttt{read},
     \texttt{write}, \texttt{ioctl}, \texttt{mmap}, \ldots
   \begin{itemize}
-  \item Jsou v \texttt{struct file\_operations}
+  \item Jsou v \texttt{struct file\_operations} (\header{linux/fs.h})
   \item Parametr pro \texttt{cdev\_add}
   \end{itemize}
   \end{itemize}
@@ -265,6 +271,7 @@
     \end{itemize}
   \item \texttt{misc\_register}, \texttt{misc\_deregister}
   \item Objeví se v \texttt{/proc/misc} a \texttt{/dev}
+  \item \header{linux/miscdevice.h}
   \end{itemize}
 
 \end{frame}
@@ -312,7 +319,7 @@
   \item Jen primitiva (\texttt{char}, \texttt{short}, \texttt{int},
     \texttt{long})
   \end{itemize}
-  \item Definované v \texttt{linux/uaccess.h}
+  \item Definované v \header{linux/uaccess.h}
   \end{itemize}
 
   Demo: pb173/02
@@ -351,22 +358,35 @@
 
   \item Jádro definuje pevné typy (z hlediska počtu bitů)
   \begin{itemize}
-  \item \texttt{linux/types.h}
+  \item \header{linux/types.h}
   \item \texttt{\_\_u8}, \texttt{\_\_u16}, \texttt{\_\_u32}, \texttt{\_\_u64}
   \item \texttt{\_\_s8}, \texttt{\_\_s16}, \texttt{\_\_s32}, \texttt{\_\_s64}
   \item Ukazatele musí být v union s \texttt{\_\_u64}
   \end{itemize}
   \end{itemize}
 
+  \begin{center}
+  \begin{tabular}{ccc}
   \begin{lstlisting}[language=C]
 struct my {
-  __u64 flags;              unsigned long flags;
-  __s16 index; <instead of> short index;
-  union {                   void *data;
+  unsigned long flags;
+  short index;
+  void *data;
+} my;
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}[language=C]
+struct my {
+  __u64 flags;
+  __s16 index;
+  union {
     void *data;
     __u64 filler;
   };
 } my;
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+  \begin{lstlisting}[language=C]
 read(fd, &my, sizeof(my));
 ioctl(fd, DO_SOMETHING, &my);
   \end{lstlisting}
