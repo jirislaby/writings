@@ -6,6 +6,7 @@
 \renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
 \newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
 \newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
 
 % Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
 %
@@ -93,10 +94,253 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Důležité informace}
+  \frametitle{Ladění jádra}
+  \heading{Jak zjistit chybu v jádře}
   \begin{itemize}
-  \item Kolokvium za DÚ
+  \item Ladícími výpisy
+  \item Výstupem přes soubor (obsah velkých bufferů apod.)
+  \item Regrese $\Rightarrow$ \texttt{git bisect}
+  \item Pád $\Rightarrow$ analýza Oops
+  \item (Debugger -- \texttt{kgdb} a další)
+  \item \ldots
   \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Výpisy}
+  \begin{itemize}
+  \item \texttt{printk} již známe
+  \item Před formátovací řetězec se vkládá \texttt{KERN\_*}
+  \begin{itemize}
+  \item Řetězec ve formě \texttt{<číslo>}
+  \item Sděluje úroveň (důležitost) zprávy
+  \item Definované v \header{linux/kernel.h}
+  \end{itemize}
+  \end{itemize}
+
+  \begin{center}
+  \begin{tabular}{|l|l|l|l|} \hline
+  Důležitost & Konzole & \texttt{/var/log/*} & \texttt{dmesg} \\ \hline\hline
+  vysoká     & ANO     & ANO                 & ANO            \\ \hline
+  normální   & NE      & ANO                 & ANO            \\ \hline
+  ladící     & NE      & NE                  & ANO            \\ \hline\hline
+  zapisuje   & jádro   & syslog*             & jádro          \\ \hline
+  \end{tabular} \\[2mm]
+  \emph{Obvyklé nastavení}
+
+  \medskip
+
+  \heading{Úroveň ovlivňuje, co se kde zobrazí}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Nastavení výpisů}
+  Nastavení konzole v \texttt{/proc/sys/kernel/printk}
+  \begin{itemize}
+  \item Popis: \doc{Documentation/sysctl/kernel.txt}
+  \item 4 čísla:
+    \begin{enumerate}
+    \item Zprávy s vyšší úrovní se objeví na konzoli (\texttt{dmesg -n})
+    \item Zprávy bez úrovně dostanou tuto
+    \item Minimum pro bod 1
+    \item Nevyužito
+    \end{enumerate}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  Pozn. 1: nastavení syslogu je závislé na systému
+
+  Pozn. 2: \texttt{dmesg} nastavit nelze
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úrovně -- závěr}
+
+  Demo: \texttt{pb173/03} + \texttt{/proc/sys/kernel/printk} + \texttt{dmesg -n}
+
+  \bigskip
+  \pause
+
+  \heading{Volba úrovně s rozvahou}
+  \begin{itemize}
+  \item Nechceme 10G \texttt{/var/log/messages} (DEBUG)
+  \item Nechceme spoustu hlášek na konzoli (WARNING)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Cíl výpisů}
+
+  \heading{Co vše může být konzole pro výpisy}
+  \begin{itemize}
+  \item \texttt{tty0-tty*}
+  \item Sériová konzole (\texttt{ttyS*})
+  \item Síťová konzole (\texttt{netconsole})
+  \item Všechno, co se zaregistruje pomocí \texttt{register\_console}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  Nastavení pomocí parametru jádra (modulu)
+  \begin{itemize}
+  \item \texttt{console=tty1}
+  \item \texttt{console=ttyS0}
+  \item \texttt{netconsole=...}
+  \end{itemize}
+
+  \medskip
+
+  \doc{Documentation/console/console.txt}\\
+  \doc{Documentation/serial-console.txt}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+  \heading{Použití netconsole}
+  \begin{enumerate}
+  \item Na hostovi: \texttt{nc -ul 0.0.0.0 60000}
+  \item \texttt{dhclient}, je-li třeba
+  \item \texttt{dmesg -n 8} (vypisovat vše)
+  \item \texttt{modinfo netconsole}
+  \item \texttt{modprobe netconsole netconsole=@/,60000@10.0.2.2/}
+  \item Např. \texttt{echo h >/proc/sysrq-trigger}
+  \end{enumerate}
+
+  Více informací v \doc{Documentation/networking/netconsole.txt}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Omezení výpisů}
+
+  \begin{itemize}
+  \item Mnoho dat
+  \begin{itemize}
+  \item Znepřehlednění (typické pro ACPI, iwlwifi)
+  \item Nestíhá se posílat na konzoli (ztráta informací)
+  \item \emph{Řešení} (částečné): \texttt{if (printk\_ratelimit()) printk();}
+  \end{itemize}
+  \item Binární data
+  \begin{itemize}
+  \item \texttt{dmesg} zobrazuje jen textová data
+  \item \emph{Řešení} (částečné): \texttt{print\_hex\_dump\_bytes}
+    (\header{linux/kernel.h})
+  \end{itemize}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \begin{center}
+  \heading{Mnoho binárních dat se předává pomocí speciálních souborů}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{debugfs}
+
+  \begin{itemize}
+  \item Většinou v /sys/kernel/debug/
+  \begin{itemize}
+  \item Pokud ne: \texttt{mount -t debugfs none /sys/kernel/debug/}
+  \end{itemize}
+  \item \doc{Documentation/filesystems/debugfs.txt}
+  \item \header{linux/debugfs.h}
+  \item \texttt{debugfs\_create\_dir},\\
+    \texttt{debugfs\_create\_file} (\texttt{file\_operations}),\\
+    \texttt{debugfs\_create\_symlink},\\
+    \texttt{debugfs\_create\_u\{8,16,32,bool\}},\\
+    \texttt{debugfs\_remove}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření položek v debugfs}
+  \begin{enumerate}
+  \item Vytvořit adresář
+  \item Vytvořit v něm soubor (u16)
+  \begin{itemize}
+  \item Vrací např. 11320
+  \end{itemize}
+  \item Přeložit, vložit do systému
+  \item Přečíst soubor
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{SysRq}
+
+  \heading{Vyžádání akce jádra}
+  \begin{itemize}
+  \item System-request (Alt-PrintScreen)
+  \item Funguje (většinou) i po pádu systému
+  \item Zapnutí: \texttt{sysctl kernel.sysrq=1}
+  \item \doc{Documentation/sysrq.txt}
+  \end{itemize}
+
+  \pause
+
+  \begin{center}
+  \small
+  \begin{tabular}{|l|l|} \hline
+  h & zkrácená nápověda \\ \hline
+  p & výpis tras procesů na CPU \\ \hline
+  t & výpis tras všech procesů \\ \hline
+  w & výpis blokujících procesů \\ \hline
+  s-u-s-b & sync + unmount + reboot \\ \hline
+  \end{tabular} \\[2mm]
+  \emph{Příklady SysRq}
+  \end{center}
+
+  Pozn.: v Qemu lze vyzkoušet v ovládací konzoli (Ctrl-Alt-2) příkazem
+  \texttt{sendkey alt-sysrq-p}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Analýza Oops}
+
+  \footnotesize
+  \begin{lstlisting}{language=C}
+my_init(void) { char *ptr = (void *)5; *ptr = 5; }
+  \end{lstlisting}
+  \begin{lstlisting}{language=XML}
+BUG: unable to handle kernel NULL pointer dereference at 00000000000005
+IP: [<ffffffffa0039042>] my_init+0x12/0x30 [pb173]
+PGD 3daff067 PUD 3c713067 PMD 0 
+Oops: 0002 [#1] SMP 
+last sysfs file: /sys/devices/system/...
+CPU 0 
+Modules linked in: pb173(+) mperf fuse ...
+Pid: 2506, comm: insmod Not tainted 2.6.36-rc4-16-default #1 /Bochs
+RIP: 0010:[<ffffffffa0039042>]  [<ffffffffa0039042>] my_init+0x12/0x30 [pb173]
+RSP: 0018:ffff88003c741f28  EFLAGS: 00010292
+RAX: 0000000000000017 RBX: ffffffffa0039180 RCX: 0000000000000e91
+...
+CR2: 0000000000000005 CR3: 000000003bb47000 CR4: 00000000000006f0
+Process insmod (pid: 2506, ...)
+Stack: ...
+Call Trace:
+ [<ffffffff810002da>] do_one_initcall+0x3a/0x170
+ [<ffffffff8108f69a>] sys_init_module+0xba/0x210
+ [<ffffffff81002efb>] system_call_fastpath+0x16/0x1b
+ [<00007fc3386320ba>] 0x7fc3386320ba
+Code: ... e8 63 c8 41 e1 <c6> 04 25 05 00 00 ...
+  \end{lstlisting}
+
 \end{frame}
 
 \end{document}
