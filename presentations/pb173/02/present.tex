@@ -252,10 +252,6 @@
 
   \item Implementuje \texttt{open}, \texttt{close}, \texttt{read},
     \texttt{write}, \texttt{ioctl}, \texttt{mmap}, \ldots
-  \begin{itemize}
-  \item Jsou v \texttt{struct file\_operations} (\header{linux/fs.h})
-  \item Parametr pro \texttt{cdev\_add}
-  \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -267,12 +263,44 @@
   \item Dělá všechnu práci z předchozího slidu
   \item Potřebujeme
     \begin{itemize}
-    \item Seznam funkcí (\texttt{struct file\_operations})
+    \item Seznam implementovaných funkcí (opět)
     \item Definici misc zařízení (\texttt{struct miscdevice})
     \end{itemize}
   \item \texttt{misc\_register}, \texttt{misc\_deregister}
   \item Objeví se v \texttt{/proc/misc} a \texttt{/dev}
   \item \header{linux/miscdevice.h}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Popis funkcí}
+
+  \begin{itemize}
+  \item \texttt{struct file\_operations} (\header{linux/fs.h})
+  \item Seznam funkcí, které chceme obsluhovat
+  \item Parametr pro \texttt{cdev\_add}, jsou v \texttt{miscdevice} apod.
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+struct module *owner; /* = THIS_MODULE */
+int (*open)(struct inode *inode, struct file *filp)
+ssize_t (*read)(struct file *filp, char __user *buf, size_t count, loff_t *offp)
+int (*release)(struct inode *inode, struct file *filp);
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}
+  \item \texttt{filp->private\_data} slouží programátorovi (libovolně)
+  \item \texttt{offp} slouží programátorovi (k poznamenání průběhu)
+  \item \texttt{\_\_user} značí ukazatel od uživatele
+  \item Návratové hodnoty
+  \begin{itemize}
+  \item \texttt{int} -- záporné = \texttt{-Echyba}, jinak 0
+  \item \texttt{ssize\_t} -- záporné = \texttt{-Echyba}, jinak počet
+    zpracovaných znaků
+  \end{itemize}
   \end{itemize}
 
 \end{frame}
