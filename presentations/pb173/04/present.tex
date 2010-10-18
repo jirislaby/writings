@@ -29,6 +29,7 @@
   \setbeamercovered{transparent}
 }
 
+\usepackage[czech]{babel}
 \usepackage[utf8]{inputenc}
 \usepackage{times}
 \usepackage[IL2]{fontenc}
@@ -45,14 +46,14 @@
 \title[PB173/01] % (optional, use only with long paper titles)
 {PB173 -- Ovladače jádra -- Linux}
 
-\subtitle{III.}
+\subtitle{IV.}
 
 \author[J. Slabý]{Jiří~Slabý}
 
 \institute[ITI] % (optional, but mostly needed)
 {ITI, Fakulta Informatiky}
 
-\date{12. 10. 2010}
+\date{19. 10. 2010}
 
 \subject{}
 % This is only inserted into the PDF information catalog. Can be left
@@ -93,17 +94,348 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{frame}
-  \frametitle{Ladění jádra}
-  \heading{Jak zjistit chybu v jádře}
+\begin{frame}[fragile]
+  \frametitle{Chyby souběhu, zámky}
+
+  \heading{LDD3 kap. 5} (zastaralá)
+
+  \bigskip
+
+  \heading{Co je chyba souběhu}
   \begin{itemize}
-  \item Ladicími výpisy
-  \item Výstupem přes soubor (obsah velkých bufferů apod.)
-  \item Pád $\Rightarrow$ analýza Oops
-  \item Regrese $\Rightarrow$ \texttt{git bisect}
-  \item (Debugger -- \texttt{kgdb} a další)
-  \item \ldots
+  \item Chyba závislá na načasování/prokládání operací
   \end{itemize}
+
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}[language=C]
+int *addr;
+...
+int a = fetch(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting}
+  \end{tabular}\\[2mm]
+  \emph{Ukázkový kód}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Příklad chyby souběhu}
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno A & Vlákno B \\ \hline
+  \begin{lstlisting}[language=C]
+int a = fetch();
+a = a + 1;
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno A & Vlákno B \\ \hline
+  \begin{lstlisting}[language=C]
+int a = fetch();
+a = a + 1;
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+int a = fetch();
+a = a + 1;
+store(a);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno A & Vlákno B \\ \hline
+  \begin{lstlisting}[language=C]
+int a = fetch();
+a = a + 1;
+store(a);
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+int a = fetch();
+a = a + 1;
+store(a);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Řešení chyb souběhu}
+
+  \begin{itemize}
+  \item Atomickou operací ve stylu \texttt{fetch\_inc\_store}
+  \begin{itemize}
+  \item Podpora CPU (zamknutí sběrnice, cache koherence)
+  \item Ne na všechno jsou operace (vesměs +, -, set, get)
+  \end{itemize}
+  \item Kritickou sekcí
+  \begin{itemize}
+  \item Kus kódu vykonávaný max. jedním procesem
+  \item Zámky
+  \end{itemize}
+  \item Read-copy-update (RCU)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Atomické operace}
+
+  \begin{itemize}
+  \item \header{asm/atomic.h}, \doc{Documentation/atomic\_ops.txt}
+  \item \texttt{atomic\_t a = ATOMIC\_INIT(5)}
+  \item Pojme 32 bitů se znaménkem (\texttt{int}) (historicky jen 24)
+  \item \texttt{atomic\_read}, \texttt{atomic\_set}
+  \item \texttt{atomic\_add}, \texttt{atomic\_inc}, \texttt{atomic\_sub},
+    \texttt{atomic\_dec}, \texttt{atomic\_*\_return} a další (LXR)
+  \end{itemize}
+
+  \pause
+
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}[language=C]
+int *addr;
+...
+int a = fetch(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}[language=C]
+atomic_t a;
+...
+atomic_inc(&a);
+/* nebo atomic_add(1, &a); */
+  \end{lstlisting}
+  \end{tabular}\\[2mm]
+  \emph{Řešení pomocí atomických operací}
+  \end{center}
+
+  \pause
+
+  \begin{itemize}
+  \item \texttt{atomic64\_t} (drahý na 32-bitu)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+  
+  \heading{Práce s atomickými typy}
+  \begin{enumerate}
+  \item Definice jednoho \texttt{atomic\_t} v \texttt{module\_init}
+  \item Nastavit hodnotu na -3 (nejlépe staticky)
+  \item Atomicky: přičíst 1 a přečíst hodnotu
+  \item Přečtenou hodnotu vypsat do logu
+  \item Přičíst 3
+  \item Odečíst 1
+  \item Přečíst hodnotu a vrátit jako návratovou
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Atomické bitové operace}
+
+  \begin{itemize}
+  \item Stačí-li 1 bit namísto \texttt{int}
+  \item \header{linux/bitops.h}, \doc{Documentation/atomic\_ops.txt}
+  \item \texttt{unsigned long a = 0}, popř. \texttt{DECLARE\_BITMAP(a, 1000)}
+  \item \texttt{set\_bit}, \texttt{clear\_bit}, \texttt{test\_bit}
+  \item \texttt{test\_and\_set\_bit}, \texttt{test\_and\_clear\_bit}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Bitmapy lze použít i neatomicky (např. v kritických sekcích)}
+  \begin{itemize}
+  \item \header{linux/bitmap.h}
+  \item \texttt{\_\_set\_bit}, \texttt{\_\_clear\_bit}
+  \item \texttt{bitmap\_zero}, \texttt{bitmap\_fill}, \texttt{bitmap\_copy}
+  \item \texttt{bitmap\_OP}, kde $\text{\texttt{OP}}\in\left\{\text{\texttt{and}},\text{\texttt{or}},\text{\texttt{xor}},\text{\texttt{andnot}},\text{\texttt{complement}}\right\}$
+  \item \texttt{bitmap\_empty}, \texttt{bitmap\_full}, \ldots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+  
+  \heading{Práce s bitmapami}
+  \begin{enumerate}
+  \item Definice bitového pole o 100 bitech
+  \item Výmaz pole (\texttt{bitmap\_zero})
+  \item Nastavení 2., 63. a 76. bitu
+  \item Výpis longu (\texttt{\%lx}) s 63. bitem (\texttt{pole[BIT\_WORD(63)]} z
+    LXR)
+  \item Výpis celého pole (\texttt{bitmap\_scnprintf})
+  \item Výpis longů obsahující 1 bity (\texttt{for\_each\_set\_bit} z
+    LXR)
+  \item Výpis čísla 1. nastaveného bitu (\texttt{find\_first\_bit})
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Zámky}
+
+  \heading{Vytvoření kritické sekce}
+  \begin{itemize}
+  \item Spinlocky
+  \begin{itemize}
+  \item Čekání ve smyčce (požírá strojový čas)
+  \item Rychlé, nesmí se uvnitř spát (čekat)
+  \end{itemize}
+  \item Mutexy
+  \begin{itemize}
+  \item Spící, fronta čekatelů
+  \item Pomalejší než spinlock (viz \texttt{\_\_mutex\_lock\_common})
+  \end{itemize}
+  \item Semafory
+  \begin{itemize}
+  \item Podobné mutexům
+  \item Počítadlo (jsou rekurzivní)
+  \item Dnes se používají vyjímečně
+  \end{itemize}
+  \item Monitory (java) \ldots
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Zámky v jádře I.}
+
+  \heading{Spinlocky}
+  \begin{itemize}
+  \item \header{linux/spinlock.h}, \doc{Documentation/spinlocks.txt}
+  \item \texttt{DEFINE\_SPINLOCK(lock)}, \texttt{spinlock\_t lock}
+  \item \texttt{spin\_lock}, \texttt{spin\_unlock}
+  \item read/write varianty
+  \begin{itemize}
+  \item Jeden zapisovatel, více čitatelů
+  \item Dražší operace než obyčejný spinlock
+  \end{itemize}
+  \item \texttt{\_irq*} varianty
+  \begin{itemize}
+  \item Zákaz přerušení, poté spinlock
+  \end{itemize}
+  \item Podobné \texttt{pthread} spinlockům
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Zámky v jádře II.}
+
+  \heading{Mutexy}
+  \begin{itemize}
+  \item \header{linux/mutex.h}
+  \item \texttt{DEFINE\_MUTEX(name)}
+  \item \texttt{mutex\_lock}, \texttt{mutex\_unlock}
+  \item Přerušitelné varianty
+  \begin{itemize}
+  \item Signál přeruší čekání
+  \item Tyto funkce vracejí hodnotu ne/mám zámek
+  \end{itemize}
+  \item Podobné \texttt{pthread} mutexům
+  \end{itemize}
+
+  \pause
+
+  \heading{Semafory}
+  \begin{itemize}
+  \item \header{linux/semaphore.h}
+  \item Víceméně nepoužívat
+  \item Pozor: \texttt{DECLARE\_MUTEX(lock)}
+  \item \texttt{down}, \texttt{up}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+  
+  \heading{Atomické čtení/zápis bufferu o velikosti 128 bytů}
+  \begin{itemize}
+  \item Globální buffer
+  \item 2 znaková (i misc) zařízení
+  \begin{itemize}
+  \item 1 implementuje \texttt{.read}
+  \item 1 implementuje \texttt{.write}
+  \end{itemize}
+  \item Zápis
+  \begin{itemize}
+  \item Umožněn pouze po 5 znacích (vrací max. 5)
+  \item Spí 10 ms po každém zápisu znaku do stránky (\texttt{msleep} z
+    \header{linux/delay.h})
+  \end{itemize}
+  \item Čtení
+  \begin{itemize}
+  \item Vrátí naráz celých 128 B
+  \item Musí vidět změny pouze po 5 znacích (až na poslední pětici)
+  \end{itemize}
+  \item Vyzkoušejte
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Deadlock}
+  
+  \begin{itemize}
+  \item 4 podmínky uváznutí
+  \item Jádro spoléhá na programátora, že k němu nikdy nedojde
+  \item \textsc{LockDep}
+  \begin{itemize}
+  \item Dynamický mechanismus hledání chyb v zámcích
+  \end{itemize}
+  \item Obvyklé typy chyb: ABBA, AA
+  \item Obvyklé chyby: \texttt{lock} + \texttt{if} + \texttt{return}
+  \end{itemize}
+
+  \begin{figure}
+  \includegraphics[width=7em]{deadlock}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Další problémy zámků}
+  
+  \begin{itemize}
+  \item Zpomalují kritický kód
+  \begin{itemize}
+  \item Odstraní se zámky
+  \item Např. kruhové buffery
+  \end{itemize}
+
+  \pause
+
+  \item Nevhodná granularita
+  \begin{itemize}
+  \item Jeden zámek na všechno vs. jeden zámek na jednu činnost
+  \item Např. BKL, nebo naopak zámky každého registru
+  \end{itemize}
+
+  \pause
+
+  \item Zahlcení
+  \begin{itemize}
+  \item Příliš mnoho procesů čeká na zámek
+  \item Lze řešit přechodem na COW, RCU, RW zámky, \ldots
+  \item Např. všechny procesy čekají na \texttt{tasklist\_lock}
+  \end{itemize}
+  \end{itemize}
+
 \end{frame}
 
 \end{document}
