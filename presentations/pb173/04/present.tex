@@ -1,6 +1,6 @@
 % vim: ai sw=2
 
-\documentclass[xcolor=dvipsnames,handout]{beamer}
+\documentclass[xcolor=dvipsnames]{beamer}
 
 \let\Oldemph\emph
 \renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
@@ -130,7 +130,8 @@ store(a, addr);
   \begin{lstlisting}[language=C]
 int a = fetch();
 a = a + 1;
-  \end{lstlisting}
+<schedule>
+  \end{lstlisting} \\
   \end{tabular}
   \end{center}
 
@@ -185,6 +186,9 @@ store(a);
   \item Zámky
   \end{itemize}
   \item Read-copy-update (RCU)
+  \begin{itemize}
+  \item Podrobnosti v LDD
+  \end{itemize}
   \end{itemize}
 \end{frame}
 
@@ -258,7 +262,7 @@ atomic_inc(&a);
   \pause
   \medskip
 
-  \heading{Bitmapy lze použít i neatomicky (např. v kritických sekcích)}
+  \heading{Bitmapy lze použít i NEATOMICKY (např. v kritických sekcích)}
   \begin{itemize}
   \item \header{linux/bitmap.h}
   \item \texttt{\_\_set\_bit}, \texttt{\_\_clear\_bit}
@@ -282,7 +286,7 @@ atomic_inc(&a);
   \item Výpis celého pole (\texttt{bitmap\_scnprintf})
   \item Výpis longů obsahující 1 bity (\texttt{for\_each\_set\_bit} z
     LXR)
-  \item Výpis čísla 1. nastaveného bitu (\texttt{find\_first\_bit})
+  \item Výpis pozice 1. nastaveného bitu (\texttt{find\_first\_bit})
   \end{enumerate}
 \end{frame}
 
@@ -311,17 +315,16 @@ atomic_inc(&a);
   \end{itemize}
 \end{frame}
 
-\begin{frame}
-  \frametitle{Zámky v jádře I.}
+\begin{frame}[fragile]
+  \frametitle{Zámky v jádře -- spinlocky}
 
-  \heading{Spinlocky}
   \begin{itemize}
   \item \header{linux/spinlock.h}, \doc{Documentation/spinlocks.txt}
   \item \texttt{DEFINE\_SPINLOCK(lock)}, \texttt{spinlock\_t lock}
   \item \texttt{spin\_lock}, \texttt{spin\_unlock}
-  \item read/write varianty
+  \item read/write varianty (\header{linux/rwlock.h})
   \begin{itemize}
-  \item Jeden zapisovatel, více čitatelů
+  \item Jeden zapisovatel, více čitatelů (jen odůvodněné případy)
   \item Dražší operace než obyčejný spinlock
   \end{itemize}
   \item \texttt{\_irq*} varianty
@@ -331,10 +334,35 @@ atomic_inc(&a);
   \item Podobné \texttt{pthread} spinlockům
   \end{itemize}
 
+  \pause
+
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}[language=C]
+int *addr;
+...
+int a = fetch(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}[language=C]
+DEFINE_SPINLOCK(addr_lock);
+int *addr;
+...
+spin_lock(&addr_lock);
+int a = fetch(addr);
+a = a + 1;
+store(a, addr);
+spin_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}\\[2mm]
+  \emph{\footnotesize Řešení pomocí spinlocků}
+  \end{center}
+
 \end{frame}
 
-\begin{frame}
-  \frametitle{Zámky v jádře II.}
+\begin{frame}[fragile]
+  \frametitle{Zámky v jádře -- mutexy}
 
   \heading{Mutexy}
   \begin{itemize}
@@ -351,12 +379,50 @@ atomic_inc(&a);
 
   \pause
 
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}[language=C]
+int *addr;
+...
+int a = fetch(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}[language=C]
+DEFINE_MUTEX(addr_lock);
+int *addr;
+...
+mutex_lock(&addr_lock);
+int a = fetch(addr);
+a = a + 1;
+store(a, addr);
+mutex_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}\\[2mm]
+  \emph{\footnotesize Řešení pomocí mutexů}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Zámky v jádře -- ostatní}
+
   \heading{Semafory}
   \begin{itemize}
   \item \header{linux/semaphore.h}
   \item Víceméně nepoužívat
   \item Pozor: \texttt{DECLARE\_MUTEX(lock)}
   \item \texttt{down}, \texttt{up}
+  \end{itemize}
+
+  \pause
+
+  \heading{Big Kernel Lock (BKL)}
+  \begin{itemize}
+  \item NEPOUŽÍVAT
+  \item Hrubozrnný zámek
+  \item Pochází z dob počátku Linuxu
+  \item \texttt{lock\_kernel}, \texttt{unlock\_kernel}
   \end{itemize}
 
 \end{frame}
@@ -385,6 +451,11 @@ atomic_inc(&a);
   \end{itemize}
   \item Vyzkoušejte
   \end{itemize}
+
+  \medskip
+
+  Pozn. 1: pb173/04\\
+  Pozn. 2: odevzdat s domácím
 
 \end{frame}
 
