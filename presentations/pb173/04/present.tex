@@ -1,6 +1,6 @@
 % vim: ai sw=2
 
-\documentclass[xcolor=dvipsnames]{beamer}
+\documentclass[xcolor=dvipsnames,handout]{beamer}
 
 \let\Oldemph\emph
 \renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
@@ -128,7 +128,7 @@ store(a, addr);
   \begin{tabular}{c|c}
   Vlákno A & Vlákno B \\ \hline
   \begin{lstlisting}[language=C]
-int a = fetch();
+int a = fetch(addr);
 a = a + 1;
 <schedule>
   \end{lstlisting} \\
@@ -141,13 +141,13 @@ a = a + 1;
   \begin{tabular}{c|c}
   Vlákno A & Vlákno B \\ \hline
   \begin{lstlisting}[language=C]
-int a = fetch();
+int a = fetch(addr);
 a = a + 1;
   \end{lstlisting} &
   \begin{lstlisting}[language=C]
-int a = fetch();
+int a = fetch(addr);
 a = a + 1;
-store(a);
+store(a, addr);
   \end{lstlisting}
   \end{tabular}
   \end{center}
@@ -158,14 +158,14 @@ store(a);
   \begin{tabular}{c|c}
   Vlákno A & Vlákno B \\ \hline
   \begin{lstlisting}[language=C]
-int a = fetch();
+int a = fetch(addr);
 a = a + 1;
-store(a);
+store(a, addr);
   \end{lstlisting} &
   \begin{lstlisting}[language=C]
-int a = fetch();
+int a = fetch(addr);
 a = a + 1;
-store(a);
+store(a, addr);
   \end{lstlisting}
   \end{tabular}
   \end{center}
@@ -222,7 +222,7 @@ atomic_inc(&a);
 /* nebo atomic_add(1, &a); */
   \end{lstlisting}
   \end{tabular}\\[2mm]
-  \emph{Řešení pomocí atomických operací}
+  \emph{\footnotesize Řešení pomocí atomických operací}
   \end{center}
 
   \pause
@@ -313,6 +313,10 @@ atomic_inc(&a);
   \end{itemize}
   \item Monitory (java) \ldots
   \end{itemize}
+
+  \begin{center}
+  \heading{Zámky lze držet jen v jádře (po dobu vykonávání syscallu)}
+  \end{center}
 \end{frame}
 
 \begin{frame}[fragile]
@@ -441,7 +445,7 @@ mutex_unlock(&addr_lock);
   \item Zápis
   \begin{itemize}
   \item Umožněn pouze po 5 znacích (vrací max. 5)
-  \item Spí 10 ms po každém zápisu znaku do stránky (\texttt{msleep} z
+  \item Spí 10 ms po každém zápisu znaku do bufferu (\texttt{msleep} z
     \header{linux/delay.h})
   \end{itemize}
   \item Čtení
