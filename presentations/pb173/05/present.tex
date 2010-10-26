@@ -97,7 +97,8 @@
 \begin{frame}
   \frametitle{Práce s pamětí}
 
-  \heading{LDD3 kap. 8} (zastaralá část o bootmem)
+  \heading{LDD3 kap. 8} (zastaralá část o bootmem)\\
+  \heading{Understanding the Linux Virtual Memory Manager} (zastaralá)
 
   \bigskip
 
@@ -112,6 +113,14 @@
 \begin{frame}
   \frametitle{Organizace paměti}
 
+  \begin{center}
+  \heading{2 oddělené světy} \\
+  (tentokrát z pohledu HW)
+  \end{center}
+
+  \pause
+  \bigskip
+
   \heading{Fyzický prostor}
   \begin{itemize}
   \item Rozložení určuje BIOS (popř. ekvivalenty -- (U)EFI, Qemu)
@@ -122,18 +131,13 @@
 
   \heading{Virtuální prostor (paměť)}
   \begin{itemize}
-  \item Určuje OS
+  \item Rozložení si určuje OS
+  \begin{itemize}
+  \item Různé na každé architektuře
+  \end{itemize}
   \item Dané mapování mezi VP a FP
-  \item Různé rozložení na každé architektuře
   \item Nutná podpora HW (MMU), jinak mapování 1:1
   \end{itemize}
-
-  \pause
-  \bigskip
-
-  \begin{center}
-  \heading{2 oddělené světy}
-  \end{center}
 
 \end{frame}
 
@@ -172,7 +176,7 @@
   \begin{itemize}
   \item Reprezentována rozsahy lineárních (fyzických) adres
   \begin{itemize}
-  \item Rozdělení na rozsahy kvůli prostorům zařízení
+  \item Rozsahy kvůli vloženým prostorům zařízení (e820)
   \end{itemize}
   \item Cache (některá zařízení také)
   \end{itemize}
@@ -183,7 +187,7 @@
   \frametitle{Úkol}
   
   \heading{Práce s fyzickou adresou -- přečtení signatury a délky nějaké ACPI
-    tabulky}
+    tabulky z fyzické adresy}
   \begin{enumerate}
   \item Najít fyzickou adresu nějaké ACPI tabulky v \texttt{dmesg}
   \begin{itemize}
@@ -301,7 +305,7 @@
 \begin{frame}
   \frametitle{Alokace paměti}
 
-  \heading{Typy alokací}
+  \heading{Základní typy alokací}
   \begin{itemize}
   \item Malé bloky až souvisle po stránkách (\texttt{kmalloc})
   \item Souvisle po stránkách (\texttt{\_\_get\_free\_pages})
@@ -393,7 +397,7 @@
   \frametitle{Poznámky na závěr}
 
   \begin{itemize}
-  \item Vše, co může číst uživatel se musí vymazat
+  \item Vše, co může číst uživatel se musí nejprve vymazat
   \begin{itemize}
   \item \texttt{kzalloc}, \texttt{get\_zeroed\_page}, \texttt{\_\_GFP\_ZERO},
     \texttt{vzalloc}
@@ -404,6 +408,30 @@
   \item \texttt{GFP\_ATOMIC} funguje všude, ale ubírá vzácné prostředky
   \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Alokace paměti}
+
+  \begin{enumerate}
+  \item Zjistěte, kolikrát za sebou lze naalokovat pamět:
+  \begin{itemize}
+  \item řádu 10 jako \texttt{GFP\_ATOMIC}
+  \item řádu 10 jako \texttt{GFP\_ATOMIC} (znovu po 5 vteřinách)
+  \item řádu 10 jako \texttt{GFP\_KERNEL}
+  \item řádu 10 jako \texttt{GFP\_KERNEL} po uvolnění předešlé paměti
+  \item Pozn.: $2^{10} \cdot 4096 = 4\,\text{M}$, jak velké pole na ukazatele?
+  \end{itemize}
+
+  \item Zkuste ve smyčce alokovat paměť s řádem $\leq$
+    \texttt{PAGE\_ALLOC\_COSTLY\_ORDER}, co se stane? \pause Přijde OOM
+    killer\ldots
+  \end{enumerate}
+
+  Demo: pb173/05
 
 \end{frame}
 
