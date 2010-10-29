@@ -1,0 +1,168 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice. 
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[IL2]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+\subtitle{VI.}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{02. 11. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Komunikace s HW}
+
+  \heading{LDD3 kap. 8} (zastaralá část o bootmem)\\
+
+  \bigskip
+
+  \begin{itemize}
+  \item Organizace paměti
+%  \item Typy paměti
+  \item Alokace paměti
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Organizace paměti}
+
+  \begin{center}
+  \heading{2 oddělené světy} \\
+  (tentokrát z pohledu HW)
+  \end{center}
+
+  \pause
+  \bigskip
+
+  \heading{Fyzický prostor}
+  \begin{itemize}
+  \item Rozložení určuje BIOS (popř. ekvivalenty -- (U)EFI, Qemu)
+  \item x86: \texttt{dmesg|grep BIOS-e820}
+  \end{itemize}
+
+  \pause
+
+  \heading{Virtuální prostor (paměť)}
+  \begin{itemize}
+  \item Rozložení si určuje OS
+  \begin{itemize}
+  \item Různé na každé architektuře
+  \end{itemize}
+  \item Dané mapování mezi VP a FP
+  \item Nutná podpora HW (MMU), jinak mapování 1:1
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Alokace paměti}
+
+  \begin{enumerate}
+  \item Zjistěte, kolikrát za sebou lze naalokovat pamět:
+  \begin{itemize}
+  \item řádu 10 jako \texttt{GFP\_ATOMIC}
+  \item řádu 10 jako \texttt{GFP\_ATOMIC} (znovu po 5 vteřinách)
+  \item řádu 10 jako \texttt{GFP\_KERNEL}
+  \item řádu 10 jako \texttt{GFP\_KERNEL} po uvolnění předešlé paměti
+  \item Pozn.: $2^{10} \cdot 4096 = 4\,\text{M}$, jak velké pole na ukazatele?
+  \end{itemize}
+
+  \item Zkuste ve smyčce alokovat paměť s řádem $\leq$
+    \texttt{PAGE\_ALLOC\_COSTLY\_ORDER}, co se stane? \pause Přijde OOM
+    killer\ldots
+  \end{enumerate}
+
+  Demo: pb173/05
+
+\end{frame}
+
+\end{document}
+
