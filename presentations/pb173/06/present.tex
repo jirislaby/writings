@@ -95,47 +95,235 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}
-  \frametitle{Komunikace s HW}
+  \frametitle{Datové typy}
 
-  \heading{LDD3 kap. 8} (zastaralá část o bootmem)\\
+  \heading{LDD3 kap. 11}
 
   \bigskip
 
   \begin{itemize}
-  \item Organizace paměti
-%  \item Typy paměti
-  \item Alokace paměti
+  \item Základní typy
+%  \item Přenositelnost
+  \item Endianita (pořadí bytů)
+  \item Datové struktury (seznam, FIFO)
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Organizace paměti}
+  \frametitle{Základní typy}
+
+  \begin{itemize}
+  \item \texttt{char}, \texttt{short}, \texttt{int}, \texttt{long},
+    \texttt{long long} (+ \texttt{unsigned})
+  \item \texttt{u8}, \texttt{u16}, \texttt{u32}, \texttt{u64},
+    \texttt{\_\_u8}, \texttt{\_\_u16}, \texttt{\_\_u32}, \texttt{\_\_u64}
+  \item \texttt{s8}, \texttt{s16}, \texttt{s32}, \texttt{s64},
+    \texttt{\_\_s8}, \texttt{\_\_s16}, \texttt{\_\_s32}, \texttt{\_\_s64}
+  \end{itemize}
+
+  \begin{table}
+  \footnotesize
+  \begin{tabular}{|l|c|c|c|c|c|c|} \hline
+arch    & char & short & int & long & ptr & long long \\ \hline\hline
+alpha   & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
+arm     & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
+ia64    & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
+m68k    & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
+mips    & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
+ppc     & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
+sparc   & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
+sparc64 & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
+x86\_32 & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
+x86\_64 & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
+  \end{tabular}
+  \caption{\texttt{sizeof} základních typů}
+  \end{table}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Základní typy}
+
+  \begin{table}
+  \footnotesize
+  \begin{tabular}{|l|c|c|c|} \hline
+arch        & virt & phys  & long \\ \hline\hline
+x86\_32     & 4    & 4     & 4    \\ \hline
+x86\_32+PAE & 4    & 4.5   & 4    \\ \hline
+x86\_64     & 8    & 8     & 8    \\ \hline
+  \end{tabular}
+  \caption{\texttt{sizeof} dalších typů}
+  \end{table}
+
+  \heading{Pro práci s fyzickou adresou \texttt{long} nestačí}
+  \begin{itemize}
+  \item Ale \texttt{u64} může být zbytečné (čisté 32-bity)
+  \item Proto speciální typy
+  \begin{itemize}
+  \item \texttt{phys\_addr\_t} (RAM)
+  \item \texttt{dma\_addr\_t} (RAM)
+  \item \texttt{resource\_size\_t} (PCI prostor apod.)
+  \item Anebo \texttt{long}, ale pak v něm uchovávat \texttt{pfn}
+    (\texttt{phys/PAGE\_SIZE})
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  Úkol: opravte typy v pb173/06 (první TODO)
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pořadí bytů}
+
+  \begin{table}
+  \caption{Číslo 0x12345678 v paměti}
+  \begin{tabular}{l|llll}
+Adresa:       &    0 &    1 &    2 &    3 \\ \hline
+Big-endian    & 0x12 & 0x34 & 0x56 & 0x78 \\
+Little-endian & 0x78 & 0x56 & 0x34 & 0x12 \\
+Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
+  \end{tabular}
+  \end{table}
+
+  \pause
+  \medskip
+
+  \heading{Pro typy o velikosti větší než 1 je nutné vědet pořadí}
+  \begin{itemize}
+  \item Specifikace
+  \begin{itemize}
+  \item x86: LE
+  \item PowerPC: LE nebo BE (dle nastavení CPU)
+  \item PCI: LE
+  \item Síťový provoz: BE
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Funkce pro pořadí bytů}
+
+  \begin{itemize}
+  \item \header{asm/byteorder.h}
+  \item \texttt{\_\_leXX}, \texttt{\_\_beXX}
+  \item \texttt{cpu\_to\_leXX}, \texttt{cpu\_to\_beXX}
+  \item \texttt{leXX\_to\_cpu}, \texttt{beXX\_to\_cpu}
+  \item $\text{\texttt{XX}}\in\left\{\text{\texttt{16}},\text{\texttt{32}},\text{\texttt{64}}\right\}$
+  \item \texttt{*p} varianty -- ukazatele
+  \item \texttt{*s} varianty -- in-place
+  \item \texttt{ntohs}, \texttt{ntohl}, \texttt{htons}, \texttt{htonl}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Úkol: doplňte tělo \texttt{decode\_and\_print} v pb173/06 (druhé TODO)
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Chyby jako ukazatele}
+
+  \begin{itemize}
+  \item \texttt{void *funkce()}
+  \item Jak vrátit chytřejší chybu, než NULL?
+  \item Díra na konci adresového prostoru
+  \begin{itemize}
+  \item Např. \texttt{0xfffffffffff00000-0xffffffffffffffff} (x86\_64)
+  \item Lze použít k zakódování chyby
+  \end{itemize}
+  \item \texttt{void *ptr=ERR\_PTR(-Eerror)}
+  \item \texttt{IS\_ERR(ptr)} $\Rightarrow$ \texttt{int err=PTR\_ERR(ptr)}
+  \item \texttt{IS\_ERR(NULL)=false}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Seznam I.}
+
+  \begin{itemize}
+  \item \header{linux/list.h}
+  \item \texttt{struct list\_head} (obsahuje \texttt{prev}, \texttt{next})
+  \begin{itemize}
+  \item Jak samotný seznam (počátek), tak jeho prvky
+  \end{itemize}
+  \item \texttt{LIST\_HEAD(my\_list)}, \texttt{INIT\_LIST\_HEAD(\&my\_list)}
+  \item \texttt{list\_add(co, kam)}, \texttt{list\_add\_tail},
+    \texttt{list\_del}
+  \item \texttt{list\_move}, \texttt{list\_move\_tail}
+  \end{itemize}
 
   \begin{center}
-  \heading{2 oddělené světy} \\
-  (tentokrát z pohledu HW)
+  \begin{tabular}{ll}
+  \begin{lstlisting}[language=C]
+struct my_struct {
+  int a;
+  struct list_head list;
+};
+LIST_HEAD(my_list);
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+struct my_struct *s;
+s = kmalloc(sizeof(*s), GFP_KERNEL);
+INIT_LIST_HEAD(&s->list);
+list_add(&s->list, &my_list);
+/* list_add_tail(&s->list, &my_list); */
+  \end{lstlisting}
+  \end{tabular}
   \end{center}
 
   \pause
-  \bigskip
+  \medskip
 
-  \heading{Fyzický prostor}
+  Úkol: naalokujte 20 stránek a v seznamu si je pamatujte.
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Seznam II.}
+
   \begin{itemize}
-  \item Rozložení určuje BIOS (popř. ekvivalenty -- (U)EFI, Qemu)
-  \item x86: \texttt{dmesg|grep BIOS-e820}
+  \item \header{linux/list.h}
+  \item \texttt{list\_empty}
+  \item \texttt{list\_first\_entry}, \\
+    \texttt{list\_for\_each\_entry}, \\
+    \texttt{list\_for\_each\_entry\_reverse}
+  \item \texttt{*\_safe} varianty -- pokud měním aktuální člen seznamu
   \end{itemize}
+
+  \begin{lstlisting}[language=C]
+struct my_struct *s;
+s = list_first_entry(&my_list, struct my_struct, list);
+/* or */
+list_for_each_entry(s, &my_list, list) {
+  s->a;
+}
+  \end{lstlisting}
 
   \pause
+  \medskip
 
-  \heading{Virtuální prostor (paměť)}
+  Úkol: předchozích 20 stránek uvolněte.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{FIFO}
+
   \begin{itemize}
-  \item Rozložení si určuje OS
-  \begin{itemize}
-  \item Různé na každé architektuře
-  \end{itemize}
-  \item Dané mapování mezi VP a FP
-  \item Nutná podpora HW (MMU), jinak mapování 1:1
+  \item \header{linux/kfifo.h}, \doc{samples/kfifo/*}
+  \item \texttt{struct kfifo}
+  \item \texttt{DECLARE\_KFIFO} $\Rightarrow$ \texttt{INIT\_KFIFO}
+  \item Jinak: \texttt{kfifo\_alloc(\&fifo, size, GFP\_*)}, \texttt{kfifo\_free}
+  \item Zápis: \texttt{kfifo\_in(\&fifo, buf, count)}
+  \item Čtení: \texttt{kfifo\_out(\&fifo, buf, count)}
+  \item Obsazeno: \texttt{kfifo\_len(\&fifo)}
+  \item Volno: \texttt{kfifo\_avail(\&fifo)}
   \end{itemize}
 
 \end{frame}
@@ -143,24 +331,14 @@
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Alokace paměti}
-
+  \heading{Práce s FIFO} (\header{linux/kfifo.h})
   \begin{enumerate}
-  \item Zjistěte, kolikrát za sebou lze naalokovat pamět:
-  \begin{itemize}
-  \item řádu 10 jako \texttt{GFP\_ATOMIC}
-  \item řádu 10 jako \texttt{GFP\_ATOMIC} (znovu po 5 vteřinách)
-  \item řádu 10 jako \texttt{GFP\_KERNEL}
-  \item řádu 10 jako \texttt{GFP\_KERNEL} po uvolnění předešlé paměti
-  \item Pozn.: $2^{10} \cdot 4096 = 4\,\text{M}$, jak velké pole na ukazatele?
-  \end{itemize}
-
-  \item Zkuste ve smyčce alokovat paměť s řádem $\leq$
-    \texttt{PAGE\_ALLOC\_COSTLY\_ORDER}, co se stane? \pause Přijde OOM
-    killer\ldots
+  \item Globalní FIFO 8 intů (\texttt{DECLARE\_KFIFO})
+  \item \texttt{INIT\_KFIFO}
+  \item Zapisovat čísla (\texttt{kfifo\_in}) dokud je místo
+    (\texttt{kfifo\_avail})
+  \item Vypsat všechna čísla (\texttt{kfifo\_out} + \texttt{kfifo\_len})
   \end{enumerate}
-
-  Demo: pb173/05
 
 \end{frame}
 
