@@ -53,7 +53,7 @@
 \institute[ITI] % (optional, but mostly needed)
 {ITI, Fakulta Informatiky}
 
-\date{02. 11. 2010}
+\date{2. 11. 2010}
 
 \subject{}
 % This is only inserted into the PDF information catalog. Can be left
@@ -137,7 +137,7 @@ sparc64 & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
 x86\_32 & 1    & 2     & 4   & 4    & 4   & 8 \\ \hline
 x86\_64 & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
   \end{tabular}
-  \caption{\texttt{sizeof} základních typů}
+  \caption{\texttt{sizeof} základních typů pro různé architektury}
   \end{table}
 
 \end{frame}
@@ -148,15 +148,15 @@ x86\_64 & 1    & 2     & 4   & 8    & 8   & 8 \\ \hline
   \begin{table}
   \footnotesize
   \begin{tabular}{|l|c|c|c|} \hline
-arch        & virt & phys  & long \\ \hline\hline
-x86\_32     & 4    & 4     & 4    \\ \hline
-x86\_32+PAE & 4    & 4.5   & 4    \\ \hline
-x86\_64     & 8    & 8     & 8    \\ \hline
+arch        & long & virt & phys \\ \hline\hline
+x86\_32     & 4    & 4    & 4    \\ \hline
+x86\_32+PAE & 4    & 4    & 4.5  \\ \hline
+x86\_64     & 8    & 8    & 8    \\ \hline
   \end{tabular}
-  \caption{\texttt{sizeof} dalších typů}
+  \caption{\texttt{sizeof} dalších typů (ukazatelů)}
   \end{table}
 
-  \heading{Pro práci s fyzickou adresou \texttt{long} nestačí}
+  \heading{Pro práci s fyzickou adresou \texttt{long}/ukazatel nestačí}
   \begin{itemize}
   \item Ale \texttt{u64} může být zbytečné (čisté 32-bity)
   \item Proto speciální typy
@@ -233,6 +233,7 @@ Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
   \item Jak vrátit chytřejší chybu, než NULL?
   \item Díra na konci adresového prostoru
   \begin{itemize}
+  \item Tj. nevalidní ukazatel (dereference by způsobila pád)
   \item Např. \texttt{0xfffffffffff00000-0xffffffffffffffff} (x86\_64)
   \item Lze použít k zakódování chyby
   \end{itemize}
@@ -250,7 +251,7 @@ Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
   \item \header{linux/list.h}
   \item \texttt{struct list\_head} (obsahuje \texttt{prev}, \texttt{next})
   \begin{itemize}
-  \item Jak samotný seznam (počátek), tak jeho prvky
+  \item \emph{Jak samotný seznam (počátek), tak jeho prvky}
   \end{itemize}
   \item \texttt{LIST\_HEAD(my\_list)}, \texttt{INIT\_LIST\_HEAD(\&my\_list)}
   \item \texttt{list\_add(co, kam)}, \texttt{list\_add\_tail},
@@ -290,19 +291,19 @@ list_add(&s->list, &my_list);
   \begin{itemize}
   \item \header{linux/list.h}
   \item \texttt{list\_empty}
-  \item \texttt{list\_first\_entry}, \\
-    \texttt{list\_for\_each\_entry}, \\
-    \texttt{list\_for\_each\_entry\_reverse}
+  \item \texttt{list\_entry}, \texttt{list\_first\_entry}, \\
+    \texttt{list\_for\_each\_entry(\ldots) \{\ldots \}} (jako \texttt{for}), \\
+    \texttt{list\_for\_each\_entry\_reverse(\ldots) \{\ldots \}}
   \item \texttt{*\_safe} varianty -- pokud měním aktuální člen seznamu
   \end{itemize}
 
   \begin{lstlisting}[language=C]
-struct my_struct *s;
+struct my_struct *s, *s1;
 s = list_first_entry(&my_list, struct my_struct, list);
+s = list_entry(s->list.next, struct my_struct, list);
 /* or */
-list_for_each_entry(s, &my_list, list) {
-  s->a;
-}
+list_for_each_entry(s, &my_list, list) { s->a; }
+list_for_each_entry_safe(s, s1, &my_list, list) { list_del(&s->list); }
   \end{lstlisting}
 
   \pause
@@ -318,8 +319,11 @@ list_for_each_entry(s, &my_list, list) {
   \begin{itemize}
   \item \header{linux/kfifo.h}, \doc{samples/kfifo/*}
   \item \texttt{struct kfifo}
-  \item \texttt{DECLARE\_KFIFO} $\Rightarrow$ \texttt{INIT\_KFIFO}
-  \item Jinak: \texttt{kfifo\_alloc(\&fifo, size, GFP\_*)}, \texttt{kfifo\_free}
+  \begin{itemize}
+  \item Statické: \texttt{DECLARE\_KFIFO} + \texttt{INIT\_KFIFO}
+  \item Dynamické: \texttt{kfifo\_alloc(\&fifo, size, GFP\_*)},
+    \texttt{kfifo\_free}
+  \end{itemize}
   \item Zápis: \texttt{kfifo\_in(\&fifo, buf, count)}
   \item Čtení: \texttt{kfifo\_out(\&fifo, buf, count)}
   \item Obsazeno: \texttt{kfifo\_len(\&fifo)}
@@ -333,12 +337,21 @@ list_for_each_entry(s, &my_list, list) {
 
   \heading{Práce s FIFO} (\header{linux/kfifo.h})
   \begin{enumerate}
-  \item Globalní FIFO 8 intů (\texttt{DECLARE\_KFIFO})
+  \item Globální FIFO 8 intů (\texttt{DECLARE\_KFIFO})
   \item \texttt{INIT\_KFIFO}
   \item Zapisovat čísla (\texttt{kfifo\_in}) dokud je místo
-    (\texttt{kfifo\_avail})
   \item Vypsat všechna čísla (\texttt{kfifo\_out} + \texttt{kfifo\_len})
   \end{enumerate}
+
+  \bigskip
+
+  Pozn.: ve starších jádrech je jiné rozhraní:
+  \begin{itemize}
+  \item jen dynamicky: \texttt{my\_fifo=kfifo\_alloc}
+  \item \texttt{\_\_kfifo\_put}=\texttt{kfifo\_in}
+  \item \texttt{\_\_kfifo\_get}=\texttt{kfifo\_out}
+  \item \texttt{\_\_kfifo\_len}, \texttt{avail} není
+  \end{itemize}
 
 \end{frame}
 
