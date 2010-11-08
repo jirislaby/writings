@@ -1,0 +1,403 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice. 
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[IL2]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+\subtitle{VII.}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{9. 11. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Komunikace s HW}
+
+  \heading{LDD3 kap. 9 a 12}
+
+  \bigskip
+
+  \begin{itemize}
+  \item I/O porty a paměť
+  \begin{itemize}
+  \item Tj. komunikace s HW
+  \end{itemize}
+  \item Práce s PCI zařízeními
+  \item Zobecnění na jiné sběrnice
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{I/O -- MMIO}
+
+  \heading{Memory Mapped I/O}
+  \begin{itemize}
+  \item Součástí fyzického adresového prostoru
+  \item Přístup standardním čtením/zápisem
+  \begin{itemize}
+  \item Nutnost přemapovat na virtuální adresy
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/io.h}, \header{linux/ioport.h}
+  \item Vyloučení: \texttt{request\_mem\_region}, \texttt{release\_mem\_region}
+  \begin{itemize}
+  \item \texttt{/proc/iomem}
+  \end{itemize}
+  \item Mapování: \texttt{virt=ioremap(phys)}, \texttt{iounmap(virt)}
+  \begin{itemize}
+  \item \texttt{/proc/vmallocinfo} (novější jádra)
+  \end{itemize}
+  \item R/W: \texttt{readX(odkud)}, \texttt{writeX(co, kam)}, kde
+    $\text{\texttt{X}}\in\left\{\text{\texttt{b}},\text{\texttt{w}},\text{\texttt{l}},\text{\texttt{q}}\right\}$
+  \item Vícenásobné R/W: \texttt{memcpy\_fromio}, \texttt{memcpy\_toio}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Úkol: Přečíst ACPI identifikaci jako minule, ale s použitím těchto funkcí a
+  kontrolou \texttt{/proc} (př.: drivers/misc/arm-charlcd.c)
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{I/O -- porty}
+
+  \heading{Porty}
+  \begin{itemize}
+  \item Speciální adresový prostor
+  \begin{itemize}
+  \item Závislé na architektuře
+  \item Speciální instrukce (\texttt{in}, \texttt{out} na x86)
+  \end{itemize}
+  \item Samostatná (malá) sběrnice
+  \begin{itemize}
+  \item Na x86: řadič klávesnice, PC spkr, staré časovače a ovladače přerušení,
+    ladicí port (80 $\Rightarrow$ segmentový displej na desce), \ldots
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/io.h}, \header{linux/ioport.h}
+  \item Vyloučení: \texttt{request\_region}, \texttt{release\_region}
+  \item R/W: \texttt{inX(port)}, \texttt{outX(co, port)}, kde
+    $\text{\texttt{X}}\in\left\{\text{\texttt{b}},\text{\texttt{w}},\text{\texttt{l}}\right\}$
+  \item Vícenásobné R/W: \texttt{insX}, \texttt{outsX}
+  \end{itemize}
+
+  \medskip
+
+  Demo: pb173/07 \\
+  Úkol: Přečíst port 0x80, zapsat na něj a znovu přečíst
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Generické rozhraní}
+  
+  \heading{Pro porty a MMIO}
+  \begin{itemize}
+  \item Pomalejší (jeden \texttt{if} při každém přístupu)
+  \item Mapování: \texttt{*\_iomap} \texttt{*\_iounmap} (\texttt{pci\_iomap})
+  \item R/W: \texttt{ioreadXX}, \texttt{iowriteXX}, kde
+    $\text{\texttt{X}}\in\left\{\text{\texttt{8}},\text{\texttt{16}},\text{\texttt{32}},\text{\texttt{64}}\right\}$
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \begin{center}
+  \heading{Většina rozhraní implementuje MMIO, \\
+    porty spíše vyjímečně}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{PCI zařízení}
+
+  \begin{itemize}
+  \item PCI, PCI-X, PCIe
+  \item Hierarchická sběrnice
+  \begin{itemize}
+  \item Identifikace doména:bus:slot:funkce
+  \item Bridge (=routery)
+  \end{itemize}
+  \item Konfigurační prostor (ROM)
+  \begin{itemize}
+  \item Automatická konfigurace
+  \item ID zařízení (vendor, device), I/O prostory, IRQ
+    \begin{itemize}
+    \item Obsah I/O -- specifikace zařízení (výrobce)
+    \end{itemize}
+  \item \texttt{lspci}
+  \end{itemize}
+  \item Podrobnosti v PCI specifikaci
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{PCI zařízení v jádře I.}
+
+  \begin{itemize}
+  \item \header{linux/pci.h}, \doc{Documentation/pci/*}
+  \item \emph{\texttt{struct pci\_dev}}, \texttt{struct pci\_bus}
+  \item \texttt{PCI\_ANY\_ID} značí jakékoliv ID
+  \end{itemize}
+
+  \medskip
+
+  \heading{Hledání zařízení}
+  \begin{enumerate}
+  \item Iterátory (starší)
+  \begin{itemize}
+  \item Vícenásobný přístup k zařízení
+  \item Nepodporuje hotplug
+  \item \texttt{pci\_get\_device} (vendor, device)
+  \item Reference: \texttt{pci\_dev\_get}, \texttt{pci\_dev\_put}
+  \end{itemize}
+  \end{enumerate}
+
+  \begin{lstlisting}[language=C]
+struct pci_dev *pdev = NULL;
+while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
+  printk("%2.x:%.2x.%.2x\n", pdev->bus->number, PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+}
+  \end{lstlisting}
+
+  Úkol: vypsat všechna zařízení v systému (jejich ID)
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{PCI zařízení v jádře II.}
+
+  \begin{enumerate}
+  \setcounter{enumi}{1}
+  \item Událostmi
+  \begin{itemize}
+  \item Registrace háčků a seznamu chtěných zařízení
+  \item Seznam: \texttt{struct pci\_device\_id} (vendor, device, atd.)
+  \item Háčky: \texttt{struct pci\_driver} (probe, remove, suspend, atd.)
+  \item \texttt{pci\_register\_driver}, \texttt{pci\_unregister\_driver}
+  \end{itemize}
+  \end{enumerate}
+
+  \begin{lstlisting}[language=C]
+struct pci_device_id my_table[] = {
+  { PCI_DEVICE(VENDOR1, DEVICE1) }, { PCI_DEVICE(VENDOR1, DEVICE2) },
+  { PCI_DEVICE(0x8086, PCI_ANY_ID), .driver_data = 1 },
+  { 0, }
+};
+MODULE_DEVICE_TABLE(pci, my_table);
+
+struct pci_driver my_pci_driver = {
+  .name = "my_driver",     .id_table = my_table,
+  .probe = my_probe,       .remove = my_remove,
+};
+
+int my_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+{
+  printk("%2.x %lu\n", pdev->bus->number, id->driver_data);
+  return 0;
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Navázání PCI zařízení}
+  \begin{enumerate}
+  \item \header{linux/pci.h}
+  \item Definice \texttt{struct pci\_device\_id}
+  \begin{itemize}
+  \item \texttt{lspci -nn} a najít Combo a jeho vendor+device ID
+  \end{itemize}
+  \item Definice \texttt{struct pci\_driver}
+  \begin{itemize}
+  \item \texttt{probe}, \texttt{remove}, \texttt{name}, \texttt{id\_table}
+  \end{itemize}
+  \item Definice háčků (viz definici \texttt{struct pci\_driver})
+  \begin{itemize}
+  \item \texttt{\scriptsize int (*probe)(struct pci\_dev *, const struct pci\_device\_id *)}
+  \item \texttt{\scriptsize void (*remove)(struct pci\_dev *)}
+  \end{itemize}
+  \item V probe a remove vypsat
+  \begin{itemize}
+  \item \texttt{pdev->bus->number}
+  \item \texttt{PCI\_SLOT(pdev->devfn)}
+  \item \texttt{PCI\_FUNC(pdev->devfn)}
+  \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Operace s PCI}
+
+  \heading{Probe}
+  \begin{itemize}
+  \item Inicializace PCI zařízení
+  \begin{itemize}
+  \item \texttt{pci\_enable\_device}
+  \item Do té doby nelze některé vlastnosti pdev používat (irq)
+  \end{itemize}
+  \item Rezervace a mapování I/O (první část cvičení)
+  \begin{itemize}
+  \item Vyloučení: \texttt{pci\_request\_region}, \texttt{pci\_request\_regions}
+  \item Mapování: \texttt{pci\_ioremap\_bar} -- alias pro
+    \texttt{ioremap(pci\_resource\_start(), pci\_resource\_len())}
+  \end{itemize}
+  \item Nastavení/detekce zařízení
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Remove}
+  \begin{itemize}
+  \item Opak Probe
+  \item \texttt{iounmap}, \texttt{pci\_release\_region}(\texttt{s}),
+    \texttt{pci\_disable\_device}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Zobecnění}
+
+  \heading{Většina ostatních sběrnic funguje stejně}
+  \begin{itemize}
+  \item USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \ldots
+  \item Nějaké probe/remove
+  \item Seznam ID
+  \item Registrace ,,ovladače''
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vyčtení identifikace}
+  \begin{enumerate}
+  \item Povolení zařízení (\texttt{pci\_enable\_device})
+  \item Rezervace baru 0 (\texttt{pci\_request\_region})
+  \item Vypsat fyzickou adresu baru 0 a porovnat s \texttt{lspci}
+  \item Přemapovat bar 0 (\texttt{ioremap})
+  \item Přečíst a rozkódovat identifikaci dole (\texttt{readX})
+  \item Uklidit v remove (unmap, release, disable)
+  \end{enumerate}
+
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents   & Meaning \\ \hline\hline
+0x0000 & 4B  & R   & \texttt{0x6D05RRrr} & Design ID \& Revision\\ \hline
+0x0004 & 4B  & R   & \texttt{0xYMDDhhmm} & Design build time \\ \hline
+\end{tabular}
+\caption{Specifikace baru 0}
+\end{table}
+
+  Pozn.: součást domácího
+
+\end{frame}
+
+\end{document}
+
