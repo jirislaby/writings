@@ -104,7 +104,7 @@
   \begin{itemize}
   \item I/O porty a paměť
   \begin{itemize}
-  \item Tj. komunikace s HW
+  \item Tj. samotná komunikace
   \end{itemize}
   \item Práce s PCI zařízeními
   \item Zobecnění na jiné sběrnice
@@ -129,7 +129,7 @@
   \heading{API}
   \begin{itemize}
   \item \header{linux/io.h}, \header{linux/ioport.h}
-  \item Vyloučení: \texttt{request\_mem\_region}, \texttt{release\_mem\_region}
+  \item Vytvoření: \texttt{request\_mem\_region}, \texttt{release\_mem\_region}
   \begin{itemize}
   \item \texttt{/proc/iomem}
   \end{itemize}
@@ -163,7 +163,7 @@
   \item Samostatná (malá) sběrnice
   \begin{itemize}
   \item Na x86: řadič klávesnice, PC spkr, staré časovače a ovladače přerušení,
-    ladicí port (80 $\Rightarrow$ segmentový displej na desce), \ldots
+    ladicí port (0x80 $\Rightarrow$ segmentový displej na desce), \ldots
   \end{itemize}
   \end{itemize}
 
@@ -172,7 +172,7 @@
   \heading{API}
   \begin{itemize}
   \item \header{linux/io.h}, \header{linux/ioport.h}
-  \item Vyloučení: \texttt{request\_region}, \texttt{release\_region}
+  \item Vytvoření: \texttt{request\_region}, \texttt{release\_region}
   \item R/W: \texttt{inX(port)}, \texttt{outX(co, port)}, kde
     $\text{\texttt{X}}\in\left\{\text{\texttt{b}},\text{\texttt{w}},\text{\texttt{l}}\right\}$
   \item Vícenásobné R/W: \texttt{insX}, \texttt{outsX}
@@ -181,7 +181,7 @@
   \medskip
 
   Demo: pb173/07 \\
-  Úkol: Přečíst port 0x80, zapsat na něj a znovu přečíst
+  Úkol: Přečíst port 0x80, zapsat do něj 1B a znovu přečíst
 
 \end{frame}
 
@@ -203,6 +203,14 @@
   \heading{Většina rozhraní implementuje MMIO, \\
     porty spíše vyjímečně}
   \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Root}
+
+  \heading{Respektujte soukromí}\\
+  pb173/marktwain
 
 \end{frame}
 
@@ -240,6 +248,7 @@
   \end{itemize}
 
   \medskip
+  \pause
 
   \heading{Hledání zařízení}
   \begin{enumerate}
@@ -259,6 +268,8 @@ while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
 }
   \end{lstlisting}
 
+  \pause
+
   Úkol: vypsat všechna zařízení v systému (jejich ID)
 
 \end{frame}
@@ -270,7 +281,7 @@ while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
   \setcounter{enumi}{1}
   \item Událostmi
   \begin{itemize}
-  \item Registrace háčků a seznamu chtěných zařízení
+  \item Registrace seznamu chtěných zařízení a háčků
   \item Seznam: \texttt{struct pci\_device\_id} (vendor, device, atd.)
   \item Háčky: \texttt{struct pci\_driver} (probe, remove, suspend, atd.)
   \item \texttt{pci\_register\_driver}, \texttt{pci\_unregister\_driver}
@@ -340,7 +351,7 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id)
   \end{itemize}
   \item Rezervace a mapování I/O (první část cvičení)
   \begin{itemize}
-  \item Vyloučení: \texttt{pci\_request\_region}, \texttt{pci\_request\_regions}
+  \item Vytvoření: \texttt{pci\_request\_region}, \texttt{pci\_request\_regions}
   \item Mapování: \texttt{pci\_ioremap\_bar} -- alias pro
     \texttt{ioremap(pci\_resource\_start(), pci\_resource\_len())}
   \end{itemize}
