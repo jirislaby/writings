@@ -1,0 +1,427 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice.
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[IL2]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+\subtitle{VIII.}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{16. 11. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out.
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command:
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Přerušení}
+
+  \heading{LDD3 kap. 7 a 10}
+
+  \bigskip
+
+  \begin{itemize}
+  \item Práce s časem
+  \begin{itemize}
+  \item Pozdržení vykonávání kódu (spánek)
+  \item Časovače
+  \item Odložené vykonání kódu
+  \end{itemize}
+  \item Přerušení HW
+  \item Změny v kontextu přerušení
+  \begin{itemize}
+  \item Zámky
+  \item Alokace
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pozdržení vykonávání}
+
+  \heading{Čekání na událost trvající pevně danou dobu}
+  \begin{enumerate}
+  \item Spánek
+  \begin{itemize}
+  \item Zapojení plánovače
+  \item Rozlišení: 1-10 ms (podle hodnoty \texttt{HZ} -- \texttt{jiffies})
+  \end{itemize}
+  \item Busy-waiting
+  \begin{itemize}
+  \item Smyčka
+  \item Rozlišení: ns
+  \end{itemize}
+  \end{enumerate}
+
+  \pause
+  \medskip
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/delay.h}
+  \item ad 1. \texttt{ssleep}, \texttt{msleep}
+  \item ad 2. \texttt{mdelay}, \texttt{udelay}, \texttt{ndelay}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{center}
+  \heading{V jádře lze čekat jen omezenou dobu}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Časovače}
+
+  \begin{itemize}
+  \item \doc{Documentation/timers/*}
+  \item Činnost v nastavených časech (i periodicky)
+  \item Kontext přerušení (nelze spát)
+  \item \texttt{/proc/timer\_list} (jen nová jádra)
+  \end{itemize}
+
+  \pause
+
+  \heading{2 druhy}
+  \begin{enumerate}
+  \item Obyčejné
+  \begin{itemize}
+  \item Fungují na každé architektuře
+  \item Založené na jiffies
+  \item Rozlišení: 1-10 ms
+  \end{itemize}
+  \item High-res
+  \begin{itemize}
+  \item Jen pro vybrané architektury
+  \item Ve valné většině kódu není třeba
+  \item Rozlišení: ns
+  \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Obyčejné časovače}
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/timer.h}
+  \item \texttt{DEFINE\_TIMER}, \texttt{setup\_timer}
+  \item \texttt{mod\_timer} (=\texttt{del\_timer}+\texttt{add\_timer})
+  \item \texttt{del\_timer\_sync}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+static void my_fun(unsigned long data);
+static DEFINE_TIMER(my_timer, my_fun, 0, 30);
+static void my_fun(unsigned long data)
+{
+  my_timer.data *= 2;
+  mod_timer(&my_timer, jiffies + msecs_to_jiffies(data));
+}
+...
+  mod_timer(&my_timer, jiffies + msecs_to_jiffies(100));
+...
+  del_timer_sync(&my_timer);
+  \end{lstlisting}
+
+  \pause
+  \medskip
+
+  Úkol: Každou vteřinu, kdy je modul v systému, vypsat \texttt{jiffies}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Odložené vykonání kódu}
+
+  \heading{Při potřebě vykonat kód, který nelze vykonat teď}
+  \begin{itemize}
+  \item Držím zámek, jsem v přerušení, \ldots
+  \item Nespecifikuje se pevně daný moment (na rozdíl od časovačů)
+  \end{itemize}
+
+  \pause
+
+  \heading{2 druhy}
+  \begin{enumerate}
+  \item Workqueue
+  \item Tasklet
+  \end{enumerate}
+
+  \heading{Rozdíly}
+  \begin{itemize}
+  \item Rychlost zavolání
+  \item Kontext zavolání
+  \item Množství kódu
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Workqueue}
+
+  \begin{itemize}
+  \item Speciální \emph{proces} volající funkce ve frontě
+  \item Lze spát
+  \item Spustí se, až se plánovač rozhodne
+  \end{itemize}
+
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/workqueue.h}
+  \item Definice funkce (práce): \texttt{DECLARE\_WORK}, \texttt{INIT\_WORK}
+  \item Globální proces:
+  \begin{itemize}
+  \item Zařazení do fronty: \texttt{schedule\_work}, \texttt{cancel\_work\_sync}
+  \end{itemize}
+  \item Vlastní proces:
+  \begin{itemize}
+  \item Vytvoření procesu: \texttt{create\_workqueue},
+    \texttt{destroy\_workqueue}
+  \item Zařazení do fronty: \texttt{queue\_work}, \texttt{cancel\_work\_sync}
+  \end{itemize}
+  \item Delayed (zavolej nejdřív za \ldots): \texttt{*\_delayed\_work}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Úkol: nahrát modul \texttt{ieee80211} (\texttt{request\_module}). Nelze
+  volat přímo v \texttt{module\_init} a je nutný i vlastní proces
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Tasklet}
+
+  \begin{itemize}
+  \item Běží v kontextu přerušení (jako časovače)
+  \item Nelze spát
+  \item Musí být rychlý
+  \item Spustí se \emph{po} příštím přerušení
+  \end{itemize}
+
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/interrupt.h}
+  \item Definice funkce (taskletu): \texttt{DECLARE\_TASKLET},
+    \texttt{tasklet\_init}
+  \item Zařazení do fronty: \texttt{tasklet\_schedule}, \texttt{tasklet\_kill}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Úkol: vytvořit tasklet a vypsat function trace (\texttt{dump\_stack})
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Přerušení HW}
+
+  \begin{itemize}
+  \item HW informuje o změně stavu
+  \begin{itemize}
+  \item Časovač tiknul, přišel paket, přečten blok z disku, \ldots
+  \end{itemize}
+  \item CPU přeruší chod programu/jádra a zavolá jádro
+  \begin{itemize}
+  \item Priority přerušení
+  \end{itemize}
+  \item OS musí obsloužit přerušení
+  \begin{itemize}
+  \item Zjistí zdroj a zavolá odpovídající ovladač (jeho obsluhu přerušení)
+    \begin{itemize}
+    \item Přerušeni je identifikováno číslem (IRQ)
+    \end{itemize}
+  \item Vynuluje přerušení na řadiči přerušení
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Nutná podpora HW (CPU, řadiče, sběrnice, zařízení)}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Přerušení v Linuxu}
+
+  \begin{itemize}
+  \item \header{linux/interrupt.h}
+  \item \texttt{request\_irq}, \texttt{free\_irq}
+  \item Flags: hlavně \texttt{IRQF\_SHARED}
+  \item Návratová hodnota z obsluhy: \texttt{IRQ\_NONE}, \texttt{IRQ\_HANDLED}
+
+  \item \texttt{/proc/interrupts}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+static irqreturn_t my_handler(int irq, void *data)
+{ /* data == my_data */
+  return my_device_raised_interrupt ? IRQ_HANDLED : IRQ_NONE;
+}
+static int my_probe(struct pci_dev *pdev, ...)
+{
+  /* enable device etc. */
+  my_data = kmalloc(...);
+  ret = request_irq(pdev->irq, my_handler, IRQF_SHARED, my_data);
+}
+  \end{lstlisting}
+
+  \pause
+
+  Úkol: vytvořte obsluhu pro Combo (zatím vracejte \texttt{IRQ\_HANDLED})
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Kontext přerušení}
+
+  \heading{Změny}
+  \begin{itemize}
+  \item Zámky
+  \begin{itemize}
+  \item Třeba používat \texttt{*\_irq*} varianty
+  \item Jinak by mohlo dojít k deadlocku
+  \end{itemize}
+  \item Alokace
+  \begin{itemize}
+  \item \texttt{GFP\_ATOMIC}
+  \item A tedy nevelké alokace
+  \end{itemize}
+  \item Kód
+  \begin{itemize}
+  \item Rychlý, krátký
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s přerušením} (součást domácího)
+  \begin{enumerate}
+  \item Vytvořit pojmenování (makra) pro registry
+  \item Spustit 100\,ms periodický časovač (pro každé PCI zařízení)
+  \begin{itemize}
+  \item Vyvolat přerušení 0x1000 (registr 0x60)
+  \end{itemize}
+  \item V probe požádat o prerušení (\texttt{request\_irq})
+  \item Povolit přerušení 0x1000 (registr 0x44)
+  \item Implementovat obsluhu
+  \begin{itemize}
+  \item Přečíst stav (registr 0x40), vypsat stav -- limitovaně
+  \item Nenula: odsouhlasit přerušení (registr 0x64), vrátit
+    \texttt{IRQ\_HANDLED}
+  \item Jinak: vrátit \texttt{IRQ\_NONE}
+  \end{itemize}
+  \end{enumerate}
+
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents   & Meaning \\ \hline\hline
+0x0040 & 4B  & R   & bitmap & Raised interrupts \\ \hline
+0x0044 & 4B  & R/W & bitmap & Enabled interrupts \\ \hline
+0x0060 & 4B  & W   & bitmap & Raise interrupts \\ \hline
+0x0064 & 4B  & W   & bitmap & Acknowledge interrupts \\ \hline
+\end{tabular}
+\caption{Specifikace baru 0 (pokračování z minula)}
+\end{table}
+
+\end{frame}
+
+\end{document}
+
