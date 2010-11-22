@@ -1,0 +1,513 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice.
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[IL2]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+\subtitle{IX.}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{23. 11. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out.
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command:
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Paměť jinak}
+
+  \heading{LDD3 kap. 15 (zastaralá)}
+
+  \bigskip
+
+  \begin{itemize}
+  \item Mapování paměti jádra (mmap)
+  \item Přímý přístup do paměti (DMA)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Mapování paměti jádra}
+
+  \heading{Předání dat do/z procesu}
+  \begin{itemize}
+  \item Známe: \texttt{read}, \texttt{write}, \texttt{ioctl}, \ldots
+  \item U všeho nutné kopírování dat
+  \begin{itemize}
+  \item \texttt{copy\_\{from,to\}\_user} apod.
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Mapování paměti}
+  \begin{itemize}
+  \item Namapování stránek do procesu
+  \item Proces používá kus stejné paměti jako jádro
+  \item Syscall: \texttt{mmap}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\texttt{mmap}}
+
+  \begin{itemize}
+  \item Jeden člen v \texttt{struct file\_operations}
+  \begin{itemize}
+  \item \texttt{\footnotesize int mmap(struct file *filp,
+    struct vm\_area\_struct *vma)}
+  \end{itemize}
+  \item V userspace odpovídá volání \texttt{mmap}
+  \begin{itemize}
+  \item \texttt{\footnotesize void *mmap(void *addr, size\_t len,
+    int prot, int flags, int fd, off\_t off)}
+  \end{itemize}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+struct vm_area_struct {
+  unsigned long vm_start; /* addr or random when addr is NULL */
+  unsigned long vm_end;   /* vm_end = vm_start+len */
+  unsigned long vm_pgoff; /* vm_pgoff = off/PAGE_SIZE */
+  unsigned long vm_flags; /* vm_flags = encoded(flags|prot) */
+  pgprot_t vm_page_prot;  /* only for remap_* functions */
+  ...
+  const struct vm_operations_struct *vm_ops; /* later ... */
+  void *vm_private_data;
+}
+  \end{lstlisting}
+
+  Je třeba namapovat stránky mezi \texttt{vm\_start} a \texttt{vm\_end}. \\
+  Ale také ověřit privilegia (čtení, zápis, spuštění).
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Základní \texttt{mmap} funkce}
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/mm.h}, \texttt{struct vm\_area\_struct}
+  \item \texttt{\_\_get\_free\_page*} $\Rightarrow$ \texttt{remap\_pfn\_range}
+  \item \texttt{vmalloc\_user} $\Rightarrow$ \texttt{remap\_vmalloc\_range}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+int my_init(void)
+{
+  mem = __get_free_page(GFP_KERNEL);
+  /* mem = vmalloc_user(PAGE_SIZE); */
+}
+...
+int my_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+  if ((vma->vm_flags & (VM_WRITE | VM_READ)) != VM_READ)
+    return -EINVAL;
+  return remap_pfn_range(vma, vma->vm_start, mem, PAGE_SIZE, vma->vm_page_prot);
+  /* return remap_vmalloc_range(vma, mem, 0); */
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Přemapování prostorů}
+  \begin{enumerate}
+  \item Alokovat 2 a 2 stránky (vmalloc a page alokátory)
+  \item Vyplnit libovolnými řetězci, každou stránku různými
+  \item Přemapovat stránky přes \texttt{mmap}
+  \begin{itemize}
+  \item Jedna dvojice R/W, druhá RO
+  \item $0 \leq \text{\texttt{pgoff}} < 2$ $\Rightarrow$ jedno mapování
+  \item $2 \leq \text{\texttt{pgoff}} < 4$ $\Rightarrow$ druhé mapování
+  \end{itemize}
+  \item Z userspace 2$\times$ \texttt{mmap} s off 0 a 2*4096
+  \begin{itemize}
+  \item Vypsat řetězce na pozicích 0 a 4096 z obou mapování
+  \end{itemize}
+  \end{enumerate}
+
+  \medskip
+
+  \heading{API znovu}
+  \begin{itemize}
+  \item \header{linux/mm.h}, \texttt{struct vm\_area\_struct}
+  \item \texttt{\footnotesize int mmap(struct file *filp,
+    struct vm\_area\_struct *vma)}
+  \item \texttt{\_\_get\_free\_page*} $\Rightarrow$ \texttt{remap\_pfn\_range}
+  \item \texttt{vmalloc\_user} $\Rightarrow$ \texttt{remap\_vmalloc\_range}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\texttt{mmap} po stránkách}
+
+  \heading{Přemapování roztroušených stránek}
+  \begin{itemize}
+  \item Přes \texttt{remap\_pfn\_range} obtížně
+  \item Při výpadcích stránek se mapují tyto stránky jednotlivě
+  \begin{itemize}
+  \item Každý ovladač má ,,page fault handler''
+  \item Stará jádra: \texttt{nopage}
+  \item Nová jádra: \texttt{fault}
+  \end{itemize}
+  \item V \texttt{mmap} je třeba zkontrolovat rozsahy a velikosti
+  \begin{itemize}
+  \item Před tím to dělaly \texttt{remap\_*\_range} funkce
+  \end{itemize}
+  \item \texttt{vma->vm\_ops}
+  \begin{itemize}
+  \item Struktura ukazující na háčky (včetně \texttt{nopage}/\texttt{fault})
+  \end{itemize}
+  \item \texttt{vma->vm\_private\_data}
+  \begin{itemize}
+  \item Pro naše potřeby
+  \item K předání informací z \texttt{mmap} do \texttt{vm\_ops}
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\texttt{mmap} po stránkách (ponovu)}
+
+  \heading{Nové API}
+  \begin{lstlisting}[language=C]
+struct vm_operations_struct {
+  void (*open)(struct vm_area_struct *vma);
+  void (*close)(struct vm_area_struct *vma);
+  int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
+}
+int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{ /* my_data = vma->vm_private_data; */
+        unsigned long offset = vmf->pgoff << PAGE_SHIFT;
+        struct page *page;
+        page = my_find_page(offset);
+        if (!page)
+                return VM_FAULT_SIGBUS;
+        get_page(page);
+        vmf->page = page;
+        return 0;
+}
+int my_mmap(struct file *filp, struct vm_area_struct *vma)
+{ /* don't forget to check ranges */
+  vma->vm_ops = &my_vm_ops;
+  vma->vm_private_data = my_data;
+  return 0;
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\texttt{mmap} po stránkách (postaru)}
+
+  \heading{Staré API}
+  \begin{lstlisting}[language=C]
+struct vm_operations_struct {
+  ...
+  struct page (*nopage)(struct vm_area_struct *vma, unsigned long address, int *type)
+}
+struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *type)
+{ /* my_data = vma->vm_private_data; */
+  unsigned long offset = vma->pgoff << PAGE_SHIFT;
+  struct page *page;
+
+  offset += address - vma->vm_start;
+  page = my_find_page(offset);
+  if (!page)
+    return NOPAGE_SIGBUS;
+  get_page(page);
+
+  if (type)
+    *type = VM_FAULT_MINOR;
+
+  return page;
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Mapování roztroušených stránek}
+  \begin{enumerate}
+  \item Předchozí příklad rozšiřte
+  \item Místo alokací dvojstránky alokovat 2 samostatné stránky
+  \begin{itemize}
+  \item \texttt{\_\_get\_free\_pages(1)} $\rightarrow$ 2$\times$
+    \texttt{\_\_get\_free\_page}
+  \end{itemize}
+  \item Přemapovat stránky přes \texttt{mmap}
+  \begin{itemize}
+  \item \texttt{remap\_pfn\_range} $\rightarrow$ \texttt{vma->vm\_ops->nopage}
+  \end{itemize}
+  \item Userspace program stejný
+  \end{enumerate}
+
+  \medskip
+
+  \heading{Potřebné podkroky}
+  \begin{itemize}
+  \item Definice \texttt{\footnotesize struct page *nopage(struct
+    vm\_area\_struct *vma, unsigned long address, int *type)}
+  \item Kontrola rozsahů v \texttt{mmap} (\texttt{end-start < 2*PAGE\_SIZE}
+    apod.)
+  \item Definice \texttt{vm\_ops} a přiřazení do \texttt{vma->vm\_ops}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{DMA}
+
+  \heading{Přímý přístup do paměti}
+  \begin{itemize}
+  \item Prozatím jsme ze/do zařízení četli/zapisovali přes CPU
+  \begin{itemize}
+  \item Tj. standardními operacemi s (přemapovanou) pamětí
+  \end{itemize}
+  \item Velké přenosy = velká zátěž CPU
+  \begin{itemize}
+  \item Cykly, čekání na pomalou sběrnici atd.
+  \end{itemize}
+  \item Místo toho naprogramujeme HW, aby přenášel data sám
+  \begin{itemize}
+  \item Nutná podpora HW (sběrnice -- arbitrace, zařízení -- přenosy)
+  \end{itemize}
+  \end{itemize}
+
+  \heading{Princip}
+  \begin{enumerate}
+  \item Alokace (speciální) paměti
+  \item (TX: vyplnění daty)
+  \item Předání ukazatele zařízení
+  \item Start přenosu
+  \item Přerušení či jiná signalizace konce přenosu
+  \item (RX: přečtení dat)
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{DMA v Linuxu}
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/dma-mapping.h}, \doc{Documentation/DMA-*}
+  \item Alokace: \texttt{dma\_alloc\_coherent}, \texttt{dma\_free\_coherent}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+int my_setup_DMA(struct device *dev)
+{
+  dma_addr_t phys;
+  void *virt;
+
+  virt = dma_alloc_coherent(dev, 100, &phys, GFP_KERNEL);
+  if (!virt)
+    return -ENOMEM;
+  memset(virt, 0xfe, 100);
+  my_store_to_HW(dev, phys);
+  my_start_HW_transfer(dev);
+  return 0;
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{DMA pro PCI}
+
+  \begin{itemize}
+  \item Nastavení masky adres
+  \begin{itemize}
+  \item Ne všechna zařízení zvládnou adresovat celý fyzický rozsah
+  \item \texttt{pci\_set\_dma\_mask(pdev, DMA\_BIT\_MASK(27))}
+  \end{itemize}
+  \pause
+  \item Zapnutí ,,správování sběrnice''
+  \begin{itemize}
+  \item Tj. zařízení umí samo iniciovat přenosy apod.
+  \item \texttt{pci\_set\_master(pdev)}
+  \end{itemize}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+int my_probe(struct pci_dev *pdev, ...)
+{
+  dma_addr_t phys;
+  void *virt;
+  ...
+  ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(27));
+  if (ret) { /* bail out */ }
+
+  pci_set_master(pdev);
+
+  virt = dma_alloc_coherent(&pdev->dev, 100, &phys, GFP_KERNEL);
+  ...
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Combo a DMA}
+
+  \begin{itemize}
+  \item Zvládá 32-bitové adresy
+  \item DMA řadič napojený na LocalBus (1), PCI (2) a PowerPC (4)
+  \item Generuje přerušení 8 na kartě
+  \item \texttt{cmd} registr \texttt{|A               |        NDstSrcR|}
+  \begin{itemize}
+  \item Bit 0: \texttt{RUN} (transfer now)
+  \item Bits 1-3: \texttt{SOURCE} (BUS)
+  \item Bits 4-6: \texttt{DESTINATION} (BUS)
+  \item Bit 7: \texttt{NOINT} (do not generate interrupt after transaction)
+  \item Bit 31: \texttt{ACKINT} (acknowledge interrupt)
+  \end{itemize}
+  \end{itemize}
+
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents & Meaning \\ \hline\hline
+0x0080 & 4B  & R/W & src      & Source address \\ \hline
+0x0084 & 4B  & R/W & dst      & Destination address \\ \hline
+0x0088 & 4B  & R/W & count    & Transfer count \\ \hline
+0x008c & 4B  & R/W & cmd      & Command register \\ \hline
+\end{tabular}
+\caption{Specifikace baru 0 (pokračování z minula)}
+\end{table}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s DMA}
+  \begin{enumerate}
+  \item Naalokovat stránku DMA prostoru
+  \item 10B nainicializovat řetězcem
+  \item Přenést 10B na PowerPC sběrnici na adresu 0x40000
+  \begin{itemize}
+  \item Nastavit všechny 4 registry
+  \item Bez přerušení (nastavit \texttt{NOINT})
+  \item Počkat na nulovou hodnotu bitu RUN (na dokončení přenosu)
+  \end{itemize}
+  \item Přenést 10B z PowerPC na DMA stránku + 10
+  \begin{itemize}
+  \item Vznikne za sebou 2$\times$ stejný vzor
+  \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{DMA s přerušením} (součást domácího)
+  \begin{enumerate}
+  \item Rozšířit předchozí o přerušení
+  \begin{itemize}
+  \item Přidat ještě jeden přenos z PowerPC na DMA + 20
+  \item Přenos bude bez \texttt{NOINT}
+  \item Je třeba povolit přerušení 8 na kartě
+  \end{itemize}
+  \item Z přerušení iniciovat tasklet
+  \item V taskletu vypsat obsah DMA paměti + 20
+  \item DMA stránku vystavit přes mmap
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
+
