@@ -161,6 +161,8 @@ struct vm_area_struct {
 }
   \end{lstlisting}
 
+  \pause
+
   Je třeba namapovat stránky mezi \texttt{vm\_start} a \texttt{vm\_end}. \\
   Ale také ověřit privilegia (čtení, zápis, spuštění).
 
@@ -199,8 +201,8 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
   \heading{Přemapování prostorů}
   \begin{enumerate}
-  \item Alokovat 2 a 2 stránky (vmalloc a page alokátory)
-  \item Vyplnit libovolnými řetězci, každou stránku různými
+  \item Alokovat souvislé 2 a 2 stránky (vmalloc a page alokátory)
+  \item Zapsat na každou stránku libovolný různý řetězec
   \item Přemapovat stránky přes \texttt{mmap}
   \begin{itemize}
   \item Jedna dvojice R/W, druhá RO
@@ -209,7 +211,7 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
   \end{itemize}
   \item Z userspace 2$\times$ \texttt{mmap} s off 0 a 2*4096
   \begin{itemize}
-  \item Vypsat řetězce na pozicích 0 a 4096 z obou mapování
+  \item V pb173/09
   \end{itemize}
   \end{enumerate}
 
@@ -238,7 +240,8 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
   \item Stará jádra: \texttt{nopage}
   \item Nová jádra: \texttt{fault}
   \end{itemize}
-  \item V \texttt{mmap} je třeba zkontrolovat rozsahy a velikosti
+  \item V \texttt{mmap}/\texttt{nopage}/\texttt{fault} je třeba zkontrolovat
+    rozsahy a velikosti
   \begin{itemize}
   \item Před tím to dělaly \texttt{remap\_*\_range} funkce
   \end{itemize}
@@ -414,7 +417,7 @@ int my_setup_DMA(struct device *dev)
   \item \texttt{pci\_set\_dma\_mask(pdev, DMA\_BIT\_MASK(27))}
   \end{itemize}
   \pause
-  \item Zapnutí ,,správování sběrnice''
+  \item Zapnutí ,,spravování sběrnice''
   \begin{itemize}
   \item Tj. zařízení umí samo iniciovat přenosy apod.
   \item \texttt{pci\_set\_master(pdev)}
@@ -481,7 +484,7 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
   \begin{itemize}
   \item Nastavit všechny 4 registry
   \item Bez přerušení (nastavit \texttt{NOINT})
-  \item Počkat na nulovou hodnotu bitu RUN (na dokončení přenosu)
+  \item Počkat na nulovou hodnotu bitu \texttt{RUN} (na dokončení přenosu)
   \end{itemize}
   \item Přenést 10B z PowerPC na DMA stránku + 10
   \begin{itemize}
@@ -494,7 +497,7 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{DMA s přerušením} (součást domácího)
+  \heading{DMA s přerušením} (domácí)
   \begin{enumerate}
   \item Rozšířit předchozí o přerušení
   \begin{itemize}
@@ -506,6 +509,41 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
   \item V taskletu vypsat obsah DMA paměti + 20
   \item DMA stránku vystavit přes mmap
   \end{enumerate}
+
+  \bigskip
+
+  Pozn.: pokud se zařízení zasekne (např. špatně nastaveným DMA), je nutné
+  stroj vypnou a zapnout, reboot nepomůže
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Další témata}
+
+  \begin{itemize}
+  \item S/G DMA, MSI či jiné HW chuťovky
+  \begin{itemize}
+  \item Nemáme HW, pouze teoreticky
+  \end{itemize}
+  \item Základy HW (paging, KBD, VGA/VESA, PIC, TIMER, PCI BIOS)
+  \begin{itemize}
+  \item Spustit qemu bez OS a pracovat s (emulovaným) HW
+  \end{itemize}
+  \item Opravdové ladění chyb
+  \begin{itemize}
+  \item Odladit kód s úmýslně přidanými chybami
+  \item K dispozici bude Oops
+  \end{itemize}
+  \item Síťovky (network stack)
+  \begin{itemize}
+  \item Vyrobit virtuální síťovku
+  \end{itemize}
+  \item Opakování jakéhokoliv tématu ze cvičení
+  \begin{itemize}
+  \item Např. víc do hloubky
+  \end{itemize}
+  \item \ldots
+  \end{itemize}
 
 \end{frame}
 
