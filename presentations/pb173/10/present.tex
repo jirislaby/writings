@@ -1,0 +1,310 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice.
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[IL2]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+\subtitle{X.}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{30. 11. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out.
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command:
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Paměť jinak II.}
+
+  \heading{LDD3 kap. 15 (zastaralá)}
+
+  \bigskip
+
+  \begin{itemize}
+  \item I. (minule): Mapování paměti jádra (mmap)
+  \item II. (dnes): Přímý přístup do paměti (DMA)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{DMA}
+
+  \heading{Přímý přístup do paměti}
+  \begin{itemize}
+  \item Prozatím jsme ze/do zařízení četli/zapisovali přes CPU
+  \begin{itemize}
+  \item Tj. standardními operacemi s (přemapovanou) pamětí
+  \end{itemize}
+  \item Velké přenosy = velká zátěž CPU
+  \begin{itemize}
+  \item Cykly, čekání na pomalou sběrnici atd.
+  \end{itemize}
+  \item Místo toho naprogramujeme HW, aby přenášel data sám
+  \begin{itemize}
+  \item Nutná podpora HW (sběrnice -- arbitrace, zařízení -- přenosy)
+  \end{itemize}
+  \end{itemize}
+
+  \heading{Princip}
+  \begin{enumerate}
+  \item Alokace (speciální) paměti
+  \item (TX: vyplnění daty)
+  \item Předání ukazatele zařízení
+  \item Start přenosu
+  \item Přerušení či jiná signalizace konce přenosu
+  \item (RX: přečtení dat)
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{DMA v Linuxu}
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/dma-mapping.h}, \doc{Documentation/DMA-*}
+  \item Alokace: \texttt{dma\_alloc\_coherent}, \texttt{dma\_free\_coherent}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+int my_setup_DMA(struct device *dev)
+{
+  dma_addr_t phys;
+  void *virt;
+
+  virt = dma_alloc_coherent(dev, 100, &phys, GFP_KERNEL);
+  if (!virt)
+    return -ENOMEM;
+  memset(virt, 0xfe, 100);
+  my_store_to_HW(dev, phys);
+  my_start_HW_transfer(dev);
+  return 0;
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{DMA pro PCI}
+
+  \begin{itemize}
+  \item Nastavení masky adres
+  \begin{itemize}
+  \item Ne všechna zařízení zvládnou adresovat celý fyzický rozsah
+  \item \texttt{pci\_set\_dma\_mask(pdev, DMA\_BIT\_MASK(27))}
+  \end{itemize}
+  \pause
+  \item Zapnutí ,,spravování sběrnice''
+  \begin{itemize}
+  \item Tj. zařízení umí samo iniciovat přenosy apod.
+  \item \texttt{pci\_set\_master(pdev)}
+  \end{itemize}
+  \end{itemize}
+
+  \begin{lstlisting}[language=C]
+int my_probe(struct pci_dev *pdev, ...)
+{
+  dma_addr_t phys;
+  void *virt;
+  ...
+  ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(27));
+  if (ret) { /* bail out */ }
+
+  pci_set_master(pdev);
+
+  virt = dma_alloc_coherent(&pdev->dev, 100, &phys, GFP_KERNEL);
+  ...
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Combo a DMA}
+
+  \begin{itemize}
+  \item Zvládá 32-bitové adresy
+  \item DMA řadič napojený na LocalBus (1), PCI (2) a PowerPC (4)
+  \item Generuje přerušení 8 na kartě
+  \item \texttt{cmd} registr \texttt{|A               |        NDstSrcR|}
+  \begin{itemize}
+  \item Bit 0: \texttt{RUN} (transfer now)
+  \item Bits 1-3: \texttt{SOURCE} (BUS)
+  \item Bits 4-6: \texttt{DESTINATION} (BUS)
+  \item Bit 7: \texttt{NOINT} (do not generate interrupt after transaction)
+  \item Bit 31: \texttt{ACKINT} (acknowledge interrupt)
+  \end{itemize}
+  \end{itemize}
+
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents & Meaning \\ \hline\hline
+0x0080 & 4B  & R/W & src      & Source address \\ \hline
+0x0084 & 4B  & R/W & dst      & Destination address \\ \hline
+0x0088 & 4B  & R/W & count    & Transfer count \\ \hline
+0x008c & 4B  & R/W & cmd      & Command register \\ \hline
+\end{tabular}
+\caption{Specifikace baru 0 (pokračování z minula)}
+\end{table}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s DMA}
+  \begin{enumerate}
+  \item Naalokovat stránku DMA prostoru
+  \item 10B nainicializovat řetězcem
+  \item Přenést 10B na PowerPC sběrnici na adresu 0x40000
+  \begin{itemize}
+  \item Nastavit všechny 4 registry
+  \item Bez přerušení (nastavit \texttt{NOINT})
+  \item Počkat na nulovou hodnotu bitu \texttt{RUN} (na dokončení přenosu)
+  \end{itemize}
+  \item Přenést 10B z PowerPC na DMA stránku + 10
+  \begin{itemize}
+  \item Vznikne za sebou 2$\times$ stejný vzor
+  \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{DMA s přerušením} (domácí)
+  \begin{enumerate}
+  \item Rozšířit předchozí o přerušení
+  \begin{itemize}
+  \item Přidat ještě jeden přenos z PowerPC na DMA + 20
+  \item Přenos bude bez \texttt{NOINT}
+  \item Je třeba povolit přerušení 8 na kartě
+  \end{itemize}
+  \item Z přerušení iniciovat tasklet
+  \item V taskletu vypsat obsah DMA paměti + 20
+  \item DMA stránku vystavit přes mmap
+  \end{enumerate}
+
+  \bigskip
+
+  Pozn.: pokud se zařízení zasekne (např. špatně nastaveným DMA), je nutné
+  stroj vypnou a zapnout, reboot nepomůže
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Další témata}
+
+  \begin{itemize}
+  \item S/G DMA, MSI či jiné HW chuťovky
+  \begin{itemize}
+  \item Nemáme HW, pouze teoreticky
+  \end{itemize}
+  \item Základy HW (paging, KBD, VGA/VESA, PIC, TIMER, PCI BIOS)
+  \begin{itemize}
+  \item Spustit qemu bez OS a pracovat s (emulovaným) HW
+  \end{itemize}
+  \item Opravdové ladění chyb
+  \begin{itemize}
+  \item Odladit kód s úmýslně přidanými chybami
+  \item K dispozici bude Oops
+  \end{itemize}
+  \item Síťovky (network stack)
+  \begin{itemize}
+  \item Vyrobit virtuální síťovku
+  \end{itemize}
+  \item Opakování jakéhokoliv tématu ze cvičení
+  \begin{itemize}
+  \item Např. víc do hloubky
+  \end{itemize}
+  \item \ldots
+  \end{itemize}
+
+\end{frame}
+
+\end{document}
+
