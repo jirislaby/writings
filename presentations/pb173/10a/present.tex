@@ -127,6 +127,8 @@
   \end{itemize}
   \end{itemize}
 
+  \pause
+
   \heading{Princip}
   \begin{enumerate}
   \item Alokace (speciální) paměti
@@ -149,7 +151,7 @@
   \end{itemize}
 
   \begin{lstlisting}[language=C]
-int my_setup_DMA(struct device *dev)
+int my_do_DMA(struct device *dev)
 {
   dma_addr_t phys;
   void *virt;
@@ -157,9 +159,12 @@ int my_setup_DMA(struct device *dev)
   virt = dma_alloc_coherent(dev, 100, &phys, GFP_KERNEL);
   if (!virt)
     return -ENOMEM;
-  memset(virt, 0xfe, 100);
-  my_store_to_HW(dev, phys);
-  my_start_HW_transfer(dev);
+  memset(virt, 0, 100);
+  my_HW_set_addr(dev, phys);
+  my_HW_start_transfer(dev);
+  while (my_HW_working(dev))
+    schedule();
+  printk(KERN_INFO "%s", virt);
   return 0;
 }
   \end{lstlisting}
@@ -169,14 +174,14 @@ int my_setup_DMA(struct device *dev)
 \begin{frame}[fragile]
   \frametitle{DMA pro PCI}
 
+  \heading{Navíc}
   \begin{itemize}
   \item Nastavení masky adres
   \begin{itemize}
   \item Ne všechna zařízení zvládnou adresovat celý fyzický rozsah
   \item \texttt{pci\_set\_dma\_mask(pdev, DMA\_BIT\_MASK(27))}
   \end{itemize}
-  \pause
-  \item Zapnutí ,,spravování sběrnice''
+  \item<2> Zapnutí ,,spravování sběrnice''
   \begin{itemize}
   \item Tj. zařízení umí samo iniciovat přenosy apod.
   \item \texttt{pci\_set\_master(pdev)}
@@ -238,7 +243,7 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
   \heading{Práce s DMA}
   \begin{enumerate}
   \item Naalokovat stránku DMA prostoru
-  \item 10B nainicializovat řetězcem
+  \item 10B nainicializovat textovým řetězcem
   \item Přenést 10B na PowerPC sběrnici na adresu 0x40000
   \begin{itemize}
   \item Nastavit všechny 4 registry
@@ -247,7 +252,7 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
   \end{itemize}
   \item Přenést 10B z PowerPC na DMA stránku + 10
   \begin{itemize}
-  \item Vznikne za sebou 2$\times$ stejný vzor
+  \item Vznikne za sebou 2$\times$ stejný řetězec
   \end{itemize}
   \end{enumerate}
 
@@ -262,9 +267,13 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
   \begin{itemize}
   \item Přidat ještě jeden přenos z PowerPC na DMA + 20
   \item Přenos bude bez \texttt{NOINT}
-  \item Je třeba povolit přerušení 8 na kartě
+  \item Je třeba povolit 8. (0x100) přerušení na kartě
   \end{itemize}
-  \item Z přerušení iniciovat tasklet
+  \item Obsoužit přerušení
+  \begin{itemize}
+  \item ACK přerušení a DMA
+  \item Iniciovat tasklet
+  \end{itemize}
   \item V taskletu vypsat obsah DMA paměti + 20
   \item DMA stránku vystavit přes mmap
   \end{enumerate}
@@ -272,7 +281,7 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
   \bigskip
 
   Pozn.: pokud se zařízení zasekne (např. špatně nastaveným DMA), je nutné
-  stroj vypnou a zapnout, reboot nepomůže
+  stroj vypnout a zapnout, reboot nepomůže
 
 \end{frame}
 
