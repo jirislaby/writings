@@ -116,7 +116,7 @@
   \frametitle{Jednoduchá komunikace}
 
   \begin{itemize}
-  \item 2 procesy
+  \item 2 procesy (producent-konzument)
   \begin{itemize}
   \item A: čeká na nějakou hotovou práci
   \item B: udělá nějakou práci a oznámí A dokončení
@@ -131,7 +131,7 @@
   \item \header{linux/completion.h}, \texttt{struct completion}
   \item \texttt{DECLARE\_COMPLETION}$_S$, \texttt{init\_completion}$_D$
   \item Čekání: \texttt{wait\_for\_completion},
-    \texttt{wait\_for\_completion\_interruptible}
+    \texttt{wait\_for\_completion\_interruptible} (retval)
   \item Dokončení: \texttt{complete}, \texttt{complete\_all}
   \end{itemize}
 
@@ -154,9 +154,12 @@ printk(KERN_DEBUG "%s\n", str);          complete(&my_comp);
   \item Doplnit do pb173/11/events \texttt{completion}
   \item Číst se bude, až někdo dokončí zápis
   \begin{itemize}
-  \item Čekání v \texttt{read} je možné přerušit
+  \item Čekání v \texttt{read} je možné přerušit signálem
     (\texttt{wait\_for\_completion\_interruptible})
   \end{itemize}
+  \item Spustit 2 instance \texttt{cat /dev/my\_name}
+  \item Pozorovat, co se děje
+  \item Spustit nekolikrát \texttt{echo XXX > /dev/my\_name}
   \end{enumerate}
 
 \end{frame}
@@ -200,6 +203,7 @@ A
   while (1) {
     str[atomic_inc_return(&my_cnt) - 1] = 'A';
     wake_up_all(&my_wait);
+    msleep(10);
   }
 
 B
@@ -234,6 +238,7 @@ C
   \item Celé je to instruování plánovače
   \item Ve skutečnosti je \texttt{wait\_event} a \texttt{wake\_up}:
   \begin{itemize}
+  \item Nastavení stavu procesu: \texttt{set\_current\_state}
   \item Uspání procesu: \texttt{schedule}
   \item Probuzení procesu: \texttt{wake\_up\_process}
   \item Popř. s obsluhou signálů: \texttt{signal\_pending}
@@ -245,7 +250,7 @@ C
   \item Pamatováním si, koho vzbudit
   \item Případnou kontrolou signálů
   \item Případnou kontrolou vypršení timeoutu
-  \item \texttt{completion} navíc řeší předání čítače
+  \item \texttt{completion} navíc řeší předání čítače (kolik procesů vzbudit)
   \end{itemize}
   \end{itemize}
 
