@@ -84,7 +84,7 @@ stages. First, the framework reads in the configuration including a source
 file list and checkers to be used. The source files are then parsed and
 encoded in AST (abstract syntax tree), CFG (control-flow graph) and call graph
 internal structures. Next, checkers are instantiated, run, and error reports
-collected.
+collected and presented.
 
 \subsubsection{Source Files and Parsing}
 The straightforward way to tell \Stanse what to check is simply to specify the
@@ -116,51 +116,67 @@ so we use it for parsing included headers to extract type definitions. The
 rest of file is handled in Java.
 
 Nowadays, we are working hard on merging a C++ support which is based on
-\textsc{clang++} and is almost complete. We do not use \textsc{clang} (at the
-time of writing this article, 2.8 is stable) for C because it still misses
-some features from the GNU C which are widely used in the Linux kernel (at
-least local labels and some assembler constraints explicitly). As we
-mentioned earlier, the design of the framework is geared towards analyzing
-large software projects. Some other \Stanse features relevant to large
-projects are described hereinafter.
+\textsc{clang++} from \textsc{LLVM} suite and is almost complete. We do not
+use \textsc{clang} (at the time of writing this article, 2.8 is stable) for C
+because it still misses some features from the GNU C which are widely used in
+the Linux kernel (at least local labels and some assembler constraints
+explicitly). As we mentioned earlier, the design of the framework is geared
+towards analyzing large software projects. Some other \Stanse features
+relevant to large projects are described hereinafter.
 
-%XXX
-\paragraph{Lazy internals}
-To save time, all internal structures used are created only when needed by
-some part of \Stanse. For example, when source file is requested by a checker,
-it is parsed into an AST representation. However, if call-graph or CFG of
-some function are not used (by this particular checker), they do not have to
-be instantiated in the memory (unless some other checker requests them). The
-instantiated data then can be discarded only by streaming (see below).
-
-\paragraph{Streaming}
 Large software projects consist of hundreds or thousands of modules
-(compilation units). In practice it is often impossible to store all the
-files with the associated data in the operating memory. \Stanse therefore
-provides streaming of the internal structures, currently on a module
-basis. When checker accesses some data for a specific source module, the whole
-module is streamed in. Since internal structures are lazy, this is not a time
-or memory bottleneck. If some module is not used anymore (or the data are
-not accessed for a significant time), then all the data
-relevant to this module are discarded from memory. If, later, the discarded
-module is accessed again, it is streamed back in. Both lazy internals and
-streaming are completely transparent to checkers.
+(compilation units). In practice, it is often impossible to store all the
+files with the associated data in the memory. \Stanse therefore provides
+\emph{streaming} of the internal structures, currently on a module basis.
+
+When a part of the tool accesses some data for a specific source module, the
+whole module is streamed in. This means the internal structures are parsed
+in a lazy manner -- we call them \emph{lazy internals}. It means not
+everything is parsed at the start of the checking process. Hence it is not a
+time or memory bottleneck at that time.
+
+Later, when many modules are streamed in, some have to be freed to not fill up
+the whole memory. The implemented least-recent-used (LRU) algorithm discards
+the structures if the data are not accessed for a significant time. If, later,
+the discarded module is accessed again, it is streamed back in. Both lazy
+internals and streaming are completely transparent to checkers.
+
+\subsubsection{Internals Accessors}
+Although all the internal structures are ready to be used by a checker at this
+point, the checker would have to walk through the structures on its own.  The
+downside of this approach is that every single checker implemented that way
+would have to reimplement the very same functionality. We wanted to avoid this
+burden and provide a programmer with a fully functional framework without a
+need of traversing the structures manually. So to fully leverage the framework
+we implemented the most important and heavily used traversal methods directly
+inside the framework.
+
+As \Stanse also supports interprocedural analysis, there was also intention
+to shield the checkers away from the code which accesses the structures. So,
+what the checkers need to do explicitly is to specify whether they want to go
+through the structures forward or backward, if the interprocedural
+walk-through should be performed and finally provide callbacks (methods) to be
+called for each node in CFG or AST. We can truly exploit this in the
+\textsc{ReachabilityChecker} (see later in \ref{sec:checkers}).
 
 \subsubsection{Error Handling}
-The reported errors usually consist of set of traces. It is because the error
-designates a concrete counterexample of behaviour checked, but can be
+The reported errors usually consist of a set of traces. It is because the
+error designates a concrete counterexample of behaviour checked, but can be
 represented by more than one path -- trace -- in the code. There are multiple
-options what to with the collected traces next.
+options what to do with the collected traces next.
 
 The basic one is to print the traces to the console. However this is
 inconvenient for larger projects as the output becomes messy due to the output
 length. For easier tracing, a built-in error trace GUI browser exists.
 \Stanse also supports external files to be the traces stored into. This is an
 XML file which can be used arbitrarily. As an example, we supply an
-\textsc{SQLite} database creator and a web interface. This becomes handy when
-sending reports to the upstream developers. In this case, an URL is sufficient
-to send.  The last but not least, \Stanse provides an interface for IDE
-plug-in to be added as an extra module.
+\textsc{SQLite} database creator complemented with a web interface. This
+becomes handy especially when sending reports to the upstream developers. In
+this case, an URL with a bare description is sufficient to be sent. The last
+but not least, \Stanse provides an interface for IDE plug-in to be added as an
+extra module. There is a plan to integrate \Stanse at least into
+\textsc{Eclipse}.
+
 
 %\vspace{-.5\baselineskip}
 \subsection{Checkers}
