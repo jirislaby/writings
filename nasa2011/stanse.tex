@@ -15,6 +15,11 @@
 \newcommand{\Stanse}{\textsc{Stanse}\xspace}
 \newcommand{\TC}{\textsc{ThreadChecker}\xspace}
 \newcommand{\AC}{\textsc{AutomatonChecker}\xspace}
+\newcommand{\RC}{\textsc{ReachabilityChecker}\xspace}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+        breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize}
 
 \begin{document}
 
@@ -86,6 +91,7 @@ encoded in AST (abstract syntax tree), CFG (control-flow graph) and call graph
 internal structures. Next, checkers are instantiated, run, and error reports
 collected and presented.
 
+\vspace{-.5\baselineskip}
 \subsubsection{Source Files and Parsing}
 The straightforward way to tell \Stanse what to check is simply to specify the
 source files manually one by one. Obviously, for large projects this is quite
@@ -116,18 +122,25 @@ so we use it for parsing included headers to extract type definitions. The
 rest of file is handled in Java.
 
 Nowadays, we are working hard on merging a C++ support which is based on
-\textsc{clang++} from \textsc{LLVM} suite and is almost complete. We do not
-use \textsc{clang} (at the time of writing this article, 2.8 is stable) for C
-because it still misses some features from the GNU C which are widely used in
-the Linux kernel (at least local labels and some assembler constraints
-explicitly). As we mentioned earlier, the design of the framework is geared
-towards analyzing large software projects. Some other \Stanse features
-relevant to large projects are described hereinafter.
+\textsc{clang++} from \textsc{LLVM} suite and we are almost finished. We do
+not use \textsc{clang} (at the time of writing this article, 2.8 is stable)
+for pure C because it still misses some features from the GNU C which are
+widely used in the Linux kernel (at least local labels and some assembler
+constraints explicitly).
 
-Large software projects consist of hundreds or thousands of modules
-(compilation units). In practice, it is often impossible to store all the
-files with the associated data in the memory. \Stanse therefore provides
-\emph{streaming} of the internal structures, currently on a module basis.
+Given a code in whatever source language, the tool parses it into an internal
+representation, first into AST represented as XML, then into CFG and from that
+a call-graph is generated. All these phases, or better, their textual and
+graphical representation might be dumped so the user can look at how their
+code looks like in these structures.
+
+As we mentioned earlier, the design of the framework is geared towards
+analyzing large software projects. Some other \Stanse features relevant to
+large projects are described hereinafter.  Large software projects consist of
+hundreds or thousands of modules (compilation units). In practice, it is often
+impossible to store all the files with the associated data in the memory.
+\Stanse therefore provides \emph{streaming} of the internal structures,
+currently on a module basis.
 
 When a part of the tool accesses some data for a specific source module, the
 whole module is streamed in. This means the internal structures are parsed
@@ -141,24 +154,27 @@ the structures if the data are not accessed for a significant time. If, later,
 the discarded module is accessed again, it is streamed back in. Both lazy
 internals and streaming are completely transparent to checkers.
 
+\vspace{-.5\baselineskip}
 \subsubsection{Internals Accessors}
-Although all the internal structures are ready to be used by a checker at this
-point, the checker would have to walk through the structures on its own.  The
-downside of this approach is that every single checker implemented that way
-would have to reimplement the very same functionality. We wanted to avoid this
-burden and provide a programmer with a fully functional framework without a
-need of traversing the structures manually. So to fully leverage the framework
-we implemented the most important and heavily used traversal methods directly
-inside the framework.
+Although all the internal structures are ready to be fully used by a checker
+at this point, the checker would have to walk through the structures on its
+own.  The downside of this approach is that every single checker implemented
+that way would have to reimplement the very same functionality. We wanted to
+avoid this burden and provide a programmer with a fully functional framework
+without a need of traversing the structures manually. So to fully leverage the
+framework we implemented the most important and heavily used traversal methods
+directly inside the framework.
 
 As \Stanse also supports interprocedural analysis, there was also intention
 to shield the checkers away from the code which accesses the structures. So,
 what the checkers need to do explicitly is to specify whether they want to go
-through the structures forward or backward, if the interprocedural
-walk-through should be performed and finally provide callbacks (methods) to be
-called for each node in CFG or AST. We can truly exploit this in the
-\textsc{ReachabilityChecker} (see later in \ref{sec:checkers}).
+through the structures forward or backward, breadth-first or depth-first, if
+the interprocedural walk-through should be performed and finally they have to
+provide callbacks (methods) to be called for each node in CFG or AST. We can
+truly exploit this functionality in the \RC which is described later in
+\ref{sec:checkers}.
 
+\vspace{-.5\baselineskip}
 \subsubsection{Error Handling}
 The reported errors usually consist of a set of traces. It is because the
 error designates a concrete counterexample of behaviour checked, but can be
@@ -177,54 +193,27 @@ but not least, \Stanse provides an interface for IDE plug-in to be added as an
 extra module. There is a plan to integrate \Stanse at least into
 \textsc{Eclipse}.
 
-
-%\vspace{-.5\baselineskip}
 \subsection{Checkers}
 \label{sec:checkers}
 
 Each checker is a module which, with the support of the \Stanse framework,
 implements some verification technique (e.g. deadlock detection). There can be
 many different checkers running simultaneously (either in parallel or
-sequentially) in \Stanse at any given time. They all run independent on each
+sequentially) in \Stanse at any given time. They all run independent of each
 other. Once a checker finds an error, it reports back a set of traces
 demonstrating this error.
 
 A new checker, in order to be used with \Stanse, needs just to implement the
-general checker interface and register with the \Stanse framework.  Each
-checker also has full read-only access to the structures representing the
-program to be checked.  \Stanse framework also provides checkers
-with
-functionality like inter- and intraprocedural CFG traversal (both
-breadth-first and depth-first) or  matching formal and actual function
-parameters at call sites. Checkers can also search for specific subtrees of
-the AST by specifying a query in a simple language designed for this purpose.
-There are currently two available checkers implemented in \Stanse, \TC and
-\AC, described in more detail later in Section~\ref{sec:linux}.
+general checker interface mentioned above and register with the framework.
+Users need not to implement their checkers if they don't want to. Instead,
+they can use the three currently available in there: \AC, \TC and \RC. We
+describe in more detail each checker in the following text.
 
-\section{Results -- Linux Kernel}
-\label{sec:linux}
-
-We decided to test the usability of \Stanse on the recent 2.6.28 Linux kernel.
-One reason for this choice is that Linux kernel represents a large and freely
-available codebase, where the absence of bugs is of a great concern. Moreover,
-the Linux kernel fully exercises most features of ANSI C99 and GNU C
-extensions.  The other motivation is to provide a free tool for Linux kernel
-developers.
-
-Currently, \textsc{Coverity Prevent}~\cite{coverity} is daily run on the
-current development branch of the Linux kernel, and the results are reported
-back to developers. However, developers kept asking for a tool with which
-they can check their code before submitting upstream. Moreover, the kernel
-code is very specific and the tool should consider these specifics.
-
-We used two general-purpose checkers, \AC and \TC, which are described
-below. These checkers are not kernel specific, but they were configured to
-look for the type of bugs commonly found in the kernel code.
-
-\paragraph{\AC}
-This checker is heavily influenced by~\cite{ECCH00}. It takes, as an input, a
-set of finite-state automata, which describe some property which we want to
-check. Properties like locking discipline, interrupt management, null pointer
+\vspace{-.7\baselineskip}
+\subsubsection{\AC}
+is heavily influenced by~\cite{ECCH00}. It takes, as an input, a set of
+finite-state automata that describe some property which we want to check.
+Properties like locking discipline, interrupt management, null pointer
 dereference, dangling pointers and many others can be handled this way.
 
 Compared to the implementation described in~\cite{ECCH00} and~\cite{HCXE02},
@@ -233,54 +222,162 @@ most important differences: (1) we do not use metacompilation, (2) automata
 are not input-language specific, a pattern matching is used instead, (3) our
 analysis is path-sensitive on checker level, but for this reason (4) the
 interprocedural analysis is done in the context of a single input file.
-% Spojeni "path-sensitive on checker level" znamena, ze tu path-sensitivitu
-% si checker resi sam - je obsazena v samotne definici checkeru (v XMLku).
 
-Some of the properties checked by the \AC in the Linux kernel
-include correct pairing (balanced locking,
-\textsf{pci\_dev\_get}/\textsf{pci\_dev\_put} etc.), memo\-ry/pointer related
-bugs (e.g. dereferencing null pointer) and atomic section restrictions.
+The patterns in the configuration are specified in the same language as AST is
+represented, so currently in XML. The idea behind was to isolate the patterns
+from the source code.
 
-\paragraph{\TC}
+\vspace{-.7\baselineskip}
+\subsubsection{\TC}
 aims to check for possible deadlocks in concurrent programs. The
 technique used is based on the notions of locksets of~\cite{relay} and
 deadlock detection by looking for cycles in resource allocation graphs (RAG).
 \TC first tries to identify the parts of the code which can run in parallel,
-as different threads. Then it builds a set of \emph{dependence graphs} for
-each such thread. A dependence graph statically represents the possible
+as different threads, then it builds a set of \emph{dependency graphs} for
+each such thread. A dependency graph statically represents the possible
 locksets during one execution of a thread. Dependency graphs are
 then combined and all cycles examined, by building the corresponding RAGs.
 
-\paragraph{}
-The running time of \Stanse on a common desktop machine was under 80
-minutes. With streaming turned on, the memory usage of the Java process
-oscillated between 200 and 600 MiB in case of forced garbage collector
-executions. The standard \Stanse makefile support was used and we did not
-have to manually tweak the source code in any way in order to be processed by
-\Stanse.
+\vspace{-.7\baselineskip}
+\subsubsection{\RC}
+searches the internals, a CFG more concretely, for
+unreachable nodes. These are then reported as warnings or errors, depending on
+importance (e.g. superfluous semicolons are less important than unused
+branch). This is an easy task and so the writing of such code should be. The
+code of the checker is below 200 lines including importance decision and much
+of strings and comments. So it tries to fully demonstrate the power of the
+\Stanse framework and its primary goal is exactly that. The tool is thus very
+easy to extend, the checker implementors can focus on real techniques.
 
-More than 70 bugs\footnote{A list of confirmed bugs is available at
-\url{http://stanse.fi.muni.cz/bugs.html}} were reported to kernel developers,
-most with the appropriate patches, and fixed in the new kernel releases. Some
-of these bugs remained undiscovered for seven
+\section{Results -- Linux Kernel}
+\label{sec:linux}
+
+We are exercising the Linux kernel by \Stanse since 2.6.28 was released back
+in 2008. It was the first release we decided to test the usability of \Stanse
+on. One reason to choose the Linux kernel is that it represents a large and
+freely available codebase, where the absence of bugs is of great concern.
+Moreover, the Linux kernel fully exercises most features of ANSI C99 and GNU C
+extensions. The other motivation is to provide a free tool for Linux kernel
+developers.
+
+Currently, \textsc{Coverity Prevent}~\cite{coverity} is daily run on the
+current development branch of the Linux kernel, and the results are reported
+back to developers. However, developers kept asking for a tool with which
+their code will be checked before it appears upstream. Moreover, the kernel
+code is very specific and the tool should consider these specifics.
+
+We used all three checkers described above. These checkers are not kernel
+specific and only the configuration for \AC has to be tailor-made to look for
+the type of bugs commonly found in the kernel code. The properties checked by
+the \AC in the kernel are:
+\begin{itemize}
+\item correct pairing of functions like balanced locking, check for correct
+  reference counting,
+\item memory/pointer related bugs like dereferencing null pointers and
+\item atomic section restrictions to find if someone can cause deadlocks by
+sleeping inside spinlocks or interrupt handlers.
+\end{itemize}
+
+\begin{figure}[tb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+static void untag_chunk(struct node *p) {
+ spin_lock(&entry->lock);
+ ...
+ new = alloc_chunk(size);
+ ...
+ spin_unlock(&entry->lock);
+}
+static struct audit_chunk *alloc_chunk(int count) {
+ ...
+ chunk = kzalloc(size, GFP_KERNEL);
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Bug found in the audit code}
+\label{fig:error}
+\end{figure}
+
+With this configuration, the running time of \Stanse on a common desktop
+machine with 2 cores and 4\,GiB of memory is under 100 minutes. With
+streaming, the memory usage of the Java process oscillates between 400 and
+1000\,MiB in case of forced garbage collector executions. The standard \Stanse
+\textsf{Makefile} support was used and we did not have to manually tweak the
+source code in any way in order to be processed by \Stanse.
+
+In the 2.6.28 release, more than 70 bugs\footnote{A list of confirmed bugs is
+available at \url{http://stanse.fi.muni.cz/bugs.html}} were reported to kernel
+developers, most with appropriate patches, and fixed in the next kernel
+release. Some of these bugs remained undiscovered for seven
 years\footnote{\url{http://lkml.org/lkml/2009/3/11/380}}. This is despite the
 kernel being daily
 checked\footnote{\url{http://marc.info/?l=linux-kernel&m=125856033627134&w=2}}
-with \textsc{Coverity Prevent}. Moreover, unlike \textsc{Coverity}, \Stanse
-is freely available to developers (under the GPLv2 license).
-The false positive rate oscillates among the different bug types, in some
-cases being about 25\%, which is quite reasonable. For not-so-well
-performing types of bugs we can get close to about this number by 
-simple techniques like simulated execution of discovered error traces (not
-implemented yet).
+with \textsc{Coverity Prevent} and we believe it is due to the filters they
+use.
 
-\paragraph{Acknowledgements}
+Now we present one bug which we found in the code reporting security
+incidents. An excerpt from the particular code is in the
+Figure~\ref{fig:error}.  \texttt{untag\_chunk} functions creates a critical
+section by a spinlock and calls \texttt{alloc\_chunk} which in turn can sleep
+in \texttt{kzalloc}. This can, under certain circumstances, lead to deadlock
+of the whole system. The bug was confirmed and fixed.
+
+The false positive (FP) rate oscillates among the different bug types, the
+overall ratio is that 40\,\% of all reported errors are real bugs. This result
+is quite low, however similarly to~\cite{havoc}, it is without any thorough
+false-positive filtering techniques (cf. Future Work section). The more
+detailed results about the \AC are in the Table~\ref{tab:results}, one row
+per each configuration.
+
+\begin{table}[tb]
+\begin{center}
+\begin{tabular}{|l|r|r|r|r|r|} \hline
+\textbf{Automaton} & \textbf{Errors} & \textbf{Assorted} & \textbf{Bugs} &
+\textbf{FP} & \textbf{Ratio} \\ \hline\hline
+\textit{Pairing} & 266 & 58 & 65  & 143 & 31.3\,\% \\ \hline
+\textit{Memory}  & 86  & 1  & 48  & 37  & 56.5\,\% \\ \hline
+\textit{Atomic}  & 35  & 1  & 16  & 18  & 47.1\,\% \\ \hline\hline
+\textbf{Overall} & 387 & 60 & 129 & 198 & 39.4\,\% \\ \hline
+\end{tabular}
+\end{center}
+\caption{Errors found by \AC in the 2.6.28 Linux kernel}
+\label{tab:results}
+\end{table}
+
+The current kernel versions are checked with other tools like
+\textsc{Coccinelle} or \textsc{Smatch}. Mostly these tools find simple pattern
+matching style properties like lock-unlock and are successful at that. We
+continue to check the kernel releases with \Stanse too and, thanks to
+interprocedural analysis, we still are able to find errors on daily basis.
+
+The most convenient advantage on these tools is their availability. The
+developers or testers can take them whenever they want and check their code
+instantly, because they are freely available and they can handle the kernel
+code. Further these tools need near no configuration (either because they
+provide predefined one or there is nothing to configure) and are ready to use
+out of the box.
+
+\subsubsection{Future Work}
+C++ support, rewrite to C, get rid of XML, daily analysis, results difference.
+Should this be here? Pay attention, we reference future work section above.
+
+\section{What's Missing}
+There are several points we miss which were commented in the past reviews.
+They include:
+\begin{itemize}
+\item soundness, completeness
+\item scalability, applicability
+\item full bugs description
+\end{itemize}
+
+\subsubsection{Acknowledgements}
 \label{sec:acknowledgements}
 
 Jan Ku\v{c}era is the author of the \TC. We would like to thank Linux kernel
-developers, and
-Cyrill Gorcunov for \Stanse alpha testing and useful suggestions.  All authors are supported by the research centre
-Institute for Theoretical Computer Science (ITI), project No. 1M0545.
+developers, and Cyrill Gorcunov for \Stanse alpha testing and useful
+suggestions. All authors are supported by the research centre Institute for
+Theoretical Computer Science (ITI), project No. 1M0545.
 
 \bibliographystyle{plain}
 \bibliography{stanse}
