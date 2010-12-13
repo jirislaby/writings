@@ -1,0 +1,285 @@
+% vim: ai sw=2
+
+\documentclass[xcolor=dvipsnames,handout]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice.
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+
+  \setbeamercovered{transparent}
+}
+
+\usepackage[czech]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[IL2]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title[PB173/01] % (optional, use only with long paper titles)
+{PB173 -- Ovladače jádra -- Linux}
+
+\subtitle{XII.}
+
+\author[J. Slabý]{Jiří~Slabý}
+
+\institute[ITI] % (optional, but mostly needed)
+{ITI, Fakulta Informatiky}
+
+\date{14. 12. 2010}
+
+\subject{}
+% This is only inserted into the PDF information catalog. Can be left
+% out.
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command:
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Síťové rozhraní}
+
+  \heading{LDD3 kap. 17}
+
+  \bigskip
+
+  \begin{itemize}
+  \item Ovladač pro ethX
+  \item Poslední cvičení
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Teoretická síťová vrstva}
+
+  \begin{figure}
+  \includegraphics[height=19em]{osi} \\
+  \footnotesize Zdroj: \url{ldn.linuxfoundation.org}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Linuxová síťová vrstva}
+
+  \begin{figure}
+  \includegraphics[height=19em]{stack} \\
+  \footnotesize Zdroj: \url{ldn.linuxfoundation.org}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Síťové rozhraní ovladače}
+
+  \heading{\texttt{netdevice}}
+  \begin{itemize}
+  \item Mezivrstva mezi HW a Linuxem (síťovou vrstvou)
+  \item Popisuje každé \texttt{eth*} zařízení
+  \item Obsahuje háčky
+  \begin{itemize}
+  \item Zařízení je UP, DOWN, změna MTU, pošli paket, \ldots
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/netdevice.h}, \texttt{struct net\_device}
+  \item Alokace: \texttt{alloc\_netdev}$_D$, \texttt{free\_netdev}$_D$
+  \item Registrace: \texttt{register\_netdev}, \texttt{unregister\_netdev}
+  \item Háčky
+  \begin{itemize}
+  \item Staré jádro: v \texttt{netdevice} přímo \texttt{open}, \texttt{stop},
+    \ldots
+  \item Nové jádro: \texttt{net\_device\_ops} (podobně jako znaková zařízení)
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\texttt{net\_device\_ops}}
+
+  \begin{lstlisting}[language=C]
+struct net_device_ops {
+  int (*ndo_open)(struct net_device *dev); /* ifup */
+  int (*ndo_stop)(struct net_device *dev); /* ifdown */
+  netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,
+       struct net_device *dev); /* send packet */
+  int (*ndo_change_mtu)(struct net_device *dev,
+       int new_mtu); /* change MTU */
+  ... /* no receive packet */
+};
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Konkrétnější rozhraní}
+
+  \begin{itemize}
+  \item Místo \texttt{alloc\_netdev} se použije konkrétnější
+  \item Nastaví vnitřní položky \texttt{netdevice}
+  \begin{itemize}
+  \item \emph{Ethernet}: \texttt{alloc\_etherdev}
+  \item IRDA: \texttt{alloc\_irdadev}
+  \item CAN: \texttt{alloc\_candev}
+  \item HDLC: \texttt{alloc\_hdlcdev}
+  \item \ldots
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Vytvoření \texttt{eth*}}
+
+  \heading{Postup vytvoření ethernetového zařízení v systému}
+  \begin{enumerate}
+  \item Alokace (\texttt{alloc\_etherdev(priv\_size)})
+  \item Vyplnění informací
+  \begin{itemize}
+  \item Háčky (\texttt{net\_device\_ops})
+  \item MAC adresa (\texttt{dev->dev\_addr})
+  \item Získání privátního ukazatele o velikosti \texttt{priv\_size}
+    (\texttt{netdev\_priv})
+  \end{itemize}
+  \item Registrace (\texttt{register\_netdev})
+  \item \ldots
+  \item Deregistrace (\texttt{unregister\_netdev})
+  \item Uvolnění (\texttt{free\_netdev})
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvořit \texttt{eth*}}
+  \begin{enumerate}
+  \item Dle postupu z předchozího slidu
+  \begin{itemize}
+  \item Registrace v \texttt{module\_init}
+  \item Deregistrace v \texttt{module\_exit}
+  \end{itemize}
+  \item Vytvořit \texttt{open}, \texttt{stop}, \texttt{start\_xmit}
+  \begin{itemize}
+  \item Těla vypíšou jen název funkce
+  \item \texttt{start\_xmit} vrátí \texttt{NETDEV\_TX\_OK}
+  \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pakety}
+
+  \heading{Tzv. socket buffery}
+  \begin{itemize}
+  \item \header{linux/skbuff.h}, \texttt{struct sk\_buff}
+  \item \texttt{dev\_alloc\_skb}$_D$ (obecně), \texttt{netdev\_alloc\_skb}$_D$
+    (pro \texttt{netdevice}), \texttt{dev\_kfree\_skb}$_D$
+  \item Obsah: \texttt{skb->data}
+  \item Délka obsahu: \texttt{skb->len}
+  \item Příjem z HW (např. z přerušení)
+  \begin{itemize}
+  \item \texttt{skb = netdev\_alloc\_skb(dev, len)}
+  \item Naplnění daty z HW
+  \item Nastavení protokolu (\texttt{skb->protocol = eth\_type\_trans(skb,
+  dev)})
+  \item \texttt{netif\_rx(skb)}
+  \end{itemize}
+  \item Posílání do HW (parametr ve \texttt{start\_xmit})
+  \begin{itemize}
+  \item Poslat paket
+  \item \texttt{dev\_kfree\_skb(skb)}
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Posílání/příjem paketů}
+  \begin{enumerate}
+  \item Doplnit kód TX
+  \begin{itemize}
+  \item Vypsat obsah paketu (\texttt{print\_hex\_dump\_bytes})
+  \item Uvolnit \texttt{skb}
+  \end{itemize}
+  \item Nastavit RX
+  \begin{itemize}
+  \item V \texttt{open} nastavit periodický časovač (per ndev), smazat v \texttt{stop}
+  \item V časovači volat \texttt{netif\_rx} s paketem z pb173/12
+  \item Inkrementovat v paketu 24. char
+  \end{itemize}
+  \item Spustit \texttt{tcpdump -ni} na \texttt{eth} rozhraní
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
+
