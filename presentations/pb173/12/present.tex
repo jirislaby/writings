@@ -131,10 +131,10 @@
 \begin{frame}
   \frametitle{Síťové rozhraní ovladače}
 
-  \heading{\texttt{netdevice}}
+  \heading{Ovladač síťové karty}
   \begin{itemize}
   \item Mezivrstva mezi HW a Linuxem (síťovou vrstvou)
-  \item Popisuje každé \texttt{eth*} zařízení
+  \item Vytváří \texttt{eth*} apod. zařízení (tzv. \texttt{netdevice})
   \item Obsahuje háčky
   \begin{itemize}
   \item Zařízení je UP, DOWN, změna MTU, pošli paket, \ldots
@@ -183,10 +183,10 @@ struct net_device_ops {
   \item Místo \texttt{alloc\_netdev} se použije konkrétnější
   \item Nastaví vnitřní položky \texttt{netdevice}
   \begin{itemize}
-  \item \emph{Ethernet}: \texttt{alloc\_etherdev}
-  \item IRDA: \texttt{alloc\_irdadev}
-  \item CAN: \texttt{alloc\_candev}
-  \item HDLC: \texttt{alloc\_hdlcdev}
+  \item \emph{Ethernet}: \texttt{alloc\_etherdev} (\header{linux/etherdevice.h})
+  \item IRDA: \texttt{alloc\_irdadev} (\header{net/irda/irda\_device.h})
+  \item CAN: \texttt{alloc\_candev} (\header{linux/can/dev.h})
+  \item HDLC: \texttt{alloc\_hdlcdev} (\header{linux/hdlc.h})
   \item \ldots
   \end{itemize}
   \end{itemize}
@@ -223,12 +223,16 @@ struct net_device_ops {
   \begin{itemize}
   \item Registrace v \texttt{module\_init}
   \item Deregistrace v \texttt{module\_exit}
+  \item MAC: \texttt{random\_ether\_addr}
+  \item \texttt{priv\_size}: \texttt{sizeof(struct timer\_list)} --
+    \texttt{setup\_timer}
   \end{itemize}
   \item Vytvořit \texttt{open}, \texttt{stop}, \texttt{start\_xmit}
   \begin{itemize}
   \item Těla vypíšou jen název funkce
   \item \texttt{start\_xmit} vrátí \texttt{NETDEV\_TX\_OK}
   \end{itemize}
+  \item Vložit do systému, udělat \texttt{ifup}, \texttt{ifdown}, \texttt{ping}
   \end{enumerate}
 
 \end{frame}
@@ -243,6 +247,7 @@ struct net_device_ops {
     (pro \texttt{netdevice}), \texttt{dev\_kfree\_skb}$_D$
   \item Obsah: \texttt{skb->data}
   \item Délka obsahu: \texttt{skb->len}
+  \pause
   \item Příjem z HW (např. z přerušení)
   \begin{itemize}
   \item \texttt{skb = netdev\_alloc\_skb(dev, len)}
@@ -251,6 +256,7 @@ struct net_device_ops {
   dev)})
   \item \texttt{netif\_rx(skb)}
   \end{itemize}
+  \pause
   \item Posílání do HW (parametr ve \texttt{start\_xmit})
   \begin{itemize}
   \item Poslat paket
@@ -272,10 +278,11 @@ struct net_device_ops {
   \end{itemize}
   \item Nastavit RX
   \begin{itemize}
-  \item V \texttt{open} nastavit periodický časovač (per ndev), smazat v \texttt{stop}
+  \item V \texttt{open} nastavit periodický časovač, smazat v \texttt{stop}
   \item V časovači volat \texttt{netif\_rx} s paketem z pb173/12
   \item Inkrementovat v paketu 24. char
   \end{itemize}
+  \item Vložit module do systému
   \item Spustit \texttt{tcpdump -ni} na \texttt{eth} rozhraní
   \end{enumerate}
 
