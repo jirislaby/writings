@@ -24,62 +24,6 @@
 	basicstyle=\scriptsize}
 
 %}}}
-%{{{ Komentovaci makro
-
-\usepackage{tikz,pgffor}
-\usetikzlibrary{arrows}
-\usetikzlibrary{shapes}
-\usepackage{txfonts}
-\usepackage{wrapfig}
-
-\tikzstyle{max}=[thick,draw,minimum size=1.4em,inner sep=0em]
-\tikzstyle{min}=[diamond,thick,draw,minimum size=1.4em,%
-    inner sep=0em]
-\tikzstyle{ran}=[circle,thick,draw,minimum size=1.4em,%
-    inner sep=0em]
-\tikzstyle{act}=[circle,thick,draw,fill,minimum size=.7em,%
-    inner sep=0em]
-\tikzstyle{mc}=[rounded corners,thick,draw,minimum size=1.4em,%
-    inner sep=.5ex]
-\tikzstyle{tran}=[thick,draw,->,>=stealth]
-\tikzstyle{loop left}=[tran, to path={.. controls +(150:.5)
-    and +(210:.5) .. (\tikztotarget) \tikztonodes}]
-\tikzstyle{loop right}=[tran, to path={.. controls +(30:.5)
-    and +(330:.5) .. (\tikztotarget) \tikztonodes}]
-\tikzstyle{loop above}=[tran, to path={.. controls +(60:.5)
-    and +(120:.5) .. (\tikztotarget) \tikztonodes}]
-\tikzstyle{loop below}=[tran, to path={.. controls +(240:.5)
-    and +(300:.5) .. (\tikztotarget) \tikztonodes}]
-
-% tohle je na konfiguraci, aby to vyuzilo cely okraj a nepreteklo
-\setlength{\marginparwidth}{3.5cm}
-
-\renewcommand{\todo}[1]{%
-  % Add to todo list
-  %
-  \begin{tikzpicture}[remember picture]%
-      \node [coordinate] (inText) {};%
-  \end{tikzpicture}%
-  %
-  % Make the margin par
-  \marginpar{%
-      \begin{tikzpicture}[remember picture]%
-   %
-          \draw node[draw=red, color=red, text width = 3.5cm] (inNote)%
-                   {{\small #1}};%
-      \end{tikzpicture}%
-  }%
-  %
-  \begin{tikzpicture}[remember picture, overlay]%
-      \draw[draw = red, thick]%
-          ([yshift=-0.1cm] inText)%
-              -| ([xshift=-0.1cm] inNote.west)%
-              -| (inNote.west);%
-  \end{tikzpicture}%
-  %
-}%
-
-%}}}
 
 \begin{document}
 
@@ -120,9 +64,11 @@ stir interest was~\cite{ECCH00}, showing that static analysis can
 efficiently find many interesting bugs in a real-world code, as demonstrated
 on the Linux kernel. This work eventually led to a successful commercial
 tool called \textsc{Coverity Prevent}~\cite{coverity}\todo{Jmenuje se
-  Coverity porad Coverity Prevent?}. Over the years, many
-other successful tools, like \textsc{Klocwork}~\cite{klocwork}\todo{Tady to
-  chce vice toolu, nejen Klockwork.}, appeared.
+Coverity porad Coverity Prevent?}\note{Asi ne, vypada to, ze uz to maji
+pojmenovane zase zpatky Coverity $<$verze$>$}. Over the years, many other
+successful tools, like \textsc{Klocwork}~\cite{klocwork}\todo{Tady to chce
+vice toolu, nejen Klockwork.}\note{mozna jeste ten FindBugs, ale tech
+uspesnych moc neni, spis uz zadny}, appeared.
 %
 However, such fully-featured tools are neither free to obtain, nor
 is their code available (e.g.~for developing new algorithms or tailoring the
@@ -134,7 +80,9 @@ code.
 \Stanse is intended to fill this gap for C language. It can be seen in
 two ways:
 \begin{enumerate}
-\item \Stanse is a robust framework (written predominantly in Java) for
+\item \note{Ja se omlouvam, ale tenhle bod jsem musel cist 3x, abych pochopil,
+  o co jde.}
+  \Stanse is a robust framework (written predominantly in Java) for
   implementing different static analysis algorithms. It is able to process
   large software projects including the whole Linux kernel.
 %   The kernel is constantly improved and
@@ -143,14 +91,24 @@ two ways:
   Hence, an implemented algorithm can be immediately evaluated on large
   real-world source codes. A module implementing a bug-finding algorithm
   within the framework is called \emph{checker}.
-\item As \Stanse already contains three checkers, it can be also seen as a
+
+  \note{Zkusil jsem to prepsat nasledovne:}
+  \Stanse is a robust framework (written predominantly in Java) for
+  implementing diverse static analysis algorithms. The framework is capable to
+  process large software projects including the whole Linux kernel and hence an
+  implemented algorithm can be immediately evaluated on large real-world
+  source codes. Such algorithms, within the framework, are called
+  \emph{checkers}.
+
+  \item As \Stanse contains three checkers already, it can be also seen as a
   working static analysis tool.
+
 \end{enumerate}
 
 The rest of the paper is structured as follows. Section~\ref{sec:framework}
 describes the functionality provided by the framework, while
 Section~\ref{sec:checkers} is devoted to the three existing checkers.
-Section~\ref{sec:results} presents some results of \Stanse on Linux
+Section~\ref{sec:results} presents some results of \Stanse on the Linux
 kernel. The last section summarizes the basic strengths of \Stanse and
 mentions some directions of its future development.
 
@@ -161,10 +119,10 @@ mentions some directions of its future development.
 \label{sec:framework}
 
 The functionality provided by the \Stanse framework can be separated into
-several stages. First, the framework reads in the configuration including a
+several stages. First, the framework reads in the configuration including
 source file list and checkers to be used. The source files are then parsed
 and encoded in \emph{abstract syntax tree (AST)}, \emph{control-flow graph
-  (CFG)}, and \emph{call-graph} internal structures. Next, checkers are
+(CFG)}, and \emph{call-graph} internal structures. Next, checkers are
 instantiated, run, and error reports collected and presented.
 
 %\vspace{-.5\baselineskip}
@@ -183,9 +141,9 @@ purposes. This functionality was inspired by the
 \Stanse can in principle handle any programming language for which a
 frontend is written. We currently support C, more specifically the ISO/ANSI
 C99 standard, and most of the GNU C extensions\todo{Sparsuje STANSE jeste
-  neco, co neni ani ve standardu ani to neni rozsireni GNU C?}. We leave the
-preprocessing to the standard GNU C preprocessor. We are currently working
-on support of other languages, in particular C++.
+neco, co neni ani ve standardu ani to neni rozsireni GNU C?}\note{Ne-e}. We
+leave the preprocessing to the standard GNU C preprocessor. We are currently
+working on support of other languages, in particular C++.
 
 Given a code in whatever source language, the tool parses it into three internal
 structures: AST represented as XML, CFG, and call-graph. All these
@@ -197,12 +155,15 @@ As we mentioned earlier, the design of the framework is geared towards
 analyzing large software projects. Such projects consist of hundreds or
 thousands of modules (compilation units). In practice, it is often
 impossible to store all the files\todo{To se jako ukladaji cely fajly? Ja
-  myslel, ze jen interni struktury. Hmm?} with the associated data in the memory.
+myslel, ze jen interni struktury. Hmm?}\note{Ne-e, je to mysleno jako ze se
+struktury vsech tech souboru nevlezou do pameti.} with the associated data in
+the memory.\note{Co treba: In practice, it is often impossible to store all
+the data associated with files in the memory.}
 The \Stanse framework therefore provides \emph{streaming} of the internal
 structures, currently on a module basis.
 
 \todo{Tenhle odstavec jsem prepsal, je to ted dobre?} Instead of loading all
-source modules at the neginning, a module is streamed in only when \Stanse
+source modules at the beginning, a module is streamed in only when \Stanse
 needs to access some internal structures for the module. This means the
 internal structures are constructed in a lazy manner -- we call them
 \emph{lazy internals}.
@@ -210,12 +171,13 @@ internal structures are constructed in a lazy manner -- we call them
 % everything is parsed at the start of the checking process. Hence it is not a
 % time or memory bottleneck at that time.
 %
-If there is not enough memory to stream in another module, some stored data
-have to be freed. The implemented least-recent-used (LRU) algorithm discards
-the structures of a module if they are not accessed for a significant
-time. If the discarded structure is later accessed again, the corresponding
-module is streamed back in. Both lazy internals and streaming are completely
-transparent to checkers.
+If there is not enough memory\note{To ne, je tam pevne dana hranice, a kdyz se
+ma parsovat dalsi pres tu hranici, tak se musi nejdriv nejaky zahodit.} to
+stream in another module, some stored data have to be freed. The implemented
+least-recent-used (LRU) algorithm discards the structures of a module if they
+are not accessed for a significant time. If the discarded structure is later
+accessed again, the corresponding module is streamed back in. Both lazy
+internals and streaming are completely transparent to checkers.
 
 \textbf{TADY!!}
 
