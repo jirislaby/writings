@@ -7,6 +7,8 @@
 \usepackage{graphicx}
 \usepackage{listings}
 
+%{{{ LaTeX definitions
+
 \newcommand\Color[2]{\textcolor{#1}{#2}}
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
 \renewcommand\note[1]{\nb{\Color{blue}{#1}}}
@@ -21,9 +23,69 @@
         breakatwhitespace=true,escapeinside={(*@}{@*)},
 	basicstyle=\scriptsize}
 
+%}}}
+%{{{ Komentovaci makro
+
+\usepackage{tikz,pgffor}
+\usetikzlibrary{arrows}
+\usetikzlibrary{shapes}
+\usepackage{txfonts}
+\usepackage{wrapfig}
+
+\tikzstyle{max}=[thick,draw,minimum size=1.4em,inner sep=0em]
+\tikzstyle{min}=[diamond,thick,draw,minimum size=1.4em,%
+    inner sep=0em]
+\tikzstyle{ran}=[circle,thick,draw,minimum size=1.4em,%
+    inner sep=0em]
+\tikzstyle{act}=[circle,thick,draw,fill,minimum size=.7em,%
+    inner sep=0em]
+\tikzstyle{mc}=[rounded corners,thick,draw,minimum size=1.4em,%
+    inner sep=.5ex]
+\tikzstyle{tran}=[thick,draw,->,>=stealth]
+\tikzstyle{loop left}=[tran, to path={.. controls +(150:.5)
+    and +(210:.5) .. (\tikztotarget) \tikztonodes}]
+\tikzstyle{loop right}=[tran, to path={.. controls +(30:.5)
+    and +(330:.5) .. (\tikztotarget) \tikztonodes}]
+\tikzstyle{loop above}=[tran, to path={.. controls +(60:.5)
+    and +(120:.5) .. (\tikztotarget) \tikztonodes}]
+\tikzstyle{loop below}=[tran, to path={.. controls +(240:.5)
+    and +(300:.5) .. (\tikztotarget) \tikztonodes}]
+
+% tohle je na konfiguraci, aby to vyuzilo cely okraj a nepreteklo
+\setlength{\marginparwidth}{3.5cm}
+
+\renewcommand{\todo}[1]{%
+  % Add to todo list
+  %
+  \begin{tikzpicture}[remember picture]%
+      \node [coordinate] (inText) {};%
+  \end{tikzpicture}%
+  %
+  % Make the margin par
+  \marginpar{%
+      \begin{tikzpicture}[remember picture]%
+   %
+          \draw node[draw=red, color=red, text width = 3.5cm] (inNote)%
+                   {{\small #1}};%
+      \end{tikzpicture}%
+  }%
+  %
+  \begin{tikzpicture}[remember picture, overlay]%
+      \draw[draw = red, thick]%
+          ([yshift=-0.1cm] inText)%
+              -| ([xshift=-0.1cm] inNote.west)%
+              -| (inNote.west);%
+  \end{tikzpicture}%
+  %
+}%
+
+%}}}
+
 \begin{document}
 
-\title{\Stanse: Bug-finding Framework for C Programs}
+%{{{ Title+Authors+Abstract
+
+\title{{STANSE}: Bug-finding Framework\\ for C Programs}
 \author{Jan~Obdr\v{z}\'alek, Ji\v{r}\'\i~Slab\'y and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University, Brno, Czech Republic
 \email{obdrzalek@fi.muni.cz, slaby@fi.muni.cz, trtikm@mail.muni.cz}}
@@ -31,131 +93,134 @@
 \maketitle
 
 \begin{abstract}
-  \Stanse is a free (available under the GPLv2 license) software tool/modular
-  framework for finding bugs in C programs using static analysis. Its two
-  main design goals are support for large software projects like Linux
-  kernel and to allow fast implementation of new bug-finding techniques with
-  minimal extra effort. Above that the reported results can be presented in
-  multiple ways, web included.
-  
-  There are currently three bug-finding algorithms implemented within \Stanse,
-  one based on automata to describe the correct behaviour, the other for
-  detecting deadlocks among multiple threads and finally one to find
-  unreachable code intended for presentation the framework proper. \Stanse was
-  tested on the recent Linux kernel, where it has found tens of previously
-  undiscovered bugs.
+  \Stanse is a free (available under the GPLv2 license) modular framework
+  for finding bugs in C programs using static analysis. Its two main design
+  goals are applicability on large software projects like Linux kernel and
+  extendability with new bug-finding techniques with a minimal effort.
+  % Above that the reported results can be presented in multiple ways, web
+  % included.
+  There are currently three bug-finding algorithms implemented within
+  \Stanse: \AC checks properties described in an automata-based formalism,
+  \TC detects deadlocks among multiple threads, and \RC looks for
+  unreachable code. \Stanse has been tested on the recent Linux kernel,
+  where it has found dozens of previously undiscovered bugs.
 \end{abstract}
+
+%}}}
+
+%{{{ Intro
 
 \section{Introduction}
 \label{sec:introduction}
 
-Bug-finding based on static analysis (we will use the more general term
-\emph{verification} from now on) have finally come of age in the last
-decade. One of the papers to really stir interest was~\cite{ECCH00}. There it
-was shown that, using known techniques, it is possible to efficiently find
-many interesting bugs in a real-world code, as demonstrated on the Linux
-kernel.  This work eventually led to a successful commercial tool called
-\textsc{Coverity Prevent}~\cite{coverity}. Over the years, many other
-successful tools, like \textsc{Klocwork}~\cite{klocwork}, appeared.
-
-The problem is that such fully-featured tools are neither free to obtain, nor
-is their code available (e.g. for developing new algorithms, or tailoring the
+Bug-finding based on static analysis 
+% (we will use the more general term \emph{verification} from now on)
+have finally come of age in the last decade. One of the papers to really
+stir interest was~\cite{ECCH00}, showing that static analysis can
+efficiently find many interesting bugs in a real-world code, as demonstrated
+on the Linux kernel. This work eventually led to a successful commercial
+tool called \textsc{Coverity Prevent}~\cite{coverity}\todo{Jmenuje se
+  Coverity porad Coverity Prevent?}. Over the years, many
+other successful tools, like \textsc{Klocwork}~\cite{klocwork}\todo{Tady to
+  chce vice toolu, nejen Klockwork.}, appeared.
+%
+However, such fully-featured tools are neither free to obtain, nor
+is their code available (e.g.~for developing new algorithms or tailoring the
 existing tools to specific tasks). The existing free tools are usually
-severely limited in what they can do (one such freely available C
-tool is e.g. \textsc{Uno}~\cite{uno}). One notable exception is
+severely limited in what they can do (e.g.~\textsc{Uno}~\cite{uno}). One notable exception is
 \textsc{FindBugs}~\cite{HP04,findbugs}, a successful tool working on Java
-code. \Stanse is intended to fill this gap for C language.
+code. 
 
-\Stanse can be thought of in two ways. First, \Stanse is a framework for
-implementing different static analysis algorithms. Second, as there are
-already three implemented verification algorithms, \Stanse can be immediately
-used as a static analysis tool for detecting errors in locking discipline,
-pointer handling etc.
+\Stanse is intended to fill this gap for C language. It can be seen in
+two ways:
+\begin{enumerate}
+\item \Stanse is a robust framework (written predominantly in Java) for
+  implementing different static analysis algorithms. It is able to process
+  large software projects including the whole Linux kernel.
+%   The kernel is constantly improved and
+%   extended by many developers, which makes the development process
+%   error-prone. Hence,  
+  Hence, an implemented algorithm can be immediately evaluated on large
+  real-world source codes. A module implementing a bug-finding algorithm
+  within the framework is called \emph{checker}.
+\item As \Stanse already contains three checkers, it can be also seen as a
+  working static analysis tool.
+\end{enumerate}
 
-\section{Architecture}
-\label{sec:architecture}
+The rest of the paper is structured as follows. Section~\ref{sec:framework}
+describes the functionality provided by the framework, while
+Section~\ref{sec:checkers} is devoted to the three existing checkers.
+Section~\ref{sec:results} presents some results of \Stanse on Linux
+kernel. The last section summarizes the basic strengths of \Stanse and
+mentions some directions of its future development.
 
-\Stanse is implemented predominantly in \textsc{Java}. In discussing \Stanse,
-we must distinguish between the \Stanse \emph{framework}, providing support for
-all phases of the error-checking process, and \emph{checkers}, which are
-specialized components doing the verification proper. We will talk about the
-framework first.
+%}}}
+%{{{ Framework
 
-\subsection{Framework Functionality}
+\section{Framework Functionality}
 \label{sec:framework}
 
-The functionality provided by the framework can be separated into several
-stages. First, the framework reads in the configuration including a source
-file list and checkers to be used. The source files are then parsed and
-encoded in AST (abstract syntax tree), CFG (control-flow graph) and call graph
-internal structures. Next, checkers are instantiated, run, and error reports
-collected and presented.
+The functionality provided by the \Stanse framework can be separated into
+several stages. First, the framework reads in the configuration including a
+source file list and checkers to be used. The source files are then parsed
+and encoded in \emph{abstract syntax tree (AST)}, \emph{control-flow graph
+  (CFG)}, and \emph{call-graph} internal structures. Next, checkers are
+instantiated, run, and error reports collected and presented.
 
-\vspace{-.5\baselineskip}
-\subsubsection{Source Files and Parsing}
-The straightforward way to tell \Stanse what to check is simply to specify the
-source files manually one by one. Obviously, for large projects this is quite
-impractical, so the tool supports whole directories to be specified by the
-user or better, a text file containing the sources, each on a separate line.
-This file can also be generated by project-specific scripts, so without much
-burden left on the users.
-
-On the other hand, this still forces users to perform some magic scripting at
-the beginning which one-button tool should not. In this respect, we leverage a
-more usual method for specifying the source files.  \Stanse can take a project
-\textsf{Makefile} and derive all the necessary information from there. In the
-C language family case, it also remembers compiler flags for preprocessing
+%\vspace{-.5\baselineskip}
+\subsection{Source Files and Parsing}
+There are several ways to tell \Stanse what source files to analyze. Besides
+the standard possibilities (a single given file, all files from a given
+directory, all files listed in a given file), \Stanse can also derive all
+the necessary information from a project \textsf{Makefile}. In the C
+language family case, it also remembers compiler flags for preprocessing
 purposes. This functionality was inspired by the
-\textsc{Sparse}~\cite{sparse} tool but differs in that it generates the file
-list only once so the build needs not be run over and over for verification
-runs e.g. with different configuration like distinct checkers.
+\textsc{Sparse}~\cite{sparse} tool.
+%  but differs in that it generates the file
+% list only once so the build needs not be run over and over for verification
+% runs e.g. with different configuration like distinct checkers.
 
-On the programming languages supported, in principle, \Stanse can handle any
-for which a frontend is written.  We currently support C, more specifically
-the ISO/ANSI C99 standard, including most of the GNU C extensions. We leave
-the preprocessing to the standard GNU C preprocessor, but the parser itself is
-generated by \textsc{ANTLR} from a top-down C grammar which we developed based
-on provided example grammar. This is a limiting factor of the whole tool when
-parsing C sources, because (according to the \textsc{ANTLR} authors) the C
-parser in Java is unoptimized and slow -- this is not true for C parser in C,
-so we use it for parsing included headers to extract type definitions. The
-rest of file is handled in Java.
+\Stanse can in principle handle any programming language for which a
+frontend is written. We currently support C, more specifically the ISO/ANSI
+C99 standard, and most of the GNU C extensions\todo{Sparsuje STANSE jeste
+  neco, co neni ani ve standardu ani to neni rozsireni GNU C?}. We leave the
+preprocessing to the standard GNU C preprocessor. We are currently working
+on support of other languages, in particular C++.
 
-Nowadays, we are working hard on merging a C++ support which is based on
-\textsc{clang++} from \textsc{LLVM} suite and we are almost finished. We do
-not use \textsc{clang} (at the time of writing this article, 2.8 is stable)
-for pure C because it still misses some features from the GNU C which are
-widely used in the Linux kernel (at least local labels and some assembler
-constraints explicitly).
-
-Given a code in whatever source language, the tool parses it into an internal
-representation, first into AST represented as XML, then into CFG and from that
-a call-graph is generated. All these phases, or better, their textual and
-graphical representation might be dumped so the user can look at how their
-code looks like in these structures.
+Given a code in whatever source language, the tool parses it into three internal
+structures: AST represented as XML, CFG, and call-graph. All these
+structures can be dumped in a textual or graphical form.
+% so the user have a can look at how their code looks like in these
+% structures.
 
 As we mentioned earlier, the design of the framework is geared towards
-analyzing large software projects. Some other \Stanse features relevant to
-large projects are described hereinafter.  Large software projects consist of
-hundreds or thousands of modules (compilation units). In practice, it is often
-impossible to store all the files with the associated data in the memory.
-\Stanse therefore provides \emph{streaming} of the internal structures,
-currently on a module basis.
+analyzing large software projects. Such projects consist of hundreds or
+thousands of modules (compilation units). In practice, it is often
+impossible to store all the files\todo{To se jako ukladaji cely fajly? Ja
+  myslel, ze jen interni struktury. Hmm?} with the associated data in the memory.
+The \Stanse framework therefore provides \emph{streaming} of the internal
+structures, currently on a module basis.
 
-When a part of the tool accesses some data for a specific source module, the
-whole module is streamed in. This means the internal structures are parsed
-in a lazy manner -- we call them \emph{lazy internals}. It means not
-everything is parsed at the start of the checking process. Hence it is not a
-time or memory bottleneck at that time.
+\todo{Tenhle odstavec jsem prepsal, je to ted dobre?} Instead of loading all
+source modules at the neginning, a module is streamed in only when \Stanse
+needs to access some internal structures for the module. This means the
+internal structures are constructed in a lazy manner -- we call them
+\emph{lazy internals}.
+%  It means not
+% everything is parsed at the start of the checking process. Hence it is not a
+% time or memory bottleneck at that time.
+%
+If there is not enough memory to stream in another module, some stored data
+have to be freed. The implemented least-recent-used (LRU) algorithm discards
+the structures of a module if they are not accessed for a significant
+time. If the discarded structure is later accessed again, the corresponding
+module is streamed back in. Both lazy internals and streaming are completely
+transparent to checkers.
 
-Later, when many modules are streamed in, some have to be freed to not fill up
-the whole memory. The implemented least-recent-used (LRU) algorithm discards
-the structures if the data are not accessed for a significant time. If, later,
-the discarded module is accessed again, it is streamed back in. Both lazy
-internals and streaming are completely transparent to checkers.
+\textbf{TADY!!}
 
-\vspace{-.5\baselineskip}
-\subsubsection{Internals Accessors}
+%\vspace{-.5\baselineskip}
+\subsection{Internals Accessors}
 Although all the internal structures are ready to be fully used by a checker
 at this point, the checker would have to walk through the structures on its
 own.  The downside of this approach is that every single checker implemented
@@ -193,7 +258,10 @@ but not least, \Stanse provides an interface for IDE plug-in to be added as an
 extra module. There is a plan to integrate \Stanse at least into
 \textsc{Eclipse}.
 
-\subsection{Checkers}
+%}}}
+%{{{ Checkers
+
+\section{Checkers}
 \label{sec:checkers}
 
 Each checker is a module which, with the support of the \Stanse framework,
@@ -249,8 +317,11 @@ of strings and comments. So it tries to fully demonstrate the power of the
 \Stanse framework and its primary goal is exactly that. The tool is thus very
 easy to extend, the checker implementors can focus on real techniques.
 
+%}}}
+%{{{ Results 
+
 \section{Results -- Linux Kernel}
-\label{sec:linux}
+\label{sec:results}
 
 We are exercising the Linux kernel by \Stanse since 2.6.28 was released back
 in 2008. It was the first release we decided to test the usability of \Stanse
@@ -358,9 +429,45 @@ code. Further these tools need near no configuration (either because they
 provide predefined one or there is nothing to configure) and are ready to use
 out of the box.
 
-\subsubsection{Future Work}
+%}}}
+%{{{ Conclusions
+
+\section{Conclusions}
+
+\subsection{Future Work}
 C++ support, rewrite to C, get rid of XML, daily analysis, results difference.
 Should this be here? Pay attention, we reference future work section above.
+
+\subsubsection{Parser:} ... but the parser itself is
+generated by \textsc{ANTLR} from a top-down C grammar which we developed
+based on provided example grammar. This is a limiting factor of the whole
+tool when parsing C sources, because (according to the \textsc{ANTLR}
+authors) the C parser in Java is unoptimized and slow -- this is not true
+for C parser in C, so we use it for parsing included headers to extract type
+definitions. The rest of file is handled in Java.
+
+Nowadays, we are working hard on merging a C++ support which is based on
+\textsc{clang++} from \textsc{LLVM} suite and we are almost finished. We do
+not use \textsc{clang} (at the time of writing this article, 2.8 is stable)
+for pure C because it still misses some features from the GNU C which are
+widely used in the Linux kernel (at least local labels and some assembler
+constraints explicitly).
+
+
+\subsubsection{Acknowledgements}
+\label{sec:acknowledgements}
+
+Jan Ku\v{c}era is the author of the \TC. We would like to thank Linux kernel
+developers, and Cyrill Gorcunov for \Stanse alpha testing and useful
+suggestions. All authors are supported by the research centre Institute for
+Theoretical Computer Science (ITI), project No. 1M0545.
+
+%}}}
+
+\bibliographystyle{plain}
+\bibliography{stanse}
+
+\end{document}
 
 \section{What's Missing}
 There are several points we miss which were commented in the past reviews.
@@ -371,15 +478,7 @@ They include:
 \item full bugs description
 \end{itemize}
 
-\subsubsection{Acknowledgements}
-\label{sec:acknowledgements}
-
-Jan Ku\v{c}era is the author of the \TC. We would like to thank Linux kernel
-developers, and Cyrill Gorcunov for \Stanse alpha testing and useful
-suggestions. All authors are supported by the research centre Institute for
-Theoretical Computer Science (ITI), project No. 1M0545.
-
-\bibliographystyle{plain}
-\bibliography{stanse}
-
-\end{document}
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-command-default: "pdfLaTeX"
+%%% End: 
