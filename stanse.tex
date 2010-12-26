@@ -285,15 +285,14 @@ ANSI C99 and GNU C extensions. The other motivation is to provide a free tool
 for Linux kernel developers.
 
 We have been applying \Stanse on the Linux kernel since version 2.6.28. Here
-we present our results of evaluation \Stanse's checker \AC just on version
-2.6.28\note{Tahle veta mi nedava moc smysl}. We focused on checking of the
+we present \Stanse results when applied to version 2.6.28. We focused on checking of the
 following properties:
 \begin{itemize}
-\item correct pairing of functions like balanced locking, check for correct
-  reference counting,
-\item pointer related bugs like dereferencing null or dangling pointers and
-\item atomic section restrictions to find if someone can cause deadlocks by
-sleeping inside spinlocks or interrupt handlers.
+\item Correct pairing of functions (balanced locking, reference counting)
+\item Pointer manipulation (dereferencing null or dangling pointers, etc.)
+\item Atomic section restrictions (deadlocks caused by sleeping inside spinlocks or interrupt handlers)
+\item Thread safety properties (deadlocks )\todo{What's the difference between point 3 and 4?}
+\item Dead code detection
 \end{itemize}
 
 %\begin{figure}[tb]
@@ -317,17 +316,14 @@ sleeping inside spinlocks or interrupt handlers.
 %\label{fig:error}
 %\end{figure}
 
+The first three properties are checked by \AC, the fourth and fifth property is checked by \TC and \RC respectively. 
+
 The running time of \Stanse on a common desktop machine with 2 cores and
 4\,GiB of memory was under 100 minutes. The memory usage of the Java process
-oscillates between 400 and 1000\,MiB in case of forced garbage collector
-executions. The false positives rate oscillates among\todo{oscillates
-  according je blbe, i ten zbytek je formulovanej divne.} the different bug
-types, the overall ratio is that 40\,\% of all reported errors are real
-bugs.  Bugs were reported to kernel developers and fixed in the next kernel
-release. Some of these bugs remained undiscovered for seven
+was between 400 and 1000\,MiB. The false positives rate differs for different properties, but the overall ratio is about 50\,\% of all sorted\todo{What to choose instead of sorted?} errors reports.  Bugs were reported to kernel developers and fixed in the following kernel
+releases. Some of these bugs remained undiscovered for seven
 years\footnote{\url{http://lkml.org/lkml/2009/3/11/380}}.
-Table~\ref{tab:results}\todo{v popisku tabulky nahradit sorted} shows results from \AC for all three checked
-properties.
+Table~\ref{tab:results} shows frequencies of error reports for all checked properties.
 
 % The standard \Stanse \textsf{Makefile} support was used and we did not have to manually tweak the source code in any way in order to be processed by \Stanse.
 
@@ -351,7 +347,7 @@ properties.
 \begin{table}[!htb]
 \begin{center}
 \begin{tabular}{|l|l|r|r|r|r|} \hline
-\textbf{Checker} & \textbf{Property} & \textbf{Reports} & \textbf{Bugs} & \textbf{FP} & \textbf{\% FP} \\ \hline\hline
+\textbf{Checker} & \textbf{Property} & \textbf{Reports} & \textbf{Errors} & \textbf{FP} & \textbf{\% FP} \\ \hline\hline
 \textit{Automaton} & \textit{Pairing}
                              & 266 & 65  & 143 & 68.8\,\% \\ \hline
 & \textit{Memory}            & 86  & 48  & 37  & 43.5\,\% \\ \hline
@@ -361,14 +357,15 @@ properties.
 \textbf{Overall}       &     & 407 & 138 & 209 & 51.4\,\% \\ \hline
 \end{tabular}
 \end{center}
-\caption{Evaluation results on the Linux kernel 2.6.28. Not all
-of the error reports (column {\bf Reports}) were classified to real errors
-(column {\bf Bugs}) and false positives (column {\bf FP}). {\bf \% FP}
-represents percentage of false positives in all classified reports.
+\caption{\Stanse results on Linux kernel version 2.6.28. Not all
+of the error reports (column {\bf Reports}) were sorted to real errors (column
+{\bf Errors}) and false positives (column {\bf FP}). Column {\bf \% FP}
+represents percentage of false positives in all sorted reports.
 \textbf{Overall} does not involve \textit{Reachability} results (it would
 distort the counts).}
 \label{tab:results}
 \end{table}
+\todo{Reachability is not included in Table \ref{tab:results}. It looks bad.}
 
 
 % !!!! MOVE NEXT ARTICLE TO THE INTRODUCTION, SINCE IT IS RELATED WORK !!!
@@ -409,7 +406,7 @@ distort the counts).}
 \section{Conclusions and Future Work}
 
 \Stanse is a free Java-based framework for simple implementation of
-bug-finding algorithms based on static analysis. The framework can process
+bug-finding algorithms based on static analysis. The framework focuses on
 large-scale software projects written in ISO/ANSI C99. \Stanse does not
 currently use any new techniques -- its novelty comes from the fact that (to
 our best knowledge) there is no other non-commercial open-source framework
