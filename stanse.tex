@@ -72,10 +72,10 @@ However, such fully-featured tools are neither free to obtain, nor is their
 code available (e.g.~for developing new algorithms or tailoring the existing
 tools to specific tasks). The existing free tools are usually severely
 limited in what they can do (e.g.~\textsc{Uno}~\cite{uno},
-\textsc{Sparse}~\cite{sparse}, \textsc{Smatch}). One notable exception is
-\textsc{FindBugs}~\cite{HP04,findbugs}, a successful tool working on Java
-code.
-
+\textsc{Sparse}~\cite{sparse}, \textsc{Smatch}~\cite{smatch}). One notable
+exception is \textsc{FindBugs}~\cite{HP04,findbugs}, a successful tool
+working on Java code.
+%
 \Stanse is intended to fill this gap for C language. It can be seen in
 two ways:
 \begin{enumerate}
@@ -103,50 +103,38 @@ mentions some directions of its future development.
 \section{Framework Functionality}
 \label{sec:framework}
 
-The functionality provided by the \Stanse framework can be separated into
-several stages. First, the framework reads in the configuration including
-source file list and checkers to be used. The source files are then parsed
-and encoded in \emph{abstract syntax tree (AST)}, \emph{control-flow graph
-  (CFG)}, and \emph{call-graph} internal structures. Next, checkers are
-instantiated,\todo{co se mysli tim ``checkers are
-instantiated''?}\note{Vytvori se jejich instance. Doslova, vytvori se pomoci
-klicoveho slova new, aby existoval v pameti.} run, and error reports collected
-and presented.
+The functionality provided by the \Stanse framework can be roughly separated
+into several stages. First, the framework reads in the configuration
+including source file list and checkers to be used. The source files are
+then parsed into a set of \emph{internal structures}, namely \emph{abstract
+  syntax trees (ASTs)}, \emph{control-flow graphs (CFGs)}, and
+\emph{call-graphs}. Next, checkers are run on these structures and error
+reports are collected and presented.  
 
 \subsection{Selecting and Parsing Source Files}
 
 There are several ways to tell \Stanse what source files to analyze. Besides
 the standard possibilities (a single given file, all files from a given
 directory, all files listed in a given file), \Stanse can also derive all
-the necessary information from a project \textsf{Makefile}. In the C
-language family case, it also remembers compiler flags for preprocessing
-purposes. This functionality was inspired by the
-\textsc{Sparse}~\cite{sparse} tool.
+the necessary information from a project \textsf{Makefile}. In this case,
+\Stanse also remebers compiler flags for preprocessing purposes. This
+functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool.
 %  but differs in that it generates the file
 % list only once so the build needs not be run over and over for verification
 % runs e.g. with different configuration like distinct checkers.
 
 \Stanse can process source files written in C, more specifically the
-ISO/ANSI C99 standard and most of the GNU C extensions.\footnote{In
-  principle, the \Stanse framework can handle any programming language for
-  which a frontend is written. We are currently working on C++ support.}
+ISO/ANSI C99 standard and most of the GNU C extensions.
 Before parsing, the sources are preprocessed by the standard GNU C
 preprocessor.
 %  We are currently working on support of
 % other languages, in particular C++.
 %
-The code is then parsed into three internal structures: AST, CFG,
-and call-graph. All these structures can be dumped in a textual or graphical
-form.
-% so the user have a can look at how their code looks like in these
-% structures.
-\todo{Ty interni struktury odpovidaji proceduram nebo modulum? A plati
-modul=file?}\note{Jak je psano niz, modul tady odpovida compilation unit, coz
-je jeden soubor. CFG odpovida jedne funkci, AST je rozkouskovane po uzlech CFG
-a call-graph se (momentalne -- kdybysme neorezavali Configuration jen na jeden
-soubor, tvoril by se call-graph pro vsechny v Configuration) tvori v ramci
-jednoho souboru. Kdyz se parsuje soubor, tak pro vsechny funkce se vyrobi CFG
-s opdovidajicimi AST uzly a take se vyrobi call-graph vsech funkci.}
+The code is then parsed into the mentioned internal structures: a
+call-graph, a CFG for each function, and an AST for each code piece
+corresponding to a node of some CFG.
+% These structures are linked in a natural way.
+All these structures can be dumped in a textual or graphical form.
 
 As mentioned earlier, the design of the framework is geared towards
 analyzing large software projects. Such projects consist of hundreds or
@@ -156,7 +144,7 @@ memory. The \Stanse framework therefore applies automatic \emph{streaming}
 of the internal structures, currently on a module basis.
 %
 Instead of parsing all source modules at the beginning, a module is streamed
-in only when \Stanse needs to access some internal structures corresponding
+in only when \Stanse needs to access some internal structure corresponding
 to the module. In other words, the internal structures are constructed in a
 lazy manner -- we call them \emph{lazy internals}.
 % It means not everything is parsed at the start of the checking
@@ -164,83 +152,32 @@ lazy manner -- we call them \emph{lazy internals}.
 %
 If the memory occupied by internal structures exceeds a given limit, some
 internal structures have to be freed before another module is streamed
-in. The implemented least-recently-used (LRU) algorithm discards the
-structures of a module if they are not accessed for a significant
-time.\todo{Jak to presne funguje - smazne to opravdu nejdyl nepouzivany
-  struktury?}\note{Ano.} If the discarded structure is later accessed again, the
-corresponding module is streamed back in. Both lazy internals and streaming
-are completely transparent to checkers.\todo{Co se mysli tim
-  ``transparent''? Nebylo by lepsi, kdyby o tom checker nevedel (a tudiz by
-  to bylo ``hidden'')?}\note{Jak rozumis pojmu transparentni? Mam za to, ze je
-  to neco, o cem checker nema poneti, ze existuje. V tomto kontextu mi to zni
-  lepe. Nevim, jak Marek (ktery to, myslim, napsal), ale ja jsem se s hidden v
-  tomto kontextu nesetkal.}
+in. The structures to be freed are selected by an LRU (least-recently-used)
+approach: \Stanse discards all internal structures of the module whose
+structures are not accessed for the longest time. If the discarded structure
+is later accessed again, the corresponding module is streamed back in. Both
+laziness of internal structures and streaming are completely
+hidden to checkers.\todo{Probral jsem to se zenou a oba si myslime, ze
+  ``transparent'' by znamenalo, ze checkery mohou ten proces sledovat, coz
+  neni pravda.}
 
 \subsection{Traversing the Parsed Code}
 
-Although all the internal structures are ready to be fully used by a checker
-at this point, the checker would have to walk through the structures on its
-own. To prevent unnecessary reimplementations, the most important and
-heavily used traversal methods are implemented directly inside the
-framework. Using this functionality, a new checker can be implemented by
-specifying
+Althought a checker can process the internal structures in an arbitrary way,
+most of them walk through CFGs using some standard strategy. To prevent
+unnecessary reimplementations, the most important and heavily used traversal
+methods are implemented directly inside the framework. Using this
+functionality, a new checker can be implemented by specifying
 \begin{itemize}
-\item whether it should go through the structures forwards or backwards,
-  breath-first or depth-first,
-\item if the interprocedural walk-through should be performed or
-  not, and
-\item methods to be called for each visited node in CFG or AST.\todo{Nepatri
-    sem i call-grafy?}\note{Pokud vim (dival jsem se ted do kodu), tak mame
-    pruchodce jen pro CFG.}
+\item whether it should go through CFGs forwards or backwards, breath-first
+  or depth-first,
+\item if the interprocedural walk-through should be performed or not (if
+  not, the function calls are ignored), and
+\item methods to be called for each visited node of a CFG.
 \end{itemize}
 This makes implementation of new algorithms extremely simple.
 
-\textbf{Tady mam vic dotazu:}
-\begin{itemize}
-\item V cem spociva podpora interproceduralni analyzy? V tom, ze si muzu
-  rict, ze do volanych struktur bud vlezu, nebo budu volani ignorovat?
-\begin{itemize}
-\item JS: rekl bych, ze ano.
-\end{itemize}
-\item Nemel bych nekde rict, kterou strukturu chci primarne prochazet
-  (call-graf, AST, CFG)?
-\begin{itemize}
-\item JS: prochazet se da jen CFG. U AST to asi nema smysl, u call-graphu asi
-ano, ale na to neni pruchodce (nikdo ho zatim nepotreboval).
-\end{itemize}
-\item Kdyz nahraju modul/soubor, kde ta analyza zacne? Projdu kazdou
-  proceduru?
-\begin{itemize}
-\item JS: ano, AC prochazi kazdou, TC si vybira ty, ktere nejsou volany nikym
-jinym v ramci souboru (tzv. pocatecni funkce)
-\end{itemize}
-\item Predpokladam, ze interni struktury jsou provazany: treba uzly v CFG
-  maji vazbu na odpovidajici podstromy v AST. Je to tak?
-\begin{itemize}
-\item JS: uplne presne
-\end{itemize}
-\item Prilepime sem neco jako: \emph{Note that the checkers are independent
-  of each other, they can be executed sequentially or in parallel.}
-  A kdyz mam vic checkeru, to se pro kazdej checker zvlast vytvari internal
-  structures? A novej checker se musi do toho frameworku nejak registrovat?
-\begin{itemize}
-\item JS: Note dava smysl.
-\item JS: Internals jsou spolecne pro vsechny a jsou pro checkery read-only.
-\item JS: registrace checkeru spociva v pridani jednoho radku do
-CheckerFactory -- ano, musi se ``registrovat''
-\end{itemize}
-\end{itemize}
-
-% As \Stanse also supports interprocedural analysis, there was also
-% intention to shield the checkers away from the code which accesses the
-% structures. So, what the checkers need to do explicitly is to specify
-% whether they want to go through the structures forward or backward,
-% breadth-first or depth-first, if the interprocedural walk-through should
-% be performed and finally they have to provide callbacks (methods) to be
-% called for each node in CFG or AST. We can truly exploit this
-% functionality in the \RC which is described later in \ref{sec:checkers}.
-
-\subsection{Processing Error Traces}
+\subsection{Processing Errors}
 
 \begin{figure}[t]
   \centering
@@ -249,31 +186,38 @@ CheckerFactory -- ano, musi se ``registrovat''
   \label{fig:bugtrace}
 \end{figure}
 
-Once a checker finds an error, it reports back a set of commented
-\emph{error traces} (paths in the analyzed code) demonstrating this
-error. \note{Obsahuje stanse nejakou podporu pro slucovani tracu
-  popisujicich stejnou chybu?}\todo{JS: ano, slucuje stejne chyby (checker,
-  typ chyby) se stejnym koncovym nebo pocatecnim bodem.} \Stanse provides
-several possibilities to present the error traces: they can be printed to the
-console, displayed using a built-in error trace GUI browser (see
-Figure~\ref{fig:bugtrace}), or saved to an external file in XML format. This
-XML file has a wide variety of possible applications. For example, we supply
-an \textsc{SQLite} database creator complemented with a web
-interface.\note{Tady to zni, jako by soucasti \Stanse byl i ten web interface.
-Co presne dela ten creator?  Nestaci napsat ``For example, we supply a tool
-translating the XML file into an \textsc{SQLite} database.''?}\todo{JS: Taky,
-ze ano, primitivni, ale je :). Viz
-\url{http://decibel.fi.muni.cz/~xslaby/stanse/}. Creator dela presne ten
-preklad XML do db, jak pises v te vete.}
+Once a checker finds an error, it reports back a commented \emph{error
+  trace} (a path in the analyzed code) demonstrating this error. \Stanse
+joins together error traces representeing the same kind of error and leading
+from/to the same point. Further, \Stanse provides several possibilities to
+present the error traces: they can be printed to the console, displayed
+using a built-in error trace GUI browser (see Figure~\ref{fig:bugtrace}), or
+saved to an external file in XML format. This XML file has a wide variety of
+possible applications. For example, we supply a tool transforming the XML
+file into an \textsc{SQLite} database complemented with a web interface
+allowing to browse errors in the database via a web browser. Using the web
+browser or the built-in error GUI browser, one can mark errors as real bugs
+or or false-positives. \Stanse also provides various statistics of errors
+like number of errors per file and checker, frequency of errors of the same
+kind, percentage of false-positives (based on user feedback), etc.
 
-%  This
-% becomes handy especially when sending reports to the upstream developers. In
-% this case, an URL with a bare description is sufficient to be sent.
-The last but not least, \Stanse provides an interface for IDE plug-in to be
-added as an extra module. \note{Te posledni vete nerozumim vubec. Muzete mi
-  to prosim vysvetlit?}\todo{JS: interfacem se mysli API. Nekdo mel psat ten
-  plugin jako Bc., tak je to nachystane, ze misto TUI, GUI nebo XML to potece do
-  nejakeho pluginu.}
+
+% \note{Tady to zni, jako by
+%   soucasti \Stanse byl i ten web interface. Co presne dela ten creator?
+%   Nestaci napsat ``For example, we supply a tool translating the XML file
+%   into an \textsc{SQLite} database.''?}\todo{JS: Taky, ze ano, primitivni,
+%   ale je :). Viz \url{http://decibel.fi.muni.cz/~xslaby/stanse/}. Creator
+%   dela presne ten preklad XML do db, jak pises v te vete.}
+
+\subsection{Other fratures}
+
+The framework provides some other features. For example, it supports
+configuration files describing both the files to be analyzed and the
+checkers to be used. Further, the framework supports parallel execution of
+more checkers (in threads). Note that the internal structures are shared by
+all running checkers. Moreover, \Stanse can run in a command line mode or
+via a fully featured GUI. \Stanse also provides an interface for IDE plug-in
+to be added as an extra module.
 
 %}}}
 %{{{ Checkers
@@ -474,6 +418,9 @@ interni struktury jsou popsany v XML a to je spatne.
 
 There is a plan to integrate \Stanse at least into \textsc{Eclipse}.
 
+In principle, the \Stanse framework can handle any programming language for
+which a frontend is written. We are currently working on C++ support.
+
 \subsubsection{Acknowledgements}
 \label{sec:acknowledgements}
 
@@ -487,7 +434,6 @@ Theoretical Computer Science (ITI), project No. 1M0545.
 \bibliographystyle{plain}
 \bibliography{stanse}
 
-\end{document}
 
 \section{What's Missing}
 There are several points we miss which were commented in the past reviews.
@@ -500,18 +446,51 @@ They include:
 
 Markovo summary:
 \begin{itemize}
-\item ï¿½e jde v prvnï¿½ ï¿½adï¿½ o framework pro statickou analï¿½zu. Tedy ï¿½e
-  nabï¿½zï¿½me funkï¿½nï¿½ balï¿½k kï¿½du, do kterï¿½ho se dï¿½ s minimï¿½lnï¿½m ï¿½silï¿½m
-  naimplementovat jistï¿½ konkrï¿½tnï¿½ novï¿½ technika.
-\item Co tedy framework nabï¿½zï¿½: Configuration,
-  LazyInternals(ASTs,CFGs,Streaming), Inter/Intra-analï¿½zy, Traversovï¿½nï¿½,
+\item ®e jde v první øadì o framework pro statickou analýzu. Tedy ¾e
+  nabízíme funkèní balík kódu, do kterého se dá s minimálním úsilím
+  naimplementovat jistá konkrétní nová technika.
+\item Co tedy framework nabízí: Configuration,
+  LazyInternals(ASTs,CFGs,Streaming), Inter/Intra-analýzy, Traversování,
   Statistics, GUI.
-\item Pro otestovï¿½nï¿½ frameworku mï¿½me napsï¿½no nï¿½kolik checkerï¿½
-  (Automaton,...). Stanse jsme byli schopni pustit na celï¿½ kernel Linuxu a
-  nalï¿½zt v nï¿½m nï¿½kolik chyb.
+\item Pro otestování frameworku máme napsáno nìkolik checkerù
+  (Automaton,...). Stanse jsme byli schopni pustit na celý kernel Linuxu a
+  nalézt v nìm nìkolik chyb.
 \end{itemize}
+
+
+
+\subsubsection{Ty interni struktury odpovidaji proceduram nebo modulum? A plati
+  modul=file?} Jak je psano niz, modul tady odpovida compilation unit, coz
+  je jeden soubor. CFG odpovida jedne funkci, AST je rozkouskovane po uzlech
+  CFG a call-graph se (momentalne -- kdybysme neorezavali Configuration jen
+  na jeden soubor, tvoril by se call-graph pro vsechny v Configuration)
+  tvori v ramci jednoho souboru. Kdyz se parsuje soubor, tak pro vsechny
+  funkce se vyrobi CFG s opdovidajicimi AST uzly a take se vyrobi call-graph
+  vsech funkci.
+\subsubsection{V cem spociva podpora interproceduralni analyzy? V tom, ze si muzu
+  rict, ze do volanych struktur bud vlezu, nebo budu volani ignorovat?}  JS:
+  rekl bych, ze ano.
+\subsubsection{Nemel bych nekde rict, kterou strukturu chci primarne prochazet
+  (call-graf, AST, CFG)?} JS: prochazet se da jen CFG. U AST to asi nema
+  smysl, u call-graphu asi ano, ale na to neni pruchodce (nikdo ho zatim
+  nepotreboval).
+\subsubsection{Kdyz nahraju modul/soubor, kde ta analyza zacne? Projdu kazdou
+  proceduru?} JS: ano, AC prochazi kazdou, TC si vybira ty, ktere nejsou
+  volany nikym jinym v ramci souboru (tzv. pocatecni funkce)
+\subsubsection{Predpokladam, ze interni struktury jsou provazany: treba uzly v CFG
+  maji vazbu na odpovidajici podstromy v AST. Je to tak?}  JS: uplne presne
+\subsubsection{Prilepime sem neco jako: \emph{Note that the checkers are independent
+    of each other, they can be executed sequentially or in parallel.} A kdyz
+  mam vic checkeru, to se pro kazdej checker zvlast vytvari internal
+  structures? A novej checker se musi do toho frameworku nejak registrovat?}
+  JS: Note dava smysl. Internals jsou spolecne pro vsechny a jsou pro
+  checkery read-only. Registrace checkeru spociva v pridani jednoho radku do
+  CheckerFactory -- ano, musi se ``registrovat''
+
+
+\end{document}
 
 %%% Local Variables:
 %%% mode: latex
-%%% TeX-command-default: "LaTeX"
+%%% TeX-command-default: "pdfLaTeX"
 %%% End:
