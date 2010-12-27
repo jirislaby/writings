@@ -216,9 +216,9 @@ structures are shared by all running checkers. Further, \Stanse can run in a
 command line mode or via a fully featured GUI. If properly configured,
 \Stanse can be used as a ``push-the-button'' tool. Due to the design of the
 framework, \Stanse can be adapted to handle other programming languages by
-writing appropriate parsers. Finally, \Stanse is basically a Java library,
-so it can be easily transformed into a static analysis plug-in for Eclipse
-or NetBeans IDE.
+writing appropriate parsers. Finally, the \Stanse framework is basically a
+Java library, so it can be easily transformed into a static analysis plug-in
+for some IDE (e.g.~Eclipse or NetBeans).
 
 %}}}
 %{{{ Checkers
@@ -277,130 +277,70 @@ strings and comments.
 %}}}
 %{{{ Results
 
-\section{Results -- Linux Kernel}
+\section{Results on Linux Kernel}
 \label{sec:results}
 
-An important reason why we focus on analysing the Linux kernel is that it
-represents a large and freely available codebase, where the absence of bugs is
-of great concern.  Moreover, the Linux kernel fully exercises most features of
-ANSI C99 and GNU C extensions. The other motivation is to provide a free tool
-for Linux kernel developers.
+We have several reasons to choose the Linux kernel to test \Stanse: the
+kernel presents a large and freely available codebase, it fully exercises
+most features of ISO/ANSI C99 and GNU C extensions, it is under constant
+development (new bugs are appearing), and absence of bugs are of great
+concern. 
 
-We have been applying \Stanse on the Linux kernel since version 2.6.28. Here
-we present \Stanse results when applied to version 2.6.28. We focused on checking of the
-following properties:
+We applied \Stanse with the three checkers described in the previous section
+to kernel version 2.6.28. \AC uses three automata describing the following
+kinds of errors:
 \begin{itemize}
-\item Correct pairing of functions (balanced locking, reference counting)
-\item Pointer manipulation (dereferencing null or dangling pointers, etc.)
-\item Atomic section restrictions (deadlocks caused by sleeping inside spinlocks or interrupt handlers)
-\item Thread safety properties (deadlocks )\todo{What's the difference between point 3 and 4?}
-\item Dead code detection
+\item incorrect pairing of functions (imbalanced locking, reference
+  counting errors)
+\item bugs in pointer manipulation (null dereference, dangling pointers, etc.)
+\item deadlocks caused by sleeping inside spinlocks or interrupt handlers
 \end{itemize}
 
-%\begin{figure}[tb]
-%\begin{center}
-%\begin{tabular}{c}
-%\begin{lstlisting}[language=C]
-%static void untag_chunk(struct node *p) {
-% spin_lock(&entry->lock);
-% ...
-% new = alloc_chunk(size);
-% ...
-% spin_unlock(&entry->lock);
-%}
-%static struct audit_chunk *alloc_chunk(int count) {
-% ...
-% chunk = kzalloc(size, GFP_KERNEL);
-%\end{lstlisting}
-%\end{tabular}
-%\end{center}
-%\caption{Bug found in the audit code}
-%\label{fig:error}
-%\end{figure}
-
-The first three properties are checked by \AC, the fourth and fifth property is checked by \TC and \RC respectively. 
-
 The running time of \Stanse on a common desktop machine with 2 cores and
-4\,GiB of memory was under 100 minutes. The memory usage of the Java process
-was between 400 and 1000\,MiB. The false positives rate differs for different properties, but the overall ratio is about 50\,\% of all sorted\todo{What to choose instead of sorted?} errors reports.  Bugs were reported to kernel developers and fixed in the following kernel
-releases. Some of these bugs remained undiscovered for seven
-years\footnote{\url{http://lkml.org/lkml/2009/3/11/380}}.
-Table~\ref{tab:results} shows frequencies of error reports for all checked properties.
+4\,GiB of memory is under 100 minutes. The memory usage of the Java process
+oscillates between 400 and 1000\,MiB. The number of errors reported by the
+checkers can be found in Table~\ref{tab:results}. Let us note that \RC
+actually detected 751 errors, but 720 of them are of a low importance
+(including 696 superfluous semicolons) and they are ommitted from our
+statistics.
 
-% The standard \Stanse \textsf{Makefile} support was used and we did not have to manually tweak the source code in any way in order to be processed by \Stanse.
-
-%In the 2.6.28 release, more than 70 bugs\footnote{A list of confirmed bugs is available at \url{http://stanse.fi.muni.cz/bugs.html}}
-
-%This is despite the kernel being daily checked\footnote{\url{http://marc.info/?l=linux-kernel&m=125856033627134&w=2}} with \textsc{Coverity Prevent} and we believe it is due to the filters they use.
-
-%Now we present one bug which we found in the code reporting security
-%incidents. An excerpt from the particular code is in the
-%Figure~\ref{fig:error}.  \texttt{untag\_chunk} functions creates a critical
-%section by a spinlock and calls \texttt{alloc\_chunk} which in turn can sleep
-%in \texttt{kzalloc}. This can, under certain circumstances, lead to deadlock
-%of the whole system. The bug was confirmed and fixed.
-
-%This result
-%is quite low, however similarly to~\cite{havoc}, it is without any thorough
-%false-positive filtering techniques (cf. Future Work section). The more
-%detailed results about the \AC are in the Table~\ref{tab:results}, one row
-%per each configuration.
-
-\begin{table}[!htb]
+\begin{table}[b]
 \begin{center}
-\begin{tabular}{|l|l|r|r|r|r|} \hline
-\textbf{Checker} & \textbf{Property} & \textbf{Reports} & \textbf{Errors} & \textbf{FP} & \textbf{\% FP} \\ \hline\hline
+\begin{tabular}{|l|l|c|c|c|c|} \hline
+\textbf{checker} & \textbf{property} & \textbf{reported err.} & \textbf{bugs} & \textbf{false pos.} & \textbf{ratio} \\ \hline\hline
 \textit{Automaton} & \textit{Pairing}
-                             & 266 & 65  & 143 & 68.8\,\% \\ \hline
-& \textit{Memory}            & 86  & 48  & 37  & 43.5\,\% \\ \hline
-& \textit{Atomic}            & 35  & 16  & 18  & 52.9\,\% \\ \hline
-\textit{Thread}        & n/a & 20  & 9   & 11  & 55.0\,\% \\ \hline
-\textit{Reachability}  & n/a & 751 & 751 & 0   & 0.0\,\%  \\ \hline\hline
-\textbf{Overall}       &     & 407 & 138 & 209 & 51.4\,\% \\ \hline
+                             & 266 & 65  & 143 & 31.3\,\% \\ \hline
+& \textit{Memory}            & 86  & 48  & 37  & 56.5\,\% \\ \hline
+& \textit{Atomic}            & 35  & 16  & 18  & 47.1\,\% \\ \hline
+\textit{Thread}        & n/a & 20  & 9   & 11  & 45.0\,\% \\ \hline
+\textit{Reachability}  & n/a & 31  & 31  & 0   & 100.0\,\%  \\ \hline\hline
+\textbf{Overall}       &     & 438 & 169 & 209 & 44.7\,\% \\ \hline
 \end{tabular}
 \end{center}
-\caption{\Stanse results on Linux kernel version 2.6.28. Not all
-of the error reports (column {\bf Reports}) were sorted to real errors (column
-{\bf Errors}) and false positives (column {\bf FP}). Column {\bf \% FP}
-represents percentage of false positives in all sorted reports.
-\textbf{Overall} does not involve \textit{Reachability} results (it would
-distort the counts).}
+\caption{\Stanse results on Linux kernel version 2.6.28.}
 \label{tab:results}
 \end{table}
-\todo{Reachability is not included in Table \ref{tab:results}. It looks bad.}
 
+We have manually analyzed all the reported errors and mark them as real bugs
+or false positives (with an exception of 60 errors reported by \AC where we
+are not able to decide in a short time whether it is a false positive or
+not). The numbers of real bugs, false positives and the ratio of real bugs
+to all classified reported errors can be also found in
+Table~\ref{tab:results}. The overall ration of real bugs to all classified
+errors is not high: 44.7\%. However, \Stanse in the current version does not
+have any thorough false-positive filtering technique.
 
-% !!!! MOVE NEXT ARTICLE TO THE INTRODUCTION, SINCE IT IS RELATED WORK !!!
-%Currently, \textsc{Coverity Prevent}~\cite{coverity} is daily run on the
-%current development branch of the Linux kernel, and the results are reported
-%back to developers. However, developers kept asking for a tool with which
-%their code will be checked before it appears upstream. Moreover, the kernel
-%code is very specific and the tool should consider these specifics.
-%The current kernel versions are checked with other tools like
-%\textsc{Coccinelle} or \textsc{Smatch}. Mostly these tools find simple pattern
-%matching style properties like lock-unlock and are successful at that. We
-%continue to check the kernel releases with \Stanse too and, thanks to
-%interprocedural analysis, we still are able to find errors on daily basis.
+More than 70 of the 169 found bugs have been reported to kernel developers
+and fixed in the following kernel releases (the other bugs have been
+independently discovered and reported by someone else or the incorrect code
+disappeared from the kernel before we finished our evaluation of reported
+errors). Some of the reported bugs remained undiscovered for seven years
+(for example, see \url{http://lkml.org/lkml/2009/3/11/380}). % This is
+% despite the kernel being regularly checked by \textsc{Coverity}. We guess
+% that it is due to a very restrictive false-positive filtering used.
 
-% Markovy pripominky k sekci 4:
-% \begin{itemize}
-% \item pro? je pou?it p??tomn? pr?b?hov? ?as v prvn? v?te sekce 4? 
-% \item ve druh?m odstavci se p??e, ?e k?d kernelu je specifick?, co? by m?lo
-%   b?t zohledn?no v toolu a v odstavci na to se p??e, ?e na?e checkery jsou
-%   nez?visl? na konkr?tn?m k?du.
-% \item ve t?et?m odstavci se p??e, ?e pouze AutomatonChecker se mus?
-%   konfigurovat. Bohu?el, ThreadChecker vy?aduje konfiguraci t??. 
-% \item v 5. odstavci: z ??sla 70 a z tabulky 1 nen? jasn?, pro? jsme pouze 70
-%   ze 129 chyb reportovali v?voj???m. 
-% \item v 5. odstavci: ...we believe it is due... Nen? d?le?it? ?emu
-%   v???me. Tu v?tu bych tam ned?val.
-% \item odstavec 6 a Figure 2 bych zcela vypustil. Je to nepodstatn?. 
-% \item v tabulce 1 bych sloupec Errors nahradil za Reports, a d?le bych zcela
-%   vypustil sloupec Assorted - d? se lehce dopo??tat, sta?? se v popisu
-%   tabulky zm?nit. 
-% \item posledn? odstavec ne??k? ??dnou d?le?itou informace o Stanse - zcela
-%   bych jej vypustil.
-% \end{itemize}
+In the subsequent versions of the kernel, we have reported another 50 bugs
+found by \Stanse and this number is increasing every month.
 
 %}}}
 %{{{ Conclusions
@@ -425,7 +365,7 @@ to and accepted by Linux kernel developers.
 \subsubsection{Future Work}
 We plan to improve the framework in several direction. We are currently
 working on C++ support. Further, we plan to provide \Stanse in the form of a
-plug-in for Eclipse or NetBeans IDE. A lot of work can be done in the area
+plug-in for Eclipse and NetBeans IDEs. A lot of work can be done in the area
 of automatic false-alarm filtering and error importance classification.
 % We also plan to design and implement some difference analysis of results
 % produced by \Stanse on various versions of the same software project.
