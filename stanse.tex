@@ -40,7 +40,7 @@
 \begin{abstract}
   \Stanse is a free (available under the GPLv2 license) modular framework
   for finding bugs in C programs using static analysis. Its two main design
-  goals are applicability on large software projects like Linux kernel and
+  goals are applicability on large software projects like the Linux kernel and
   extendability with new bug-finding techniques with a minimal effort.
   % Above that the reported results can be presented in multiple ways, web
   % included.
@@ -131,8 +131,8 @@ preprocessor.
 % other languages, in particular C++.
 %
 The code is then parsed into the mentioned internal structures: a
-call-graph, a CFG for each function, and an AST for each code piece
-corresponding to a node of some CFG.
+call-graph, a CFG for each function, and an AST for the whole file.
+Subtrees in the AST are referenced from appropriate CFG nodes.
 % These structures are linked in a natural way.
 All these structures can be dumped in a textual or graphical form.
 
@@ -152,7 +152,7 @@ lazy manner.
 %
 If the memory occupied by internal structures exceeds a given limit, some
 internal structures have to be freed before another module is streamed
-in. The structures to be freed are selected by an LRU (least-recently-used)
+in. The structures to be freed are selected by the LRU (least recently used)
 approach: \Stanse discards all internal structures of the module whose
 structures are not accessed for the longest time. If the discarded structure
 is later accessed again, the corresponding module is streamed back in. Both
@@ -180,7 +180,7 @@ This makes implementation of new algorithms extremely simple.
 \begin{figure}[t]
   \centering
     \includegraphics[width=9.1cm]{screen-bug-tracing}
-  \caption{The error trace GUI browser.}
+  \caption{Error traces in the \Stanse GUI.}
   \label{fig:bugtrace}
 \end{figure}
 
@@ -189,16 +189,16 @@ Once a checker finds an error, it reports back a commented \emph{error
 % \Stanse provides support for grouping together error traces representing the same kind of error
 % and leading from/to the same point. 
 \Stanse provides several possibilities to present the error traces: they can
-be printed to the console, displayed using a built-in error trace GUI
-browser (see Figure~\ref{fig:bugtrace}), or saved to an external file in XML
+be printed to the console, displayed using a built-in error trace browser in
+the GUI (see Figure~\ref{fig:bugtrace}), or saved to an external file in XML
 format. This XML file has a wide variety of possible applications. For
 example, we supply a tool transforming the XML file into an \textsc{SQLite}
 database complemented with a web interface allowing to browse errors in the
-database via a web browser. Using the web browser or the built-in error GUI
-browser, one can mark errors as real bugs or false-positives. \Stanse
-also provides various statistics of errors like number of errors per file
-and checker, frequency of errors of the same kind, percentage of
-false-positives (based on user feedback), etc.
+database via a web browser. Using the web browser or the built-in graphical
+error browser, one can mark errors as real bugs or false positives. \Stanse
+also provides various statistics of errors like number of errors per checker,
+frequency of errors of the same kind, percentage of false positives (based on
+user feedback).
 
 
 % \note{Tady to zni, jako by
@@ -223,22 +223,11 @@ for some IDE (e.g.~Eclipse or NetBeans).
 %}}}
 %{{{ Checkers
 
-\section{Checkers}
-\label{sec:checkers}
-
-% Each checker is a module which, with the support of the \Stanse framework,
-% implements some verification technique (e.g. deadlock detection). There can be
-% many different checkers running simultaneously (either in parallel or
-% sequentially) in \Stanse at any given time. They all run independent of each
-% other.
-
-% A new checker, in order to be used with \Stanse, needs just to implement the
-% general checker interface mentioned above and register with the framework.
-% Users need not to implement their checkers if they don't want to. Instead,
-In this section we describe the three currently available checkers.
+\section{Checkers}\label{sec:checkers}
+In this section we briefly describe the three currently available checkers.
 
 \subsubsection{\AC}
-is heavily influenced by~\cite{ECCH00}. It takes, as an input, a set of
+is heavily influenced by~\cite{ECCH00}. It takes, as input, a set of
 finite-state automata that describe some properties which we want to check.
 Properties like locking discipline, interrupt management, null pointer
 dereference, dangling pointers and many others can be handled this way.
@@ -280,14 +269,14 @@ strings and comments.
 \section{Results on Linux Kernel}
 \label{sec:results}
 
-We have several reasons to choose the Linux kernel to test \Stanse: the
-kernel presents a large and freely available codebase, it fully exercises
-most features of ISO/ANSI C99 and GNU C extensions, it is under constant
-development (new bugs are appearing), and absence of bugs are of great
+We have several reasons to choose the Linux kernel for testing \Stanse: the
+kernel is a large and freely available codebase, it fully exercises most
+features of ISO/ANSI C99 and GNU C extensions, it is under constant
+development (constant income of new bugs), and absence of bugs is of great
 concern. 
 
 We applied \Stanse with the three checkers described in the previous section
-to kernel version 2.6.28. \AC uses three automata describing the following
+to version 2.6.28. \AC uses three automata describing the following
 kinds of errors:
 \begin{itemize}
 \item incorrect pairing of functions (imbalanced locking, reference
@@ -296,22 +285,21 @@ kinds of errors:
 \item deadlocks caused by sleeping inside spinlocks or interrupt handlers
 \end{itemize}
 
-The running time of \Stanse on a common desktop machine with 2 cores and
-4\,GiB of memory is under 100 minutes. The memory usage of the Java process
-oscillates between 400 and 1000\,MiB. The number of errors reported by the
-checkers can be found in Table~\ref{tab:results}. Let us note that \RC
-actually detected 751 errors, but 720 of them are of a low importance
-(including 696 superfluous semicolons) and they are omitted from our
-statistics.
+The running time of \Stanse on a common desktop machine with two 2.5\,GHz
+cores and 4\,GiB of memory is under two hours. The memory usage of the Java
+process oscillates between 400 and 1000\,MiB. The number of errors reported by
+the checkers can be found in Table~\ref{tab:results}. Let us note that \RC
+actually detected 751 errors, but 720 of them are of low importance (including
+696 superfluous semicolons) and they are omitted from our statistics.
 
 \begin{table}[b]
 \begin{center}
 \setlength{\tabcolsep}{3pt}
 \begin{tabular}{|l|l|c|c|c|c|} \hline
 \textbf{Checker} & \textbf{Automaton} & \textbf{Reported err.} & \textbf{Bugs} & \textbf{False pos.} & \textbf{Ratio} \\ \hline\hline
-& Pairing           & 266 & 65  & 143 & 31.3\,\% \\ \cline{2-6}
-\AC & Pointers        & 86  & 48  & 37  & 56.5\,\% \\ \cline{2-6}
-& Deadlocks            & 35  & 16  & 18  & 47.1\,\% \\ \hline
+& Pairing                    & 266 & 65  & 143 & 31.3\,\% \\ \cline{2-6}
+\AC & Pointers               & 86  & 48  & 37  & 56.5\,\% \\ \cline{2-6}
+& Deadlocks                  & 35  & 16  & 18  & 47.1\,\% \\ \hline
 \multicolumn{2}{|l|}{\TC}    & 20  & 9   & 11  & 45.0\,\% \\ \hline
 \multicolumn{2}{|l|}{\RC}    & 31  & 31  & 0   & 100.0\,\%  \\ \hline\hline
 \multicolumn{2}{|l|}{\textbf{Overall}}  & 438 & 169 & 209 & 44.7\,\% \\ \hline
@@ -321,25 +309,25 @@ statistics.
 \label{tab:results}
 \end{table}
 
-We have manually analysed all the reported errors and mark them as real bugs
+We have manually analysed all the reported errors and marked them as real bugs
 or false positives (with an exception of 60 errors reported by \AC where we
 are not able to decide in a short time whether it is a false positive or
 not). The numbers of real bugs, false positives and the ratio of real bugs
 to all classified reported errors can be also found in
 Table~\ref{tab:results}. The overall ratio of real bugs to all classified
 errors is not high: 44.7\%. However, \Stanse in the current version does not
-have any thorough false-positive filtering technique.
+have any thorough false positive filtering technique.
 
 More than 70 of the 169 found bugs have been reported to kernel developers
 and fixed in the following kernel releases (the other bugs have been
 independently discovered and reported by someone else or the incorrect code
 disappeared from the kernel before we finished our evaluation of reported
-errors). Some of the reported bugs remained undiscovered for seven years
-(for example, see \url{http://lkml.org/lkml/2009/3/11/380}). % This is
-% despite the kernel being regularly checked by \textsc{Coverity}. We guess
-% that it is due to a very restrictive false-positive filtering used.
+errors). Some of the reported bugs remained undiscovered for more than seven
+years (for illustration, see \url{http://lkml.org/lkml/2009/3/11/380}).
+% This is despite the kernel being regularly checked by \textsc{Coverity}. We
+% guess that it is due to a very restrictive false positive filtering used.
 
-We have reported another 50 bugs found by \Stanse in the subsequent versions
+We have reported another 60 bugs found by \Stanse in the subsequent versions
 of the kernel. This number is increasing every month.
 
 %}}}
@@ -366,7 +354,7 @@ to and confirmed by Linux kernel developers already.
 We plan to improve the framework in several direction. We are currently
 working on C++ support. Further, we plan to provide \Stanse in the form of a
 plug-in for Eclipse and NetBeans IDEs. A lot of work can be done in the area
-of automatic false-alarm filtering and error importance classification.
+of automatic false alarm filtering and error importance classification.
 % We also plan to design and implement some difference analysis of results
 % produced by \Stanse on various versions of the same software project.
 Independently of new features development, we would like to speed up the
