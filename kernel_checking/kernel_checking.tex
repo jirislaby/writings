@@ -12,7 +12,11 @@
 \renewcommand\note[1]{\nb{\Color{blue}{#1}}}
 \newcommand\todo[1]{\nb{\Color{red}{#1}}}
 
-\newcommand{\Stanse}{\textsc{Stanse}\xspace}
+\newcommand{\COC}{\textsc{Coccinelle}\xspace}
+\newcommand{\COV}{\textsc{Coverity}\xspace}
+\newcommand{\SM}{\textsc{Smatch}\xspace}
+\newcommand{\SP}{\textsc{Sparse}\xspace}
+\newcommand{\ST}{\textsc{Stanse}\xspace}
 
 \lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
         breakatwhitespace=true,escapeinside={(*@}{@*)},
@@ -42,11 +46,10 @@ errors is of great concern since middle of 60's\note{fakt?}.
 
 There is a variety of techniques allowing for pruning bugs out of code. Most
 of the invented algorithms is implemented and provided to be used. Some are
-freely available or even open-source like \textsc{Smatch}~\cite{smatch},
-\textsc{Sparse}~\cite{sparse}, \textsc{Stanse}~\cite{stanse} and
-\textsc{FindBugs}~\cite{findbugs}. Others check
-open-source code, but are not available to programmers. The most known tool
-belonging to this category is \textsc{Coverity}~\cite{coverity}. Finally, the
+freely available or even open-source like \SM~\cite{smatch},
+\SP~\cite{sparse}, \ST~\cite{stanse} and \textsc{FindBugs}~\cite{findbugs}.
+Others check open-source code, but are not available to programmers. The most
+known tool belonging to this category is \COV~\cite{coverity}. Finally, the
 tools which are commercial only include \textsc{Klocwork}~\cite{klocwork} and
 \textsc{Codesonar}\cite{codesonar}.
 
@@ -74,23 +77,87 @@ This section contains a brief description of tools we evaluate on the Linux
 kernel. We also present types of bugs which each tool can catch.
 
 \subsection{Coverity}
+It is a product originally developed at the XXX university. It is based solely
+on static analysis.
 
 \subsection{Smatch and Sparse}
+\SP is a simple parser with some basic checks on the top of that.  It was
+developed by Linus Torvalds, the Linux kernel founder, to check some simple
+properties in the kernel.
+
+It can catch errors such invalid dereferences of addresses which were intended
+to be dereferenced only via special helpers. These helpers usually enforces
+the compiler to not optimize the accesses to the memory or devices themselves.
+It also looks for variable definition which should be local to files but are
+not marked by static modifier.
+
+\SM is a follower of \SP. It uses its compiler, but have more eligible
+techniques implemented. It is useful in finding bugs in memory accesses like
+NULL pointer dereference or memory leaks.
+
+It is very easy to add a "checker" into \SM. It is a matter of adding a hook
+and specifying what to do (a function) and when (on fucntion entry/return,
+dereference\note{fakt?}, etc.).
+
+Both of the tools are intra-procedural only and loops are unrolled exactly
+3\note{fakt?} times. Internal structures cannot be by default used by the
+checkers, only hooks may be used.
 
 \subsection{Stanse}
+\ST was developed at the Masaryk University. It is rather a framework intended
+for implementation of checking algorithms. Currently there are three checkers
+which might be used on the Linux kernel:
+\begin{itemize}
+\item \textsc{AutomatonChecker} -- pairing of locking functions, memory 
+\item \textsc{ThreadChecker} -- finds potential deadlocks in the code
+\item \textsc{ReachabilityChecker} -- simple checker to find unreachable code
+\end{itemize}
 
-\subsection{Other Tools}
+\ST analyses the code inter-procedurally, provides checker internal
+representations of the code.
+
+\subsection{Coccinelle}
 There exist also tools developed for purposes other than finding bugs which
 were later reinvented for bug-finding. To this set we do not count simple
 pattern finding languages like \textsc{grep} or \textsc{awk}. We rather mean
-\textsc{Coccinelle}~\cite{coccinelle} and similar.
+\COC~\cite{coccinelle} and similar.
 
-\section{Results}
+Originally, \COC was a semantic patcher. It was an instrument to automatically
+change some patterns to some other patterns in the code.  Renaming a function
+is a good example of use.
+
+Nowadays, the tool is used also for finding simple bugs in the kernel code. It
+can catch missing unlocking functions or dereferences after the memory is
+freed.
+
+\subsection{Other Tools}
+There are probably many other tools capable of parsing the Linux kernel and we
+miss in this study. It is mostly of much energy invested into the initial
+setup. All of the tools we present here are easy to set up (without much
+burder) and even easier to be run.
+
+\section{Evaluation}
 \label{sec:results}
-\textsc{Coverity}'s results are taken over from~\cite{billion}.
+\COV's results are taken over from~\cite{billion}. \COC, \SM, \SP and \ST was
+evaluated on the Linux kernel version 2.6.XXX. In each of the following
+sections we describe step-by-step how the analysis was performed.
+
+\subsection{Setup}
+
+\subsection{Run}
+
+\subsection{Results}
 
 \section{Conclusion}
 \label{sec:conclusion}
+In this paper we described some static analysis tools which are used to
+finding bugs in the Linux kernel. We describe the tools slightly and then we
+provide results of the Linux kernel runs. These include description of kinds
+of bugs found and statistics about the bugs themselves.
+
+It turns out that the only commercial tools we had the results from can find
+variety of errors with minimal effort spent on the crawling thorough the bug
+reports thanks to low false positive rate.
 
 \subsubsection{Acknowledgements}
 \label{sec:acknowledgements}
