@@ -1,4 +1,5 @@
 TEX=latex
+GRAPHS=$(patsubst %.dot,%.pdf,$(wildcard *.dot))
 
 all: pdf
 pdf: present.pdf
@@ -6,7 +7,7 @@ ps: present.ps
 
 present.dvi: present.tex FORCE
 
-present.tex:
+present.tex: $(GRAPHS)
 
 %.pdf: %.tex FORCE
 	pdflatex $<
@@ -15,6 +16,9 @@ present.tex:
 	pslatex $<
 	dvips $(subst .tex$,.dvi,$<) -o$@
 	rm $(subst .tex$,.dvi,$<)
+
+%.pdf: %.dot
+	dot -Tpdf -o $@ $^
 
 clean:
 	rm -f present.{pdf,dvi,toc,aux,log,bbl,blg,ps,out}
