@@ -10,10 +10,10 @@ present.dvi: present.tex FORCE
 present.tex: $(GRAPHS)
 
 %.pdf: %.tex FORCE
-	pdflatex $<
+	pdflatex --shell-escape $<
 
 %.ps: %.tex FORCE
-	pslatex $<
+	pslatex --shell-escape $<
 	dvips $(subst .tex$,.dvi,$<) -o$@
 	rm $(subst .tex$,.dvi,$<)
 
