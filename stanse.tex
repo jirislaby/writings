@@ -21,6 +21,7 @@
 \newcommand{\TC}{\textsc{ThreadChecker}\xspace}
 \newcommand{\AC}{\textsc{AutomatonChecker}\xspace}
 \newcommand{\RC}{\textsc{ReachabilityChecker}\xspace}
+\newcommand{\LC}{\textsc{LockChecker}\xspace}
 
 \lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
         breakatwhitespace=true,escapeinside={(*@}{@*)},
@@ -53,9 +54,10 @@
   extendability with new bug-finding techniques with a minimal effort.
   % Above that the reported results can be presented in multiple ways, web
   % included.
-  Currently there are three bug-finding algorithms implemented within
+  Currently there are four bug-finding algorithms implemented within
   \Stanse: \AC checks properties described in an automata-based formalism,
-  \TC detects deadlocks among multiple threads, and \RC looks for
+  \TC detects deadlocks among multiple threads, \LC finds locking errors based
+  on statistics, and \RC looks for
   unreachable code. \Stanse has been tested on the Linux kernel, where it
   has found dozens of previously undiscovered bugs.
 \end{abstract}
@@ -112,19 +114,11 @@ mentions some directions of its future development.
 \section{Framework Functionality}
 \label{sec:framework}
 
-\Stanse framework is modular and fully open. It is designed to allow static analysis of large software projects (like Linux kernel), and to reduce an effort when implementing a new static analysis technique.
-% An integration of a new checker into the framework is very easy and the checker immediately gains whole functionality of the framework discussed bellow.
-Architecture of the framework is depicted in Figure~\ref{fig:architecture}. We describe its individual parts in separate subsections.
-
- %matching formal and actual function parameters
-
-%The functionality provided by the \Stanse framework can be roughly separated
-%into several stages. First, the framework reads in the configuration
-%including the list of source files to be analysed and checkers to be
-%used. The source files are then parsed into a set of \emph{internal
-%  structures}, namely \emph{abstract syntax trees (ASTs)},
-%\emph{control-flow graphs (CFGs)}, and \emph{call-graphs}. Next, checkers
-%are run on these structures and error reports are collected and presented.
+\Stanse framework is modular and fully open. It is designed to allow static
+analysis of large software projects like Linux kernel. Further it is aimed to
+reduce effort when implementing a new static analysis technique.
+Architecture of the framework is depicted in Figure~\ref{fig:architecture}. We
+describe its individual parts in separate subsections.
 
 \begin{figure}[!htb]
   \centering
@@ -142,11 +136,20 @@ the standard possibilities (a single given file, all files from a given
 directory, all files listed in a given file), \Stanse can also derive all
 the necessary information from a project \textsf{Makefile}. In this case,
 \Stanse also remembers compiler flags for preprocessing purposes. This
-functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. At bottom left corner of Figure~\ref{fig:architecture} there we show a list of \texttt{.C} files which are identified in the configuration.
+functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. At the
+bottom left corner of Fig.~\ref{fig:architecture} we show a list of
+\texttt{.C} files which are identified in the configuration.
 
-We also need to specify checkers which should be applied to chosen source files. We can see the list of selected checkers in the top of Figure~\ref{fig:architecture}. There can be many checkers running simultaneously in \Stanse. But they do not see each other. They proceed independently. Checkers themselves might require their own configuration files. They are depicted at top right corner of Figure~\ref{fig:architecture}.
+We also need to specify checkers which should be applied to chosen source
+files. We can see the list of selected checkers on the top of
+Fig.~\ref{fig:architecture}. There can be many checkers running
+simultaneously in \Stanse. But they do not see each other. They proceed
+independently. Checkers themselves might require their own configuration
+files. They are depicted at the top right corner of
+Fig.~\ref{fig:architecture}.
 
-The configuration can be passed to \Stanse framework via command line arguments or edited in GUI application.
+The configuration can be passed to the \Stanse framework via command line
+arguments. User can also add them in the graphical interface.
 
 \subsection{Parsing Source Files}
 
@@ -161,28 +164,37 @@ The configuration can be passed to \Stanse framework via command line arguments 
 % runs e.g. with different configuration like distinct checkers.
 
 \Stanse framework can process source files written in C. More specifically the
-ISO/ANSI C99 standard and most of the GNU C extensions. This allows \Stanse to process software projects like Linux kernel. We are currently working on support of other languages, in particular C++. We have a prototype implementation, but it is not included in the distribution yet. The parsing pipeline, including a preprocessing the source files by the standard GNU C preprocessor, is depicted bottom in Figure~\ref{fig:architecture}. It is important to note that we do not parse all the sources in a sequence one by one as they appear in a configuration. Since we use streaming (discussed later), the pipeline is applied several times independently for individual source files.
+ISO/ANSI C99 standard and most of the GNU C extensions. This allows \Stanse to
+process software projects like Linux kernel. We are currently working on
+support of other languages, in particular C++. We have a prototype
+implementation, which is included in the distribution already. The parsing
+pipeline, including a preprocessing the source files by the standard GNU C
+preprocessor, is depicted at the bottom in Fig.~\ref{fig:architecture}. It is
+important to note that we do not parse all the sources in a sequence one by
+one as they appear in a configuration. Since we use streaming (discussed
+later), the pipeline is applied several times independently for individual
+source files.
 
 \subsection{Program Internal Representation}
-
-%
 The code is then parsed into the \emph{internal structures}: a
 call-graph, a CFG for each function, and an AST for the whole file.
 Subtrees in the AST are referenced from appropriate CFG nodes.
 % These structures are linked in a natural way.
-We show these structures in the middle of Figure~\ref{fig:architecture}.
+We show these structures in the middle of Fig.~\ref{fig:architecture}.
 All these structures can be dumped in a textual or graphical form.
 
-Since we aim at large software projects consisting of hundreds or
-thousands of modules (compilation units), it is often impossible in practice to store the corresponding internal structures in the
-memory all at once. The \Stanse framework therefore applies automatic \emph{streaming} of the internal structures, currently on a module basis.
-Instead of parsing all source modules at the beginning, a module is streamed
-in only when \Stanse needs to access some internal structure corresponding
-to the module. In other words, the internal structures are constructed in a
-lazy manner.
+Since we aim at large software projects consisting of hundreds or thousands of
+modules (compilation units), it is often impossible in practice to store the
+corresponding internal structures in the memory all at once. The \Stanse
+framework therefore applies automatic \emph{streaming} of the internal
+structures. This is currently performed on a module basis. Instead of parsing
+all source modules at the beginning, a module is streamed in only when \Stanse
+needs to access some internal structure corresponding to the module. In other
+words, the internal structures are constructed in a lazy manner.
 % It means not everything is parsed at the start of the checking
 % process. Hence it is not a time or memory bottleneck at that time.
-%
+
+
 If the memory occupied by internal structures exceeds a given limit, some
 internal structures have to be freed before another module is streamed
 in. The structures to be freed are selected by the LRU (least recently used)
@@ -192,38 +204,15 @@ is later accessed again, the corresponding module is streamed back in. Both
 laziness of internal structures and streaming are completely invisible to
 checkers.
 
+\subsection{Traversing Internal Representation}
+\label{ssec:travers}
 
-%As mentioned earlier, the design of the framework is geared towards
-%analysing large software projects.
-%
-% Such projects consist of hundreds or
-%thousands of modules (compilation units). In practice, it is often
-%impossible to store all the corresponding internal structures in the
-%memory. The \Stanse framework therefore applies automatic \emph{streaming}
-%of the internal structures, currently on a module basis.
-%
-%Instead of parsing all source modules at the beginning, a module is streamed
-%in only when \Stanse needs to access some internal structure corresponding
-%to the module. In other words, the internal structures are constructed in a
-%lazy manner.
-%% It means not everything is parsed at the start of the checking
-%% process. Hence it is not a time or memory bottleneck at that time.
-%%
-%If the memory occupied by internal structures exceeds a given limit, some
-%internal structures have to be freed before another module is streamed
-%in. The structures to be freed are selected by the LRU (least recently used)
-%approach: \Stanse discards all internal structures of the module whose
-%structures are not accessed for the longest time. If the discarded structure
-%is later accessed again, the corresponding module is streamed back in. Both
-%laziness of internal structures and streaming are completely invisible to
-%checkers.
-
-\subsection{Traversing Internal Representation}\label{ssec:travers}
-
-Although a checker may need to work with the internal structures in an arbitrary way, most of checkers walk through CFGs using some standard strategy. To prevent
-unnecessary reimplementations, the most important and heavily used traversal
-methods are implemented directly inside the framework. With this
-functionality, one can implement a new checker (or its part) by specifying
+Although a checker may need to work with the internal structures in an
+arbitrary way, most of checkers walk through CFGs using some standard
+strategy. To prevent unnecessary reimplementations, the most important and
+heavily used traversal methods are implemented directly inside the framework.
+With this functionality, one can implement a new checker (or its part) by
+specifying
 \begin{itemize}
 \item whether it should go through CFGs forwards or backwards, breadth-first
   or depth-first,
@@ -231,14 +220,26 @@ functionality, one can implement a new checker (or its part) by specifying
   not, the function calls are ignored), and
 \item a method (callback) to be called for each visited node in a CFG.
 \end{itemize}
-This makes implementation of new algorithms extremely simple. The discussed functionality is shown to the left of internal representation in Figure~\ref{fig:architecture}.
+This makes implementation of new algorithms extremely simple. The discussed
+functionality is shown to the left of internal representation in
+Fig.~\ref{fig:architecture}.
 
 \subsection{Concept of Checkers}
 
 % The checkers have an access to shared read-only representation of analysed source files and also to a . This is done by an interface, as we can see in the .
-In \Stanse framework a checker is an implementation of some concrete static analysis technique. Each checker has an access to shared internal structure of analysed source files. They are also gained an access to the algorithms providing navigation in those structures. This is done by an interface between checkers and internal structure and libraries of the framework. The interface is depicted in Figure~\ref{fig:architecture} right bellow the checkers.
+In the \Stanse framework a checker is an implementation of some concrete
+static analysis technique. Each checker has an access to a shared internal
+structure of analysed source files. They are also provided with an access to
+the algorithms providing navigation in those structures. This is done by an
+interface between checkers and internal structure and libraries of the
+framework. The interface is depicted in Fig.~\ref{fig:architecture} right
+bellow the checkers.
 
-The checkers are integrated to the framework of \Stanse using concrete factory design pattern. Therefore, to insert a new checker to the framework of \Stanse one needs to implement general checker interface, and register it to the checkers' factory of the framework. Then it gains a full access to the features of the framework accessible through the discussed interface.
+The checkers are integrated in the framework of \Stanse using concrete factory
+design pattern. Therefore, to insert a new checker to the framework one needs
+to implement generic checker interface and register it to the checkers'
+factory of the framework. Then it gains a full access to the features of the
+framework accessible through the discussed interface.
 
 \subsection{Processing Errors}
 
@@ -265,28 +266,8 @@ also provides various statistics of errors like number of errors per checker,
 frequency of errors of the same kind, percentage of false positives (based on
 user feedback).
 
-Error reporting and tracing pipeline is depicted to the right of interface and internal representation of Figure~\ref{fig:architecture}.
-
-
-% \note{Tady to zni, jako by
-%   soucasti \Stanse byl i ten web interface. Co presne dela ten creator?
-%   Nestaci napsat ``For example, we supply a tool translating the XML file
-%   into an \textsc{SQLite} database.''?}\todo{JS: Taky, ze ano, primitivni,
-%   ale je :). Viz \url{http://decibel.fi.muni.cz/~xslaby/stanse/}. Creator
-%   dela presne ten preklad XML do db, jak pises v te vete.}
-
-%\subsection{Other Features}
-%
-%The framework provides some other features. For example, it supports
-%parallel execution of more checkers (in threads). Note that the internal
-%structures are shared by all running checkers. Further, \Stanse can run in a
-%command line mode or via a fully featured GUI. If properly configured,
-%\Stanse can be used as a ``push-the-button'' tool. Due to the design of the
-%framework, \Stanse can be adapted to handle other programming languages by
-%writing appropriate parsers. Finally, the \Stanse framework is basically a
-%Java library, so it can be easily transformed into a static analysis plug-in
-%for some IDE (e.g.~Eclipse or NetBeans).
-
+Error reporting and tracing pipeline is depicted to the right of interface and
+internal representation of Fig.~\ref{fig:architecture}.
 
 %}}}
 %{{{ Checkers
@@ -304,13 +285,17 @@ dereference, dangling pointers and many others can be handled this way.
 Compared to the implementation described in~\cite{ECCH00} and~\cite{HCXE02},
 our technique differs in several aspects. In particular, we do not use
 metacompilation, automata are not input-language specific (a pattern
-matching is used instead), and
-% our analysis is path-sensitive on checker level, but for this reason
-the interprocedural analysis is done in the context of a single input file.
+matching is used instead), and the interprocedural analysis is done in the
+context of a single input file.
 
-% The patterns in the configuration are specified in the same language as AST is
-% represented, so currently in XML. The idea behind was to isolate the patterns
-% from the source code.
+\subsubsection{\LC}
+accounts statistics about variable accesses. It also tracks which locks are
+locked while each of the variable is accessed. Then, with combination of this
+information, it count in how many cases each variable is accessed while some
+lock is held. If some variable is changed 99 times while some lock is held and
+in one it is not, it is reported as possible error. The boundary is currently
+set to 70, so that at least 70\% of accesses must be under locks. The rest
+(30\%) is then reported. This work is based upon~\cite{lockchecker}.
 
 \subsubsection{\TC}
 aims to check for possible deadlocks in concurrent programs. The technique
@@ -345,10 +330,11 @@ strings and comments.
 & Pairing                    & 266 & 65  & 143 & 31.3\,\% \\ \cline{2-6}
 \AC & Pointers               & 86  & 48  & 37  & 56.5\,\% \\ \cline{2-6}
 & Deadlocks                  & 35  & 16  & 18  & 47.1\,\% \\ \hline
+\multicolumn{2}{|l|}{\LC}    & 13  & 6   & 7   & 46.2\,\%  \\ \hline
 \multicolumn{2}{|l|}{\TC}    & 20  & 9   & 11  & 45.0\,\% \\ \hline
 \multicolumn{2}{|l|}{\RC}    & 31  & 31  & 0   & 100.0\,\%  \\ \hline\hline
-\multicolumn{2}{|l|}{\textbf{Overall}}  & \textbf{438} & \textbf{169} &
-\textbf{209} & \textbf{44.7\,\%} \\ \hline
+\multicolumn{2}{|l|}{\textbf{Overall}}  & \textbf{451} & \textbf{175} &
+\textbf{216} & \textbf{47.9\,\%} \\ \hline
 \end{tabular}
 \end{center}
 \caption{\Stanse results on the Linux kernel version 2.6.28.}
@@ -536,11 +522,9 @@ Theoretical Computer Science (ITI), project No. 1M0545.
 The source code is also available. \Stanse is distributed under the GPL v2
 license. Currently, the tool is used mainly by the developers and students at
 the Masaryk University. It is also used by programmers in a partner software
-company, and a handful of Linux kernel developers. Several other kernel
-developers, in whose code \Stanse has found bugs, have also expressed interest
-in using \Stanse regularly\footnote{\url{http://lkml.org/lkml/2009/7/18/59}
-and follow-ups}. We therefore expect the number of users to go significantly
-up with the first full release 1.0.0.
+company. Several other kernel developers, in whose code \Stanse has found
+bugs, have also expressed interest in using \Stanse
+regularly\footnote{\url{http://lkml.org/lkml/2009/7/18/59} and follow-ups}.
 
 \end{document}
 
