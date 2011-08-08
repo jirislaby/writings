@@ -72,12 +72,11 @@
 During the last decade, bug-finding techniques based on static analysis have
 finally come of age. One of the papers to really stir interest
 was~\cite{ECCH00}, showing that static analysis can efficiently find many
-interesting bugs in a real-world code.
-%, as demonstrated on the Linux kernel. 
-This work eventually led to a successful commercial tool called
-\textsc{Coverity}~\cite{coverity}. Over the years, several other successful
-tools, like \textsc{CodeSonar}~\cite{codesonar} or
-\textsc{Klocwork}~\cite{klocwork}, appeared.
+interesting bugs in a real-world code.  This work eventually led to a
+successful commercial tool called \textsc{Coverity}~\cite{coverity}. Over the
+years, several other successful tools, like
+\textsc{CodeSonar}~\cite{codesonar} or \textsc{Klocwork}~\cite{klocwork}
+appeared.
 %
 However, such fully-featured tools are neither free to obtain, nor is their
 code available (e.g.~for developing new algorithms or tailoring the existing
@@ -85,10 +84,8 @@ tools to specific tasks). The existing free tools are usually severely
 limited in what they can do (e.g.~\textsc{Uno}~\cite{uno},
 \textsc{Sparse}~\cite{sparse}, \textsc{Smatch}~\cite{smatch}). One notable
 exception is \textsc{FindBugs}~\cite{HP04,findbugs}, a successful tool
-working on Java code.
-%
-\Stanse is intended to fill this gap for C language. It can be seen in
-two ways:
+working on Java code. \Stanse is intended to fill this gap for C language. It
+can be seen in two ways:
 \begin{enumerate}
 \item \Stanse is a robust framework (written predominantly in Java) for
   implementing diverse static analysis algorithms. An implemented algorithm
@@ -97,13 +94,13 @@ two ways:
   can process the whole Linux kernel). An implementation of such an algorithm
   within the framework is called \emph{checker}.
 
-  \item As \Stanse already contains three checkers, it can be also seen as a
+  \item As \Stanse already contains four checkers, it can be also seen as a
   working static analysis tool.
 \end{enumerate}
 
 The rest of the paper is structured as follows. Section~\ref{sec:framework}
 describes the functionality provided by the framework, while
-Section~\ref{sec:checkers} is devoted to the three existing checkers.
+Section~\ref{sec:checkers} is devoted to the four existing checkers.
 Section~\ref{sec:results} presents some results of \Stanse on the Linux
 kernel. The last section summarizes the basic strengths of \Stanse and
 mentions some directions of its future development.
@@ -117,8 +114,11 @@ mentions some directions of its future development.
 \Stanse framework is modular and fully open. It is designed to allow static
 analysis of large software projects like Linux kernel. Further it is aimed to
 reduce effort when implementing a new static analysis technique.
-Architecture of the framework is depicted in Figure~\ref{fig:architecture}. We
-describe its individual parts in separate subsections.
+Architecture of the framework is depicted in Fig.~\ref{fig:architecture}. As
+can be seen, the tool consists of standard parts for these kinds of tools.
+Apart from that there are also parts which are not common to all static
+analyzers or are specialized in some way. In the following subsections we
+describe those.
 
 \begin{figure}[!htb]
   \centering
@@ -129,7 +129,9 @@ describe its individual parts in separate subsections.
 
 \subsection{Configuration}
 
-\Stanse framework contains data structures capturing a configuration of an analysis to be performed. We always need to know what source files to analyze and by what checkers. That information we call the \emph{configuration}. 
+\Stanse framework contains data structures capturing a configuration of an
+analysis to be performed. We always need to know what source files to analyze
+and by what checkers. That information we call \emph{configuration}. 
 
 There are several ways how to tell \Stanse what source files to analyse. Besides
 the standard possibilities (a single given file, all files from a given
@@ -137,19 +139,18 @@ directory, all files listed in a given file), \Stanse can also derive all
 the necessary information from a project \textsf{Makefile}. In this case,
 \Stanse also remembers compiler flags for preprocessing purposes. This
 functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. At the
-bottom left corner of Fig.~\ref{fig:architecture} we show a list of
+bottom left corner of Fig.~\ref{fig:architecture}, we show a list of
 \texttt{.C} files which are identified in the configuration.
 
-We also need to specify checkers which should be applied to chosen source
+We also need to specify checkers which should be applied to configured source
 files. We can see the list of selected checkers on the top of
-Fig.~\ref{fig:architecture}. There can be many checkers running
-simultaneously in \Stanse. But they do not see each other. They proceed
-independently. Checkers themselves might require their own configuration
-files. They are depicted at the top right corner of
-Fig.~\ref{fig:architecture}.
+Fig.~\ref{fig:architecture}. There can be many checkers running simultaneously
+in \Stanse. But they do not see each other. They proceed independently.
+Checkers themselves might require their own configuration files. They are
+depicted at the top right corner of Fig.~\ref{fig:architecture}.
 
 The configuration can be passed to the \Stanse framework via command line
-arguments. User can also add them in the graphical interface.
+arguments. User can also add them one by one in the graphical interface.
 
 \subsection{Parsing Source Files}
 
@@ -176,12 +177,12 @@ later), the pipeline is applied several times independently for individual
 source files.
 
 \subsection{Program Internal Representation}
-The code is then parsed into the \emph{internal structures}: a
-call-graph, a CFG for each function, and an AST for the whole file.
-Subtrees in the AST are referenced from appropriate CFG nodes.
-% These structures are linked in a natural way.
-We show these structures in the middle of Fig.~\ref{fig:architecture}.
-All these structures can be dumped in a textual or graphical form.
+When the code is parsed, we have \emph{internal structures}: a call graph
+among functions, a control flow graph (CFG) for each function, and an abstract
+syntax tree (AST) for the whole file. Subtrees in the AST are referenced from
+appropriate CFG nodes. We show these structures in the middle of
+Fig.~\ref{fig:architecture}. All these structures can be dumped in a textual
+or graphical form.
 
 Since we aim at large software projects consisting of hundreds or thousands of
 modules (compilation units), it is often impossible in practice to store the
@@ -200,7 +201,7 @@ internal structures have to be freed before another module is streamed
 in. The structures to be freed are selected by the LRU (least recently used)
 approach: \Stanse discards all internal structures of the module whose
 structures are not accessed for the longest time. If the discarded structure
-is later accessed again, the corresponding module is streamed back in. Both
+is accessed again later, the corresponding module is streamed back in. Both
 laziness of internal structures and streaming are completely invisible to
 checkers.
 
