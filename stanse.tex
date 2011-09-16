@@ -23,6 +23,11 @@
 \newcommand{\RC}{\textsc{ReachabilityChecker}\xspace}
 \newcommand{\LC}{\textsc{LockChecker}\xspace}
 
+\newcommand{\MT}[1]{{\color{blue} #1}}
+\newcommand{\MTD}[1]{{\color{red} #1}}
+%\renewcommand{\MT}[1]{{#1}}
+%\renewcommand{\MTD}[1]{}
+
 \lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
         breakatwhitespace=true,escapeinside={(*@}{@*)},
 	basicstyle=\scriptsize}
@@ -72,7 +77,7 @@
 During the last decade, bug-finding techniques based on static analysis have
 finally come of age. One of the papers to really stir interest
 was~\cite{ECCH00}, showing that static analysis can efficiently find many
-interesting bugs in a real-world code.  This work eventually led to a
+interesting bugs in real-world code.  This work eventually led to a
 successful commercial tool called \textsc{Coverity}~\cite{coverity}. Over the
 years, several other successful tools, like
 \textsc{CodeSonar}~\cite{codesonar} or \textsc{Klocwork}~\cite{klocwork}
@@ -84,7 +89,7 @@ tools to specific tasks). The existing free tools are usually severely
 limited in what they can do (e.g.~\textsc{Uno}~\cite{uno},
 \textsc{Sparse}~\cite{sparse}, \textsc{Smatch}~\cite{smatch}). One notable
 exception is \textsc{FindBugs}~\cite{HP04,findbugs}, a successful tool
-working on Java code. \Stanse is intended to fill this gap for C language. It
+working on Java code. \Stanse is intended to fill this gap for the C language. It
 can be seen in two ways:
 \begin{enumerate}
 \item \Stanse is a robust framework (written predominantly in Java) for
@@ -92,11 +97,17 @@ can be seen in two ways:
   can be immediately evaluated on large real-world software projects written
   in C as the framework is capable to process such projects (for example, it
   can process the whole Linux kernel). An implementation of such an algorithm
-  within the framework is called \emph{checker}.
+  within the framework is called a \emph{checker}.
 
   \item As \Stanse already contains four checkers, it can be also seen as a
   working static analysis tool.
 \end{enumerate}
+
+\MT{
+The tools mentioned so far, including \Stanse, provide may analysis. There is also wide range of static analysis tools providing must analysis. Successful tools like \textsc{Pex}, \textsc{Klee}, \textsc{Exe}, or \textsc{Sage} are of that kind. Since may and must analyses are complementary, they are very different to \Stanse in basic principles.
+}
+
+\todo{Nechapu proc recenzenti chteji srovnani \Stanse se \textsc{SOOT}em? Podle me se jedna o zcela nesrovnatelne veci. Nenapada Vas, co maji spolecne, co by se melo okomentovat/porovnat?}
 
 The rest of the paper is structured as follows. Section~\ref{sec:framework}
 describes the functionality provided by the framework, while
@@ -111,7 +122,7 @@ mentions some directions of its future development.
 \section{Framework Functionality}
 \label{sec:framework}
 
-\Stanse framework is modular and fully open. It is designed to allow static
+\MT{The} \Stanse framework is modular and fully open. It is designed to allow static
 analysis of large software projects like Linux kernel. Further it is aimed to
 reduce effort when implementing a new static analysis technique.
 Architecture of the framework is depicted in Fig.~\ref{fig:architecture}. As
@@ -129,7 +140,7 @@ describe those.
 
 \subsection{Configuration}
 
-\Stanse framework contains data structures capturing a configuration of an
+The \Stanse framework contains data structures capturing a configuration of an
 analysis to be performed. We always need to know what source files to analyze
 and by what checkers. That information we call \emph{configuration}. 
 
@@ -149,7 +160,7 @@ in \Stanse. But they do not see each other. They proceed independently.
 Checkers themselves might require their own configuration files. They are
 depicted at the top right corner of Fig.~\ref{fig:architecture}.
 
-The configuration can be passed to the \Stanse framework via command line
+The configuration can be passed to \MT{the} \Stanse framework via command line
 arguments. User can also add them one by one in the graphical interface.
 
 \subsection{Parsing Source Files}
@@ -164,9 +175,9 @@ arguments. User can also add them one by one in the graphical interface.
 % list only once so the build needs not be run over and over for verification
 % runs e.g. with different configuration like distinct checkers.
 
-\Stanse framework can process source files written in C. More specifically the
+\MT{The} \Stanse framework can process source files written in C. More specifically the
 ISO/ANSI C99 standard and most of the GNU C extensions. This allows \Stanse to
-process software projects like Linux kernel. We are currently working on
+process software projects like \MT{the} Linux kernel. We are currently working on
 support of other languages, in particular C++. We have a prototype
 implementation, which is included in the distribution already. The parsing
 pipeline, including a preprocessing the source files by the standard GNU C
@@ -174,9 +185,10 @@ preprocessor, is depicted at the bottom in Fig.~\ref{fig:architecture}. It is
 important to note that we do not parse all the sources in a sequence one by
 one as they appear in a configuration. Since we use streaming (discussed
 later), the pipeline is applied several times independently for individual
-source files.
+source files. \todo{Tady je potreba doplnit, proc jsme napsali vlastni parser, proc jsme nepouzili GCC, a konecne, proc jsme nepouzili LLVM (CLANG). Take by bylo dobre dodat odkazy na GCC a LLVM do bibliografie.}
 
 \subsection{Program Internal Representation}
+
 When the code is parsed, we have \emph{internal structures}: a call graph
 among functions, a control flow graph (CFG) for each function, and an abstract
 syntax tree (AST) for the whole file. Subtrees in the AST are referenced from
@@ -203,7 +215,40 @@ approach: \Stanse discards all internal structures of the module whose
 structures are not accessed for the longest time. If the discarded structure
 is accessed again later, the corresponding module is streamed back in. Both
 laziness of internal structures and streaming are completely invisible to
-checkers.
+checkers. \MT{A purpose of the streaming is to allow checkers to assume that all sources are presented in the memory at once.}
+
+\MT{In current implementation of streaming each source file streamed out from the memory is completely discarded. \Stanse does not backup already parsed internal structures into a auxiliary files before discarding. As a consequence, when internal structures of the discarded file are needed again, \Stanse starts the parsing pipeline of the file from scratch to recreate requested internal structures. Although loading of previously parsed internal structures from auxiliary files would sped up the streaming process, a profiling of \Stanse's performance on the Linux kernel have not shown streaming to be a performance bottleneck. An usage of such auxiliary files can be implemented, if streaming performance became a performance problem in a future.}
+
+\subsection{\MT{Pointer Analysis in \Stanse}}
+
+\MT{
+
+When analysing programming languages involving pointers, it is almost always necessary to use an appropriate kind of pointer analysis. Since \texttt{C} is such a type of programming language, the \Stanse framework should provide a pointer analysis. But there are many different kind of analyses. Many of them are flow-insensitive, some ore context-insensitive, some are field-insensitive, and so on. There are many pointer analyses that combine mentioned properties to balance between precision and performance.
+
+It is difficult to predict, what pointer analyses are the most likely to be used in checkers implemented in \Stanse in future. Therefore the \Stanse framework does not contain any particular implementation of pointer analysis. Instead, we have implemented \textit{Steensgard}'s flow-insensitive and context-insensitive points-to analysis and also \textit{Shapiro-Horowitz}'s points-to analysis, which allows parametrization between Steensgard's and Andersen's points-to analyses. \textit{Shapiro-Horowitz}'s points-to analysis is flow-insensitive but can be context-sensitive. Both analyses are currently implemented as regular checkers. These analyses can be used in other checkers by loading particular analysis as a sub-checker.
+
+The decision of implementing pointer analyses in separate checkers has one important negative drawback. When two or more checkers are run simultaneously in \Stanse and they use the same kind of pointer analysis (as their own sub-checker), then the pointer analysis is executed for each checker independently - i.e.~several times. If the points to analyses were implemented inside the \Stanse framework, this won't happen.
+
+The reason for implementing points to analyses in checkers instead of in the \Stanse framework is just because we have not made a final decision, which pointer analyses are the best to be put into the framework. The current solution with checkers in a temporary one.
+}
+
+\subsection{\MT{Matching Language Constructs}}
+
+\MT{
+
+Checkers, as implementations of may static analyses, usually work with some syntactical subset of language constructs. On these constructs the checkers define how sets of their abstract states changes. On the remaining language constructs the abstract states do not change at all, i.e.~state transformation function on such the states is just identity.
+
+It depends on particular checker which constructs affects sets of its abstract states and which do not. Therefore \Stanse offers checkers a parametric specification of language subset, which is important for them. It works as follows.
+
+Since AST seems to be very useful internal representation of an analysed code for many types of may analyses, the \Stanse framework defines a simple language speaking about structure of AST. In this language a checker can specify, what kinds of sub-trees of AST the checker is interested in. A basic construct in this simple language is so called \emph{pattern}. It is an XML description of particular subtree in ATS, which may contain special nodes - keywords it this language, which allow parametrization of shape and also appearance of particular AST nodes in the tree. Therefore, a pattern is a specifications of whole set of AST sub-trees. And collection of patterns constitute the parametric specification of language constructs a checker is interested in.
+
+The \Stanse framework contains a library, which provides loading of patterns and also functions scanning AST of analysed functions to find matching instances of patterns in the ASTs of the analysed functions.
+
+When a checker knows where in an AST matches which pattern, it then simply knows where should be applied which action. This greatly simplifies implementation of checkers.
+
+A similar system of recognition of specific language constructs was introduced in~\cite{METAL}\todo{doplnit citaci METALu}. Their language METAL allows parametrization of C grammar, instead of parametrizing AST subtrees as \Stanse's patterns do. Nevertheless, the purpose of both approaches is the same.
+
+}
 
 \subsection{Traversing Internal Representation}
 \label{ssec:travers}
@@ -221,7 +266,20 @@ specifying
   not, the function calls are ignored), and
 \item a method (callback) to be called for each visited node in a CFG.
 \end{itemize}
-This makes implementation of new algorithms extremely simple. The discussed
+This makes implementation of new algorithms extremely simple.
+
+
+\MT{
+
+For example, when a checker must implement a forward flow-sensitive analysis, then it asks the \Stanse framework to traverse paths in CFGs in forward depth-first manner. This can be implemented by a single call to a library function \texttt{traverseCFGToDepthForward}, which takes particular CFG as an argument and also subclass of \Stanse library class \texttt{CFGPathVisitor}, where the checker implements action, which should be taken whenever CFG node is visited (already in requested order). The checker implements the action in a method \texttt{visit} of the subclass.
+
+Another example is support for interprocedural analysis. It is common for interprocedural analyses to build function summaries. Unfortunatelly, these summaries might differ from analysis to another. It is difficult in general to build a single universal representation of function summaries, which will suit to any kind of analysis. Therefore, instead of trying to provide one, the \Stanse framework provides libraries, which are likely to be helpful in constructing many different kinds of summaries for different analyses. Those libraries provides automated mapping between arguments and formal parameters in call sites (library \texttt{ArgumentPassingManager}) and autovated mapping of return values back to calling functions (library \texttt{ReturnValuePassingManager}). In addition, for those interprocedural analyses, which do not construct summaries at all (and rely on function inlining), \Stanse provide an automated traversation between different CFGs according to function calls. This can be again done by a single call to \Stanse library from a checket (e.g.~\texttt{traverseCFGPathsForwardInterprocedural}).
+
+}
+
+
+
+ The discussed
 functionality is shown to the left of internal representation in
 Fig.~\ref{fig:architecture}.
 
@@ -229,7 +287,7 @@ Fig.~\ref{fig:architecture}.
 
 % The checkers have an access to shared read-only representation of analysed source files and also to a . This is done by an interface, as we can see in the .
 In the \Stanse framework a checker is an implementation of some concrete
-static analysis technique. Each checker has an access to a shared internal
+static analysis technique. Each checker has \MTD{an} access to a shared internal
 structure of analysed source files. They are also provided with an access to
 the algorithms providing navigation in those structures. This is done by an
 interface between checkers and internal structure and libraries of the
@@ -242,6 +300,10 @@ to implement generic checker interface and register it to the checkers'
 factory of the framework. Then it gains a full access to the features of the
 framework accessible through the discussed interface.
 
+\MT{
+The \Stanse framework allows checkers to show a progress of their activity in an uniform way. Each checker is passed an instance of a \texttt{ProgressManager} class into which the checker just sends its progress messages. The checker does not need to care where the messages go (whether to a particular GUI window or command line) and how to show them there. It simplifies the implementation of checkers while receiving a feel of an uniform implementation of all the checkers.
+}
+
 \subsection{Processing Errors}
 
 \begin{figure}[t]
@@ -252,8 +314,8 @@ framework accessible through the discussed interface.
 \end{figure}
 
 Once a checker finds an error, it reports it back to the framework as a
-commented \emph{error trace}. A path in the analysed code demonstrating this
-error. \Stanse framework provides a data type for describing an error. 
+commented \emph{error trace} - a path in the analysed code demonstrating this
+error. \MT{The} \Stanse framework provides a data type for describing an error. 
 In the framework there are then several possibilities how to present the error
 traces back to the user of \Stanse: they can be printed to the console,
 displayed using a built-in error trace browser in the GUI (see
@@ -269,6 +331,9 @@ user feedback).
 
 Error reporting and tracing pipeline is depicted to the right of interface and
 internal representation of Fig.~\ref{fig:architecture}.
+
+
+
 
 %}}}
 %{{{ Checkers
@@ -372,7 +437,7 @@ statistics.
 We have manually analysed all the found errors and classified them as real
 errors or false positives (with an exception of 60 errors found by \AC where
 we are not able to decide in a short time whether it is a false positive or
-not). The numbers of real errors, false positives and the ratio of real errors
+not). \MT{It is important to note, that the checkers do not produce any false negatives (assuming there is no bug in the checkers' implementation). They all implement may analyses and as a such they can not miss a defect underlying their specifications.}  The numbers of real errors, false positives and the ratio of real errors
 to all classified errors can be also found in Table~\ref{tab:results}. The
 overall ratio of real errors to all classified errors is not high: 47.9\%.
 However, \Stanse in the current version does not have any thorough false
@@ -520,6 +585,151 @@ the Masaryk University. It is also used by programmers in a partner software
 company. Several other kernel developers, in whose code \Stanse has found
 bugs, have also expressed interest in using \Stanse
 regularly\footnote{\url{http://lkml.org/lkml/2009/7/18/59} and follow-ups}.
+
+\section{\MT{Integration of New Checker}}
+
+\MT{
+
+Here we want to show how easy is to integrate a new checker into \Stanse. The process requires only two simple step to gain the full functionality provided by \Stanse framework.
+
+The first step is to create a subclass, say \texttt{MyChecker}, of \Stanse abstract class \texttt{Checker}. In the subclass we need to implements the following three methods:
+\begin{itemize}
+	\item \texttt{getName} :  This method returns unique name of the checker. It does not have to be readable for humans. But typical implementation is \texttt{MyChecker.class.} \texttt{getName()}.
+	\item \texttt{toString} :  This method returns a short textual description of the checker.
+	\item \texttt{check} : This is the method, where the checker's analysis should be implemented in. More precisely, this method is called by \Stanse, when checker's analysis have to be performed.
+\end{itemize}
+
+And the second step is to integrate \texttt{MyChecker} into \Stanse framework. Instances of checkers (already integrated into the \Stanse framework) are then created following concrete factory design pattern. This implies for checkers, they have to implement mechanism of creation of their own instances. In \Stanse we require to define whole subclass of abstract class \texttt{CheckerCreator} instead of definition of a single creation function. But the task is also very simple. In our case we create a subclass \texttt{MyCheckerCreator} of \texttt{CheckerCreator} abstract class and we implement the following methods:
+\begin{itemize}
+	\item \texttt{getCheckerName} :  This method returns an user-readable name of the checker. So we can implement this method like \texttt{return "MyChecker"}
+	\item \texttt{getCheckerCreationInfo} :  The method returns a comprehensive textual description of the checker. The information is printed to the users of \Stanse when they decide, which checkers to use for analysing their code.
+	\item \texttt{getDataFilesExtensions} : When our checker requires some configuration files to be loaded, this method returns a list of extensions of those files. When the checker does not require any configuration files, the function returns just empty list. This is also the case for \texttt{MyChecker}.
+	\item \texttt{checkArgumentList} : This method accepts a list of files and returns true only iff they represent all configuration files the checker need to work properly. When the checker does not require any configuration files, the method always returns \texttt{true}. So implementation in case of \texttt{MyChecker} is obvious.
+	\item \texttt{createInterprocedural} : This method is supposed to create an instance of the checker. In our case the implementation would be like \texttt{return new MyChecker()}.	
+	\item \texttt{createIntraprocedural} : This method does exactly the same job as the previous one. It is here to allow different checkers to distinguish different implementations for iter- and intra-procedural analyses. Nevertheless, there is typically only a single implementation, so both methods return an instance of the same checker class. This is also the case for \texttt{MyChecker}.
+\end{itemize}
+
+We are almost done. The last thing is to register the class \texttt{MyCheckerCreator} into \Stanse checker creators factory. It consists of appending a line
+\begin{itemize}
+	\item[] \texttt{registerCheckerCreator(new MyCheckerCreator())}
+\end{itemize}
+at the end of \Stanse's file \texttt{CheckerFactory.java}.
+}
+
+\section{\MT{Important Bugs found by \Stanse}}
+
+\MT{Although checkers currently implemented in \Stanse are based on techniques published many years ago, running then on the Linux kernel helped to uncover several important bugs in the software. To get a better view, how such error look like, we present here two such an errors, discovered by two different checkers.}
+
+\subsection{\MT{AutomatonChecker}}
+
+\MT{Many bugs found by the \AC trigger only under specific conditions, however
+some of them may be visible to the user. Consider this code excerpt taken
+from the 2.6.27 kernel, drivers/pci/hotplug/pciehp\_core.c file,
+\textsf{set\_lock\_status} function:}
+
+\begin{lstlisting}[language=C]
+mutex_lock(&slot->ctrl->crit_sect);
+/* has it been >1 sec since our last toggle? */
+if ((get_seconds() - slot->last_emi_toggle) < 1)
+	return -EINVAL;
+\end{lstlisting}
+
+\MT{Note the \textsf{mutex\_lock} function followed by \textbf{if} with
+\textbf{return} in
+the true branch. There is an omitted \textsf{mutex\_unlock}. \Stanse helped to
+find out this problem. In fact this deadlock could be easily triggered by a
+user. It is sufficient to write "1" to \textsf{/sys/bus/pci/slots/.../lock}
+file twice within a second.}
+
+\subsection{\MT{ThreadChecker}}
+\MT{
+%http://lkml.org/lkml/2009/4/14/527
+An example of non-trivial error which could not be found by the
+\AC. The code described here is from the 2.6.28
+kernel, file fs/ecryptfs/messaging.c.
+
+There are three locks in the code,
+\textsf{msg\_ctx-\textgreater mux} local per context, and two global --
+\textsf{ecryptfs\_daemon\_hash\_mux} and
+\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.
+
+Let us denote lock dependencies as a binary relation where the first component
+depends on the second. I.e. \textsf{lock(A)} followed by \textsf{lock(B)}
+means dependency B on A: $(A,B)$. For short, it is $A\leftarrow B$.
+}
+%When there
+%is a circular dependency, it leads to a deadlock.
+
+\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX}]
+int ecryptfs_process_response(...)
+{
+	...
+	mutex_lock(&msg_ctx->mux); XY\label{ecrypt_mux1}YX
+	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux1}YX
+	...
+	mutex_unlock(&ecryptfs_daemon_hash_mux);
+	...
+unlock:
+	mutex_unlock(&msg_ctx->mux);
+out:
+	return rc;
+}
+\end{lstlisting}
+\MT{Here the two locks on lines~\ref{ecrypt_mux1} and~\ref{ecrypt_hmux1}
+give \textsf{msg\_ctx-\textgreater mux} 
+$\leftarrow$ \textsf{ecryptfs\_daemon\_hash\_mux}.}
+\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
+static int ecryptfs_send_message_locked(...)
+{
+	...
+	mutex_lock(&ecryptfs_msg_ctx_lists_mux); XY\label{ecrypt_lmux2}YX
+	...
+	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
+	...
+}
+
+int ecryptfs_send_message(...)
+{
+	int rc;
+
+	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux2}YX
+	rc = ecryptfs_send_message_locked(...) XY\label{ecrypt_call}YX
+	mutex_unlock(&ecryptfs_daemon_hash_mux);
+	return rc;
+}
+\end{lstlisting}
+\MT{At line~\ref{ecrypt_call}, function \textsf{ecryptfs\_send\_message\_locked} is
+called from
+\textsf{ecryptfs\_send\_message}, hence the locks at lines~\ref{ecrypt_lmux2}
+and~\ref{ecrypt_hmux2} generate lock dependency of
+\textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$
+\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.}
+\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
+int ecryptfs_wait_for_response(...)
+{
+	...
+	mutex_lock(&ecryptfs_msg_ctx_lists_mux);
+	mutex_lock(&msg_ctx->mux);
+	...
+	mutex_unlock(&msg_ctx->mux);
+	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
+	return rc;
+}
+\end{lstlisting}
+\MT{Finally, this function introduces \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
+$\leftarrow$ \textsf{msg\_ctx-\textgreater mux}.
+
+Composing these results together the following circular dependency of these
+three locks was found:
+\begin{itemize}
+\item \textsf{msg\_ctx-\textgreater mux} $\leftarrow$ \textsf{ecryptfs\_daemon\_hash\_mux}
+\item \textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$ \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
+\item \textsf{ecryptfs\_msg\_ctx\_lists\_mux} $\leftarrow$
+  \textsf{msg\_ctx-\textgreater mux}
+\end{itemize}
+
+This issue was later confirmed as a real bug leading to a
+deadlock\footnote{http://lkml.org/lkml/2009/4/14/527}. }
 
 \end{document}
 
