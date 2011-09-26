@@ -25,9 +25,9 @@
 {
 %  \usetheme{Warsaw}
 \usetheme{Madrid}
-
-  \setbeamercovered{transparent}
 }
+
+\setbeamertemplate{navigation symbols}{}
 
 \usepackage[utf8]{inputenc}
 \usepackage{times}
@@ -42,7 +42,7 @@
 	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
 	commentstyle=\color{blue}}
 
-\title[PB173/01] % (optional, use only with long paper titles)
+\title[PB173/02] % (optional, use only with long paper titles)
 {PB173 -- Ovladače jádra -- Linux}
 
 \subtitle{II.}
@@ -52,7 +52,7 @@
 \institute[ITI] % (optional, but mostly needed)
 {ITI, Fakulta Informatiky}
 
-\date{5. 10. 2010}
+\date{4. 10. 2010}
 
 \subject{}
 % This is only inserted into the PDF information catalog. Can be left
@@ -101,11 +101,10 @@
   \item DÚ do příštího cvičení
   \end{itemize}
   \item Login/heslo
-  \begin{enumerate}
-  \item Exportované domovské adresáře $\Rightarrow$ login/login (z FI)
-  \item Jinak $\Rightarrow$ vyvoj/vyvoj
-  \end{enumerate}
-  \item GIT: \texttt{git://decibel.fi.muni.cz/\textasciitilde xslaby/pb173}
+  \begin{itemize}
+  \item vyvoj/vyvoj
+  \end{itemize}
+  \item GIT: \texttt{git://github.com/jirislaby/pb173.git}
   \begin{itemize}
   \item \texttt{git pull -\,-rebase}
   \end{itemize}
@@ -129,27 +128,28 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Komunikace s uživatelem I.}
+  \frametitle{Komunikace I.}
   \begin{enumerate}
   \item Voláním funkce: system call (syscall)
   \begin{itemize}
-  \item V jádře: tabulka číslo-funkce (\texttt{unistd.h})
   \item Skok do jádra speciální instrukcí (x86\_64: \texttt{syscall})
     \begin{itemize}
     \item O skok se stará libc (\texttt{fwrite}$\rightarrow$\texttt{write}$\rightarrow$\texttt{syscall}$\rightarrow$instrukce)
     \item Drahá operace (přepnutí kontextu)
     \end{itemize}
-  \item \texttt{syscall(\_\_NR\_write, STDOUT\_FILENO, "Test\textbackslash n",
-    5);}
-  \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_write}
+  \item 1. parametr \texttt{syscall}u je číslo operace
+    \begin{itemize}
+    \item V jádře: tabulka číslo-funkce
+    \end{itemize}
+  \item \texttt{syscall(\_\_NR\_fork)}
+  \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_fork}
   \end{itemize}
 
   \pause
 
   \item Speciální syscall
   \begin{itemize}
-  \item Bez skoku do jádra, v knihovně linkované jádrem (\texttt{vdso.so})
-  \item Několik málo jednoduchých funkcí (\texttt{gettimeofday}, \ldots)
+  \item \texttt{vdso.so}
   \end{itemize}
   \end{enumerate}
 
@@ -164,35 +164,23 @@
 
 \begin{frame}
   \frametitle{Úkol}
-  V userspace: pomocí volání \texttt{syscall} spustit \texttt{/bin/date}.
-  Předtím vypsat nějakou informaci.
-
-  \medskip
-
+  \heading{V userspace: pomocí \texttt{syscall} vypsat nějakou informaci}
   \begin{enumerate}
-  \item \texttt{syscall(\_\_NR\_write, \ldots, "Running date\textbackslash n",
-    \ldots)}
-  \item \texttt{syscall(\_\_NR\_execve, "/bin/date", \ldots)}
+  \item \texttt{syscall} a \texttt{\_\_NR\_write}
   \end{enumerate}
 
   \medskip
 
   Je třeba znát prototypy funkcí.
   \begin{itemize}
-  \item Většinou jsou dokumentované: \texttt{man write}, \texttt{man execve}
+  \item Většinou jsou dokumentované: \texttt{man write}
   \item Jinak použít lxr
-  \begin{itemize}
-  \item \texttt{sys\_fork}
-  \item \texttt{SYSCALL\_DEFINE1(rmdir, \ldots)} $\rightarrow$
-  	\texttt{sys\_rmdir}
-  \item \texttt{SYSCALL\_DEFINE3(read, \ldots)} $\rightarrow$ \texttt{sys\_read}
-  \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Komunikace s uživatelem II.}
+  \frametitle{Komunikace II.}
   \begin{enumerate}
   \setcounter{enumi}{2}
   \item Speciální soubory v \texttt{/dev}
