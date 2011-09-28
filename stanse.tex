@@ -135,7 +135,7 @@ describe those.
 
 \begin{figure}[!htb]
   \centering
-    \includegraphics[width=11cm]{fig_architecture}
+    \includegraphics[width=10cm]{fig_architecture}
   \caption{\Stanse framework architecture.}
   \label{fig:architecture}
 \end{figure}
@@ -177,9 +177,21 @@ preprocessor, is depicted at the bottom in Fig.~\ref{fig:architecture}.  It is
 important to note that we do not parse all the sources in a sequence one by
 one as they appear in a configuration. Since we use streaming (discussed
 later), the pipeline is applied several times independently for individual
-source files. \todo{Tady je potreba doplnit, proc jsme napsali vlastni parser,
-proc jsme nepouzili GCC, a konecne, proc jsme nepouzili LLVM (CLANG). Take by
-bylo dobre dodat odkazy na GCC a LLVM do bibliografie.}
+source files.
+
+The parser in \Stanse is a generated one. We developed a grammar and use
+\textsc{AntLR} to generate the parser. We have to do this, because at the time
+of writing this paper, there are no proper parsers able to parse most of the
+GNU C. Especially the Linux Kernel. There is one notable exception:
+\textsc{Clang}. It is slowly improving and will be able to handle the Linux
+kernel in the near future. But yet, it still contains bugs and cannot be used
+reliably. Our plan is to use its parser after it improves.
+
+Also, one may object that we could use the parser from the GNU compiler (GCC).
+But the code there is not prepared for static analysis. Its internal
+structures are not suitable for our purposes. For example the CFG is built on
+the top of RTL or tree representation (we encourage the reader to look into
+the GCC manual where these are described).
 
 \subsection{Program Internal Representation}
 
@@ -373,9 +385,18 @@ to implement generic checker interface and register it to the checkers'
 factory of the framework. Then it gains a full access to the features of the
 framework accessible through the discussed interface.
 
-\MT{
-The \Stanse framework allows checkers to show a progress of their activity in an uniform way. Each checker is passed an instance of a \texttt{ProgressManager} class into which the checker just sends its progress messages. The checker does not need to care where the messages go (whether to a particular GUI window or command line) and how to show them there. It simplifies the implementation of checkers while receiving a feel of an uniform implementation of all the checkers.
-}
+It is very easy to integrate a new checker into \Stanse. The process requires
+only three simple steps to be fully functional. The first step is to create a
+subclass of \Stanse abstract class \texttt{Checker}, say \texttt{MyChecker}.
+The most important method to implement is \texttt{check}. There the analysis
+algorithm should be implemented.
+
+The second step is to integrate the newly created class into the framework.
+This means implementation of \texttt{MyCheckerCreator}, a subclass of
+\texttt{CheckerCreator} abstract class. And the final step is to register the
+class \texttt{MyCheckerCreator}. It comprises adding a line
+\texttt{registerCheckerCreator(new MyCheckerCreator())} at the end of
+\texttt{CheckerFactory.java}.
 
 \subsection{Processing Errors}
 
@@ -405,21 +426,37 @@ user feedback).
 Error reporting and tracing pipeline is depicted to the right of interface and
 internal representation of Fig.~\ref{fig:architecture}.
 
-
-
-
 %}}}
 %{{{ Checkers
 
 \section{Checkers}\label{sec:checkers}
 
-In this section we briefly describe the four currently available checkers.
+In this section we briefly describe the four currently available checkers. All
+configurable are provided with sample configuration so that they can be used
+instantly without studying any details about them. But they are also flexible
+so that one may tune the configuration if needed.
 
 \subsubsection{\AC}
 is heavily influenced by~\cite{ECCH00}. It takes, as input, a set of
 finite-state automata that describe some properties which we want to check.
-Properties like locking discipline, interrupt management, null pointer
-dereference, dangling pointers and many others can be handled this way.
+Then there are patterns which match against the code to be checked. Finally
+there are transitions, i.e. a description of which pattern does which
+automaton state change. Properties like locking discipline, interrupt
+management, null pointer dereference, dangling pointers and many others can be
+handled this way.
+
+An example of the locking checker is presented in Fig.~\ref{fig:automaton}.
+The automaton starts in the unlocked state (\textsf{U}). Transitions are
+performed by the functions (patterns) depicted at the edges. Then, for
+instance, if there is an unlock transition from the unlocked state, an error
+is reported.
+
+\begin{figure}[!htb]
+  \centering
+    \includegraphics[width=3cm]{lock_unlock}
+  \caption{Automaton for locks checking}
+  \label{fig:automaton}
+\end{figure}
 
 Compared to the implementation described in~\cite{ECCH00} and~\cite{HCXE02},
 our technique differs in several aspects. In particular, we do not use
@@ -429,23 +466,31 @@ context of a single input file.
 
 \subsubsection{\LC}
 accounts statistics about variable accesses. It also tracks which locks are
-locked while each of the variable is accessed. Then, with combination of this
-information, it counts in how many cases each variable is accessed while some
-lock is held. If, for instance, some variable is changed 99 times while some
-lock is held and in one case it is not, this is reported as possible error.
-The boundary is currently set to 70, so that at least 70\% of accesses must be
-under locks. The rest (30\%) is then reported. This work is based
-upon~\cite{lockchecker}.
+locked while each of the variable is accessed. Again both variable accesses
+and locks are specified by patterns.
+
+Then, with combination of the information about accesses and locks held, it
+counts a statistics in how many cases each variable is accessed while some
+lock is held. If the difference is proportional, an error is reported. So if,
+for instance, some variable is changed 99 times while some lock is held and in
+one case the lock is not, this is reported as a possible error. The boundary
+is currently set to 70, so that at least 70\% of accesses must be under locks.
+The rest (30\%) is then reported. This work is based upon~\cite{lockchecker}.
 
 \subsubsection{\TC}
 aims to check for possible deadlocks in concurrent programs. The technique
 is based on the notions of locksets of~\cite{relay} and deadlock detection
 by looking for cycles in \emph{resource allocation graphs (RAGs)}. \TC first
 tries to identify the parts of the code which can run in parallel, as
-different threads. Then it builds a set of \emph{dependency graphs} for each
-such thread. A dependency graph statically represents the possible locksets
-during one execution of a thread. Dependency graphs are then combined and
-transformed to RAGs. If some RAG contains a cycle, an error is reported.
+different threads. This is performed by searching of functions instantiating
+threads (such as \texttt{pthread\_create}). Or, for the Linux kernel, we also
+specify manually which hooks may be run parallel.
+
+Then the checker builds a set of \emph{dependency graphs} for each such
+thread. A dependency graph statically represents a possible locksets during
+one execution of a thread. Dependency graphs are then combined and transformed
+into RAGs. If there is a circular lock dependency, RAG contains a cycle. If
+that is the case, an error is reported to the user.
 
 \subsubsection{\RC}
 searches CFGs for unreachable nodes. These are then reported as warnings or
@@ -456,29 +501,13 @@ features described in Subsection~\ref{ssec:travers}. The code of the checker
 has less than 200 lines including the mentioned error/warning classification
 and many strings and comments.
 
+Even though it is a very simple checker it was still able to find serious bugs
+in the kernel. For example a superfluous semicolon can cause unexpected
+unconditional returns from functions like in the following code: \textsf{if
+(cond)\underline{;} return;}.
+
 %}}}
 %{{{ Results
-
-\begin{table*}[htb]
-\begin{center}
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{|l|l|c|c|c|c|} \hline
-\textbf{Checker} & \textbf{Automaton} &
-\multicolumn{3}{|c|}{\textbf{Errors}} & \textbf{Real/classified} \\ \cline{3-5}
-&&\textbf{Found} & \textbf{Real} & \textbf{False pos.} & \textbf{error ratio}\\ \hline\hline
-& Pairing                    & 266 & 65  & 143 & 31.3\,\% \\ \cline{2-6}
-\AC & Pointers               & 86  & 48  & 37  & 56.5\,\% \\ \cline{2-6}
-& Deadlocks                  & 35  & 16  & 18  & 47.1\,\% \\ \hline
-\multicolumn{2}{|l|}{\LC}    & 13  & 6   & 7   & 46.2\,\%  \\ \hline
-\multicolumn{2}{|l|}{\TC}    & 20  & 9   & 11  & 45.0\,\% \\ \hline
-\multicolumn{2}{|l|}{\RC}    & 31  & 31  & 0   & 100.0\,\%  \\ \hline\hline
-\multicolumn{2}{|l|}{\textbf{Overall}}  & \textbf{451} & \textbf{175} &
-\textbf{216} & \textbf{47.9\,\%} \\ \hline
-\end{tabular}
-\end{center}
-\caption{\Stanse results on the Linux kernel version 2.6.28.}
-\label{tab:results}
-\end{table*}
 
 \section{Results on Linux Kernel}
 \label{sec:results}
@@ -507,6 +536,27 @@ actually found 751 errors, but 720 of them are of low importance
 (including 696 superfluous semicolons) and they are omitted from our
 statistics.
 
+\begin{table*}[tb]
+\begin{center}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{|l|l|c|c|c|c|} \hline
+\textbf{Checker} & \textbf{Automaton} &
+\multicolumn{3}{|c|}{\textbf{Errors}} & \textbf{Real/classified} \\ \cline{3-5}
+&&\textbf{Found} & \textbf{Real} & \textbf{False pos.} & \textbf{error ratio}\\ \hline\hline
+& Pairing                    & 266 & 65  & 143 & 31.3\,\% \\ \cline{2-6}
+\AC & Pointers               & 86  & 48  & 37  & 56.5\,\% \\ \cline{2-6}
+& Deadlocks                  & 35  & 16  & 18  & 47.1\,\% \\ \hline
+\multicolumn{2}{|l|}{\LC}    & 13  & 6   & 7   & 46.2\,\%  \\ \hline
+\multicolumn{2}{|l|}{\TC}    & 20  & 9   & 11  & 45.0\,\% \\ \hline
+\multicolumn{2}{|l|}{\RC}    & 31  & 31  & 0   & 100.0\,\%  \\ \hline\hline
+\multicolumn{2}{|l|}{\textbf{Overall}}  & \textbf{451} & \textbf{175} &
+\textbf{216} & \textbf{47.9\,\%} \\ \hline
+\end{tabular}
+\end{center}
+\caption{\Stanse results on the Linux kernel version 2.6.28.}
+\label{tab:results}
+\end{table*}
+
 We have manually analysed all the found errors and classified them as real
 errors or false positives (with an exception of 60 errors found by \AC where
 we are not able to decide in a short time whether it is a false positive or
@@ -531,6 +581,116 @@ illustration, see our report at \url{http://lkml.org/lkml/2009/3/11/380}).
 We have reported another 60 bugs found by \Stanse in the subsequent versions
 of the kernel. This number is increasing every month.
 
+\subsection{Important Bugs found by \Stanse}
+Although checkers currently implemented in \Stanse are based on techniques
+published many years ago, running them on the Linux kernel helped to uncover
+several important bugs in the software. To get a better view, how such error
+look like, we present here two such an errors, discovered by two different
+checkers.
+
+\subsubsection{AutomatonChecker}
+Many bugs found by the \AC trigger only under specific conditions, however
+some of them may be visible to the user. Consider this code excerpt taken
+from the 2.6.27 kernel, drivers/pci/hotplug/pciehp\_core.c file,
+\textsf{set\_lock\_status} function:
+
+\begin{lstlisting}[language=C]
+mutex_lock(&slot->ctrl->crit_sect);
+/* has it been >1 sec since our last toggle? */
+if ((get_seconds() - slot->last_emi_toggle) < 1)
+	return -EINVAL;
+\end{lstlisting}
+
+Note the \textsf{mutex\_lock} function followed by \textbf{if} with
+\textbf{return} in the true branch. There is an omitted
+\textsf{mutex\_unlock}. \Stanse helped to find out this problem. In fact this
+deadlock could be easily triggered by a user. It is sufficient to write "1" to
+\textsf{/sys/bus/pci/slots/.../lock} file twice within a second.
+
+\subsubsection{ThreadChecker}
+%http://lkml.org/lkml/2009/4/14/527
+An example of non-trivial error which could not be found by the \AC. The code
+described here is from the 2.6.28 kernel, file fs/ecryptfs/messaging.c.
+
+There are three locks in the code,
+\textsf{msg\_ctx-\textgreater mux} local per context, and two global --
+\textsf{ecryptfs\_daemon\_hash\_mux} and
+\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.
+
+Let us denote lock dependencies as a binary relation where the first component
+depends on the second. I.e. \textsf{lock(A)} followed by \textsf{lock(B)}
+means dependency B on A: $(A,B)$. For short, it is $A\leftarrow B$.
+
+\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX}]
+int ecryptfs_process_response(...)
+{
+	...
+	mutex_lock(&msg_ctx->mux); XY\label{ecrypt_mux1}YX
+	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux1}YX
+	...
+	mutex_unlock(&ecryptfs_daemon_hash_mux);
+	...
+unlock:
+	mutex_unlock(&msg_ctx->mux);
+out:
+	return rc;
+}
+\end{lstlisting}
+Here the two locks on lines~\ref{ecrypt_mux1} and~\ref{ecrypt_hmux1} give
+\textsf{msg\_ctx-\textgreater mux} $\leftarrow$
+\textsf{ecryptfs\_daemon\_hash\_mux}.
+\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
+static int ecryptfs_send_message_locked(...)
+{
+	...
+	mutex_lock(&ecryptfs_msg_ctx_lists_mux); XY\label{ecrypt_lmux2}YX
+	...
+	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
+	...
+}
+
+int ecryptfs_send_message(...)
+{
+	int rc;
+
+	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux2}YX
+	rc = ecryptfs_send_message_locked(...) XY\label{ecrypt_call}YX
+	mutex_unlock(&ecryptfs_daemon_hash_mux);
+	return rc;
+}
+\end{lstlisting}
+At line~\ref{ecrypt_call}, function \textsf{ecryptfs\_send\_message\_locked}
+is called from \textsf{ecryptfs\_send\_message}, hence the locks at
+lines~\ref{ecrypt_lmux2} and~\ref{ecrypt_hmux2} generate lock dependency of
+\textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$
+\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.
+\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
+int ecryptfs_wait_for_response(...)
+{
+	...
+	mutex_lock(&ecryptfs_msg_ctx_lists_mux);
+	mutex_lock(&msg_ctx->mux);
+	...
+	mutex_unlock(&msg_ctx->mux);
+	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
+	return rc;
+}
+\end{lstlisting}
+Finally, this function introduces \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
+$\leftarrow$ \textsf{msg\_ctx-\textgreater mux}.
+
+Composing these results together the following circular dependency of these
+three locks was found:
+\begin{itemize}
+\item \textsf{msg\_ctx-\textgreater mux} $\leftarrow$ \textsf{ecryptfs\_daemon\_hash\_mux}
+\item \textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$ \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
+\item \textsf{ecryptfs\_msg\_ctx\_lists\_mux} $\leftarrow$
+  \textsf{msg\_ctx-\textgreater mux}
+\end{itemize}
+
+This issue was later confirmed as a real bug leading to a
+deadlock\footnote{http://lkml.org/lkml/2009/4/14/527}.
+
 %}}}
 %{{{ Conclusions
 
@@ -543,7 +703,8 @@ currently use any new techniques -- its novelty comes from the fact that (to
 our best knowledge) there is no other open-source framework with comparable
 applicability and efficiency. We note that more than 130 bugs found by
 \Stanse have been reported to and confirmed by Linux kernel developers
-already.
+already. More information and the tool itself can be found at
+\url{http://stanse.fi.muni.cz/}.
 
 \subsubsection{Future Work}
 We plan to improve the framework in several directions. We are currently
@@ -642,170 +803,6 @@ Theoretical Computer Science (ITI), project No. 1M0545.
 %  JS: Note dava smysl. Internals jsou spolecne pro vsechny a jsou pro
 %  checkery read-only. Registrace checkeru spociva v pridani jednoho radku do
 %  CheckerFactory -- ano, musi se ``registrovat''
-
-\appendix
-
-\section{Availability}
-
-\begin{tabular*}{1.0\linewidth}{ll}
-  Website: & \url{http://stanse.fi.muni.cz/} \cr
-  Version: & 1.2.0 \cr
-  Download: & \url{http://stanse.fi.muni.cz/download} 
-\end{tabular*}
-
-\medskip
-\noindent
-The source code is also available. \Stanse is distributed under the GPL v2
-license. Currently, the tool is used mainly by the developers and students at
-the Masaryk University. It is also used by programmers in a partner software
-company. Several other kernel developers, in whose code \Stanse has found
-bugs, have also expressed interest in using \Stanse
-regularly\footnote{\url{http://lkml.org/lkml/2009/7/18/59} and follow-ups}.
-
-\section{\MT{Integration of New Checker}}
-
-\MT{
-
-Here we want to show how easy is to integrate a new checker into \Stanse. The process requires only two simple step to gain the full functionality provided by \Stanse framework.
-
-The first step is to create a subclass, say \texttt{MyChecker}, of \Stanse abstract class \texttt{Checker}. In the subclass we need to implements the following three methods:
-\begin{itemize}
-	\item \texttt{getName} :  This method returns unique name of the checker. It does not have to be readable for humans. But typical implementation is \texttt{MyChecker.class.} \texttt{getName()}.
-	\item \texttt{toString} :  This method returns a short textual description of the checker.
-	\item \texttt{check} : This is the method, where the checker's analysis should be implemented in. More precisely, this method is called by \Stanse, when checker's analysis have to be performed.
-\end{itemize}
-
-And the second step is to integrate \texttt{MyChecker} into \Stanse framework. Instances of checkers (already integrated into the \Stanse framework) are then created following concrete factory design pattern. This implies for checkers, they have to implement mechanism of creation of their own instances. In \Stanse we require to define whole subclass of abstract class \texttt{CheckerCreator} instead of definition of a single creation function. But the task is also very simple. In our case we create a subclass \texttt{MyCheckerCreator} of \texttt{CheckerCreator} abstract class and we implement the following methods:
-\begin{itemize}
-	\item \texttt{getCheckerName} :  This method returns an user-readable name of the checker. So we can implement this method like \texttt{return "MyChecker"}
-	\item \texttt{getCheckerCreationInfo} :  The method returns a comprehensive textual description of the checker. The information is printed to the users of \Stanse when they decide, which checkers to use for analysing their code.
-	\item \texttt{getDataFilesExtensions} : When our checker requires some configuration files to be loaded, this method returns a list of extensions of those files. When the checker does not require any configuration files, the function returns just empty list. This is also the case for \texttt{MyChecker}.
-	\item \texttt{checkArgumentList} : This method accepts a list of files and returns true only iff they represent all configuration files the checker need to work properly. When the checker does not require any configuration files, the method always returns \texttt{true}. So implementation in case of \texttt{MyChecker} is obvious.
-	\item \texttt{createInterprocedural} : This method is supposed to create an instance of the checker. In our case the implementation would be like \texttt{return new MyChecker()}.	
-	\item \texttt{createIntraprocedural} : This method does exactly the same job as the previous one. It is here to allow different checkers to distinguish different implementations for iter- and intra-procedural analyses. Nevertheless, there is typically only a single implementation, so both methods return an instance of the same checker class. This is also the case for \texttt{MyChecker}.
-\end{itemize}
-
-We are almost done. The last thing is to register the class \texttt{MyCheckerCreator} into \Stanse checker creators factory. It consists of appending a line
-\begin{itemize}
-	\item[] \texttt{registerCheckerCreator(new MyCheckerCreator())}
-\end{itemize}
-at the end of \Stanse's file \texttt{CheckerFactory.java}.
-}
-
-\section{\MT{Important Bugs found by \Stanse}}
-
-\MT{Although checkers currently implemented in \Stanse are based on techniques published many years ago, running then on the Linux kernel helped to uncover several important bugs in the software. To get a better view, how such error look like, we present here two such an errors, discovered by two different checkers.}
-
-\subsection{\MT{AutomatonChecker}}
-
-\MT{Many bugs found by the \AC trigger only under specific conditions, however
-some of them may be visible to the user. Consider this code excerpt taken
-from the 2.6.27 kernel, drivers/pci/hotplug/pciehp\_core.c file,
-\textsf{set\_lock\_status} function:}
-
-\begin{lstlisting}[language=C]
-mutex_lock(&slot->ctrl->crit_sect);
-/* has it been >1 sec since our last toggle? */
-if ((get_seconds() - slot->last_emi_toggle) < 1)
-	return -EINVAL;
-\end{lstlisting}
-
-\MT{Note the \textsf{mutex\_lock} function followed by \textbf{if} with
-\textbf{return} in
-the true branch. There is an omitted \textsf{mutex\_unlock}. \Stanse helped to
-find out this problem. In fact this deadlock could be easily triggered by a
-user. It is sufficient to write "1" to \textsf{/sys/bus/pci/slots/.../lock}
-file twice within a second.}
-
-\subsection{\MT{ThreadChecker}}
-\MT{
-%http://lkml.org/lkml/2009/4/14/527
-An example of non-trivial error which could not be found by the
-\AC. The code described here is from the 2.6.28
-kernel, file fs/ecryptfs/messaging.c.
-
-There are three locks in the code,
-\textsf{msg\_ctx-\textgreater mux} local per context, and two global --
-\textsf{ecryptfs\_daemon\_hash\_mux} and
-\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.
-
-Let us denote lock dependencies as a binary relation where the first component
-depends on the second. I.e. \textsf{lock(A)} followed by \textsf{lock(B)}
-means dependency B on A: $(A,B)$. For short, it is $A\leftarrow B$.
-}
-%When there
-%is a circular dependency, it leads to a deadlock.
-
-\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX}]
-int ecryptfs_process_response(...)
-{
-	...
-	mutex_lock(&msg_ctx->mux); XY\label{ecrypt_mux1}YX
-	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux1}YX
-	...
-	mutex_unlock(&ecryptfs_daemon_hash_mux);
-	...
-unlock:
-	mutex_unlock(&msg_ctx->mux);
-out:
-	return rc;
-}
-\end{lstlisting}
-\MT{Here the two locks on lines~\ref{ecrypt_mux1} and~\ref{ecrypt_hmux1}
-give \textsf{msg\_ctx-\textgreater mux} 
-$\leftarrow$ \textsf{ecryptfs\_daemon\_hash\_mux}.}
-\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
-static int ecryptfs_send_message_locked(...)
-{
-	...
-	mutex_lock(&ecryptfs_msg_ctx_lists_mux); XY\label{ecrypt_lmux2}YX
-	...
-	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
-	...
-}
-
-int ecryptfs_send_message(...)
-{
-	int rc;
-
-	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux2}YX
-	rc = ecryptfs_send_message_locked(...) XY\label{ecrypt_call}YX
-	mutex_unlock(&ecryptfs_daemon_hash_mux);
-	return rc;
-}
-\end{lstlisting}
-\MT{At line~\ref{ecrypt_call}, function \textsf{ecryptfs\_send\_message\_locked} is
-called from
-\textsf{ecryptfs\_send\_message}, hence the locks at lines~\ref{ecrypt_lmux2}
-and~\ref{ecrypt_hmux2} generate lock dependency of
-\textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$
-\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.}
-\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
-int ecryptfs_wait_for_response(...)
-{
-	...
-	mutex_lock(&ecryptfs_msg_ctx_lists_mux);
-	mutex_lock(&msg_ctx->mux);
-	...
-	mutex_unlock(&msg_ctx->mux);
-	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
-	return rc;
-}
-\end{lstlisting}
-\MT{Finally, this function introduces \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
-$\leftarrow$ \textsf{msg\_ctx-\textgreater mux}.
-
-Composing these results together the following circular dependency of these
-three locks was found:
-\begin{itemize}
-\item \textsf{msg\_ctx-\textgreater mux} $\leftarrow$ \textsf{ecryptfs\_daemon\_hash\_mux}
-\item \textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$ \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
-\item \textsf{ecryptfs\_msg\_ctx\_lists\_mux} $\leftarrow$
-  \textsf{msg\_ctx-\textgreater mux}
-\end{itemize}
-
-This issue was later confirmed as a real bug leading to a
-deadlock\footnote{http://lkml.org/lkml/2009/4/14/527}. }
 
 \end{document}
 
