@@ -24,9 +24,7 @@
 \newcommand{\LC}{\textsc{LockChecker}\xspace}
 
 \newcommand{\MT}[1]{{\color{blue} #1}}
-\newcommand{\MTD}[1]{{\color{red} #1}}
 %\renewcommand{\MT}[1]{{#1}}
-%\renewcommand{\MTD}[1]{}
 
 \lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
         breakatwhitespace=true,escapeinside={(*@}{@*)},
@@ -104,7 +102,11 @@ can be seen in two ways:
 \end{enumerate}
 
 \MT{
-The tools mentioned so far, including \Stanse, provide may analysis. There is also wide range of static analysis tools providing must analysis. Successful tools like \textsc{Pex}, \textsc{Klee}, \textsc{Exe}, or \textsc{Sage} are of that kind. Since may and must analyses are complementary, they are very different to \Stanse in basic principles.
+The tools mentioned so far, including \Stanse, provide may\todo{this was
+circled} analysis. There is also wide range of static analysis tools providing
+must analysis. Successful tools like \textsc{Pex}, \textsc{Klee},
+\textsc{Exe}, or \textsc{Sage} are of that kind. Since may and must analyses
+are complementary, they are very different from \Stanse in basic principles.
 }
 
 \todo{Nechapu proc recenzenti chteji srovnani \Stanse se \textsc{SOOT}em? Podle me se jedna o zcela nesrovnatelne veci. Nenapada Vas, co maji spolecne, co by se melo okomentovat/porovnat?}
@@ -122,9 +124,9 @@ mentions some directions of its future development.
 \section{Framework Functionality}
 \label{sec:framework}
 
-\MT{The} \Stanse framework is modular and fully open. It is designed to allow static
-analysis of large software projects like Linux kernel. Further it is aimed to
-reduce effort when implementing a new static analysis technique.
+The \Stanse framework is modular and fully open. It is designed to allow
+static analysis of large software projects like Linux kernel. Further it is
+aimed to reduce effort when implementing a new static analysis technique.
 Architecture of the framework is depicted in Fig.~\ref{fig:architecture}. As
 can be seen, the tool consists of standard parts for these kinds of tools.
 Apart from that there are also parts which are not common to all static
@@ -160,32 +162,24 @@ in \Stanse. But they do not see each other. They proceed independently.
 Checkers themselves might require their own configuration files. They are
 depicted at the top right corner of Fig.~\ref{fig:architecture}.
 
-The configuration can be passed to \MT{the} \Stanse framework via command line
+The configuration can be passed to the \Stanse framework via command line
 arguments. User can also add them one by one in the graphical interface.
 
 \subsection{Parsing Source Files}
 
-%There are several ways to tell \Stanse what source files to analyse. Besides
-%the standard possibilities (a single given file, all files from a given
-%directory, all files listed in a given file), \Stanse can also derive all
-%the necessary information from a project \textsf{Makefile}. In this case,
-%\Stanse also remembers compiler flags for preprocessing purposes. This
-%functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool.
-%  but differs in that it generates the file
-% list only once so the build needs not be run over and over for verification
-% runs e.g. with different configuration like distinct checkers.
-
-\MT{The} \Stanse framework can process source files written in C. More specifically the
-ISO/ANSI C99 standard and most of the GNU C extensions. This allows \Stanse to
-process software projects like \MT{the} Linux kernel. We are currently working on
-support of other languages, in particular C++. We have a prototype
+The \Stanse framework can process source files written in C. More specifically
+the ISO/ANSI C99 standard and most of the GNU C extensions. This allows
+\Stanse to process software projects like the Linux kernel. We are currently
+working on support of other languages, in particular C++. We have a prototype
 implementation, which is included in the distribution already. The parsing
 pipeline, including a preprocessing the source files by the standard GNU C
-preprocessor, is depicted at the bottom in Fig.~\ref{fig:architecture}. It is
+preprocessor, is depicted at the bottom in Fig.~\ref{fig:architecture}.  It is
 important to note that we do not parse all the sources in a sequence one by
 one as they appear in a configuration. Since we use streaming (discussed
 later), the pipeline is applied several times independently for individual
-source files. \todo{Tady je potreba doplnit, proc jsme napsali vlastni parser, proc jsme nepouzili GCC, a konecne, proc jsme nepouzili LLVM (CLANG). Take by bylo dobre dodat odkazy na GCC a LLVM do bibliografie.}
+source files. \todo{Tady je potreba doplnit, proc jsme napsali vlastni parser,
+proc jsme nepouzili GCC, a konecne, proc jsme nepouzili LLVM (CLANG). Take by
+bylo dobre dodat odkazy na GCC a LLVM do bibliografie.}
 
 \subsection{Program Internal Representation}
 
@@ -215,38 +209,96 @@ approach: \Stanse discards all internal structures of the module whose
 structures are not accessed for the longest time. If the discarded structure
 is accessed again later, the corresponding module is streamed back in. Both
 laziness of internal structures and streaming are completely invisible to
-checkers. \MT{A purpose of the streaming is to allow checkers to assume that all sources are presented in the memory at once.}
+checkers. \MT{A purpose of the streaming is to allow checkers to assume that
+all sources are present in the memory at once.}
 
-\MT{In current implementation of streaming each source file streamed out from the memory is completely discarded. \Stanse does not backup already parsed internal structures into a auxiliary files before discarding. As a consequence, when internal structures of the discarded file are needed again, \Stanse starts the parsing pipeline of the file from scratch to recreate requested internal structures. Although loading of previously parsed internal structures from auxiliary files would sped up the streaming process, a profiling of \Stanse's performance on the Linux kernel have not shown streaming to be a performance bottleneck. An usage of such auxiliary files can be implemented, if streaming performance became a performance problem in a future.}
+\MT{In the current implementation of streaming, each source file streamed out
+from the memory is completely discarded. \Stanse does not backup already
+parsed internal structures into a auxiliary files before discarding. As a
+consequence, when internal structures of the discarded file are needed again,
+\Stanse starts the parsing pipeline of the file from scratch to recreate
+requested internal structures. Although loading of previously parsed internal
+structures from auxiliary files would speed up the streaming process, a
+profiling of \Stanse's performance on the Linux kernel has not shown
+streaming to be a performance bottleneck. A usage of such auxiliary files can
+be implemented, if streaming performance became a performance problem in the
+future.}
 
 \subsection{\MT{Pointer Analysis in \Stanse}}
 
 \MT{
 
-When analysing programming languages involving pointers, it is almost always necessary to use an appropriate kind of pointer analysis. Since \texttt{C} is such a type of programming language, the \Stanse framework should provide a pointer analysis. But there are many different kind of analyses. Many of them are flow-insensitive, some ore context-insensitive, some are field-insensitive, and so on. There are many pointer analyses that combine mentioned properties to balance between precision and performance.
+When analysing programming languages involving pointers, it is almost always
+necessary to use an appropriate kind of pointer analysis. Since \texttt{C} is
+such a type of programming language, the \Stanse framework should provide a
+pointer analysis. But there are many different kind of analyses. Many of them
+are flow-insensitive, some are context-insensitive, some are
+field-insensitive, and so on. There are many pointer analyses that combine
+mentioned properties to balance between precision and performance.
 
-It is difficult to predict, what pointer analyses are the most likely to be used in checkers implemented in \Stanse in future. Therefore the \Stanse framework does not contain any particular implementation of pointer analysis. Instead, we have implemented \textit{Steensgard}'s flow-insensitive and context-insensitive points-to analysis and also \textit{Shapiro-Horowitz}'s points-to analysis, which allows parametrization between Steensgard's and Andersen's points-to analyses. \textit{Shapiro-Horowitz}'s points-to analysis is flow-insensitive but can be context-sensitive. Both analyses are currently implemented as regular checkers. These analyses can be used in other checkers by loading particular analysis as a sub-checker.
+It is difficult to predict, what pointer analyses are the most likely to be
+used in checkers implemented in \Stanse in future. Therefore the \Stanse
+framework does not contain any particular implementation of pointer analysis.
+Instead, we have implemented \textit{Steensgard}'s flow-insensitive and
+context-insensitive points-to analysis and also \textit{Shapiro-Horowitz}'s
+points-to analysis, which allows parametrization between Steensgard's and
+Andersen's points-to analyses. \textit{Shapiro-Horowitz}'s points-to analysis
+is flow-insensitive but can be context-sensitive. Both analyses are currently
+implemented as regular checkers. These analyses can be used in other checkers
+by loading particular analysis as a sub-checker.
 
-The decision of implementing pointer analyses in separate checkers has one important negative drawback. When two or more checkers are run simultaneously in \Stanse and they use the same kind of pointer analysis (as their own sub-checker), then the pointer analysis is executed for each checker independently - i.e.~several times. If the points to analyses were implemented inside the \Stanse framework, this won't happen.
+The decision of implementing pointer analyses in separate checkers has one
+important negative drawback. When two or more checkers are run simultaneously
+in \Stanse and they use the same kind of pointer analysis (as their own
+sub-checker), then the pointer analysis is executed for each checker
+independently - i.e.~several times. If the points to analyses were implemented
+inside the \Stanse framework, this will not happen.
 
-The reason for implementing points to analyses in checkers instead of in the \Stanse framework is just because we have not made a final decision, which pointer analyses are the best to be put into the framework. The current solution with checkers in a temporary one.
+The reason for implementing points to analyses in checkers instead of in the
+\Stanse framework is just because we have not made a final decision, which
+pointer analyses are the best to be put into the framework. The current
+solution with checkers is a temporary one.
 }
 
 \subsection{\MT{Matching Language Constructs}}
 
 \MT{
 
-Checkers, as implementations of may static analyses, usually work with some syntactical subset of language constructs. On these constructs the checkers define how sets of their abstract states changes. On the remaining language constructs the abstract states do not change at all, i.e.~state transformation function on such the states is just identity.
+Checkers, as implementations of may static analyses, usually work with some
+syntactical subset of language constructs. On these constructs the checkers
+define how sets of their abstract states changes. On the remaining language
+constructs the abstract states do not change at all, i.e.~state transformation
+function on such the states is just identity.
 
-It depends on particular checker which constructs affects sets of its abstract states and which do not. Therefore \Stanse offers checkers a parametric specification of language subset, which is important for them. It works as follows.
+It depends on particular checker which constructs affect sets of its abstract
+states and which do not. Therefore \Stanse offers checkers a parametric
+specification of language subset, which is important for them. It works as
+follows.
 
-Since AST seems to be very useful internal representation of an analysed code for many types of may analyses, the \Stanse framework defines a simple language speaking about structure of AST. In this language a checker can specify, what kinds of sub-trees of AST the checker is interested in. A basic construct in this simple language is so called \emph{pattern}. It is an XML description of particular subtree in ATS, which may contain special nodes - keywords it this language, which allow parametrization of shape and also appearance of particular AST nodes in the tree. Therefore, a pattern is a specifications of whole set of AST sub-trees. And collection of patterns constitute the parametric specification of language constructs a checker is interested in.
+Since AST seems to be very useful internal representation of an analysed code
+for many types of may analyses, the \Stanse framework defines a simple
+language speaking about structure of AST. In this language a checker can
+specify, what kinds of sub-trees of AST the checker is interested in. A basic
+construct in this simple language is so called \emph{pattern}. It is an XML
+description of particular subtree in ATS, which may contain special nodes --
+keywords it this language, which allow parametrization of shape and also
+appearance of particular AST nodes in the tree. Therefore, a pattern is a
+specifications of whole set of AST sub-trees. And collection of patterns
+constitute the parametric specification of language constructs a checker is
+interested in.
 
-The \Stanse framework contains a library, which provides loading of patterns and also functions scanning AST of analysed functions to find matching instances of patterns in the ASTs of the analysed functions.
+The \Stanse framework contains a library, which provides loading of patterns
+and also functions scanning AST of analysed functions to find matching
+instances of patterns.
 
-When a checker knows where in an AST matches which pattern, it then simply knows where should be applied which action. This greatly simplifies implementation of checkers.
+When a checker knows where in an AST matches which pattern, it then simply
+knows where should be applied which action. This greatly simplifies
+implementation of checkers.\todo{English}
 
-A similar system of recognition of specific language constructs was introduced in~\cite{METAL}\todo{doplnit citaci METALu}. Their language METAL allows parametrization of C grammar, instead of parametrizing AST subtrees as \Stanse's patterns do. Nevertheless, the purpose of both approaches is the same.
+A similar system of recognition of specific language constructs was introduced
+in~\cite{METAL}. Their language METAL allows parametrization of C grammar,
+instead of parametrizing AST subtrees as \Stanse's patterns do. Nevertheless,
+the purpose of both approaches is the same.
 
 }
 
@@ -271,9 +323,31 @@ This makes implementation of new algorithms extremely simple.
 
 \MT{
 
-For example, when a checker must implement a forward flow-sensitive analysis, then it asks the \Stanse framework to traverse paths in CFGs in forward depth-first manner. This can be implemented by a single call to a library function \texttt{traverseCFGToDepthForward}, which takes particular CFG as an argument and also subclass of \Stanse library class \texttt{CFGPathVisitor}, where the checker implements action, which should be taken whenever CFG node is visited (already in requested order). The checker implements the action in a method \texttt{visit} of the subclass.
+For example, when a checker must implement a forward flow-sensitive analysis,
+then it asks the \Stanse framework to traverse paths in CFGs in forward
+depth-first manner. This can be implemented by a single call to a library
+function \texttt{traverseCFGToDepthForward}. It takes a particular CFG as an
+argument and also subclass of \Stanse library class \texttt{CFGPathVisitor}.
+There the checker implements an action, which should be taken whenever a CFG
+node is visited (already in the requested order). The checker implements the
+action in a method \texttt{visit} of the subclass.
 
-Another example is support for interprocedural analysis. It is common for interprocedural analyses to build function summaries. Unfortunatelly, these summaries might differ from analysis to another. It is difficult in general to build a single universal representation of function summaries, which will suit to any kind of analysis. Therefore, instead of trying to provide one, the \Stanse framework provides libraries, which are likely to be helpful in constructing many different kinds of summaries for different analyses. Those libraries provides automated mapping between arguments and formal parameters in call sites (library \texttt{ArgumentPassingManager}) and autovated mapping of return values back to calling functions (library \texttt{ReturnValuePassingManager}). In addition, for those interprocedural analyses, which do not construct summaries at all (and rely on function inlining), \Stanse provide an automated traversation between different CFGs according to function calls. This can be again done by a single call to \Stanse library from a checket (e.g.~\texttt{traverseCFGPathsForwardInterprocedural}).
+Another example is a support for interprocedural analysis. It is common for
+interprocedural analyses to build function summaries. Unfortunatelly, these
+summaries may differ from one analysis to another. It is difficult in general
+to build a single universal representation of function summaries, which would
+suit to any kind of analysis. Therefore, instead of trying to provide one, the
+\Stanse framework provides libraries, which are likely to be helpful in
+constructing many different kinds of summaries for different analyses. Those
+libraries provides automated mapping between arguments and formal parameters
+in call sites (library \texttt{ArgumentPassingManager}) and automated mapping
+of return values back to calling functions (library
+\texttt{ReturnValuePassingManager}). In addition, for those interprocedural
+analyses, which do not construct summaries at all (and rely on function
+inlining), \Stanse provides an automated traversation among different CFGs
+according to function calls. Again, this can be done by a single call to
+the \Stanse library from a checker
+(e.g.~\texttt{traverseCFGPathsForwardInterprocedural}).
 
 }
 
@@ -285,9 +359,8 @@ Fig.~\ref{fig:architecture}.
 
 \subsection{Concept of Checkers}
 
-% The checkers have an access to shared read-only representation of analysed source files and also to a . This is done by an interface, as we can see in the .
 In the \Stanse framework a checker is an implementation of some concrete
-static analysis technique. Each checker has \MTD{an} access to a shared internal
+static analysis technique. Each checker has an access to a shared internal
 structure of analysed source files. They are also provided with an access to
 the algorithms providing navigation in those structures. This is done by an
 interface between checkers and internal structure and libraries of the
@@ -315,7 +388,7 @@ The \Stanse framework allows checkers to show a progress of their activity in an
 
 Once a checker finds an error, it reports it back to the framework as a
 commented \emph{error trace} - a path in the analysed code demonstrating this
-error. \MT{The} \Stanse framework provides a data type for describing an error. 
+error. The \Stanse framework provides a data type for describing an error. 
 In the framework there are then several possibilities how to present the error
 traces back to the user of \Stanse: they can be printed to the console,
 displayed using a built-in error trace browser in the GUI (see
@@ -437,11 +510,14 @@ statistics.
 We have manually analysed all the found errors and classified them as real
 errors or false positives (with an exception of 60 errors found by \AC where
 we are not able to decide in a short time whether it is a false positive or
-not). \MT{It is important to note, that the checkers do not produce any false negatives (assuming there is no bug in the checkers' implementation). They all implement may analyses and as a such they can not miss a defect underlying their specifications.}  The numbers of real errors, false positives and the ratio of real errors
-to all classified errors can be also found in Table~\ref{tab:results}. The
-overall ratio of real errors to all classified errors is not high: 47.9\%.
-However, \Stanse in the current version does not have any thorough false
-positive filtering technique.
+not). \MT{It is important to note, that the checkers do not produce any false
+negatives (assuming there is no bug in the checkers' implementation). They all
+implement may analyses and hence they can not miss a defect underlying
+their\todo{whose?} specifications.}  The numbers of real errors, false
+positives and the ratio of real errors to all classified errors can be also
+found in Table~\ref{tab:results}. The overall ratio of real errors to all
+classified errors is not high: 47.9\%.  However, \Stanse in the current
+version does not have any thorough false positive filtering technique.
 
 More than 70 of the 169 real errors have been reported to kernel developers
 and fixed in the following kernel releases (the rest have been independently
