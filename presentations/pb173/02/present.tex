@@ -52,7 +52,7 @@
 \institute[ITI] % (optional, but mostly needed)
 {ITI, Fakulta Informatiky}
 
-\date{4. 10. 2010}
+\date{4. 10. 2011}
 
 \subject{}
 % This is only inserted into the PDF information catalog. Can be left
@@ -251,7 +251,7 @@
   \item Dělá všechnu práci z předchozího slidu
   \item Potřebujeme
     \begin{itemize}
-    \item Seznam implementovaných funkcí (opět)
+    \item Seznam implementovaných funkcí (opět; viz dále)
     \item Definici misc zařízení (\texttt{struct miscdevice})
     \end{itemize}
   \item \texttt{misc\_register}, \texttt{misc\_deregister}
@@ -264,17 +264,16 @@
 \begin{frame}[fragile]
   \frametitle{Popis funkcí}
 
+  \heading{Seznam funkcí, které chceme obsluhovat}
   \begin{itemize}
   \item \texttt{struct file\_operations} (\header{linux/fs.h})
-  \item Seznam funkcí, které chceme obsluhovat
-  \item Parametr pro \texttt{cdev\_add}, jsou v \texttt{miscdevice} apod.
+  \item Parametr pro \texttt{cdev\_add}, součást \texttt{miscdevice} apod.
   \end{itemize}
 
+  \pause
+
   \begin{lstlisting}[language=C]
-struct module *owner; /* = THIS_MODULE */
-int (*open)(struct inode *inode, struct file *filp)
-ssize_t (*read)(struct file *filp, char __user *buf, size_t count, loff_t *offp)
-int (*release)(struct inode *inode, struct file *filp);
+ssize_t (*write)(struct file *filp, const char __user *buf, size_t count, loff_t *offp)
   \end{lstlisting}
 
   \pause
@@ -282,7 +281,7 @@ int (*release)(struct inode *inode, struct file *filp);
   \begin{itemize}
   \item \texttt{filp->private\_data} slouží programátorovi (libovolně)
   \item \texttt{offp} slouží programátorovi (k poznamenání průběhu)
-  \item \texttt{\_\_user} značí ukazatel od uživatele
+  \item \texttt{\_\_user} značí ukazatel od uživatele (tomu nevěříme)
   \item Návratové hodnoty
   \begin{itemize}
   \item \texttt{int} -- záporné = \texttt{-Echyba}, jinak 0
@@ -290,6 +289,47 @@ int (*release)(struct inode *inode, struct file *filp);
     zpracovaných znaků
   \end{itemize}
   \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \begin{enumerate}
+  \item Najděte všechny možné funkce, které lze obsluhovat
+  \begin{itemize}
+  \item Najděte \texttt{struct file\_operations} v lxr
+  \item Projděte strukturu
+  \end{itemize}
+  \item Najděte možné chybové návratové hodnoty
+  \begin{itemize}
+  \item Najděte \texttt{EPERM} v lxr
+  \item Projděte ostatní
+  \end{itemize}
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Příklad operací}
+  \begin{lstlisting}[language=C]
+struct file_operations my_fops = {
+  .owner = THIS_MODULE,
+  .open = my_open,
+  .write = my_write,
+  .release = my_release,
+};
+
+int my_open(struct inode *inode, struct file *filp) {
+  filp->private_data = __something;
+  return 0;
+}
+
+ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t *offp) {
+  /* filp->private_data is __something here */
+  if (count == 0)
+    return -EINVAL;
+  return 0;
+}
+  \end{lstlisting}
 
 \end{frame}
 
@@ -373,16 +413,34 @@ int (*release)(struct inode *inode, struct file *filp);
   \item Jiná délka dat
   \item Jiné zarovnání struktur
   \end{itemize}
+  \end{itemize}
 
-  \pause
+  \bigskip
 
-  \item Jádro definuje pevné typy (z hlediska počtu bitů)
+  \begin{center}
+  \begin{tabular}{|c|c|c|} \hline
+  Uživatel (32-bit) & & Jádro (64-bit) \\ \hline
+  \texttt{data} ... 4 bajty &
+  \begin{lstlisting}[language=C]
+struct my {
+  void *data;
+};
+  \end{lstlisting} &
+  \texttt{data} ... 8 bajtů \\ \hline
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Pevné typy v jádře}
+  \framesubtitle{z hlediska počtu bitů}
+
   \begin{itemize}
   \item \header{linux/types.h}
   \item \texttt{\_\_u8}, \texttt{\_\_u16}, \texttt{\_\_u32}, \texttt{\_\_u64}
   \item \texttt{\_\_s8}, \texttt{\_\_s16}, \texttt{\_\_s32}, \texttt{\_\_s64}
   \item Ukazatele musí být v union s \texttt{\_\_u64}
-  \end{itemize}
   \end{itemize}
 
   \begin{center}
