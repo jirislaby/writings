@@ -237,79 +237,19 @@ future.}
 \subsection{\MT{Pointer Analysis in \Stanse}}
 
 \MT{
+When analysing programs involving pointers, it is almost always necessary to use some pointer analysis to support the main one. There are many kinds of pointer analyses differing in accuracy and speed. Since different program analyses may have different requirements to pointer analyses, the \Stanse framework should ideally provide all available pointer analyses to checkers.
 
-When analysing programming languages involving pointers, it is almost always
-necessary to use an appropriate kind of pointer analysis. Since \texttt{C} is
-such a type of programming language, the \Stanse framework should provide a
-pointer analysis. But there are many different kind of analyses. Many of them
-are flow-insensitive, some are context-insensitive, some are
-field-insensitive, and so on. There are many pointer analyses that combine
-mentioned properties to balance between precision and performance.
-
-It is difficult to predict, what pointer analyses are the most likely to be
-used in checkers implemented in \Stanse in future. Therefore the \Stanse
-framework does not contain any particular implementation of pointer analysis.
-Instead, we have implemented \textit{Steensgard}'s flow-insensitive and
-context-insensitive points-to analysis and also \textit{Shapiro-Horowitz}'s
-points-to analysis, which allows parametrization between Steensgard's and
-Andersen's points-to analyses. \textit{Shapiro-Horowitz}'s points-to analysis
-is flow-insensitive but can be context-sensitive. Both analyses are currently
-implemented as regular checkers. These analyses can be used in other checkers
-by loading particular analysis as a sub-checker.
-
-The decision of implementing pointer analyses in separate checkers has one
-important negative drawback. When two or more checkers are run simultaneously
-in \Stanse and they use the same kind of pointer analysis (as their own
-sub-checker), then the pointer analysis is executed for each checker
-independently - i.e.~several times. If the points to analyses were implemented
-inside the \Stanse framework, this will not happen.
-
-The reason for implementing points to analyses in checkers instead of in the
-\Stanse framework is just because we have not made a final decision, which
-pointer analyses are the best to be put into the framework. The current
-solution with checkers is a temporary one.
+Nevertheless, the \Stanse framework currently provides just two pointer analyses: \textit{Steensgaard}'s\cite{SG96} and \textit{Shapiro-Horowitz}'s\cite{SH97} analyses. Both analyses are \emph{may} analyses - they compute an over-approximation of an accurate solution. The \textit{Steensgard}'s analysis is very fast and it is widely used in practice. On the other hand it is not very accurate. The \textit{Shapiro-Horowitz}'s analysis allows parametrization between \textit{Steensgard}'s and \textit{Andersen}'s analyses. One can therefore balance between speed of \textit{Steensgard}'s analysis and accuracy of \textit{Andersen}'s one.
 }
 
 \subsection{\MT{Matching Language Constructs}}
 
 \MT{
+Many static analyses changes their internal state only on some subset of program expressions. For example, when analysing race conditioning in a parallel program, one may only focus to expressions involving synchronization, while ignoring all others. The \Stanse framework therefore provides a specification language for determining a set of program expressions.
 
-Checkers, as implementations of may static analyses, usually work with some
-syntactical subset of language constructs. On these constructs the checkers
-define how sets of their abstract states changes. On the remaining language
-constructs the abstract states do not change at all, i.e.~state transformation
-function on such the states is just identity.
+The language defines a collection of \emph{patterns}. Each pattern is supposed to identify a single specific kind of sub-trees in AST of analysed program. A pattern itself is therefore also a sub-tree of AST, where some of its vertices are ``special''. They allow to define a set of possible sub-trees at that vertex.
 
-It depends on particular checker which constructs affect sets of its abstract
-states and which do not. Therefore \Stanse offers checkers a parametric
-specification of language subset, which is important for them. It works as
-follows.
-
-Since AST seems to be very useful internal representation of an analysed code
-for many types of may analyses, the \Stanse framework defines a simple
-language speaking about structure of AST. In this language a checker can
-specify, what kinds of sub-trees of AST the checker is interested in. A basic
-construct in this simple language is so called \emph{pattern}. It is an XML
-description of particular subtree in ATS, which may contain special nodes --
-keywords it this language, which allow parametrization of shape and also
-appearance of particular AST nodes in the tree. Therefore, a pattern is a
-specifications of whole set of AST sub-trees. And collection of patterns
-constitute the parametric specification of language constructs a checker is
-interested in.
-
-The \Stanse framework contains a library, which provides loading of patterns
-and also functions scanning AST of analysed functions to find matching
-instances of patterns.
-
-When a checker knows where in an AST matches which pattern, it then simply
-knows where should be applied which action. This greatly simplifies
-implementation of checkers.\todo{English}
-
-A similar system of recognition of specific language constructs was introduced
-in~\cite{METAL}. Their language METAL allows parametrization of C grammar,
-instead of parametrizing AST subtrees as \Stanse's patterns do. Nevertheless,
-the purpose of both approaches is the same.
-
+Checkers in \Stanse intensively work with AST. So identifying expressions again in terms of AST is very practical. On the other hand, there are other successful approaches. For example, in specification language METAL~\cite{METAL} directly a \texttt{C} expression can be parametrized to define a set.
 }
 
 \subsection{Traversing Internal Representation}
@@ -330,42 +270,31 @@ specifying
 \end{itemize}
 This makes implementation of new algorithms extremely simple.
 
-
 \MT{
-
 For example, when a checker must implement a forward flow-sensitive analysis,
 then it asks the \Stanse framework to traverse paths in CFGs in forward
-depth-first manner. This can be implemented by a single call to a library
+depth-first manner. This can be implemented by a single call to a
 function \texttt{traverseCFGToDepthForward}. It takes a particular CFG as an
-argument and also subclass of \Stanse library class \texttt{CFGPathVisitor}.
+argument and also subclass of \Stanse class \texttt{CFGPathVisitor}.
 There the checker implements an action, which should be taken whenever a CFG
 node is visited (already in the requested order). The checker implements the
 action in a method \texttt{visit} of the subclass.
 
-Another example is a support for interprocedural analysis. It is common for
-interprocedural analyses to build function summaries. Unfortunatelly, these
-summaries may differ from one analysis to another. It is difficult in general
-to build a single universal representation of function summaries, which would
-suit to any kind of analysis. Therefore, instead of trying to provide one, the
-\Stanse framework provides libraries, which are likely to be helpful in
-constructing many different kinds of summaries for different analyses. Those
-libraries provides automated mapping between arguments and formal parameters
-in call sites (library \texttt{ArgumentPassingManager}) and automated mapping
-of return values back to calling functions (library
-\texttt{ReturnValuePassingManager}). In addition, for those interprocedural
-analyses, which do not construct summaries at all (and rely on function
-inlining), \Stanse provides an automated traversation among different CFGs
-according to function calls. Again, this can be done by a single call to
-the \Stanse library from a checker
-(e.g.~\texttt{traverseCFGPathsForwardInterprocedural}).
-
+In addition, for those interprocedural analyses, which do not construct summaries, \Stanse provides an automated traversal among different CFGs
+according to function calls (involving automated parameters passing and value returning). Again, this can be done by a single call to
+the \Stanse framework.
 }
 
-
-
- The discussed
-functionality is shown to the left of internal representation in
+The discussed functionality is shown to the left of internal representation in
 Fig.~\ref{fig:architecture}.
+
+\subsection{Support for Function Summaries}
+\label{ssec:summaries}
+
+\MT{
+
+Interprocedural analyses typically build function summaries. Unfortunately, these summaries may differ from one analysis to another. Nevertheless, quite common part in building many summaries is passing formal and actual parameters in call sites and mapping return values to appropriate variables. Therefore, the \Stanse framework provides classes simplifying the parameters passing and values returning for checkers. These classes also provide conversion of a given expression at a call site in callee into an equal expression in called function. The conversion can also be required in the opposite direction (for values returning).
+}
 
 \subsection{Concept of Checkers}
 
