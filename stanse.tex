@@ -103,8 +103,8 @@ can be seen in two ways:
 
 \MT{
 The tools mentioned so far, including \Stanse, provide may\todo{this was
-circled} analysis. There is also wide range of static analysis tools providing
-must analysis. Successful tools like \textsc{Pex}, \textsc{Klee},
+circled} analysis. There is also a wide range of static analysis tools
+providing must analysis. Successful tools like \textsc{Pex}, \textsc{Klee},
 \textsc{Exe}, or \textsc{Sage} are of that kind. Since may and must analyses
 are complementary, they are very different from \Stanse in basic principles.
 }
@@ -224,32 +224,55 @@ all sources are present in the memory at once.}
 
 \MT{In the current implementation of streaming, each source file streamed out
 from the memory is completely discarded. \Stanse does not backup already
-parsed internal structures into a auxiliary files before discarding. As a
+parsed internal structures into auxiliary files before discarding. As a
 consequence, when internal structures of the discarded file are needed again,
 \Stanse starts the parsing pipeline of the file from scratch to recreate
 requested internal structures. Although loading of previously parsed internal
 structures from auxiliary files would speed up the streaming process, a
 profiling of \Stanse's performance on the Linux kernel has not shown
-streaming to be a performance bottleneck. A usage of such auxiliary files can
-be implemented, if streaming performance became a performance problem in the
-future.}
+streaming to be a performance bottleneck. A usage of such auxiliary files
+would be implemented, if streaming performance became a performance problem in
+the future.}
 
 \subsection{\MT{Pointer Analysis in \Stanse}}
 
 \MT{
-When analysing programs involving pointers, it is almost always necessary to use some pointer analysis to support the main one. There are many kinds of pointer analyses differing in accuracy and speed. Since different program analyses may have different requirements to pointer analyses, the \Stanse framework should ideally provide all available pointer analyses to checkers.
+When analysing programs involving pointers, it is almost always necessary to
+use some pointer analysis to support the main one. There are many kinds of
+pointer analysis. They differ in accuracy and speed. Since different program
+analyses may have different requirements to pointer analyses, the \Stanse
+framework should ideally provide all available pointer analyses to checkers.
 
-Nevertheless, the \Stanse framework currently provides just two pointer analyses: \textit{Steensgaard}'s\cite{SG96} and \textit{Shapiro-Horowitz}'s\cite{SH97} analyses. Both analyses are \emph{may} analyses - they compute an over-approximation of an accurate solution. The \textit{Steensgard}'s analysis is very fast and it is widely used in practice. On the other hand it is not very accurate. The \textit{Shapiro-Horowitz}'s analysis allows parametrization between \textit{Steensgard}'s and \textit{Andersen}'s analyses. One can therefore balance between speed of \textit{Steensgard}'s analysis and accuracy of \textit{Andersen}'s one.
+Nevertheless, the \Stanse framework currently provides just two pointer
+analyses: \textit{Steensgaard}'s~\cite{SG96} and
+\textit{Shapiro-Horowitz}'s~\cite{SH97}. Both analyses are \emph{may} analyses
+-- they compute an over-approximation of an accurate solution. The
+\textit{Steensgard}'s analysis is very fast and it is widely used in practice.
+On the other hand it is not very accurate. The \textit{Shapiro-Horowitz}'s
+analysis allows parametrization between \textit{Steensgard}'s and
+\textit{Andersen}'s analyses. One can therefore balance between speed of
+\textit{Steensgard}'s analysis and accuracy of \textit{Andersen}'s one.
 }
 
 \subsection{\MT{Matching Language Constructs}}
 
 \MT{
-Many static analyses changes their internal state only on some subset of program expressions. For example, when analysing race conditioning in a parallel program, one may only focus to expressions involving synchronization, while ignoring all others. The \Stanse framework therefore provides a specification language for determining a set of program expressions.
+Many static analyses change their internal state only on some subset of
+program expressions. For example, when finding race conditions in a
+parallel program, one may only focus on expressions involving synchronization,
+while ignoring all others. The \Stanse framework therefore provides a
+specification language for determining a set of program expressions.
 
-The language defines a collection of \emph{patterns}. Each pattern is supposed to identify a single specific kind of sub-trees in AST of analysed program. A pattern itself is therefore also a sub-tree of AST, where some of its vertices are ``special''. They allow to define a set of possible sub-trees at that vertex.
+The language defines a collection of \emph{patterns}. Each pattern is supposed
+to identify a single specific kind of sub-trees in AST of analysed program. A
+pattern itself is therefore also a sub-tree of AST, where some of its vertices
+are ``special''. They allow to define a set of possible sub-trees at that
+vertex.
 
-Checkers in \Stanse intensively work with AST. So identifying expressions again in terms of AST is very practical. On the other hand, there are other successful approaches. For example, in specification language METAL~\cite{METAL} directly a \texttt{C} expression can be parametrized to define a set.
+Checkers in \Stanse work with AST intensively. So identifying expressions in
+terms of AST is very practical. On the other hand, there are other successful
+approaches. For example, in specification language METAL~\cite{METAL}, a
+\texttt{C} expression can be directly parametrized to define a set.
 }
 
 \subsection{Traversing Internal Representation}
@@ -275,7 +298,7 @@ For example, when a checker must implement a forward flow-sensitive analysis,
 then it asks the \Stanse framework to traverse paths in CFGs in forward
 depth-first manner. This can be implemented by a single call to a
 function \texttt{traverseCFGToDepthForward}. It takes a particular CFG as an
-argument and also subclass of \Stanse class \texttt{CFGPathVisitor}.
+argument and also a subclass of \Stanse class \texttt{CFGPathVisitor}.
 There the checker implements an action, which should be taken whenever a CFG
 node is visited (already in the requested order). The checker implements the
 action in a method \texttt{visit} of the subclass.
@@ -293,7 +316,15 @@ Fig.~\ref{fig:architecture}.
 
 \MT{
 
-Interprocedural analyses typically build function summaries. Unfortunately, these summaries may differ from one analysis to another. Nevertheless, quite common part in building many summaries is passing formal and actual parameters in call sites and mapping return values to appropriate variables. Therefore, the \Stanse framework provides classes simplifying the parameters passing and values returning for checkers. These classes also provide conversion of a given expression at a call site in callee into an equal expression in called function. The conversion can also be required in the opposite direction (for values returning).
+Interprocedural analyses typically build function summaries. Unfortunately,
+these summaries may differ from one analysis to another. Nevertheless, quite
+common part in building many summaries is passing formal and actual parameters
+to call sites and mapping return values to appropriate variables. Therefore,
+the \Stanse framework provides classes simplifying the parameters passing and
+values returning for checkers. These classes also provide a conversion of a
+given expression in the caller into an equal expression in the called
+function. The conversion can also be required in the opposite direction, i.e.
+for returned values.
 }
 
 \subsection{Concept of Checkers}
