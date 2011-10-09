@@ -54,7 +54,7 @@
   \Stanse is a free (available under the GPLv2 license) modular framework
   for finding bugs in C programs using static analysis. Its two main design
   goals are 1) ability to process large software projects like the Linux kernel and
-  2) exntensibility with new bug-finding techniques with a minimal effort.
+  2) extensibility with new bug-finding techniques with a minimal effort.
   % Above that the reported results can be presented in multiple ways, web
   % included.
   Currently there are four bug-finding algorithms implemented within
@@ -129,7 +129,7 @@ aimed to reduce effort when implementing a new static analysis technique.
 Architecture of the framework is depicted in Fig.~\ref{fig:architecture},
 and is more or less standard. The bug-finding algorithms are implemented as
 \emph{checkers}, and will be described in more detail in
-Section~\ref{sec:checkers}. In this section we focus on the fuctionality of
+Section~\ref{sec:checkers}. In this section we focus on the functionality of
 the framework itself, describing only the non-standard or for some other
 reason interesting features.
 
@@ -162,7 +162,7 @@ configured source files.
 % Fig.~\ref{fig:architecture}. 
 There can be many checkers running simultaneously in \Stanse. However they
 cannot share any data and proceed independently.
-Checkers themselves can also be configired through their own configuration
+Checkers themselves can also be configured through their own configuration
 files. 
 % They are
 % depicted at the top right corner of Fig.~\ref{fig:architecture}.
@@ -241,12 +241,13 @@ changed if streaming performance becomes a problem in the future.
 
 \subsection{Pointer Analysis in \Stanse}
 
-\MT{
-When analysing programs involving pointers, it is almost always necessary to
-use some pointer analysis to support the main one. There are many kinds of
-pointer analysis. They differ in accuracy and speed. Since different program
-analyses may have different requirements to pointer analyses, the \Stanse
-framework should ideally provide all available pointer analyses to checkers.
+Since C programs tend to heavily use pointers, it almost always becomes a
+necessity to use some form of pointer analysis. There are many different
+known approaches to pointer analysis, differing in speed and accuracy. As
+each bug-finding/program analysis technique may have different requirements
+regarding pointer analysis, a framework like \Stanse
+should ideally implement several different pointer analysis techniques and
+provide them to its checkers.
 
 Nevertheless, the \Stanse framework currently provides just two pointer
 analyses: \textit{Steensgaard}'s~\cite{SG96} and
@@ -257,11 +258,10 @@ On the other hand it is not very accurate. The \textit{Shapiro-Horowitz}'s
 analysis allows parametrization between \textit{Steensgard}'s and
 \textit{Andersen}'s analyses. One can therefore balance between speed of
 \textit{Steensgard}'s analysis and accuracy of \textit{Andersen}'s one.
-}
 
-\subsection{\MT{Matching Language Constructs}}
 
-\MT{
+\subsection{Matching Language Constructs}
+
 Many static analyses change their internal state only on some subset of
 program expressions. For example, when finding race conditions in a
 parallel program, one may only focus on expressions involving synchronization,
@@ -274,17 +274,17 @@ pattern itself is therefore also a sub-tree of AST, where some of its vertices
 are ``special''. They allow to define a set of possible sub-trees at that
 vertex.
 
-Checkers in \Stanse work with AST intensively. So identifying expressions in
-terms of AST is very practical. On the other hand, there are other successful
-approaches. For example, in specification language METAL~\cite{METAL}, a
-\texttt{C} expression can be directly parametrized to define a set.
-}
+This is, however, not the only possible approach. For example, in the
+METAL~\cite{METAL} specification language, a \texttt{C} expression can be
+directly parametrized to define a set. The solution we implemented exploits
+the fact that checkers in \Stanse work with AST intensively, and therefore
+identifying expressions in terms of AST is very practical.
 
 \subsection{Traversing Internal Representation}
 \label{ssec:travers}
 
 Although a checker may need to work with the internal structures in an
-arbitrary way, most of checkers walk through CFGs using some standard
+arbitrary way, most checkers walk through CFGs using some standard
 strategy. To prevent unnecessary reimplementations, the most important and
 heavily used traversal methods are implemented directly inside the framework.
 With this functionality, one can implement a new checker (or its part) by
@@ -292,47 +292,47 @@ specifying
 \begin{itemize}
 \item whether it should go through CFGs forwards or backwards, breadth-first
   or depth-first,
-\item if the interprocedural walk-through should be performed or not (if
+\item whether the interprocedural walk-through should be performed or not (if
   not, the function calls are ignored), and
 \item a method (callback) to be called for each visited node in a CFG.
 \end{itemize}
 This makes implementation of new algorithms extremely simple.
 
-\MT{
-For example, when a checker must implement a forward flow-sensitive analysis,
-then it asks the \Stanse framework to traverse paths in CFGs in forward
+For example, when a checker needs to implement a forward flow-sensitive analysis,
+it may ask the \Stanse framework to traverse paths in CFGs in forward
 depth-first manner. This can be implemented by a single call to a
-function \texttt{traverseCFGToDepthForward}. It takes a particular CFG as an
-argument and also a subclass of \Stanse class \texttt{CFGPathVisitor}.
-There the checker implements an action, which should be taken whenever a CFG
+function \texttt{traverseCFGToDepthForward}, which takes as an argument a
+CFG and a subclass of \Stanse class \texttt{CFGPathVisitor}. In this class
+the checker defines the action which should be taken whenever a CFG
 node is visited (already in the requested order). The checker implements the
 action in a method \texttt{visit} of the subclass.
 
-In addition, for those interprocedural analyses, which do not construct summaries, \Stanse provides an automated traversal among different CFGs
-according to function calls (involving automated parameters passing and value returning). Again, this can be done by a single call to
-the \Stanse framework.
-}
+In addition, for those interprocedural analyses which do not construct
+summaries \Stanse provides an automated traversal among different CFGs
+according to function calls (involving automated parameters passing and
+value returning). Again, this can be done using a single call to the \Stanse
+framework.  
 
-The discussed functionality is shown to the left of internal representation in
-Fig.~\ref{fig:architecture}.
+The functionality described in this section is shown in Fig.~\ref{fig:architecture} as
+``Code navigating libraries''.
+
+% The discussed functionality is shown to the left of internal representation in
+% Fig.~\ref{fig:architecture}.
 
 \subsection{Support for Function Summaries}
 \label{ssec:summaries}
-
-\MT{
 
 Interprocedural analyses typically build function summaries. Unfortunately,
 these summaries may differ from one analysis to another. Nevertheless, quite
 common part in building many summaries is passing formal and actual parameters
 to call sites and mapping return values to appropriate variables. Therefore,
-the \Stanse framework provides classes simplifying the parameters passing and
+the \Stanse framework provides classes simplifying the parameter passing and
 values returning for checkers. These classes also provide a conversion of a
 given expression in the caller into an equal expression in the called
 function. The conversion can also be required in the opposite direction, i.e.
 for returned values.
-}
 
-\subsection{Concept of Checkers}
+\subsection{The Concept of Checkers}
 
 In the \Stanse framework a checker is an implementation of some concrete
 static analysis technique. Each checker has an access to a shared internal
@@ -370,16 +370,16 @@ class \texttt{MyCheckerCreator}. It comprises adding a line
   \label{fig:bugtrace}
 \end{figure}
 
-Once a checker finds an error, it reports it back to the framework as a
-commented \emph{error trace} - a path in the analysed code demonstrating this
-error. The \Stanse framework provides a data type for describing an error. 
+Once a checker finds an error, it reports the error back to the framework in
+the form of an annotated \emph{error trace} - a path in the analysed code demonstrating this
+error. A datatype is provided in the \Stanse framework to describe an error. 
 In the framework there are then several possibilities how to present the error
 traces back to the user of \Stanse: they can be printed to the console,
 displayed using a built-in error trace browser in the GUI (see
 Fig.~\ref{fig:bugtrace}), or saved to an external file in XML format. This
 XML file has a wide variety of possible applications. For example, we supply a
 tool transforming the XML file into an \textsc{SQLite} database. The database
-is complemented with a web interface allowing to browse errors in the database
+is supplemented with a web interface allowing to browse errors in the database
 via a web browser. Using the web browser or the built-in graphical error
 browser, one can mark errors as real bugs or false positives. \Stanse also
 provides various statistics of errors like number of errors per checker,
