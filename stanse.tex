@@ -113,9 +113,9 @@ can be seen in two ways:
 The paper is structured as follows. Section~\ref{sec:framework}
 describes the functionality provided by the framework, while
 Section~\ref{sec:checkers} is devoted to the four existing checkers.
-Section~\ref{sec:results} presents some results of \Stanse on the Linux
+In Section~\ref{sec:results} we present some results of running \Stanse on the Linux
 kernel. The last section summarizes the basic strengths of \Stanse and
-mentions some directions of its future development.
+mentions some directions of future development.
 
 %}}}
 %{{{ Framework
@@ -124,13 +124,14 @@ mentions some directions of its future development.
 \label{sec:framework}
 
 The \Stanse framework is modular and fully open. It is designed to allow
-static analysis of large software projects like Linux kernel. Further it is
+static analysis of large software projects like Linux kernel. Furthermore it is
 aimed to reduce effort when implementing a new static analysis technique.
-Architecture of the framework is depicted in Fig.~\ref{fig:architecture}. As
-can be seen, the tool consists of standard parts for these kinds of tools.
-Apart from that there are also parts which are not common to all static
-analyzers or are specialized in some way. In the following subsections we
-describe those.
+Architecture of the framework is depicted in Fig.~\ref{fig:architecture},
+and is more or less standard. The bug-finding algorithms are implemented as
+\emph{checkers}, and will be described in more detail in
+Section~\ref{sec:checkers}. In this section we focus on the fuctionality of
+the framework itself, describing only the non-standard or for some other
+reason interesting features.
 
 \begin{figure}[!htb]
   \centering
@@ -145,56 +146,63 @@ The \Stanse framework contains data structures capturing a configuration of an
 analysis to be performed. We always need to know what source files to analyze
 and by what checkers. That information we call \emph{configuration}. 
 
-There are several ways how to tell \Stanse what source files to analyse. Besides
-the standard possibilities (a single given file, all files from a given
-directory, all files listed in a given file), \Stanse can also derive all
+There are several ways how to tell \Stanse which source files to analyse. Besides
+the standard possibilities (a given file, all files from a given
+directory, all files listed in a list), \Stanse can also derive all
 the necessary information from a project \textsf{Makefile}. In this case,
 \Stanse also remembers compiler flags for preprocessing purposes. This
-functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. At the
-bottom left corner of Fig.~\ref{fig:architecture}, we show a list of
-\texttt{.C} files which are identified in the configuration.
+functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. 
+% At the
+% bottom left corner of Fig.~\ref{fig:architecture}, we show a list of
+% \texttt{.C} files which are identified in the configuration.
 
-We also need to specify checkers which should be applied to configured source
-files. We can see the list of selected checkers on the top of
-Fig.~\ref{fig:architecture}. There can be many checkers running simultaneously
-in \Stanse. But they do not see each other. They proceed independently.
-Checkers themselves might require their own configuration files. They are
-depicted at the top right corner of Fig.~\ref{fig:architecture}.
-
-The configuration can be passed to the \Stanse framework via command line
-arguments. User can also add them one by one in the graphical interface.
+The user must also specify the checkers which should be run on the
+configured source files. 
+% We can see the list of selected checkers on the top of
+% Fig.~\ref{fig:architecture}. 
+There can be many checkers running simultaneously in \Stanse. However they
+cannot share any data and proceed independently.
+Checkers themselves can also be configired through their own configuration
+files. 
+% They are
+% depicted at the top right corner of Fig.~\ref{fig:architecture}.
+The configuration can be passed to the \Stanse framework either via command line
+arguments, or using the graphical interface.
 
 \subsection{Parsing Source Files}
 
-The \Stanse framework can process source files written in C. More specifically
-the ISO/ANSI C99 standard and most of the GNU C extensions. This allows
-\Stanse to process software projects like the Linux kernel. We are currently
-working on support of other languages, in particular C++. We have a prototype
-implementation, which is included in the distribution already. The parsing
-pipeline, including a preprocessing the source files by the standard GNU C
-preprocessor, is depicted at the bottom in Fig.~\ref{fig:architecture}.  It is
-important to note that we do not parse all the sources in a sequence one by
-one as they appear in a configuration. Since we use streaming (discussed
-later), the pipeline is applied several times independently for individual
-source files.
+The \Stanse framework can process source files written in C, more
+specifically in the ISO/ANSI C99 standard together with most of the GNU C
+extensions. This allows \Stanse to process software projects like the Linux
+kernel. We are currently working on support of other languages, in
+particular C++, a prototype implementation for which is included in the
+distribution. The parsing pipeline, including a preprocessing the source
+files by the standard GNU C preprocessor, is depicted at the bottom in
+Fig.~\ref{fig:architecture}.  It is important to note that we do not parse
+the source files in a sequence one by one as they appear in a
+configuration. Since we use streaming (which we discuss later), the pipeline
+is applied as needed for each individual source file.
 
-The parser in \Stanse is a generated one. We developed a grammar and use
-\textsc{AntLR} to generate the parser. We have to do this, because at the time
-of writing this paper, there are no proper parsers able to parse most of the
-GNU C. Especially the Linux Kernel. There is one notable exception:
-\textsc{Clang}. It is slowly improving and will be able to handle the Linux
-kernel in the near future. But yet, it still contains bugs and cannot be used
-reliably. Our plan is to use its parser after it improves.
+The parser used in \Stanse is generated using the \textsc{AntLR} tool from
+our own annotated C grammar. The reason for us to write our own parser was
+that at the time we started to develop \textsc{Stanse} we could not find
+free parser which, while being suitable for our purposes, would be able to
+parse most of the GNU C. (Linux Kernel makes heavy use of GNU C language
+extensions.)  There is one notable exception: \textsc{Clang}, which is
+slowly improving and will be able to handle the Linux kernel in the near
+future. However, in its current form it still contains bugs and cannot be
+used reliably. Our plan is to switch from our parser to \textsc{Clang} once
+it becomes stable and feature complete.
 
-Also, one may object that we could use the parser from the GNU compiler (GCC).
-But the code there is not prepared for static analysis. Its internal
-structures are not suitable for our purposes. For example the CFG is built on
-the top of RTL or tree representation (we encourage the reader to look into
-the GCC manual where these are described).
+Also, one may object that we could use the parser from the GNU compiler
+(GCC).  Unfortunately this parser, and most importantly its internal
+structures, is not suitable for our purposes.  For example the CFG is built
+on the top of RTL or tree representation (we encourage the reader to look
+into the GCC manual where these are described).
 
 \subsection{Program Internal Representation}
 
-When the code is parsed, we have \emph{internal structures}: a call graph
+Once the code is parsed, its is represented using \Stanse's \emph{internal structures}: a call graph
 among functions, a control flow graph (CFG) for each function, and an abstract
 syntax tree (AST) for the whole file. Subtrees in the AST are referenced from
 appropriate CFG nodes. We show these structures in the middle of
@@ -203,39 +211,35 @@ or graphical form.
 
 Since we aim at large software projects consisting of hundreds or thousands of
 modules (compilation units), it is often impossible in practice to store the
-corresponding internal structures in the memory all at once. The \Stanse
+corresponding internal structures in the memory all at the same time. The \Stanse
 framework therefore applies automatic \emph{streaming} of the internal
 structures. This is currently performed on a module basis. Instead of parsing
-all source modules at the beginning, a module is streamed in only when \Stanse
-needs to access some internal structure corresponding to the module. In other
-words, the internal structures are constructed in a lazy manner.
-% It means not everything is parsed at the start of the checking
-% process. Hence it is not a time or memory bottleneck at that time.
-
+all source modules in the beginning, a module is streamed in only when \Stanse
+needs to access some internal structure belonging to the module. In other
+words, the internal structures are constructed on demand, in a lazy manner.
 
 If the memory occupied by internal structures exceeds a given limit, some
 internal structures have to be freed before another module is streamed
-in. The structures to be freed are selected by the LRU (least recently used)
+in. The structures to be freed are selected using the LRU (least recently used)
 approach: \Stanse discards all internal structures of the module whose
 structures are not accessed for the longest time. If the discarded structure
 is accessed again later, the corresponding module is streamed back in. Both
 laziness of internal structures and streaming are completely invisible to
-checkers. \MT{A purpose of the streaming is to allow checkers to assume that
-all sources are present in the memory at once.}
+checkers. 
 
-\MT{In the current implementation of streaming, each source file streamed out
-from the memory is completely discarded. \Stanse does not backup already
+In the current implementation of streaming, each source file streamed out
+from the memory is completely discarded. \Stanse does not back up already
 parsed internal structures into auxiliary files before discarding. As a
 consequence, when internal structures of the discarded file are needed again,
 \Stanse starts the parsing pipeline of the file from scratch to recreate
 requested internal structures. Although loading of previously parsed internal
-structures from auxiliary files would speed up the streaming process, a
+structures from auxiliary files would speed up the streaming process,
 profiling of \Stanse's performance on the Linux kernel has not shown
-streaming to be a performance bottleneck. A usage of such auxiliary files
-would be implemented, if streaming performance became a performance problem in
-the future.}
+streaming to be a performance bottleneck. However this could be easily
+changed if streaming performance becomes a problem in the future.
 
-\subsection{\MT{Pointer Analysis in \Stanse}}
+
+\subsection{Pointer Analysis in \Stanse}
 
 \MT{
 When analysing programs involving pointers, it is almost always necessary to
