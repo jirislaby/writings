@@ -23,11 +23,10 @@
 
 \mode<presentation>
 {
-%  \usetheme{Warsaw}
 \usetheme{Madrid}
-
-  \setbeamercovered{transparent}
 }
+
+\setbeamertemplate{navigation symbols}{}
 
 \usepackage[czech]{babel}
 \usepackage[utf8]{inputenc}
@@ -53,7 +52,7 @@
 \institute[ITI] % (optional, but mostly needed)
 {ITI, Fakulta Informatiky}
 
-\date{19. 10. 2010}
+\date{11. 10. 2011}
 
 \subject{}
 % This is only inserted into the PDF information catalog. Can be left
@@ -111,7 +110,7 @@
   \begin{lstlisting}[language=C]
 int *addr;
 ...
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting}
@@ -125,10 +124,21 @@ store(a, addr);
   \frametitle{Příklad chyby souběhu}
 
   \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}[language=C]
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting}
+  \end{tabular}
+
+  \bigskip
+  \pause
+
   \begin{tabular}{c|c}
   Vlákno A & Vlákno B \\ \hline
   \begin{lstlisting}[language=C]
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 <schedule>
   \end{lstlisting} \\
@@ -141,11 +151,11 @@ a = a + 1;
   \begin{tabular}{c|c}
   Vlákno A & Vlákno B \\ \hline
   \begin{lstlisting}[language=C]
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
   \end{lstlisting} &
   \begin{lstlisting}[language=C]
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting}
@@ -158,12 +168,12 @@ store(a, addr);
   \begin{tabular}{c|c}
   Vlákno A & Vlákno B \\ \hline
   \begin{lstlisting}[language=C]
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} &
   \begin{lstlisting}[language=C]
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting}
@@ -175,22 +185,31 @@ store(a, addr);
   \frametitle{Řešení chyb souběhu}
 
   \begin{itemize}
-  \item Atomickou operací ve stylu \texttt{fetch\_inc\_store}
+  \item Atomickou operací ve stylu \texttt{load\_inc\_store}
   \begin{itemize}
-  \item Podpora CPU (zamknutí sběrnice, cache koherence)
-  \item Ne na všechno jsou operace (vesměs +, -, set, get)
+  \item Nutná podpora CPU
+  \item Ne na všechno jsou operace (vesměs jen +, -, load, store)
   \end{itemize}
+
+  \pause
+
   \item Kritickou sekcí
   \begin{itemize}
   \item Kus kódu vykonávaný max. jedním procesem
   \item Zámky
   \end{itemize}
+
+  \pause
+
   \item Read-copy-update (RCU)
   \begin{itemize}
   \item Podrobnosti v LDD
   \end{itemize}
   \end{itemize}
 \end{frame}
+
+\part{Atomické operace, bitmapy}
+\frame{\partpage}
 
 \begin{frame}[fragile]
   \frametitle{Atomické operace}
@@ -211,7 +230,7 @@ store(a, addr);
   \begin{lstlisting}[language=C]
 int *addr;
 ...
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} & $\Rightarrow$ &
@@ -290,6 +309,9 @@ atomic_inc(&a);
   \end{enumerate}
 \end{frame}
 
+\part{Zámky}
+\frame{\partpage}
+
 \begin{frame}
   \frametitle{Zámky}
 
@@ -326,15 +348,6 @@ atomic_inc(&a);
   \item \header{linux/spinlock.h}, \doc{Documentation/spinlocks.txt}
   \item \texttt{DEFINE\_SPINLOCK(lock)}, \texttt{spinlock\_t lock}
   \item \texttt{spin\_lock}, \texttt{spin\_unlock}
-  \item read/write varianty (\header{linux/rwlock.h})
-  \begin{itemize}
-  \item Jeden zapisovatel, více čitatelů (jen odůvodněné případy)
-  \item Dražší operace než obyčejný spinlock
-  \end{itemize}
-  \item \texttt{\_irq*} varianty
-  \begin{itemize}
-  \item Zákaz přerušení, poté spinlock
-  \end{itemize}
   \item Podobné \texttt{pthread} spinlockům
   \end{itemize}
 
@@ -345,7 +358,7 @@ atomic_inc(&a);
   \begin{lstlisting}[language=C]
 int *addr;
 ...
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} & $\Rightarrow$ &
@@ -354,7 +367,7 @@ DEFINE_SPINLOCK(addr_lock);
 int *addr;
 ...
 spin_lock(&addr_lock);
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
 spin_unlock(&addr_lock);
@@ -363,6 +376,55 @@ spin_unlock(&addr_lock);
   \emph{\footnotesize Řešení pomocí spinlocků}
   \end{center}
 
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Spinlocky a přerušení}
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno & Přerušení \\ \hline
+  \begin{lstlisting}[language=C]
+spin_lock(&addr_lock);
+<interrupt>
+spin_unlock(&addr_lock);
+.
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+.
+spin_lock(&addr_lock);
+// ^^^ deadlock ^^^
+spin_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \heading{\texttt{\_irq*} varianty}
+  \begin{itemize}
+  \item Zákaz přerušení, poté spinlock
+  \end{itemize}
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno & Přerušení \\ \hline
+  \begin{lstlisting}[language=C]
+spin_lock_irq(&addr_lock);
+// interrupt cannot trigger
+spin_unlock_irq(&addr_lock);
+.
+.
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+.
+.
+spin_lock(&addr_lock);
+...
+spin_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
 \end{frame}
 
 \begin{frame}[fragile]
@@ -388,7 +450,7 @@ spin_unlock(&addr_lock);
   \begin{lstlisting}[language=C]
 int *addr;
 ...
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} & $\Rightarrow$ &
@@ -397,7 +459,7 @@ DEFINE_MUTEX(addr_lock);
 int *addr;
 ...
 mutex_lock(&addr_lock);
-int a = fetch(addr);
+int a = load(addr);
 a = a + 1;
 store(a, addr);
 mutex_unlock(&addr_lock);
@@ -420,10 +482,15 @@ mutex_unlock(&addr_lock);
   \end{itemize}
 
   \pause
+  \medskip
+  \medskip
 
   \heading{Big Kernel Lock (BKL)}
   \begin{itemize}
   \item NEPOUŽÍVAT
+  \begin{itemize}
+  \item V nových jádrech už ani není
+  \end{itemize}
   \item Hrubozrnný zámek
   \item Pochází z dob počátku Linuxu
   \item \texttt{lock\_kernel}, \texttt{unlock\_kernel}
@@ -444,13 +511,13 @@ mutex_unlock(&addr_lock);
   \end{itemize}
   \item Zápis
   \begin{itemize}
-  \item Umožněn pouze po 5 znacích (vrací max. 5)
+  \item Umožněn max. po 5 znacích (\texttt{.write} vrací max. 5)
   \item Spí 10 ms po každém zápisu znaku do bufferu (\texttt{msleep} z
     \header{linux/delay.h})
   \end{itemize}
   \item Čtení
   \begin{itemize}
-  \item Vrátí naráz celých 128 B
+  \item Vrátí naráz celých 128 B (je-li \texttt{count} dostatečně velký)
   \item Musí vidět změny pouze po 5 znacích (až na poslední pětici)
   \end{itemize}
   \item Vyzkoušejte
@@ -458,7 +525,7 @@ mutex_unlock(&addr_lock);
 
   \medskip
 
-  Pozn. 1: pb173/04\\
+  Pozn. 1: práce s \texttt{offp} v pb173/04\\
   Pozn. 2: odevzdat s domácím
 
 \end{frame}
@@ -489,8 +556,8 @@ mutex_unlock(&addr_lock);
   \begin{itemize}
   \item Zpomalují kritický kód
   \begin{itemize}
-  \item Odstraní se zámky
-  \item Např. kruhové buffery
+  \item Řešení: odstranit zámky
+  \item Např. kruhovými buffery
   \end{itemize}
 
   \pause
