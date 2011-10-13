@@ -1,0 +1,551 @@
+% vim: tw=78 ai sw=2 spell spelllang=en
+
+\documentclass[handout,xcolor=dvipsnames]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+
+% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
+%
+% In principle, this file can be redistributed and/or modified under
+% the terms of the GNU Public License, version 2.
+%
+% However, this file is supposed to be a template to be modified
+% for your own needs. For this reason, if you use this file as a
+% template and not specifically distribute it as part of a another
+% package/program, I grant the extra permission to freely copy and
+% modify this file as you see fit and even to delete this copyright
+% notice. 
+
+
+\mode<presentation>
+{
+%  \usetheme{Warsaw}
+\usetheme{Madrid}
+}
+
+\setbeamertemplate{navigation symbols}{}
+
+\usepackage[utf8]{inputenc}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+
+\usepackage{graphicx}
+\usepackage[final]{listings}
+\usepackage{multirow}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}}
+
+\title{\textsc{Stanse}}
+
+\subtitle{Bug-finding Framework for C Programs}
+
+\author[J. Obdržálek, J. Slabý, M. Trtík]{Jan~Obdržálek, \emph{Jiří~Slabý}, Marek~Trtík}
+
+\institute{ITI, Faculty of Informatics \\ Masaryk University}
+
+\date{Oct 16th 2011, Lednice}
+
+\subject{Theoretical Computer Science}
+% This is only inserted into the PDF information catalog. Can be left
+% out. 
+
+
+
+% If you have a file called "university-logo-filename.xxx", where xxx
+% is a graphic format that can be processed by latex or pdflatex,
+% resp., then you can add a logo as follows:
+
+% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
+% \logo{\pgfuseimage{university-logo}}
+
+
+
+% Delete this, if you do not want the table of contents to pop up at
+% the beginning of each subsection:
+% \AtBeginSubsection[]
+% {
+%   \begin{frame}<beamer>
+%     \frametitle{Outline}
+%     \tableofcontents[currentsection,currentsubsection]
+%   \end{frame}
+% }
+
+
+% If you wish to uncover everything in a step-wise fashion, uncomment
+% the following command: 
+
+%\beamerdefaultoverlayspecification{<+->}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Presentation Outline}
+
+  \begin{itemize}
+  \item What is \textsc{Stanse}
+  \pause
+  \item Current status
+  \begin{itemize}
+  \item What \textsc{Stanse} can do
+  \item What algorithms/techniques are contained
+  \end{itemize}
+  \pause
+  \item Future work
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{What is \textsc{Stanse}}
+  \begin{itemize}
+  \item Mainly a framework for new techniques
+  \begin{itemize}
+  \item No additional work, everything needed is available
+  \end{itemize}
+  \pause
+  \item But also implements some static analyses
+  \pause
+  \item Developed at ITI FI, MU
+  \pause
+  \item Written in Java
+  \begin{itemize}
+  \item Ease of new techniques implementation
+  \item Some drawbacks (see later)
+  \end{itemize}
+  \end{itemize}
+
+  \begin{center}
+  \includegraphics[height=3.5cm]{stanse}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Current State}
+
+  \begin{itemize}
+  \item \emph{Full ANSI C99 support}, including most GNU C extensions
+    \begin{itemize}
+    \item I.e. analyses the Linux kernel
+    \end{itemize}
+  \item Modular, easily extensible
+  \item Easy-to-use \emph{graphical interface} and error inspection
+  \item Checker--independent system for error reporting
+  \item Intra- and inter-procedural analysis
+  \item Batch + build system support (\textsc{make})
+  \item Web interface for errors tracking
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\textsc{Stanse} Parser}
+
+  \begin{center}
+  \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-parser}
+  \end{center}
+
+  \heading{Input: Source code} \\
+  \heading{Output: Internal representation}
+
+  \pause
+  \medskip
+
+  \heading{C parser}
+  \begin{itemize}
+  \item Preprocessor
+  \item Machine-generated (\textsc{antlr})
+  \begin{itemize}
+  \item Relatively slow
+  \end{itemize}
+  \item Output
+  \begin{itemize}
+  \item Abstract Syntax Tree (AST) in XML
+  \item Control Flow Graph (CFG)
+  \item Call Graph (CG)
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Internal Structures Example}
+  \begin{center}
+  \begin{tabular}{|c|} \hline
+  Source \\ \hline \hline
+  \begin{lstlisting}[language=C]
+if (cond)
+  yes();
+else
+  no();
+  \end{lstlisting} \\
+  $\Downarrow$
+  \end{tabular} \\
+  \begin{tabular}{|c|c|} \hline
+  AST (\texttt{$--$dump$-$xml}) & CFG (\texttt{$--$dump$-$cfg}) \\ \hline\hline
+  \begin{lstlisting}[language=XML]
+<ifElseStatement>
+  <id>cond</id>         # cond
+  <expressionStatement> # true
+    <functionCall>
+      <id>yes</id>
+    </functionCall>
+  </expressionStatement>
+  <expressionStatement> # false
+    <functionCall>
+      <id>no</id>
+    </functionCall>
+  </expressionStatement>
+</ifElseStatement>
+  \end{lstlisting}
+  & \parbox[c]{2.6cm}{\includegraphics[width=2.6cm]{cond}} \\ \hline
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\textsc{Stanse} Parser cont.}
+
+  \begin{center}
+  \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-parser}
+  \end{center}
+
+  \heading{Internal structures}
+  \begin{itemize}
+  \item Classes for walking through internals
+  \item Support for large code bases
+  \begin{itemize}
+  \item Streaming
+  \item Lazy parsing
+  \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Checkers}
+
+  \begin{center}
+  \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-checker}
+  \end{center}
+
+  \heading{Input: Internals} \\
+  \heading{Output: Errors passed to the error management}
+
+  \pause
+  \medskip
+
+  \begin{itemize}
+  \item AutomatonChecker
+  \item ThreadChecker
+  \item LockChecker
+  \item ReachabilityChecker
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{AutomatonChecker}
+
+  \begin{itemize}
+  \item Finite automata for erroneous behaviour description
+  \begin{itemize}
+  \item Stems from \textsc{xgcc} (Stanford)
+  \end{itemize}
+  \end{itemize}
+  \begin{center}
+    \input{locking.pspdftex}
+  \end{center}
+
+  \pause
+
+  \begin{itemize}
+  \item Hlídá zámky, paměť, referenční počty a podobné chyby
+  \begin{itemize}
+    \item Cokoli může být popsáno KA, může být i zkontrolováno
+    \item Např. chybné zamykání, vnoření zámků,
+      dereference NULL, spaní uvnitř kritických sekcí, úniky zdrojů atd.
+  \end{itemize}
+  \end{itemize}
+\end{frame}
+  
+\begin{frame}
+  \frametitle{ThreadChecker}
+  \begin{itemize}
+  \item Hledá a sleduje chování vlákna
+  \item Pozoruje zamykání a odemykání zámků (interprocedurálně)
+  \item Tvoří tzv. Resource Allocation grafy
+    \begin{itemize}
+    \item K výpočtu závislostí zámků
+    \end{itemize}
+  \item Proloží vytvořené grafy všech vláken a hledá cykly
+  \item Nachází netriviální problémy se zámky mezi vlákny
+  \end{itemize}
+
+  \begin{center}
+  \begin{tabular}{ccccccc}
+    \parbox{1cm}{\includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,height=3.2cm]{RAG1}} & + &
+    \parbox{1cm}{\includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,height=3.2cm]{RAG2}} & + &
+    \parbox{1cm}{\includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,height=3.2cm]{RAG3}} & = &
+    \parbox{3cm}{\includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,height=3.2cm]{RAG}}
+  \end{tabular}
+  \end{center}
+\end{frame}
+  
+\begin{frame}[fragile]
+  \frametitle{LockChecker}
+
+  \begin{itemize}
+  \item Statistická analýza (Engler)
+  \item Sleduje přístupy do paměti
+  \item Počítá statistiku, kolik z nich bylo pod zámkem
+  \item Poměr alespoň 1:9 znamená pravděpodobnou chybu
+  \end{itemize}
+
+  \begin{center}
+  \begin{tabular}{|c|c|} \hline
+  V kódu 20$\times$ & V kódu 1$\times$ \\ \hline\hline
+  \begin{lstlisting}[language=C]
+lock(A);
+glob_var = 1;
+unlock(A);
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+/* no lock */
+glob_var = 5;
+/* no unlock */
+  \end{lstlisting} \\ \hline
+  & \textcolor{red}{Potencionální chyba} \\ \hline
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+  
+\begin{frame}[fragile]
+  \frametitle{ReachabilityChecker}
+  \begin{itemize}
+  \item Hledá nedosažitelný (mrtvý) kód
+  \item Implementace má okolo 200 řádků
+  \item Slouží pouze jako demonstrace prostředí
+    \begin{itemize}
+    \item I přesto nalezl nějaké chyby
+    \end{itemize}
+  \end{itemize}
+
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}[language=C]
+void fun(int error)
+{
+  // superfluous
+  // semicolon
+  //        |
+  //        v
+  if (error);
+    return;
+  // we won't
+  // get here
+  fun1();
+  fun2();
+}
+  \end{lstlisting} & $\Rightarrow$ &
+  \parbox[c]{5.5cm}{\includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,height=5cm]{dead}}
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Konfigurace}
+
+  \begin{center}
+  \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-conf}
+  \end{center}
+
+  \begin{itemize}
+  \item (Některé) checkery načítají XML soubory s konfigurací
+  \item AutomatonChecker -- popis automatu včetně funkcí
+  \item ThreadChecker -- funkce tvořící vlákna + zamykací funkce
+  \item LockChecker -- zamykací funkce a poměr
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Chyby}
+
+  \begin{center}
+  \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-errors}
+  \end{center}
+
+  \heading{Vstup: výstup z checkerů} \\
+  \heading{Výstup: uživateli}
+
+  \begin{itemize}
+  \item Příkazová řádka
+  \item Grafické rozhraní
+  \item Webové rozhraní
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Nalezené chyby I.}
+  
+  \heading{ANF Data}
+  \begin{itemize}
+  \item Chybějící test \texttt{malloc()} oproti NULL
+  \item Úniky paměti
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Linuxové jádro}\\
+  Přes 120 chyb následujících druhů (nahlášeny a opraveny):
+  \begin{itemize}
+  \item Chyby paměti
+  \item Nesprávné zacházení se zámky
+    \begin{itemize}
+    \item Tj. potenciální skutečné deadlocky (viz příklad dále)
+    \end{itemize}
+  \item Párování funkcí
+    \begin{itemize}
+    \item Např. get\_cpu/put\_cpu, povolení/zákaz přerušení atd.
+    \end{itemize}
+  \item (Neúmyslně) nedosažitelný kód
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Další kód}
+  \begin{itemize}
+  \item Projekt CESNETu vyrábějící HW akcelerátory
+  \item Malé knihovny a nástroje (acl, attr)
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Nalezené chyby II.}
+
+  \heading{Malý příklad chyby v jádře}
+
+  Zdroj: \texttt{\small linux-2.6.28/drivers/pci/hotplug/pciehp\_core.c}
+  \begin{lstlisting}[language=C]
+static int set_lock_status(struct hotplug_slot *hotplug_slot,
+                           u8 status)
+{
+  struct slot *slot = hotplug_slot->private;
+  ...
+  mutex_lock(&slot->ctrl->crit_sect);
+
+  /* has it been >1 sec since our last toggle? */
+  if ((get_seconds() - slot->last_emi_toggle) < 1)
+    return -EINVAL;
+  ...
+  mutex_unlock(&slot->ctrl->crit_sect);
+  return 0;
+}
+  \end{lstlisting}
+
+  Spoušť: \texttt{\small echo '1' > /sys/bus/pci/slots/.../lock} dvakrát za 1s
+
+  \pause
+  \medskip
+
+  Uplný seznam na \url{http://stanse.fi.muni.cz/bugs.html}.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Nevýhody \textsc{Stanse}}
+
+  \heading{Falešná hlášení}
+  \begin{itemize}
+  \item Oscilují mezi 30 a 70 \% -- v závislosti na checkeru, konfiguraci a
+  zdrojových souborech
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \heading{Špatný parser}
+  \begin{itemize}
+  \item Pomalý -- zčásti Java, zčásti \textsc{antlr}
+  \item Paměťově náročný -- zejména XML AST strom
+  \item Málo informací -- např. chybí typy proměnných
+  \item Omezený preprocesor -- nelze mapovat na původní kód
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+\frametitle{Tools Comparison}
+\heading{Many static analysis tools, some of them are compared here}
+\small
+\begin{tabular}{l|ccccl}
+\multirow{2}{*}{Name} &
+Open- &
+Configu- &
+Batch &
+Inter- &
+\multirow{2}{*}{Languages} \\
+%Tool name        & Open & Confi-  & Batch   & Inter- & Languages
+                  & source & rable & support & proc.  & \\ \hline
+\textsc{\textcolor{red}{Coverity}}$^\dagger$
+		  & no   & yes     & yes     & yes    & GC, C++, C\#, Java \\
+\textsc{\textcolor{red}{Klocwork}}$^\dagger$
+		  & no   & yes     & yes     & yes    & GC, C++, C\#, Java \\
+\textsc{Splint}   & yes  & no      & no      & no     & C \\
+\textsc{Sparse}   & yes  & no      & yes     & no     & GC \\
+\textsc{Clang}    & yes  & no      & yes     & no     & GC, C++, Obj-C \\
+\textsc{Uno}      & yes  & yes     & no      & yes    & C$^\dagger$ \\
+\textsc{Stanse}   & yes  & yes     & yes     & yes    & GC \\
+\textsc{FindBugs} & yes  & no      & yes     & no     & Java \\ \hline
+\multicolumn{6}{l}{\footnotesize GC means GNU C} \\
+\multicolumn{6}{l}{\footnotesize $^\dagger$\textcolor{red}{Leaders}} \\
+\multicolumn{6}{l}{\footnotesize $^\ddagger$Support for C in \textsc{Uno}
+does not even contain full C99} \\
+\end{tabular}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Conclusion}
+  \begin{itemize}
+  \item \textsc{Stanse} is rather a \emph{framework}, but contains also
+  \emph{checkers}
+  \item It found \emph{many errors} in real code
+  \item More information at \url{http://stanse.fi.muni.cz/}
+  \end{itemize}
+
+  \heading{Future Work}
+  \begin{itemize}
+  \item C++ support -- is being plugged-in
+  \item Speedup parser
+  \item Lower memory footprint (mainly XMLs)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Discussion}
+  \begin{center} \huge
+  Thanks for your attention! \\[2em]
+  Questions?
+  \end{center}
+\end{frame}
+
+\end{document}
+
