@@ -44,9 +44,11 @@
 
 \subtitle{Bug-finding Framework for C Programs}
 
-\author[J. Obdržálek, J. Slabý, M. Trtík]{Jan~Obdržálek, \emph{Jiří~Slabý}, Marek~Trtík}
+\author[Obdrzalek, Slaby, Trtík]{Jan~Obdrzalek, \emph{Jiri~Slaby},
+Marek~Trtík\\ \hskip 1.5em \small{\textit{[Yiri Sla-be]}}}
 
-\institute{ITI, Faculty of Informatics \\ Masaryk University}
+\institute[ITI FI MU]{ITI, Faculty of Informatics \\ Masaryk University
+\\ Czech Republic}
 
 \date{Oct 16th 2011, Lednice}
 
@@ -259,7 +261,7 @@ else
   \frametitle{AutomatonChecker}
 
   \begin{itemize}
-  \item Finite automata for erroneous behaviour description
+  \item Finite automata for system behavior description
   \begin{itemize}
   \item Stems from \textsc{xgcc} (Stanford)
   \end{itemize}
@@ -271,11 +273,10 @@ else
   \pause
 
   \begin{itemize}
-  \item Hlídá zámky, paměť, referenční počty a podobné chyby
+  \item Watches locks, memory accesses, reference counts, \ldots
   \begin{itemize}
-    \item Cokoli může být popsáno KA, může být i zkontrolováno
-    \item Např. chybné zamykání, vnoření zámků,
-      dereference NULL, spaní uvnitř kritických sekcí, úniky zdrojů atd.
+    \item Whatever can be described by FA, can be also checked
+    \item Errors like imbalanced locking, NULL dereference, resource leaks
   \end{itemize}
   \end{itemize}
 \end{frame}
@@ -283,14 +284,14 @@ else
 \begin{frame}
   \frametitle{ThreadChecker}
   \begin{itemize}
-  \item Hledá a sleduje chování vlákna
-  \item Pozoruje zamykání a odemykání zámků (interprocedurálně)
-  \item Tvoří tzv. Resource Allocation grafy
+  \item Finds and inspects threads behavior
+  \item Watches locking and unlocking there
+  \item Creates so-called Resource Allocation Graphs (RAG)
     \begin{itemize}
-    \item K výpočtu závislostí zámků
+    \item For lock dependency tracking
     \end{itemize}
-  \item Proloží vytvořené grafy všech vláken a hledá cykly
-  \item Nachází netriviální problémy se zámky mezi vlákny
+  \item Merges created RAGs and searches cycles
+%  \item Finds non-trivial locking problems among threads
   \end{itemize}
 
   \begin{center}
@@ -307,15 +308,15 @@ else
   \frametitle{LockChecker}
 
   \begin{itemize}
-  \item Statistická analýza (Engler)
-  \item Sleduje přístupy do paměti
-  \item Počítá statistiku, kolik z nich bylo pod zámkem
-  \item Poměr alespoň 1:9 znamená pravděpodobnou chybu
+  \item Statistical analysis (Engler)
+  \item Tracks memory accesses
+  \item Counts statistics, how many of them was with some lock held
+  \item Ratio being at least 1:9 means a potential error
   \end{itemize}
 
   \begin{center}
   \begin{tabular}{|c|c|} \hline
-  V kódu 20$\times$ & V kódu 1$\times$ \\ \hline\hline
+  20$\times$ in code & 1$\times$ in code \\ \hline\hline
   \begin{lstlisting}[language=C]
 lock(A);
 glob_var = 1;
@@ -326,7 +327,7 @@ unlock(A);
 glob_var = 5;
 /* no unlock */
   \end{lstlisting} \\ \hline
-  & \textcolor{red}{Potencionální chyba} \\ \hline
+  & \textcolor{red}{Potential error} \\ \hline
   \end{tabular}
   \end{center}
 
@@ -335,11 +336,11 @@ glob_var = 5;
 \begin{frame}[fragile]
   \frametitle{ReachabilityChecker}
   \begin{itemize}
-  \item Hledá nedosažitelný (mrtvý) kód
-  \item Implementace má okolo 200 řádků
-  \item Slouží pouze jako demonstrace prostředí
+  \item Finds unreachable (dead) code
+  \item Implemented in about 200 lines
+  \item Serves as a demonstration for the framework
     \begin{itemize}
-    \item I přesto nalezl nějaké chyby
+    \item In spite of that, it found some errors 
     \end{itemize}
   \end{itemize}
 
@@ -367,82 +368,82 @@ void fun(int error)
 \end{frame}
 
 \begin{frame}
-  \frametitle{Konfigurace}
+  \frametitle{Configuration}
 
   \begin{center}
   \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-conf}
   \end{center}
 
   \begin{itemize}
-  \item (Některé) checkery načítají XML soubory s konfigurací
-  \item AutomatonChecker -- popis automatu včetně funkcí
-  \item ThreadChecker -- funkce tvořící vlákna + zamykací funkce
-  \item LockChecker -- zamykací funkce a poměr
+  \item Checkers can load XML files with configuration
+  \item AutomatonChecker -- FA description
+  \item ThreadChecker -- thread-creation and locking functions
+  \item LockChecker -- locking functions and ratio
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Chyby}
+  \frametitle{Errors}
 
   \begin{center}
   \includegraphics[trim=1.3cm 1.3cm 1.3cm 1.3cm,width=10cm]{level-errors}
   \end{center}
 
-  \heading{Vstup: výstup z checkerů} \\
-  \heading{Výstup: uživateli}
+  \heading{Input: Errors from checkers} \\
+  \heading{Output: To user}
 
   \begin{itemize}
-  \item Příkazová řádka
-  \item Grafické rozhraní
-  \item Webové rozhraní
+  \item Command line
+  \item Graphical user interface
+  \item Web interface
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Nalezené chyby I.}
+  \frametitle{Found Errors I.}
   
   \heading{ANF Data}
   \begin{itemize}
-  \item Chybějící test \texttt{malloc()} oproti NULL
-  \item Úniky paměti
+  \item Missing \texttt{malloc()} return value tests
+  \item Memory leaks
   \end{itemize}
 
   \pause
   \medskip
 
-  \heading{Linuxové jádro}\\
-  Přes 120 chyb následujících druhů (nahlášeny a opraveny):
+  \heading{Linux Kernel}\\
+  Over 120 errors of the following kind (reported and fixed):
   \begin{itemize}
-  \item Chyby paměti
-  \item Nesprávné zacházení se zámky
+  \item Memory errors
+  \item Improper locking
     \begin{itemize}
-    \item Tj. potenciální skutečné deadlocky (viz příklad dále)
+    \item I.e. real deadlocks (cf. example further)
     \end{itemize}
-  \item Párování funkcí
+  \item Function pairing
     \begin{itemize}
-    \item Např. get\_cpu/put\_cpu, povolení/zákaz přerušení atd.
+    \item E.g. get\_cpu/put\_cpu, interrupt enable/disable
     \end{itemize}
-  \item (Neúmyslně) nedosažitelný kód
+  \item (Unintentionally) unreachable code
   \end{itemize}
 
   \pause
   \medskip
 
-  \heading{Další kód}
+  \heading{Other code}
   \begin{itemize}
-  \item Projekt CESNETu vyrábějící HW akcelerátory
-  \item Malé knihovny a nástroje (acl, attr)
+  \item CESNET project developing HW akcelerators
+  \item Small libraries and tools (acl, attr)
   \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Nalezené chyby II.}
+  \frametitle{Found Errors II.}
 
-  \heading{Malý příklad chyby v jádře}
+  \heading{An example of the Linux Kernel bug}
 
-  Zdroj: \texttt{\small linux-2.6.28/drivers/pci/hotplug/pciehp\_core.c}
+  Source: \texttt{\small linux-2.6.28/drivers/pci/hotplug/pciehp\_core.c}
   \begin{lstlisting}[language=C]
 static int set_lock_status(struct hotplug_slot *hotplug_slot,
                            u8 status)
@@ -460,34 +461,12 @@ static int set_lock_status(struct hotplug_slot *hotplug_slot,
 }
   \end{lstlisting}
 
-  Spoušť: \texttt{\small echo '1' > /sys/bus/pci/slots/.../lock} dvakrát za 1s
+  Trigger: \texttt{\small echo '1' > /sys/bus/pci/slots/.../lock} twice in 1\,s
 
   \pause
   \medskip
 
-  Uplný seznam na \url{http://stanse.fi.muni.cz/bugs.html}.
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Nevýhody \textsc{Stanse}}
-
-  \heading{Falešná hlášení}
-  \begin{itemize}
-  \item Oscilují mezi 30 a 70 \% -- v závislosti na checkeru, konfiguraci a
-  zdrojových souborech
-  \end{itemize}
-
-  \medskip
-  \pause
-
-  \heading{Špatný parser}
-  \begin{itemize}
-  \item Pomalý -- zčásti Java, zčásti \textsc{antlr}
-  \item Paměťově náročný -- zejména XML AST strom
-  \item Málo informací -- např. chybí typy proměnných
-  \item Omezený preprocesor -- nelze mapovat na původní kód
-  \end{itemize}
+  Full list: \url{http://stanse.fi.muni.cz/bugs.html}
 
 \end{frame}
 
@@ -533,6 +512,7 @@ does not even contain full C99} \\
   \heading{Future Work}
   \begin{itemize}
   \item C++ support -- is being plugged-in
+  \item Lower false-positives (30-70 \%) -- techniques are known
   \item Speedup parser
   \item Lower memory footprint (mainly XMLs)
   \end{itemize}
