@@ -1,90 +1,9 @@
 % vim: ai sw=2
 
-\documentclass[xcolor=dvipsnames,handout]{beamer}
-
-\let\Oldemph\emph
-\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
-\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
-\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
-\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
-
-% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
-%
-% In principle, this file can be redistributed and/or modified under
-% the terms of the GNU Public License, version 2.
-%
-% However, this file is supposed to be a template to be modified
-% for your own needs. For this reason, if you use this file as a
-% template and not specifically distribute it as part of a another
-% package/program, I grant the extra permission to freely copy and
-% modify this file as you see fit and even to delete this copyright
-% notice.
-
-
-\mode<presentation>
-{
-%  \usetheme{Warsaw}
-\usetheme{Madrid}
-
-  \setbeamercovered{transparent}
-}
-
-\usepackage[czech]{babel}
-\usepackage[utf8]{inputenc}
-\usepackage{times}
-\usepackage[IL2]{fontenc}
-
-\usepackage{graphicx}
-\usepackage[final]{listings}
-\usepackage{multirow}
-
-\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
-	breakatwhitespace=true,escapeinside={(*@}{@*)},
-	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
-	commentstyle=\color{blue}}
-
-\title[PB173/01] % (optional, use only with long paper titles)
-{PB173 -- Ovladače jádra -- Linux}
+\input{../header.tex}
 
 \subtitle{IX.}
-
-\author[J. Slabý]{Jiří~Slabý}
-
-\institute[ITI] % (optional, but mostly needed)
-{ITI, Fakulta Informatiky}
-
 \date{23. 11. 2010}
-
-\subject{}
-% This is only inserted into the PDF information catalog. Can be left
-% out.
-
-
-
-% If you have a file called "university-logo-filename.xxx", where xxx
-% is a graphic format that can be processed by latex or pdflatex,
-% resp., then you can add a logo as follows:
-
-% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
-% \logo{\pgfuseimage{university-logo}}
-
-
-
-% Delete this, if you do not want the table of contents to pop up at
-% the beginning of each subsection:
-% \AtBeginSubsection[]
-% {
-%   \begin{frame}<beamer>
-%     \frametitle{Outline}
-%     \tableofcontents[currentsection,currentsubsection]
-%   \end{frame}
-% }
-
-
-% If you wish to uncover everything in a step-wise fashion, uncomment
-% the following command:
-
-%\beamerdefaultoverlayspecification{<+->}
 
 \begin{document}
 
@@ -132,21 +51,64 @@
 
 \end{frame}
 
-\begin{frame}[fragile]
+\begin{frame}
   \frametitle{\texttt{mmap}}
 
   \begin{itemize}
-  \item Jeden člen v \texttt{struct file\_operations}
-  \begin{itemize}
-  \item \texttt{\footnotesize int mmap(struct file *filp,
-    struct vm\_area\_struct *vma)}
-  \end{itemize}
-  \item V userspace odpovídá volání \texttt{mmap}
+  \item V userspace volání \texttt{mmap}
   \begin{itemize}
   \item \texttt{\footnotesize void *mmap(void *addr, size\_t len,
     int prot, int flags, int fd, off\_t off)}
   \end{itemize}
+  \item V jádře jeden člen v \texttt{struct file\_operations}
+  \begin{itemize}
+  \item \texttt{\footnotesize int mmap(struct file *filp,
+    struct vm\_area\_struct *vma)}
+  \item Parametry jsou v \texttt{struct vm\_area\_struct}
   \end{itemize}
+  \end{itemize}
+
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Alokace pomocí \texttt{mmap} (uživatelský prostor)}
+  \begin{enumerate}
+  \item Anonymní paměť
+  \begin{itemize}
+  \item \texttt{\footnotesize void *mmap(void *addr, size\_t len,
+    int prot, int flags, int fd, off\_t off)}
+  \item \texttt{len} \ldots\ 20M
+  \item \texttt{prot} \ldots\ \texttt{PROT\_READ} a \texttt{PROT\_WRITE}
+  \item \texttt{flags} \ldots\ \texttt{MAP\_PRIVATE} a \texttt{MAP\_ANONYMOUS}
+  \item \texttt{fd} \ldots\ -1
+  \end{itemize}
+
+  \pause
+
+  \item Mapování /dev/zero
+  \begin{itemize}
+  \item \texttt{flags} \ldots\ \texttt{MAP\_PRIVATE}
+  \item \texttt{fd} \ldots\ deskriptor otevřeného /dev/zero
+  \end{itemize}
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Parametry \texttt{mmap}}
+
+  Prototyp (znovu):
+
+  \texttt{\footnotesize void *mmap(void *addr, size\_t len,
+    int prot, int flags, int fd, off\_t off)}
+  \begin{itemize}
+  \item Jsou v jádře uloženy v \texttt{struct vm\_area\_struct}
+  \end{itemize}
+
+  \bigskip
+  \pause
 
   \begin{lstlisting}[language=C]
 struct vm_area_struct {
@@ -202,16 +164,16 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
   \heading{Přemapování prostorů}
   \begin{enumerate}
   \item Alokovat souvislé 2 a 2 stránky (vmalloc a page alokátory)
-  \item Zapsat na každou stránku libovolný různý řetězec
+  \item Zapsat na každou stránku libovolný, ale různý řetězec
   \item Přemapovat stránky v \texttt{mmap}
   \begin{itemize}
-  \item Jedna dvojice R/W, druhá RO
+  \item První dvojice RO, druhá R/W
   \item $0 \leq \text{\texttt{pgoff}} < 2$ $\Rightarrow$ jedno mapování
   \item $2 \leq \text{\texttt{pgoff}} < 4$ $\Rightarrow$ druhé mapování
   \end{itemize}
   \item Z userspace 2$\times$ \texttt{mmap} s off 0 a 2*4096
   \begin{itemize}
-  \item V pb173/09
+  \item Již hotovo v pb173/09
   \end{itemize}
   \end{enumerate}
 
@@ -269,15 +231,15 @@ struct vm_operations_struct {
   int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
 }
 int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
-{ /* my_data = vma->vm_private_data; */
-        unsigned long offset = vmf->pgoff << PAGE_SHIFT;
-        struct page *page;
-        page = my_find_page(offset);
-        if (!page)
-                return VM_FAULT_SIGBUS;
-        get_page(page);
-        vmf->page = page;
-        return 0;
+{ /* my_data == vma->vm_private_data; */
+  unsigned long offset = vmf->pgoff << PAGE_SHIFT;
+  struct page *page;
+  page = my_find_page(offset);
+  if (!page)
+    return VM_FAULT_SIGBUS;
+  get_page(page);
+  vmf->page = page;
+  return 0;
 }
 int my_mmap(struct file *filp, struct vm_area_struct *vma)
 { /* don't forget to check ranges */
@@ -340,8 +302,12 @@ struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *t
 
   \heading{Potřebné podkroky}
   \begin{itemize}
-  \item Definice \texttt{\footnotesize struct page *nopage(struct
+  \item Definice \texttt{\footnotesize int fault(struct vm\_area\_struct *vma,
+    struct vm\_fault *vmf);}
+  \begin{itemize}
+  \item Popř. staré \texttt{\footnotesize struct page *nopage(struct
     vm\_area\_struct *vma, unsigned long address, int *type)}
+  \end{itemize}
   \item Kontrola rozsahů v \texttt{mmap} (\texttt{end-start < 2*PAGE\_SIZE}
     apod.)
   \item Definice \texttt{vm\_ops} a přiřazení do \texttt{vma->vm\_ops}
