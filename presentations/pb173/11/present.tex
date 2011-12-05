@@ -1,102 +1,15 @@
 % vim: ai sw=2
 
-\documentclass[xcolor=dvipsnames,handout]{beamer}
-
-\let\Oldemph\emph
-\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
-\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
-\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
-\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
-
-% Copyright 2004 by Till Tantau <tantau@users.sourceforge.net>.
-%
-% In principle, this file can be redistributed and/or modified under
-% the terms of the GNU Public License, version 2.
-%
-% However, this file is supposed to be a template to be modified
-% for your own needs. For this reason, if you use this file as a
-% template and not specifically distribute it as part of a another
-% package/program, I grant the extra permission to freely copy and
-% modify this file as you see fit and even to delete this copyright
-% notice.
-
-
-\mode<presentation>
-{
-%  \usetheme{Warsaw}
-\usetheme{Madrid}
-
-  \setbeamercovered{transparent}
-}
-
-\usepackage[czech]{babel}
-\usepackage[utf8]{inputenc}
-\usepackage{times}
-\usepackage[IL2]{fontenc}
-
-\usepackage{graphicx}
-\usepackage[final]{listings}
-\usepackage{multirow}
-
-\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
-	breakatwhitespace=true,escapeinside={(*@}{@*)},
-	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
-	commentstyle=\color{blue}}
-
-\title[PB173/01] % (optional, use only with long paper titles)
-{PB173 -- Ovladače jádra -- Linux}
+\input{../header.tex}
 
 \subtitle{XI.}
-
-\author[J. Slabý]{Jiří~Slabý}
-
-\institute[ITI] % (optional, but mostly needed)
-{ITI, Fakulta Informatiky}
-
-\date{7. 12. 2010}
-
-\subject{}
-% This is only inserted into the PDF information catalog. Can be left
-% out.
-
-
-
-% If you have a file called "university-logo-filename.xxx", where xxx
-% is a graphic format that can be processed by latex or pdflatex,
-% resp., then you can add a logo as follows:
-
-% \pgfdeclareimage[height=0.5cm]{university-logo}{university-logo-filename}
-% \logo{\pgfuseimage{university-logo}}
-
-
-
-% Delete this, if you do not want the table of contents to pop up at
-% the beginning of each subsection:
-% \AtBeginSubsection[]
-% {
-%   \begin{frame}<beamer>
-%     \frametitle{Outline}
-%     \tableofcontents[currentsection,currentsubsection]
-%   \end{frame}
-% }
-
-
-% If you wish to uncover everything in a step-wise fashion, uncomment
-% the following command:
-
-%\beamerdefaultoverlayspecification{<+->}
+\date{6. 12. 2011}
 
 \begin{document}
 
 \begin{frame}
   \titlepage
 \end{frame}
-
-%%%%%%%%%%%%%%%%%%%%%%%
-
-\part{Komunikace mezi procesy}
-
-\frame{\partpage}
 
 \begin{frame}
   \frametitle{Komunikace mezi procesy}
@@ -226,7 +139,7 @@ C
   \heading{Použití \texttt{wait\_queue}}
   \begin{enumerate}
   \item Místo \texttt{completion}, použít v pb173/11/events \texttt{wait\_queue}
-  \item Číst se bude, až někdo zápíše více než 5 znaků
+  \item Číst se bude, až bude v bufferu více než 5 znaků
   \end{enumerate}
 
 \end{frame}
@@ -256,113 +169,78 @@ C
 
 \end{frame}
 
-\part{Hackovací techniky}
-
-\frame{\partpage}
-
 \begin{frame}
-  \frametitle{Hackovací techniky}
+  \frametitle{Úkol}
 
-  \heading{Z pohledu jádra}
+  \heading{Explicitní čekání}
+  \begin{enumerate}
+  \item Místo \texttt{wait\_event}, použijte funkce z předchozího slidu
   \begin{itemize}
-  \item Zabít stroj (DoS)
-  \item Zneužít stroj
+  \item Prostudujte (a použijte) tělo makra
+    \texttt{\_\_wait\_event\_interruptible}
   \end{itemize}
+  \item Pozměňte čekací podmínku tak, že se bude čekat alespoň na 2~\texttt{a} a
+    1~\texttt{b} v poli
+  \end{enumerate}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Zabít stroj}
+\begin{frame}[fragile]
+  \frametitle{\texttt{kthread}}
 
   \begin{itemize}
-  \item Jednodušší
+  \item Vytvoření vlákna (procesu) pro výpočty
   \begin{itemize}
-  \item Stačí provést něco zlého
-  \begin{itemize}
-  \item Předat špatný ukazatel
-  \item Vytvořit příliš procesů
-  \item Naalokovat hodně paměti
+  \item Beží v jádře
+  \item Chování jako uživatelský proces
   \end{itemize}
-  \item Jádro udělá dereferenci a spadne
-  \end{itemize}
-  \item Nejčastější druhy
-  \begin{itemize}
-  \item DDoS
-  \item Paket smrti
-  \item Neočekávaný vstup od uživatele
-  \end{itemize}
+  \item \header{linux/kthread.h}
+  \item \texttt{kthread\_run}, \texttt{kthread\_stop}
+  \item \texttt{kthread\_should\_stop}
   \end{itemize}
 
-\end{frame}
-
-\begin{frame}
-  \frametitle{Zneužít stroj}
-
-  \begin{itemize}
-  \item K získání administrátorských oprávnění
-  \item Složitější
-  \begin{itemize}
-  \item Musí se předat ,,divný'' ukazatel
-  \item Jádro udělá dereferenci a spustí náš kód
-  \end{itemize}
-  \item Obtížná část:
-  \begin{itemize}
-  \item Zjistit, jak se dá díra zneužít
-  \item Vyrobit správná data, která podstrčit
-  \item Nepřepsat toho příliš mnoho, aby nedošlo k pádu
-  \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Co s root účtem}
-
-  \begin{itemize}
-  \item Vyrobit si e-mail relay pro spamy
-  \item Upravit jakoukoliv službu
-  \item Ukrást peníze/vědomosti (vláda, armáda)
+  \medskip
   \pause
-  \item Skrýt se v systému (rootkit) a sbírat data
-  \begin{itemize}
-  \item Změnit tabulku systémových volání
-    \begin{itemize}
-    \item \texttt{ls /proc} a \texttt{ps} neuvidí proces
-    \item Napsat vlastní readdir s patřičným filtrem
-    \item Najít tabulku např. přes /proc/kallsyms
-    \item Změnit tabulku a volat původní readdir
-    \end{itemize}
-  \pause
-  \item Podobně pro přerušení
-    \begin{itemize}
-    \item Stisky klávesnice (hesla) apod.
-    \end{itemize}
-  \end{itemize}
-  \end{itemize}
+
+  \heading{Příklad} \\
+  \begin{tabular}{c|c}
+  \begin{lstlisting}[language=C]
+static int my_proc(void *data)
+{ /* data = my_data */
+  while (1) {
+    wait_event(...);
+    if (kthread_should_stop())
+      break;
+    do_some_work();
+  }
+  return 0;
+}
+  \end{lstlisting} &
+  \begin{lstlisting}[language=C]
+static int my_init(void)
+{
+  struct task_struct *t;
+  t = kthread_run(my_proc, my_data,
+      "my_process");
+  if (!IS_ERR) {
+    ssleep(10);
+    kthread_stop(my_proc);
+  }
+  ...
+  \end{lstlisting}
+  \end{tabular}
 
 \end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Buffer overflow příklad}
+  \heading{Vytvoření vlákna}
   \begin{enumerate}
-  \item Prostudujte pb173/11/hack
-  \begin{itemize}
-  \item Uživatelský proces: user
-  \item Jaderný modul: kern
-  \end{itemize}
-  \item Přeložit a vložit modul
-  \item Nastavit práva /dev/my\_name na 666
-  \item Pod běžným uživatelem spustit pb173:
-  \begin{itemize}
-  \item \texttt{pb173 0 /dev/my\_name} (nezneužít díru)
-  \item \texttt{pb173 1 /dev/my\_name} (zneužít díru)
-  \end{itemize}
-  \item Opravit díru ve \texttt{write}
-  \begin{itemize}
-  \item \texttt{pb173 1 /dev/my\_name} nesmí skončit s úspěchem
-  \end{itemize}
+  \item Vytvořte vlákno
+  \item Vlákno počká, až někdo něco zapíše
+  \item Přepíše všechny znaky \texttt{a} na \texttt{b}
+  \item Vzbudí všechny, kteří čekají na data
   \end{enumerate}
 
 \end{frame}
