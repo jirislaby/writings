@@ -1,0 +1,124 @@
+% vim: ai sw=2
+
+\input{../header.tex}
+
+\subtitle{XIII.}
+\date{20. 12. 2011}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Různé}
+
+  \begin{itemize}
+  \item Firmware
+  \item Analýza OOPS
+  \end{itemize}
+
+\end{frame}
+
+\part{Firmware}
+\frame{\partpage}
+
+\begin{frame}[fragile]
+  \frametitle{Firmware}
+
+  \begin{itemize}
+  \item Binární kód v zařízení
+  \item Nahrává jej (většinou) ovladač
+  \end{itemize}
+
+  \bigskip
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/firmware.h}, \texttt{struct firmware}
+  \item \texttt{request\_firmware(const struct firmware **fw, const char *name,
+    struct device *device)}
+  \begin{itemize}
+  \item \texttt{fw} -- návratová hodnota
+  \item \texttt{name} -- jméno souboru
+  \end{itemize}
+  \item \texttt{release\_firmware}
+  \end{itemize}
+
+  \bigskip
+
+  \begin{lstlisting}[language=C]
+struct firmware {
+  size_t size;
+  const u8 *data;
+  ...
+};
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Nahrátí firmware}
+  \begin{enumerate}
+  \item Zkopírujte pb173/13/fw/firmware\_*.bin do /lib/firmware
+  \item Nahrajte firmware v ovladači
+  \begin{itemize}
+  \item V závislosti na architektuře (např. makro \texttt{CONFIG\_64BIT})
+  \end{itemize}
+  \item Zkopírujte data do spustitelné paměti
+  \begin{itemize}
+  \item \texttt{\_\_vmalloc + PAGE\_KERNEL\_EXEC}
+  \end{itemize}
+  \item V cyklu pro 0 \ldots 100
+  \begin{itemize}
+  \item Zavolejte 0. offset alokované paměti
+  \item Prototyp: \texttt{unsigned int (*)(unsigned int)}
+  \item Vypište návratovou hodnotu
+  \end{itemize}
+  \item Zjistěte, co firmware dělá
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Firmware v ASM}
+
+  \texttt{\small \$ objdump -D -b binary -m i386 -M x86-64 firmware\_64.bin} \\
+  \begin{lstlisting}[language={[x86masm]Assembler}]
+ 0:   31 c0           xor    %eax,%eax     ; eax -- retval
+ 2:   83 ff 0d        cmp    $0xd,%edi     ; edi -- param 0
+ 5:   77 14           ja     0x1b
+ 7:   83 ff 01        cmp    $0x1,%edi
+ a:   b0 01           mov    $0x1,%al
+ c:   76 0d           jbe    0x1b
+ e:   66 90           xchg   %ax,%ax       ; nop
+10:   0f af c7        imul   %edi,%eax
+13:   83 ef 01        sub    $0x1,%edi
+16:   83 ff 01        cmp    $0x1,%edi
+19:   75 f5           jne    0x10
+1b:   f3 c3           repz retq            ; "return eax"
+  \end{lstlisting}
+
+\end{frame}
+
+\part{Analýza OOPS}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Společný úkol}
+
+  \heading{Analýza pádů}
+  \begin{enumerate}
+  \item Modul v pb173/13/oops
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
+
