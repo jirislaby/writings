@@ -1,49 +1,169 @@
+% vim: tw=78 ai spell spelllang=en
+
 \documentclass[10pt]{llncs}
 \usepackage{color}
 \usepackage{url}
-\usepackage{xspace}
 \usepackage{graphicx}
 \usepackage{listings}
+\usepackage{multirow}
+\usepackage{xspace}
 
 \newcommand\Color[2]{\textcolor{#1}{#2}}
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
 \renewcommand\note[1]{\nb{\Color{blue}{#1}}}
 \newcommand\todo[1]{\nb{\Color{red}{#1}}}
 
+\lstset{escapeinside={(*@}{@*)}}
+
 \begin{document}
 
 \title{Finding Bugs by Automata Using Symbolic Execution}
-\author{Jan~Strej\v{c}\'ek, Ji\v{r}\'\i~Slab\'y and Marek~Trt\'{\i}k}
+\author{Jan~Strej\v{c}ek, Ji\v{r}\'\i~Slab\'y and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University, Brno, Czech Republic
 \email{\{strejcek,slaby,trtik\}@fi.muni.cz}}
 
 \maketitle
 
 \begin{abstract}
-  BUBUBU\cite{stanse} \todo{este nevyslo}
 \end{abstract}
 
 \section{Introduction}
 \label{sec:introduction} \todo{H}
 
-\cite{ucklee}
+SE King~\cite{se}
+
+\textsc{Metal}~\cite{metal}
+\textsc{Stanse}~\cite{stanse} \note{este nevyslo takze asi nic}
+\textsc{Klee}~\cite{klee}
 
 \section{Instrumentation}
-\label{sec:instr} \todo{J}
+\label{sec:instr}
+
+We want to find a similar set of errors to those found by tools like
+Metal~\cite{metal}. These tools use abstract interpretation as an algorithm
+and automata for program behavior description. To be able to track a state of
+automata using the symbolic execution, the code has to be instrumented before
+the execution itself. However, the code instrumented is different to the
+behavior performed by the automata in abstract interpretation on the same
+code.
+
+Abstract interpretation has to consider a set of states by each program
+location and a transform function over these sets for the locations. It
+is due to exploring all paths of the program at once. For the symbolic
+execution it is sufficient to remember the actual state of the program path
+explored. The other paths are explored separately in a different run.
+
+To present the difference of the instrumentation before the symbolic execution
+and computing abstract interpretation automata states,
+Fig.~\ref{fig:instrumentation} is attached. Consider a function \texttt{foo}
+where a lock A is used. Further there is a \texttt{compute} function.  Assume
+that it changes the program state, especially the A state, in no way.
+
+Abstract interpretation, while computing a fix-point, would transform states
+at lines~\ref{line:lock} and~\ref{line:unlock} according to an automaton. An
+example of such an automaton is depicted in Fig.~\ref{fig:automaton}. In that
+specific case, line~\ref{line:lock} transforms unlocked state into locked one
+and locked state into an erroneous one. The latter is eventually reported by
+the tool as an error to the user.
+
+Thanks to the simple run being evaluated at once, the lock may be only in one
+state at a time. Hence we introduce an integer for each lock used. The integer
+then corresponds exactly to the automaton state. I.e. all function calls to
+\texttt{lock} and \texttt{unlock} are replaced by assignments to this integer
+by one or zero respectively. Now it reminds to describe the way of error state
+checking.
+
+Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
+so-called \texttt{assert} function may be used to provoke the executor to
+report a failure. The function (or macro more precisely) is used by developers
+for debugging purposes. The macro takes exactly one argument. When it
+evaluates to true, an error is reported. Both when a program containing the
+facility is run and when executed by symbolic executor.
+
+Thus our tool inserts an \texttt{assert} before each assignment. There the
+assertion is that the integer is zero when the code is about to take a lock
+and one in the opposite case.
+
+\begin{figure}[tb]
+\begin{center}
+\begin{tabular}{|l l|l|l|} \hline
+& \textbf{Original code} & \textbf{AI} & \textbf{Instrumentation for SE} \\ \hline
+\begin{lstlisting}{language=C}
+1
+2
+3
+4
+5
+\end{lstlisting} &
+\begin{lstlisting}{language=C}
+foo() {
+  lock(A);(*@ \label{line:lock} @*)
+  compute();
+  unlock(A);(*@ \label{line:unlock} @*)
+}
+\end{lstlisting} &
+\begin{lstlisting}[language=C]
+foo() {
+  state_change
+  no_state_change
+  state_change
+}
+\end{lstlisting} &
+\begin{lstlisting}[language=C]
+foo() {
+  assert(A = 0); A := 1;
+  compute();
+  assert(A = 1); A := 0;
+}
+\end{lstlisting} \\ \hline
+\end{tabular}
+\end{center}
+\caption{Code a) we want to check; b) that is used for abstract interpretation
+and c) instrumented for use with symbolic execution}
+\label{fig:instrumentation}
+\end{figure}
+
+\begin{figure}[htb]
+\begin{center}
+\includegraphics[width=3cm]{lock_unlock}
+\end{center}
+\caption{An automaton describing locking behavior}
+\label{fig:automaton}
+\end{figure}
+
+Andersen Points-To analysis.
 
 \section{Slicing}
 \label{sec:slicing} \todo{M}
 
 \section{Implementation}
 \label{sec:impl} \todo{J}
+
 \subsection{Experiments}
 \label{sec:experiments} \todo{J}
+
+See Table~\ref{tab:results}.
+
+\begin{table}[t]
+\begin{tabular}{|l|l|l|l|l|l|} \hline
+\multirow{2}{*}{\textbf{File and Function}} &
+  \multicolumn{5}{|c|}{\textbf{Running Time}} \\
+ & \textbf{Compilation} & \textbf{Instrumentation$^{\dagger}$} &
+   \textbf{Slicing} & \textbf{Symbolic Execution} & \textbf{Total} \\ \hline
+file1.c foo & & & & & \\ \hline
+\end{tabular}
+\caption{Technique run on several files. $\dagger$ Including the points-to
+analysis time.}
+\label{tab:results}
+\end{table}
 
 \section{Related Work}
 \label{sec:related} \todo{M}
 
 \section{Future Work}
 \label{sec:future} \todo{H}
+
+\textsc{UcKlee}\cite{ucklee}
 
 \section{Conclusion}
 \label{sec:conclusion} \todo{H}
@@ -54,7 +174,7 @@
 All authors are supported by the research centre Institute for Theoretical
 Computer Science (ITI), project No. 1M0545.
 
-\todo{ITI skoncilo, ne? + pridat DG}
+\todo{ITI skoncilo, pridat DG}
 
 \bibliographystyle{plain}
 \bibliography{sse}
