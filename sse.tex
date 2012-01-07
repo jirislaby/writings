@@ -60,11 +60,12 @@ where a lock A is used. Further there is a \texttt{compute} function.  Assume
 that it changes the program state, especially the A state, in no way.
 
 Abstract interpretation, while computing a fix-point, would transform states
-at lines~\ref{line:lock} and~\ref{line:unlock} according to an automaton. An
-example of such an automaton is depicted in Fig.~\ref{fig:automaton}. In that
-specific case, line~\ref{line:lock} transforms unlocked state into locked one
-and locked state into an erroneous one. The latter is eventually reported by
-the tool as an error to the user.
+at lines~\ref{line:lock} and~\ref{line:unlock} according to an automaton
+describing locking. An example of such an automaton is depicted in
+Fig.~\ref{fig:automaton}.  In that specific case, line~\ref{line:lock}
+transforms unlocked state into locked one and locked state into an erroneous
+one. The latter is eventually reported by the tool as an error to the user.
+Similarly for line~\ref{line:unlock}.
 
 Thanks to the simple run being evaluated at once, the lock may be only in one
 state at a time. Hence we introduce an integer for each lock used. The integer
@@ -78,11 +79,12 @@ so-called \texttt{assert} function may be used to provoke the executor to
 report a failure. The function (or macro more precisely) is used by developers
 for debugging purposes. The macro takes exactly one argument. When it
 evaluates to true, an error is reported. Both when a program containing the
-facility is run and when executed by symbolic executor.
+facility is run and when executed by the symbolic executor we use.
 
 Thus our tool inserts an \texttt{assert} before each assignment. There the
 assertion is that the integer is zero when the code is about to take a lock
-and one in the opposite case.
+and one in the opposite case. This can be seen in
+Fig.~\ref{fig:instrumentation}, column three.
 
 \begin{figure}[tb]
 \begin{center}
@@ -137,7 +139,24 @@ Andersen Points-To analysis.
 \label{sec:slicing} \todo{M}
 
 \section{Implementation}
-\label{sec:impl} \todo{J}
+\label{sec:impl}
+We decided to verify the functionality on the C code. Many projects with
+open-source license (and source code available) are written in C. Finally, we
+decided to test our tool on the Linux kernel. It is a large and well tested
+piece of software. Also it is of high interest to be bug-free. Otherwise
+systems could be easily compromised.
+
+The tool is not implemented from scratch. It is written as a module for the
+LLVM framework~\cite{llvm}. This provides us a parser (and compiler) for free
+and a documented application programming interface. Also for this code a
+symbolic executor exists already. It is called \textsc{Klee}.
+
+First the tool instruments the code on the C level. Each locking function is
+superseded by an \textsc{assert} and assignment to an appropriate integer.
+Then the tool turns the C code into LLVM by compiler called \textsc{clang}.
+
+Further the LLVM bytecode is sliced by an LLVM inter-procedural slicer to
+eliminate unneeded (irrelevant) code.
 
 \subsection{Experiments}
 \label{sec:experiments} \todo{J}
