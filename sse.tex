@@ -41,50 +41,23 @@ SE King~\cite{se}
 
 We want to find a similar set of errors to those found by tools like
 Metal~\cite{metal}. These tools use abstract interpretation as an algorithm
-and automata for program behavior description. To be able to track a state of
-automata using the symbolic execution, the code has to be instrumented before
-the execution itself. However, the code instrumented is different to the
-behavior performed by the automata in abstract interpretation on the same
-code.
+and automata for program behavior description.  For the sake of pilot testing
+and simplicity we narrowed the set of checked properties to locking errors
+only. This comprises checks for inappropriate leaving functions with lock
+held, double locks and double unlocks. We plan to augment the checked
+properties set in the future.
 
-Abstract interpretation has to consider a set of states by each program
+To be able to track a state of automata using the symbolic execution, the code
+has to be instrumented before the execution itself. However, the code being
+instrumented is slightly different to the behavior performed by the automata
+in abstract interpretation on the same code.
+
+Abstract interpretation has to consider a set of states for each program
 location and a transform function over these sets for the locations. It
-is due to exploring all paths of the program at once. For the symbolic
-execution it is sufficient to remember the actual state of the program path
-explored. The other paths are explored separately in a different run.
-
-To present the difference of the instrumentation before the symbolic execution
-and computing abstract interpretation automata states,
-Fig.~\ref{fig:instrumentation} is attached. Consider a function \texttt{foo}
-where a lock A is used. Further there is a \texttt{compute} function.  Assume
-that it changes the program state, especially the A state, in no way.
-
-Abstract interpretation, while computing a fix-point, would transform states
-at lines~\ref{line:lock} and~\ref{line:unlock} according to an automaton
-describing locking. An example of such an automaton is depicted in
-Fig.~\ref{fig:automaton}.  In that specific case, line~\ref{line:lock}
-transforms unlocked state into locked one and locked state into an erroneous
-one. The latter is eventually reported by the tool as an error to the user.
-Similarly for line~\ref{line:unlock}.
-
-Thanks to the simple run being evaluated at once, the lock may be only in one
-state at a time. Hence we introduce an integer for each lock used. The integer
-then corresponds exactly to the automaton state. I.e. all function calls to
-\texttt{lock} and \texttt{unlock} are replaced by assignments to this integer
-by one or zero respectively. Now it reminds to describe the way of error state
-checking.
-
-Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
-so-called \texttt{assert} function may be used to provoke the executor to
-report a failure. The function (or macro more precisely) is used by developers
-for debugging purposes. The macro takes exactly one argument. When it
-evaluates to true, an error is reported. Both when a program containing the
-facility is run and when executed by the symbolic executor we use.
-
-Thus our tool inserts an \texttt{assert} before each assignment. There the
-assertion is that the integer is zero when the code is about to take a lock
-and one in the opposite case. This can be seen in
-Fig.~\ref{fig:instrumentation}, column three.
+is due to exploring all paths of the program in a single run. For the symbolic
+execution it is sufficient to remember an actual state of the automata for a
+program path currently explored. Other paths are explored separately in a
+different run.
 
 \begin{figure}[tb]
 \begin{center}
@@ -97,7 +70,7 @@ Fig.~\ref{fig:instrumentation}, column three.
 4
 5
 \end{lstlisting} &
-\begin{lstlisting}{language=C}
+\begin{lstlisting}{language=C,firstnumber=1}
 foo() {
   lock(A);(*@ \label{line:lock} @*)
   compute();
@@ -120,10 +93,16 @@ foo() {
 \end{lstlisting} \\ \hline
 \end{tabular}
 \end{center}
-\caption{Code a) we want to check; b) that is used for abstract interpretation
+\caption{Code a) we want to check; b) that abstract interpretation evaluates
 and c) instrumented for use with symbolic execution}
 \label{fig:instrumentation}
 \end{figure}
+
+To present a difference between abstract interpretation automata states
+computation and the instrumentation to be used with the symbolic execution,
+Fig.~\ref{fig:instrumentation} is attached. Consider a function \texttt{foo}
+where a lock A is used. Further there is a \texttt{compute} function.  Assume
+that it changes the program state, especially the A state, in no way.
 
 \begin{figure}[htb]
 \begin{center}
@@ -133,12 +112,48 @@ and c) instrumented for use with symbolic execution}
 \label{fig:automaton}
 \end{figure}
 
+Abstract interpretation, while computing a fix-point, would transform states
+at lines~\ref{line:lock} and~\ref{line:unlock} according to an automaton
+describing locking. An example of such an automaton is depicted in
+Fig.~\ref{fig:automaton}.  In that specific case, line~\ref{line:lock}
+forces abstract interpreter to transform unlocked state into locked one and
+locked state into an erroneous one. The latter is eventually reported by the
+tool as an error to user.  Analogical transitions are performed on
+line~\ref{line:unlock}.
+
+Since a single run is evaluated at once while executing symbolically, the lock
+may be only in one state at a time. Hence we introduce an integer for each
+lock used. The integer then corresponds exactly to the automaton state.  I.e.
+all function calls to \texttt{lock} and \texttt{unlock} are replaced by
+assignments to this integer by one or zero respectively. So far we simulate
+only the lock behavior, it reminds to describe the way error state is
+revealed.
+
+Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
+so-called \texttt{assert} function may be used to provoke the executor to
+report a failure when a bad state is reached. The function (or macro more
+precisely) is used by developers for debugging purposes. It takes exactly one
+argument. When it evaluates to true, an error is reported. Both when a program
+containing the debug facility is run and when executed by the symbolic
+executor we use.
+
+Thus our tool inserts an \texttt{assert} before each assignment to the lock
+state. To be precise it means the error state of the automaton is never
+reached. It is checked whether the following transition would be a failure.
+This approach simplifies slicing a bit. I.e. not all assignments are
+necessarily needed and might be sliced right away.
+
+The first parameter of the \texttt{assert} macro, the assertion, is check that
+the integer is zero when the code is about to take a lock and one in the
+opposite case. This can be seen in Fig.~\ref{fig:instrumentation}, the third
+column.
+
 \paragraph{Points-To Analysis} To be precise in decision about pointers in our
 tool, we implemented Andersen points-to analysis~\cite{andersen}. Primarily,
-it helps us in slicing to decide if two pointers are the same or not. Further
-it determines which functions are called by indirect function calls, which
-locks point to the same allocation during instrumentation phase even though
-the locks have a different name and so on.
+it helps us in slicing to decide if two pointers point to the same object or
+not. Further it determines which functions may be called by indirect function
+calls, which locks point to the same allocated object during instrumentation
+phase even though the locks have a different name and so on.
 
 \section{Slicing}
 \label{sec:slicing} \todo{M}
@@ -160,18 +175,18 @@ function is superseded by an \textsc{assert} and assignment to an appropriate
 integer to reflect the automaton state. This task is performed by our first
 LLVM module called \texttt{Prepare}.
 
-The instrumented C code is then taken by the tool and turned into LLVM code.
-For this purpose a compiler called \textsc{clang}\footnote{\textsc{clang} is a
-part of the LLVM framework.} is used.
+The instrumented C code is then taken by the tool and turned into LLVM
+bytecode. For this purpose a compiler from the LLVM framework called
+\textsc{clang} is used. Optimizations are turned off as required by
+\textsc{Klee}. Further, the generated bytecode is sliced by an LLVM
+inter-procedural slicer to eliminate irrelevant code. This is done by a
+separate LLVM module \texttt{Slicer}.
 
-Further the LLVM bytecode is sliced by an LLVM inter-procedural slicer to
-eliminate unneeded (irrelevant) code. This is done by a separate LLVM module
-\texttt{Slicer}.
-
-Given the sliced input, we parse the LLVM code with \texttt{Kleerer} LLVM
-module. This pass creates a separate file with LLVM bytecode for each function
-in the file. It also adds \texttt{main} function which is where the analysis
-start -- in each of the files it calls a different function.
+Given the sliced input, the LLVM bytecode is parsed by the \texttt{Kleerer}
+LLVM module. This pass creates a separate file with LLVM bytecode for each
+function present in the source file. It also adds a \texttt{main} function.
+This is where the analysis starts -- in each of the files it calls a different
+function.
 
 \begin{figure}[htb]
 \begin{center}
@@ -263,7 +278,11 @@ analysis time.}
 \section{Future Work}
 \label{sec:future} \todo{H}
 
-\textsc{UcKlee}\cite{ucklee}
+\textsc{UcKlee}~\cite{ucklee}
+
+Other checkers than locking.
+
+Capable of running on most of the kernel.
 
 \section{Conclusion}
 \label{sec:conclusion} \todo{H}
