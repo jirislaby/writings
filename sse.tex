@@ -133,35 +133,116 @@ and c) instrumented for use with symbolic execution}
 \label{fig:automaton}
 \end{figure}
 
-Andersen Points-To analysis.
+\paragraph{Points-To Analysis} To be precise in decision about pointers in our
+tool, we implemented Andersen points-to analysis~\cite{andersen}. Primarily,
+it helps us in slicing to decide if two pointers are the same or not. Further
+it determines which functions are called by indirect function calls, which
+locks point to the same allocation during instrumentation phase even though
+the locks have a different name and so on.
 
 \section{Slicing}
 \label{sec:slicing} \todo{M}
 
 \section{Implementation}
 \label{sec:impl}
-We decided to verify the functionality on the C code. Many projects with
-open-source license (and source code available) are written in C. Finally, we
-decided to test our tool on the Linux kernel. It is a large and well tested
-piece of software. Also it is of high interest to be bug-free. Otherwise
-systems could be easily compromised.
+We decided to verify the functionality on the C code. The main reason is that
+many projects with open-source license (and source code available) are written
+in C. Hence there is a fair codebase to test.
 
 The tool is not implemented from scratch. It is written as a module for the
-LLVM framework~\cite{llvm}. This provides us a parser (and compiler) for free
-and a documented application programming interface. Also for this code a
-symbolic executor exists already. It is called \textsc{Klee}.
+LLVM framework~\cite{llvm}. This provides us with a C parser (and compiler)
+for free and a documented application programming interface. Also for LLVM
+a symbolic executor exists already. It is called \textsc{Klee}.
 
-First the tool instruments the code on the C level. Each locking function is
-superseded by an \textsc{assert} and assignment to an appropriate integer.
-Then the tool turns the C code into LLVM by compiler called \textsc{clang}.
+Before we can really run the executor, several steps have to be performed
+first. Initially, the tool instruments the code on the C level. Each locking
+function is superseded by an \textsc{assert} and assignment to an appropriate
+integer to reflect the automaton state. This task is performed by our first
+LLVM module called \texttt{Prepare}.
+
+The instrumented C code is then taken by the tool and turned into LLVM code.
+For this purpose a compiler called \textsc{clang}\footnote{\textsc{clang} is a
+part of the LLVM framework.} is used.
 
 Further the LLVM bytecode is sliced by an LLVM inter-procedural slicer to
-eliminate unneeded (irrelevant) code.
+eliminate unneeded (irrelevant) code. This is done by a separate LLVM module
+\texttt{Slicer}.
+
+Given the sliced input, we parse the LLVM code with \texttt{Kleerer} LLVM
+module. This pass creates a separate file with LLVM bytecode for each function
+in the file. It also adds \texttt{main} function which is where the analysis
+start -- in each of the files it calls a different function.
+
+\begin{figure}[htb]
+\begin{center}
+\textcolor{red}{Do we want this figure (picture needed)?} \\
+C $\rightarrow$ Instrumentation (Prepare) $\rightarrow$ LLVM compiler (clang) $\rightarrow$ slicing (Slicer) $\rightarrow$
+main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
+\end{center}
+\caption{Phases of our tool}
+\label{fig:phases}
+\end{figure}
 
 \subsection{Experiments}
-\label{sec:experiments} \todo{J}
+\label{sec:experiments}
 
-See Table~\ref{tab:results}.
+The implementation described above was evaluated on a real code too. The
+evaluation was performed on the Linux kernel. It is a large and well tested
+piece of software. Also it is generally of high interest to be bug-free.
+Otherwise systems could be indeed compromised rather easily.
+
+All tests performed were run on a standard office machine. On a hardware
+level, its configuration is a dual-core processor, 6\,GiB of memory.
+Operating system installed is Linux. \textsc{Klee} is run on the instrumented
+and sliced LLVM code. We specify \textsc{Klee} parameters to add an upper
+bound on solver and overall time. The former is set to 3 seconds, the latter
+to 30. We tried to increase these times with no real effect.
+
+We do not optimize option for \textsc{Klee} because it causes \textsc{Klee} to
+crash under some circumstances. The optimization might help the analysis,
+hence the crashes are yet to be investigated.
+
+At this early stage of the tool, the evaluation is not performed on the whole
+kernel. It is because it still does not scale that much. We plan to extend
+the tool to be capable of handling whole kernel. We limited our testing to a
+set of files. We aimed the technique at the functions where XXX\todo{what to
+write here} reported a trace. Be it a real error or false positive. We
+consulted the files with upstream developers to sort out which are in each
+category.
+
+This helps us to sort the results provided by our tool. The output is the tool
+either:
+\begin{itemize}
+\item confirms a real error -- reports an error at the same location the
+abstract interpretation tool did or
+\item confirms a false positive -- does not report anything at that location
+or
+\item does not finish computation -- due to various errors.
+\end{itemize}
+
+The last category stems from two sources. First, the tool hits a limit of
+symbolic execution and times out. This happens especially when locks are
+dependent upon loops. Then the loops are not sliced away and symbolic
+execution does not finish in the bounded time.
+
+Second, memory errors occur. This is due to our functions input handling. For
+each parameter of a function analyzed, a symbolic memory is allocated. Size is
+determined as the parameter size. When the parameter is a pointer, the size is
+multiplied by 4000. So for example 4 bytes for integer, and 16000 for integer
+pointer. Further, for the pointer case, we pass a pointer to the middle of the
+array (functions might dereference memory at negative index). The idea behind
+is explained in~\cite{ucklee}.
+
+Even if we use this feature, function may touch a memory out-of-bounds this
+array. Typically when there is a pointer to a structure passed to a function
+and when the structure contains another pointer. It is uninitialized. We plan
+to implement the same on-demand handling \textsc{UcKlee}~\cite{ucklee} does.
+
+For files from each of the three categories we present examples where we are
+sure about the results. I.e. upstream developers confirmed they are either
+error or false positive and we are able with our limited knowledge to reason
+about the files. They are presented in Table~\ref{tab:results}. It contains
+running time of each step performed on the files.
 
 \begin{table}[t]
 \begin{tabular}{|l|l|l|l|l|l|} \hline
