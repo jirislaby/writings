@@ -11,38 +11,49 @@
 \usetikzlibrary{arrows,shapes}
 \usetikzlibrary{plothandlers}
 
+%{{{ (La)TeX definitions
+
 \newcommand\Color[2]{\textcolor{#1}{#2}}
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
 \renewcommand\note[1]{\nb{\Color{blue}{#1}}}
 \newcommand\todo[1]{\nb{\Color{red}{#1}}}
 \newcommand{\todol}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
 \newcommand{\rem}[1]{{\scriptsize{{\textcolor{blue}{[#1]}}}}}
-
 \lstset{escapeinside={(*@}{@*)}}
+
+%}}}
 
 \begin{document}
 
+%{{{ Title + Author
+
 \title{Finding Bugs by Automata Using Symbolic Execution}
-\author{Jan~Strej\v{c}ek, Ji\v{r}\'\i~Slab\'y and Marek~Trt\'{\i}k}
-\institute{Faculty of Informatics, Masaryk University, Brno, Czech Republic
+\author{Ji\v{r}\'\i~Slab\'y, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
+\institute{Faculty of Informatics, Masaryk University\\
+  Botanick\'a 68a, 60200 Brno, Czech Republic\\
 \email{\{strejcek,slaby,trtik\}@fi.muni.cz}}
+
+%}}}
 
 \maketitle
 
 \begin{abstract}
 \end{abstract}
 
+%{{{ Intro
+
 \section{Introduction}
 \label{sec:introduction} \todo{H}
 
 SE King~\cite{se}
 
-\textsc{Metal}~\cite{metal}
-\textsc{Stanse}~\cite{stanse} \note{este nevyslo takze asi nic}
+\textsc{Metal}~\cite{metal,pldi02}
+\textsc{Stanse}~\cite{stanse} 
 \textsc{Klee}~\cite{klee}
 
 \begin{figure}[!htb]
     \centering
+    \footnotesize
     \begin{lstlisting}[language=C, numbers=none]
         int L1 = 0, L2 = 0;
 
@@ -64,251 +75,123 @@ SE King~\cite{se}
         14  return dst;                           {U,RL}
         }
     \end{lstlisting}
-    \caption{Function \texttt{copy} copying a source string \texttt{src} into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel writes.}
-        \label{fig:copy}
+    \caption{Function \texttt{copy} copying a source string \texttt{src}
+      into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel
+      writes.}
+    \label{fig:copy}
 \end{figure}
 
-\todol{Popsat running program na Figure~\ref{fig:copy}. Nezapomenout zminit, ze \texttt{L} muze ukazovat na \texttt{L1} i \texttt{L2} - diky Andersenovi.}
-\todol{Popsat AI - ty mnoziny v obrazku. Nejsou potreba detaily, jen musi byt jasne, jak se k tem mnozinam doslo a jaky maji vyznam.}
-\todol{Popsat vsechny tri chybove reporty z AI jeden je false positive (trace = 1,2,3,7,8,12,13) vedouci na radek 13 s double-unlockem (DU), druhy jak by smet (trace = 5,7,8,9,10,12,14) vedouci na radek 14, kde se opousti funkce v lock stavu (RL), ale ten treti je realna chyba (trace = 5,7,8,12,14) vedouci na radek 14, kde se opousti funkce v lock stavu (RL)}
+\todo{Neomezit se na jeden lock? Pro uvod by to bylo rozumejsi, pak se pri
+  instrumentaci vysvetli ta komplikace s points-to analyzou.} 
 
-\begin{figure}[!htb]
-    \centering
-    \tikzstyle{loc} = [circle,thick,draw,inner sep=0.9pt]
-    \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.1pt]
-    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
-    \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
-    \footnotesize
-    \begin{tikzpicture}[node distance=0.65cm]
-        \node [loc] (1) {$2$};
-        \node [loc] (2) [below of=1] {$3$}
-            edge [pre] node {} (1);
+\begin{itemize}
+\item Dodelat automat pro lockovaci chyby (obrazek).
+\item Popsat vsechny tri lockovaci chyby ve Figure~\ref{fig:copy} z AI jeden
+  je false positive (trace = 1,2,3,7,8,12,13) vedouci na radek 13 s
+  double-unlockem (DU), druhy jak by smet (trace = 5,7,8,9,10,12,14) vedouci
+  na radek 14, kde se opousti funkce v lock stavu (RL), ale ten treti je
+  realna chyba (trace = 5,7,8,12,14) vedouci na radek 14, kde se opousti
+  funkce v lock stavu (RL)
+\item Popsat priciny false positivu: nerealne cesty a syntakticke
+  automaty. (Prakticke priciny bych nechal do zaveru k future work.)
+\item Nas prinos: metal + slic. + SE a semanticke automaty. Zduraznit, ze
+  slicing muze prinest konecnost vypoctu SE a tim potvrdit bezchybnost kodu
+  (kod ma typicky nekonecne mnoho cest vypoctu a tudiz se SE nedopocita). 
+\item struktura clanku.
+\end{itemize}
 
-        % ->false branch
-        \node [loc] (3) [left of=2,below of=2] {$7$}
-            edge [pre] node [label=above:F~~] {} (2);
-        \node [loc] (4) [below of=3] {$8$}
-            edge [pre] node {} (3);
-        \node [loc2] (5) [below of=4] {$12$}
-            edge [pre] node {} (4);
-        \node [loc2] (6) [below of=5] {$14$}
-            edge [pre] node {} (5);
+%{{{ Obrazek nekonecneho stromu symbolicke exekuce na neproslicovanem kodu
 
-        % ->true branch
-        \node [loc] (7) [right of=2,below of=2] {$4$}
-            edge [pre] node [label=above:~~T] {} (2);
-        \node [loc] (8) [below of=7] {$5$}
-            edge [pre] node {} (7);
-        \node [loc] (9) [below of=8] {$7$}
-            edge [pre] node {} (8);
-        \node [loc] (10) [below of=9] {$8$}
-            edge [pre] node {} (9);
+% \begin{figure}[!htb]
+%     \centering
+%     \tikzstyle{loc} = [circle,thick,draw,inner sep=0.9pt]
+%     \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.1pt]
+%     \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+%     \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+%     \footnotesize
+%     \begin{tikzpicture}[node distance=0.65cm]
+%         \node [loc] (1) {$2$};
+%         \node [loc] (2) [below of=1] {$3$}
+%             edge [pre] node {} (1);
 
-        % ->true->false branch
-        \node [loc2] (11) [left of=10,below of=10] {$12$}
-            edge [pre] node [label=above:F~~] {} (10);
-        \node [loc2] (12) [below of=11] {$14$}
-            edge [pre] node {} (11);
+%         % ->false branch
+%         \node [loc] (3) [left of=2,below of=2] {$7$}
+%             edge [pre] node [label=above:F~~] {} (2);
+%         \node [loc] (4) [below of=3] {$8$}
+%             edge [pre] node {} (3);
+%         \node [loc2] (5) [below of=4] {$12$}
+%             edge [pre] node {} (4);
+%         \node [loc2] (6) [below of=5] {$14$}
+%             edge [pre] node {} (5);
 
-        % ->true->true branch
-        \node [loc] (13) [right of=10,below of=10] {$9$}
-            edge [pre] node [label=above:~~T] {} (10);
-        \node [loc2] (14) [below of=13] {$10$}
-            edge [pre] node {} (13);
-        \node [loc] (15) [below of=14] {$8$}
-            edge [pre] node {} (14);
+%         % ->true branch
+%         \node [loc] (7) [right of=2,below of=2] {$4$}
+%             edge [pre] node [label=above:~~T] {} (2);
+%         \node [loc] (8) [below of=7] {$5$}
+%             edge [pre] node {} (7);
+%         \node [loc] (9) [below of=8] {$7$}
+%             edge [pre] node {} (8);
+%         \node [loc] (10) [below of=9] {$8$}
+%             edge [pre] node {} (9);
 
-        % ->true->true->false branch
-        \node [loc2] (16) [left of=15,below of=15] {$12$}
-            edge [pre] node [label=above:F~~] {} (15);
-        \node [loc2] (17) [below of=16] {$13$}
-            edge [pre] node {} (16);
-        \node [loc2] (18) [below of=17] {$14$}
-            edge [pre] node {} (17);
+%         % ->true->false branch
+%         \node [loc2] (11) [left of=10,below of=10] {$12$}
+%             edge [pre] node [label=above:F~~] {} (10);
+%         \node [loc2] (12) [below of=11] {$14$}
+%             edge [pre] node {} (11);
 
-        % ->true->true->true branch
-        \node [loc] (19) [right of=15,below of=15] {$9$}
-            edge [pre] node [label=above:~~T] {} (15);
-        \node [loc2] (20) [below of=19] {$10$}
-            edge [pre] node {} (19);
-        \node [loc] (21) [below of=20] {$8$}
-            edge [pre] node {} (20);
+%         % ->true->true branch
+%         \node [loc] (13) [right of=10,below of=10] {$9$}
+%             edge [pre] node [label=above:~~T] {} (10);
+%         \node [loc2] (14) [below of=13] {$10$}
+%             edge [pre] node {} (13);
+%         \node [loc] (15) [below of=14] {$8$}
+%             edge [pre] node {} (14);
 
-        % ->true->true->false->false branch
-        \node [loc2] (22) [left of=21,below of=21] {$12$}
-            edge [pre] node [label=above:F~~] {} (21);
-        \node [loc2] (23) [below of=22] {$13$}
-            edge [pre] node {} (22);
-        \node [loc2] (24) [below of=23] {$14$}
-            edge [pre] node {} (23);
+%         % ->true->true->false branch
+%         \node [loc2] (16) [left of=15,below of=15] {$12$}
+%             edge [pre] node [label=above:F~~] {} (15);
+%         \node [loc2] (17) [below of=16] {$13$}
+%             edge [pre] node {} (16);
+%         \node [loc2] (18) [below of=17] {$14$}
+%             edge [pre] node {} (17);
 
-        % ->true->true->true->true branch
-        \node [loc] (25) [right of=21,below of=21] {$9$}
-            edge [pre] node [label=above:~~T] {} (21);
-        \node [loc2] (26) [below of=25] {$10$}
-            edge [pre] node {} (25);
-        \node [loc] (27) [below of=26] {$8$}
-            edge [pre] node {} (26);
-        \node [] (FINF) [below of=27,left of=27] {}
-            edge [dotted,thick] node {} (27);
-        \node [] (TINF) [below of=27,right of=27] {}
-            edge [dotted,thick] node {} (27);
-    \end{tikzpicture} 
-    \caption{Symbolic execution tree of function \texttt{copy}}
-        \label{fig:copy:SET}
-\end{figure} 
+%         % ->true->true->true branch
+%         \node [loc] (19) [right of=15,below of=15] {$9$}
+%             edge [pre] node [label=above:~~T] {} (15);
+%         \node [loc2] (20) [below of=19] {$10$}
+%             edge [pre] node {} (19);
+%         \node [loc] (21) [below of=20] {$8$}
+%             edge [pre] node {} (20);
 
-\todol{K obrazku~\ref{fig:copy:SET} hlavne rict, ze strom je nekonecty -> SE se nedopocita. Pak je take dobre rict, ze cesta 2,3,4,5,7,8,12,14 je sice chybovou z pohledu zamykani, ale SE to neobjevi, protoze nedojde k padu programu. Aby tu chybu SE chytla, tak se ji musi dat vedet. SE neumi sama o sobe neumi chytat chyby "vyssi urovne", jako je to nase zamykani zamku.}
+%         % ->true->true->false->false branch
+%         \node [loc2] (22) [left of=21,below of=21] {$12$}
+%             edge [pre] node [label=above:F~~] {} (21);
+%         \node [loc2] (23) [below of=22] {$13$}
+%             edge [pre] node {} (22);
+%         \node [loc2] (24) [below of=23] {$14$}
+%             edge [pre] node {} (23);
 
-\newpage
+%         % ->true->true->true->true branch
+%         \node [loc] (25) [right of=21,below of=21] {$9$}
+%             edge [pre] node [label=above:~~T] {} (21);
+%         \node [loc2] (26) [below of=25] {$10$}
+%             edge [pre] node {} (25);
+%         \node [loc] (27) [below of=26] {$8$}
+%             edge [pre] node {} (26);
+%         \node [] (FINF) [below of=27,left of=27] {}
+%             edge [dotted,thick] node {} (27);
+%         \node [] (TINF) [below of=27,right of=27] {}
+%             edge [dotted,thick] node {} (27);
+%     \end{tikzpicture} 
+%     \caption{Symbolic execution tree of function \texttt{copy}}
+%         \label{fig:copy:SET}
+% \end{figure} 
 
-\begin{figure}[!htb]
-    \centering
-    \begin{lstlisting}[language=C, numbers=none]
-        int L1 = 0, L2 = 0;
+%}}}
 
-        char* copy(char* src, char* dst, int* L) {
-            int i, len;
-            __ISSE_ensure_unlocked(L);           {L}
-            len = 0;
-            if (src != 0 && dst != 0) {
-                len = *(int*)src; /* get string length */
-                __ISSE_lock(L);                  {L}
-                lock(L);
-            }
-            i = 0;
-            while (i < len) {
-            dst[i] = src[i];
-                ++i;
-            }
-            if (len > 0) {
-                __ISSE_unlock(L);                {L}
-                unlock(L);
-            }
-            __ISSE_ensure_unlocked(L);           {L}
-            return dst;
-        }
-    \end{lstlisting}
-    \caption{Instrumented function \texttt{copy} by functions manipulating locking automata pointed by \texttt{L}.}
-        \label{fig:copy_instrumented}
-\end{figure}
-
-\todol{Popsat instrumentaci na radcich s \texttt{\{L\}}. }
-\todol{Ty radky s \texttt{\{L\}} hlavne rikaji, na kterem radku jsou ktere promenne relevantni pro slicovani. Tam kde mnozina chybi, tak tam neni relevantni nic. Proto musime rict, ze na radky s \texttt{\{L\}} polozime slicovaci kriteria (na kazdy radek jedno) s promennymi v te mnozine. V nasem pripade to vzdy bude pouze to \texttt{L}.}
-
-\newpage
-
-\begin{figure}[!htb]
-    \centering
-    \begin{lstlisting}[language=C, numbers=none]
-        int __ISSE_lock[2] = { 0, 0 }; 
-
-        int __ISSE_get_memory_pool_index(int const* ptr)
-        {
-            if (ptr == &L1) return 0;
-            if (ptr == &L2) return 1;
-            return -1; // unreachable
-        }
-
-        void __ISSE_ensure_unlocked(int const* L) {
-            int i = __ISSE_get_memory_pool_index(L);
-            assert(__ISSE_lock[i] == 0);
-        }
-
-        void __ISSE_lock(int const* L) {
-            int i = __ISSE_get_memory_pool_index(L);
-            assert(__ISSE_lock[i] == 0);
-            __ISSE_lock[i] = 1;
-        }
-
-        void __ISSE_unlock(int const* L) {
-            int i = __ISSE_get_memory_pool_index(L);
-            assert(__ISSE_lock[i] == 1);
-            __ISSE_lock[i] = 0;
-        }
-    \end{lstlisting}
-    \caption{Functions implementing functionality of instrumetation of automata into a program.}
-        \label{fig:instrumentation_stuff}
-\end{figure}
-
-\todol{Sjednocenim points-to mnozin ukazatelu ukazujicich na zamky dostaneme \emph{konecnou} mnozinu zamku. Prvek teto mnoziny muze byt budto globalni promenna, nebo se jedna o fiktivni objekt reprezentujici dymaickou alokaci pameti na heapu (tj. fiktivni zamek reprezentuje vsechny objekty naalokovane jednim volanim \texttt{malloc} - na danem radku v kodu). Pouzijeme koncept "alokatoru" znamy z C++. Mame alokator $A$, ktery deli fyzickou pamet programu na tolik \emph{memory pools}, kolik je prvku v te konecne mnozine zamku. Memory pools jsou indexovany od $0$ az do poctu zamku mnoziny minus jedna, a kazdy memory pool ma unikatni index. Kazdemu zamku z mnoziny zamku odpovida unikatni memory pool. Memory pool zamku, ktery je globalni promennou, obsahuje jen tu globalni promennou. Memory pool fiktivniho zamku je (velka) cast heapu, v niz se budou vyskytovat vsechny objekty alokovane na radku, pro nejz byl zaveden ten fiktivni zamek. Dany radek instrumentujeme tak, ze misto puvodniho volani \texttt{malloc} zavolame nas alokator $A$, kde mu predame index memory poolu tohoto fiktivniho objektu. Alokator $A$ pak naalokuje a vrati pozadovany kus pameti v danem memory poolu. Pro $A$ je pak jednoduche zjisiti pro zadany ukazatel, do ktereho memory poolu patri, protoze si sam organizuje memory pooly a alokace v nich. Mnozinu zamku vracenych z points-to analyzy pak realizujeme tak, ze vytvorime pole tolika \texttt{int}-u (inicializovanych na $0$), kolik je memory poolu. Index memory poolu je soucasne indexem do pole. Na obrazku~\ref{fig:instrumentation_stuff} funkce \texttt{\_\_ISSE\_get\_memory\_pool\_index} predsavuje funkci alokatoru $A$, vracejici pro zadany ukazatel \texttt{ptr} memory pool, do nejz ten ukazatel ukazuje. Telo teto funkce resi pouze running example, takze jsou tam jenom testy pro zamky odpovidajici globalnim promennym.}
-
-\newpage
-
-\begin{figure}[!htb]
-    \centering
-    \begin{lstlisting}[language=C, numbers=none]
-        char* copy(char* src, char* dst, int* L) {
-        1  int len;
-        2  __ISSE_ensure_unlocked(L);
-        3  len = 0;
-        4  if (src != 0 && dst != 0) {
-        5      len = *(int*)src; /* get string length */
-        6      __ISSE_lock(L);
-        7  }
-        8  if (len > 0) {
-        9      __ISSE_unlock(L);
-        10 }
-        11 __ISSE_ensure_unlocked(L);
-        12 return dst;
-        }
-    \end{lstlisting}
-    \caption{Sliced function \texttt{copy} with respect to manipulation with locks.}
-        \label{fig:copy_sliced}
-\end{figure}
-
-\todol{Hlavne je potreba zminit, ze zmizel ten cyklus a tak bude SE konecna. Pritom ale musime rict, ze v kodu zustaly manipulace se zamky a hlavne asserty (hlidajici spravne stavy zamku), ktere umozni SE detekovat ty zamykaci chyby.}
-
-\begin{figure}[!htb]
-    \centering
-    \tikzstyle{loc} = [circle,thick,draw,inner sep=0.9pt]
-    \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.1pt]
-    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
-    \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
-    \footnotesize
-    \begin{tikzpicture}[node distance=0.65cm]
-        \node [loc] (1) {$2$};
-        \node [loc] (2) [below of=1] {$3$}
-            edge [pre] node {} (1);
-
-        % ->false branch
-        \node [loc] (3) [left of=2,below of=2] {$8$}
-            edge [pre] node [label=above:F~~] {} (2);
-        \node [loc2] (4) [below of=3] {$11$}
-            edge [pre] node {} (3);
-        \node [loc2] (5) [below of=4] {$12$}
-            edge [pre] node {} (4);
- 
-        % ->true branch
-        \node [loc] (7) [right of=2,below of=2] {$5$}
-            edge [pre] node [label=above:~~T] {} (2);
-        \node [loc] (8) [below of=7] {$6$}
-            edge [pre] node {} (7);
-        \node [loc] (9) [below of=8] {$8$}
-            edge [pre] node {} (8);
-
-        % ->true->false branch
-        \node [loc2] (11) [left of=9,below of=9] {$11$}
-            edge [pre] node [label=above:F~~] {} (9);
-        \node [] (BUG) [below of=11,yshift=0.2cm] {bug};
-
-        % ->true->true branch
-        \node [loc] (13) [right of=9,below of=9] {$9$}
-            edge [pre] node [label=above:~~T] {} (9);
-        \node [loc2] (14) [below of=13] {$11$}
-            edge [pre] node {} (13);
-        \node [loc2] (15) [below of=14] {$12$}
-            edge [pre] node {} (14);
-    \end{tikzpicture} 
-    \caption{Symbolic execution tree of sliced function \texttt{copy}}
-        \label{fig:copy_sliced:SET}
-\end{figure}
-
-\todol{Vyzvednout konecnost SETu proslicovaneho programu. Dal vyzvednout, ze diky assertu zdetekujeme na ceste 2,3,5,6,8,11 realnou chybu. Zadna dalsi hlaska (false positive) uz se nevygeneruje.}
-
-\todol{Zbyva poresit zpetne mapovani chyby do puvodniho neproslicovaneho programu. Napadly me dve moznosti. Prvni je trivialni az hloupa: Pro kazdy radek v proslicovanem programu muzu najit odpovidajici radek v programu originalnim. Proto ty radky v originalnim programu, ktere odpovidaji chybove ceste v proslicovanem programu, oznacim modre. Dostanu tak modrou prerusovanou cestu v originalnim programu. Kazde dva kusy cesty pak propojim pres sede oznacenou cast kodu, pres niz se muze dojit z jedno kusu do druheho. Sede casti se tedy urcuji jako sjednoceni cest v CFG napojujici jeden kus modre cesty na druhy. Druha moznost, jak trace mapovat zpet, je uz zajimavejsi: Vezmu si path condition chybove cesty z proslicovaneho programu. Pak spustim SE na originalnim programu s path condition inicialne nastavenou na tu z chybove cesty v proslicovanem programu. Jakmile dorazim v originalnim programu do lokace odpovidajici cilove lokaci chybove cesty v proslicovanem programu, tak jsem nasel chybovy trace v originalnim programu. Tady ale vyvstava hodne otazek k zodpovezeni, na ktere nam mozna nevyjde cas. Hlavne: Bude nalezeny chybovy trace v originalnim programu urcite tim chybovym? Neutavi se SE na originalnim programu i pres znalost path condition chybove cesty z proslicovaneho programu?}
-
-\newpage
+%}}}
+%{{{ Instrumentation
 
 \section{Instrumentation}
 \label{sec:instr}
@@ -429,14 +312,218 @@ not. Further it determines which functions may be called by indirect function
 calls, which locks point to the same allocated object during instrumentation
 phase even though the locks have a different name and so on.
 
+\begin{figure}[!htb]
+    \centering
+    \begin{lstlisting}[language=C, numbers=none]
+        int L1 = 0, L2 = 0;
+
+        char* copy(char* src, char* dst, int* L) {
+            int i, len;
+            __ISSE_ensure_unlocked(L);           {L}
+            len = 0;
+            if (src != 0 && dst != 0) {
+                len = *(int*)src; /* get string length */
+                __ISSE_lock(L);                  {L}
+                lock(L);
+            }
+            i = 0;
+            while (i < len) {
+            dst[i] = src[i];
+                ++i;
+            }
+            if (len > 0) {
+                __ISSE_unlock(L);                {L}
+                unlock(L);
+            }
+            __ISSE_ensure_unlocked(L);           {L}
+            return dst;
+        }
+    \end{lstlisting}
+    \caption{Instrumented function \texttt{copy} by functions manipulating
+      locking automata pointed by \texttt{L}.}
+    \label{fig:copy_instrumented}
+\end{figure}
+
+\todol{Smazat \texttt{\{L\}} na koncich radku, ktere puvodne melo slouzit instrumentaci. }
+
+\begin{figure}[!htb]
+    \centering
+    \begin{lstlisting}[language=C, numbers=none]
+        int __ISSE_lock[2] = { 0, 0 }; 
+
+        int __ISSE_get_memory_pool_index(int const* ptr)
+        {
+            if (ptr == &L1) return 0;
+            if (ptr == &L2) return 1;
+            return -1; // unreachable
+        }
+
+        void __ISSE_ensure_unlocked(int const* L) {
+            int i = __ISSE_get_memory_pool_index(L);
+            assert(__ISSE_lock[i] == 0);
+        }
+
+        void __ISSE_lock(int const* L) {
+            int i = __ISSE_get_memory_pool_index(L);
+            assert(__ISSE_lock[i] == 0);
+            __ISSE_lock[i] = 1;
+        }
+
+        void __ISSE_unlock(int const* L) {
+            int i = __ISSE_get_memory_pool_index(L);
+            assert(__ISSE_lock[i] == 1);
+            __ISSE_lock[i] = 0;
+        }
+    \end{lstlisting}
+    \caption{Functions implementing functionality of instrumetation of automata into a program.}
+        \label{fig:instrumentation_stuff}
+\end{figure}
+
+\todol{Sjednocenim points-to mnozin ukazatelu ukazujicich na zamky dostaneme
+  \emph{konecnou} mnozinu zamku. Prvek teto mnoziny muze byt budto globalni
+  promenna, nebo se jedna o fiktivni objekt reprezentujici dymaickou alokaci
+  pameti na heapu (tj. fiktivni zamek reprezentuje vsechny objekty
+  naalokovane jednim volanim \texttt{malloc} - na danem radku v
+  kodu). Pouzijeme koncept "alokatoru" znamy z C++. Mame alokator $A$, ktery
+  deli fyzickou pamet programu na tolik \emph{memory pools}, kolik je prvku
+  v te konecne mnozine zamku. Memory pools jsou indexovany od $0$ az do
+  poctu zamku mnoziny minus jedna, a kazdy memory pool ma unikatni
+  index. Kazdemu zamku z mnoziny zamku odpovida unikatni memory pool. Memory
+  pool zamku, ktery je globalni promennou, obsahuje jen tu globalni
+  promennou. Memory pool fiktivniho zamku je (velka) cast heapu, v niz se
+  budou vyskytovat vsechny objekty alokovane na radku, pro nejz byl zaveden
+  ten fiktivni zamek. Dany radek instrumentujeme tak, ze misto puvodniho
+  volani \texttt{malloc} zavolame nas alokator $A$, kde mu predame index
+  memory poolu tohoto fiktivniho objektu. Alokator $A$ pak naalokuje a vrati
+  pozadovany kus pameti v danem memory poolu. Pro $A$ je pak jednoduche
+  zjisiti pro zadany ukazatel, do ktereho memory poolu patri, protoze si sam
+  organizuje memory pooly a alokace v nich. Mnozinu zamku vracenych z
+  points-to analyzy pak realizujeme tak, ze vytvorime pole tolika
+  \texttt{int}-u (inicializovanych na $0$), kolik je memory poolu. Index
+  memory poolu je soucasne indexem do pole. Na
+  obrazku~\ref{fig:instrumentation_stuff} funkce
+  \texttt{\_\_ISSE\_get\_memory\_pool\_index} predsavuje funkci alokatoru
+  $A$, vracejici pro zadany ukazatel \texttt{ptr} memory pool, do nejz ten
+  ukazatel ukazuje. Telo teto funkce resi pouze running example, takze jsou
+  tam jenom testy pro zamky odpovidajici globalnim promennym.}
+
+%}}}
+%{{{ Slicing
+
 \section{Slicing}
 \label{sec:slicing} \todo{M}
+
+\begin{figure}[!htb]
+    \centering
+    \begin{lstlisting}[language=C, numbers=none]
+        char* copy(char* src, char* dst, int* L) {
+        1  int len;
+        2  __ISSE_ensure_unlocked(L);
+        3  len = 0;
+        4  if (src != 0 && dst != 0) {
+        5      len = *(int*)src; /* get string length */
+        6      __ISSE_lock(L);
+        7  }
+        8  if (len > 0) {
+        9      __ISSE_unlock(L);
+        10 }
+        11 __ISSE_ensure_unlocked(L);
+        12 return dst;
+        }
+    \end{lstlisting}
+    \caption{Sliced function \texttt{copy} with respect to manipulation with locks.}
+        \label{fig:copy_sliced}
+\end{figure}
+
+\todol{Hlavne je potreba zminit, ze zmizel ten cyklus a tak bude SE konecna. Pritom ale musime rict, ze v kodu zustaly manipulace se zamky a hlavne asserty (hlidajici spravne stavy zamku), ktere umozni SE detekovat ty zamykaci chyby.}
+
+\todo{Je treba zmnit, ze kdyz se vyslicovany kod muze zacyklit, pak nase
+  technika muze dat false positive - ale i v tomto pripade je v kodu
+  pravdepodobne problem - existuje smysluplny nedosazitelny kod}.
+
+%}}}
+%{{{ Symbolic Execution
 
 \section{Symbolic Execution}
 \label{sec:SEonSliced} \todo{M}
 
+Je otazka, jestli to sem davat?
+
+\begin{figure}[!htb]
+    \centering
+    \tikzstyle{loc} = [circle,thick,draw,inner sep=0.9pt]
+    \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.1pt]
+    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+    \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+    \footnotesize
+    \begin{tikzpicture}[node distance=0.65cm]
+        \node [loc] (1) {$2$};
+        \node [loc] (2) [below of=1] {$3$}
+            edge [pre] node {} (1);
+
+        % ->false branch
+        \node [loc] (3) [left of=2,below of=2] {$8$}
+            edge [pre] node [label=above:F~~] {} (2);
+        \node [loc2] (4) [below of=3] {$11$}
+            edge [pre] node {} (3);
+        \node [loc2] (5) [below of=4] {$12$}
+            edge [pre] node {} (4);
+ 
+        % ->true branch
+        \node [loc] (7) [right of=2,below of=2] {$5$}
+            edge [pre] node [label=above:~~T] {} (2);
+        \node [loc] (8) [below of=7] {$6$}
+            edge [pre] node {} (7);
+        \node [loc] (9) [below of=8] {$8$}
+            edge [pre] node {} (8);
+
+        % ->true->false branch
+        \node [loc2] (11) [left of=9,below of=9] {$11$}
+            edge [pre] node [label=above:F~~] {} (9);
+        \node [] (BUG) [below of=11,yshift=0.2cm] {bug};
+
+        % ->true->true branch
+        \node [loc] (13) [right of=9,below of=9] {$9$}
+            edge [pre] node [label=above:~~T] {} (9);
+        \node [loc2] (14) [below of=13] {$11$}
+            edge [pre] node {} (13);
+        \node [loc2] (15) [below of=14] {$12$}
+            edge [pre] node {} (14);
+    \end{tikzpicture} 
+    \caption{Symbolic execution tree of sliced function \texttt{copy}}
+        \label{fig:copy_sliced:SET}
+\end{figure}
+
+\todol{Vyzvednout konecnost SETu proslicovaneho programu. Dal vyzvednout, ze diky assertu zdetekujeme na ceste 2,3,5,6,8,11 realnou chybu. Zadna dalsi hlaska (false positive) uz se nevygeneruje.}
+
+\todol{Zbyva poresit zpetne mapovani chyby do puvodniho neproslicovaneho
+  programu. Napadly me dve moznosti. Prvni je trivialni az hloupa: Pro kazdy
+  radek v proslicovanem programu muzu najit odpovidajici radek v programu
+  originalnim. Proto ty radky v originalnim programu, ktere odpovidaji
+  chybove ceste v proslicovanem programu, oznacim modre. Dostanu tak modrou
+  prerusovanou cestu v originalnim programu. Kazde dva kusy cesty pak
+  propojim pres sede oznacenou cast kodu, pres niz se muze dojit z jedno
+  kusu do druheho. Sede casti se tedy urcuji jako sjednoceni cest v CFG
+  napojujici jeden kus modre cesty na druhy. Druha moznost, jak trace
+  mapovat zpet, je uz zajimavejsi: Vezmu si path condition chybove cesty z
+  proslicovaneho programu. Pak spustim SE na originalnim programu s path
+  condition inicialne nastavenou na tu z chybove cesty v proslicovanem
+  programu. Jakmile dorazim v originalnim programu do lokace odpovidajici
+  cilove lokaci chybove cesty v proslicovanem programu, tak jsem nasel
+  chybovy trace v originalnim programu. Tady ale vyvstava hodne otazek k
+  zodpovezeni, na ktere nam mozna nevyjde cas. Hlavne: Bude nalezeny chybovy
+  trace v originalnim programu urcite tim chybovym? Neutavi se SE na
+  originalnim programu i pres znalost path condition chybove cesty z
+  proslicovaneho programu?}
+
+%}}}
+%{{{ Trace Back Mapping
+
 \section{Trace Back Mapping}
 \label{sec:BackMapping} \todo{???}
+
+%}}}
+%{{{ Implementation
 
 \section{Implementation}
 \label{sec:impl}
@@ -477,6 +564,9 @@ main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
 \caption{Phases of our tool}
 \label{fig:phases}
 \end{figure}
+
+%}}}
+%{{{ Experiments
 
 \subsection{Experiments}
 \label{sec:experiments}
@@ -557,8 +647,14 @@ analysis time.}
 
 \todo{add the files and comment them}
 
+%}}}
+%{{{ Related Work
+
 \section{Related Work}
 \label{sec:related} \todo{M}
+
+%}}}
+%{{{ Future Work
 
 \section{Future Work}
 \label{sec:future} \todo{H}
@@ -569,6 +665,9 @@ Other checkers than locking.
 
 Capable of running on most of the kernel.
 
+%}}}
+%{{{ Conclusion
+
 \section{Conclusion}
 \label{sec:conclusion} \todo{H}
 
@@ -578,7 +677,9 @@ Capable of running on most of the kernel.
 All authors are supported by the research centre Institute for Theoretical
 Computer Science (ITI), project No. 1M0545.
 
-\todo{ITI skoncilo, pridat DG}
+\todo{ITI skoncilo, pridat DG a Tonyho projekty - [H]}
+
+%}}}
 
 \bibliographystyle{plain}
 \bibliography{sse}
