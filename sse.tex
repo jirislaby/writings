@@ -31,7 +31,7 @@
 \author{Ji\v{r}\'\i~Slab\'y, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
-\email{\{strejcek,slaby,trtik\}@fi.muni.cz}}
+\email{\{slaby,strejcek,trtik\}@fi.muni.cz}}
 
 %}}}
 
@@ -52,29 +52,28 @@ SE King~\cite{se}
 \textsc{Klee}~\cite{klee}
 
 \begin{figure}[!htb]
-    \centering
-    \footnotesize
-    \begin{lstlisting}[language=C, numbers=none]
-        int L1 = 0, L2 = 0;
-
-        /* Andersen: L can points-to { &L1, &L2 } */
-        char* copy(char* src, char* dst, int* L) {
-        1  int i, len;
-        2  len = 0;                               {U}
-        3  if (src != 0 && dst != 0) {            {U}
-        4      len = *(int*)src; /* get length */ {U}
-        5      lock(L);                           {L}
-        6  }
-        7  i = 0;                                 {U,L}
-        8  while (i < len) {                      {U,L}
-        9      dst[i] = src[i];                   {U,L}
-        10      ++i;                              {U,L}
-        11  }
-        12  if (len > 0)                          {U,L}
-        13      unlock(L);                        {U,DU}
-        14  return dst;                           {U,RL}
-        }
+    \begin{center}
+    \begin{tabular}{l}
+    \begin{lstlisting}[language=C]
+char *copy(char *src, char *dst, int *L) {
+1  int i, len;
+2  len = 0;                               {U}
+3  if (src != NULL && dst != NULL) {      {U}
+4      len = strlen(src);                 {U}
+5      lock(L);                           {L}
+6  }
+7  i = 0;                                 {U,L}
+8  while (i < len) {                      {U,L}
+9      dst[i] = src[i];                   {U,L}
+10     i++;                               {U,L}
+11 }
+12 if (len > 0)                          {U,L}
+13     unlock(L);                        {U,DU}
+14 return dst;                           {U,RL}
+}
     \end{lstlisting}
+    \end{tabular}
+    \end{center}
     \caption{Function \texttt{copy} copying a source string \texttt{src}
       into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel
       writes.}
@@ -198,11 +197,7 @@ SE King~\cite{se}
 
 We want to find a similar set of errors to those found by tools like
 Metal~\cite{metal}. These tools use abstract interpretation as an algorithm
-and automata for program behavior description.  For the sake of pilot testing
-and simplicity we narrowed the set of checked properties to locking errors
-only. This comprises checks for inappropriate leaving functions with lock
-held, double locks and double unlocks. We plan to augment the checked
-properties set in the future.
+and automata for program behavior description.
 
 To be able to track a state of automata using the symbolic execution, the code
 has to be instrumented before the execution itself. However, the code being
@@ -216,50 +211,11 @@ execution it is sufficient to remember an actual state of the automata for a
 program path currently explored. Other paths are explored separately in a
 different run.
 
-\begin{figure}[tb]
-\begin{center}
-\begin{tabular}{|l l|l|l|} \hline
-& \textbf{Original code} & \textbf{AI} & \textbf{Instrumentation for SE} \\ \hline
-\begin{lstlisting}{language=C}
-1
-2
-3
-4
-5
-\end{lstlisting} &
-\begin{lstlisting}{language=C,firstnumber=1}
-foo() {
-  lock(A);(*@ \label{line:lock} @*)
-  compute();
-  unlock(A);(*@ \label{line:unlock} @*)
-}
-\end{lstlisting} &
-\begin{lstlisting}[language=C]
-foo() {
-  state_change
-  no_state_change
-  state_change
-}
-\end{lstlisting} &
-\begin{lstlisting}[language=C]
-foo() {
-  assert(A = 0); A := 1;
-  compute();
-  assert(A = 1); A := 0;
-}
-\end{lstlisting} \\ \hline
-\end{tabular}
-\end{center}
-\caption{Code a) we want to check; b) that abstract interpretation evaluates
-and c) instrumented for use with symbolic execution}
-\label{fig:instrumentation}
-\end{figure}
-
-To present a difference between abstract interpretation automata states
-computation and the instrumentation to be used with the symbolic execution,
-Fig.~\ref{fig:instrumentation} is attached. Consider a function \texttt{foo}
-where a lock A is used. Further there is a \texttt{compute} function.  Assume
-that it changes the program state, especially the A state, in no way.
+%To present a difference between abstract interpretation automata states
+%computation and the instrumentation to be used with the symbolic execution,
+%Fig.~\ref{fig:instrumentation} is attached. Consider a function \texttt{foo}
+%where a lock A is used. Further there is a \texttt{compute} function.  Assume
+%that it changes the program state, especially the A state, in no way.
 
 \begin{figure}[htb]
 \begin{center}
@@ -313,70 +269,72 @@ calls, which locks point to the same allocated object during instrumentation
 phase even though the locks have a different name and so on.
 
 \begin{figure}[!htb]
-    \centering
-    \begin{lstlisting}[language=C, numbers=none]
-        int L1 = 0, L2 = 0;
-
-        char* copy(char* src, char* dst, int* L) {
-            int i, len;
-            __ISSE_ensure_unlocked(L);           {L}
-            len = 0;
-            if (src != 0 && dst != 0) {
-                len = *(int*)src; /* get string length */
-                __ISSE_lock(L);                  {L}
-                lock(L);
-            }
-            i = 0;
-            while (i < len) {
-            dst[i] = src[i];
-                ++i;
-            }
-            if (len > 0) {
-                __ISSE_unlock(L);                {L}
-                unlock(L);
-            }
-            __ISSE_ensure_unlocked(L);           {L}
-            return dst;
-        }
+    \begin{center}
+    \begin{tabular}{l}
+    \begin{lstlisting}[language=C]
+char *copy(char *src, char *dst, int *L) {
+    int i, len;
+    __ISSE_ensure_unlocked(L);
+    len = 0;
+    if (src != NULL && dst != NULL) {
+	len = strlen(src);
+	__ISSE_lock(L);
+	lock(L);
+    }
+    i = 0;
+    while (i < len) {
+        dst[i] = src[i];
+	i++;
+    }
+    if (len > 0) {
+	__ISSE_unlock(L);
+	unlock(L);
+    }
+    __ISSE_ensure_unlocked(L);
+    return dst;
+}
     \end{lstlisting}
-    \caption{Instrumented function \texttt{copy} by functions manipulating
-      locking automata pointed by \texttt{L}.}
+    \end{tabular}
+    \end{center}
+    \caption{\texttt{copy} function instrumented by functions manipulating
+    with locking automata pointed by \texttt{L}.}
     \label{fig:copy_instrumented}
 \end{figure}
 
-\todol{Smazat \texttt{\{L\}} na koncich radku, ktere puvodne melo slouzit instrumentaci. }
-
 \begin{figure}[!htb]
-    \centering
-    \begin{lstlisting}[language=C, numbers=none]
-        int __ISSE_lock[2] = { 0, 0 }; 
+    \begin{center}
+    \begin{tabular}{l}
+    \begin{lstlisting}[language=C]
+int __ISSE_lock[2] = { 0, 0 }; 
 
-        int __ISSE_get_memory_pool_index(int const* ptr)
-        {
-            if (ptr == &L1) return 0;
-            if (ptr == &L2) return 1;
-            return -1; // unreachable
-        }
+int __ISSE_get_memory_pool_index(const int *ptr)
+{
+    if (ptr == &L1) return 0;
+    if (ptr == &L2) return 1;
+    return -1; /* unreachable */
+}
 
-        void __ISSE_ensure_unlocked(int const* L) {
-            int i = __ISSE_get_memory_pool_index(L);
-            assert(__ISSE_lock[i] == 0);
-        }
+void __ISSE_ensure_unlocked(const int *L) {
+    int i = __ISSE_get_memory_pool_index(L);
+    assert(__ISSE_lock[i] == 0);
+}
 
-        void __ISSE_lock(int const* L) {
-            int i = __ISSE_get_memory_pool_index(L);
-            assert(__ISSE_lock[i] == 0);
-            __ISSE_lock[i] = 1;
-        }
+void __ISSE_lock(const int *L) {
+    int i = __ISSE_get_memory_pool_index(L);
+    assert(__ISSE_lock[i] == 0);
+    __ISSE_lock[i] = 1;
+}
 
-        void __ISSE_unlock(int const* L) {
-            int i = __ISSE_get_memory_pool_index(L);
-            assert(__ISSE_lock[i] == 1);
-            __ISSE_lock[i] = 0;
-        }
+void __ISSE_unlock(const int *L) {
+    int i = __ISSE_get_memory_pool_index(L);
+    assert(__ISSE_lock[i] == 1);
+    __ISSE_lock[i] = 0;
+}
     \end{lstlisting}
-    \caption{Functions implementing functionality of instrumetation of automata into a program.}
-        \label{fig:instrumentation_stuff}
+    \end{tabular}
+    \end{center}
+    \caption{Functions implementing instrumentation of automata into a program.}
+    \label{fig:instrumentation_stuff}
 \end{figure}
 
 \todol{Sjednocenim points-to mnozin ukazatelu ukazujicich na zamky dostaneme
@@ -413,26 +371,31 @@ phase even though the locks have a different name and so on.
 \section{Slicing} \label{sec:slicing} \todo{M}
 
 \begin{figure}[!htb]
-    \centering
-    \begin{lstlisting}[language=C, numbers=none]
-        char* copy(char* src, char* dst, int* L) {
-        1  int len;
-        2  __ISSE_ensure_unlocked(L);
-        3  len = 0;
-        4  if (src != 0 && dst != 0) {
-        5      len = *(int*)src; /* get string length */
-        6      __ISSE_lock(L);
-        7  }
-        8  if (len > 0) {
-        9      __ISSE_unlock(L);
-        10 }
-        11 __ISSE_ensure_unlocked(L);
-        12 return dst;
-        }
+    \begin{center}
+    \begin{tabular}{l}
+    \begin{lstlisting}[language=C]
+char *copy(char *src, char *dst, int *L) {
+1  int len;
+2  __ISSE_ensure_unlocked(L);
+3  len = 0;
+4  if (src != NULL && dst != NULL) {
+5      len = strlen(src);
+6      __ISSE_lock(L);
+7  }
+8  if (len > 0) {
+9      __ISSE_unlock(L);
+10 }
+11 __ISSE_ensure_unlocked(L);
+12 return dst;
+}
     \end{lstlisting}
-    \caption{Sliced function \texttt{copy} with respect to manipulation with locks.}
-        \label{fig:copy_sliced}
+    \end{tabular}
+    \end{center}
+    \caption{Sliced function \texttt{copy} with respect to locks
+    manipulation.}
+    \label{fig:copy_sliced}
 \end{figure}
+\todo{caption more precisely}
 
 \todol{Hlavne je potreba zminit, ze zmizel ten cyklus a tak bude SE konecna. Pritom ale musime rict, ze v kodu zustaly manipulace se zamky a hlavne asserty (hlidajici spravne stavy zamku), ktere umozni SE detekovat ty zamykaci chyby.}
 
@@ -536,23 +499,30 @@ for free and a documented application programming interface. Also for LLVM
 a symbolic executor exists already. It is called \textsc{Klee}.
 
 Before we can really run the executor, several steps have to be performed
-first. Initially, the tool instruments the code on the C level. Each locking
-function is superseded by an \textsc{assert} and assignment to an appropriate
-integer to reflect the automaton state. This task is performed by our first
-LLVM module called \texttt{Prepare}.
+first. Initially, the tool instruments the code on the C level.  Although the
+technique is universal, we narrowed it down for the sake of pilot testing and
+simplicity. The set of checked properties is thus limited to locking errors
+only. This comprises checks for inappropriate leaving functions with lock
+held, double locks and double unlocks. We plan to augment the checked
+properties set in the future.
+
+During the instrumentation, each locking function is superseded by an
+\textsc{assert} and assignment to an appropriate integer to reflect the
+automaton state. This task is performed by our first LLVM module called
+\texttt{Prepare}.
 
 The instrumented C code is then taken by the tool and turned into LLVM
 bytecode. For this purpose a compiler from the LLVM framework called
 \textsc{clang} is used. Optimizations are turned off as required by
 \textsc{Klee}. Further, the generated bytecode is sliced by an LLVM
 inter-procedural slicer to eliminate irrelevant code. This is done by a
-separate LLVM module \texttt{Slicer}.
+separate LLVM module named \texttt{Slicer}.
 
 Given the sliced input, the LLVM bytecode is parsed by the \texttt{Kleerer}
 LLVM module. This pass creates a separate file with LLVM bytecode for each
-function present in the source file. It also adds a \texttt{main} function.
-This is where the analysis starts -- in each of the files it calls a different
-function.
+function present in the source file. To all the created files, it also adds a
+\texttt{main} function. This is where the analysis starts -- in each of the
+files it calls a different function.
 
 \begin{figure}[htb]
 \begin{center}
