@@ -19,7 +19,7 @@
 \newcommand\todo[1]{\nb{\Color{red}{#1}}}
 \newcommand{\todol}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
 \newcommand{\rem}[1]{{\scriptsize{{\textcolor{blue}{[#1]}}}}}
-\lstset{escapeinside={(*@}{@*)}}
+\lstset{basicstyle=\scriptsize,escapeinside={(*@}{@*)}}
 
 %}}}
 
@@ -70,15 +70,15 @@ SE King~\cite{se}
     \begin{lstlisting}[language=C]
 char *copy(char *src, char *dst, int *L) {
 1  int i, len;
-2  len = 0;                               {U}
-3  if (src != NULL && dst != NULL) {      {U}
-4      len = strlen(src);                 {U}
-5      lock(L);                           {L}
+2  len = 0;                              {U}
+3  if (src != NULL && dst != NULL) {     {U}
+4      len = strlen(src);                {U}
+5      lock(L);                          {L}
 6  }
-7  i = 0;                                 {U,L}
-8  while (i < len) {                      {U,L}
-9      dst[i] = src[i];                   {U,L}
-10     i++;                               {U,L}
+7  i = 0;                                {U,L}
+8  while (i < len) {                     {U,L}
+9      dst[i] = src[i];                  {U,L}
+10     i++;                              {U,L}
 11 }
 12 if (len > 0)                          {U,L}
 13     unlock(L);                        {U,DU}
@@ -208,111 +208,105 @@ char *copy(char *src, char *dst, int *L) {
 \section{Instrumentation}
 \label{sec:instr}
 
-We want to find a similar set of errors to those found by tools like
-Metal~\cite{metal}. These tools use abstract interpretation as an algorithm
-and automata for program behavior description.
+We want to find a similar set of errors to those found by tools like those
+using \textsc{Metal}~\cite{metal}. These tools use abstract interpretation as
+an algorithm and automata for program behavior description.
 
-To be able to track a state of automata using the symbolic execution, the code
-has to be instrumented before the execution itself. However, the code being
-instrumented is slightly different to the behavior performed by the automata
-in abstract interpretation on the same code.
+Abstract interpretation loads the automata before the analysis and then fires
+transitions and remembers states while computing a fix-point. Generally there
+may be multiple states for each program location. It is due to exploring all
+paths of the program in a single run.
 
-Abstract interpretation has to consider a set of states for each program
-location and a transform function over these sets for the locations. It
-is due to exploring all paths of the program in a single run. For the symbolic
-execution it is sufficient to remember an actual state of the automata for a
-program path currently explored. Other paths are explored separately in a
-different run.
+With the symbolic execution, this is slightly different. It is sufficient to
+remember an actual state of the automata for a program path currently
+explored. Other paths are explored separately in a different runs.
 
-%To present a difference between abstract interpretation automata states
-%computation and the instrumentation to be used with the symbolic execution,
-%Fig.~\ref{fig:instrumentation} is attached. Consider a function \texttt{foo}
-%where a lock A is used. Further there is a \texttt{compute} function.  Assume
-%that it changes the program state, especially the A state, in no way.
+There are two approaches to track the automata states. First, to implement the
+functionality directly into the executor. This would be an intrusive change to
+a compact code which is intended to do a dedicated job.  The second approach
+is to instrument the code before the execution itself.  That results in a
+separate module without touching the executor's code.
 
-\begin{figure}[htb]
-\begin{center}
-\includegraphics[width=3cm]{lock_unlock}
-\end{center}
-\caption{An automaton describing locking behavior}
-\label{fig:automaton}
-\end{figure}
+%\begin{figure}[htb]
+%\begin{center}
+%\includegraphics[width=3cm]{lock_unlock}
+%\end{center}
+%\caption{An automaton describing locking behavior}
+%\label{fig:automaton}
+%\end{figure}
 
-Abstract interpretation, while computing a fix-point, would transform states
-at lines~\ref{line:lock} and~\ref{line:unlock} according to an automaton
-describing locking. An example of such an automaton is depicted in
-Fig.~\ref{fig:automaton}.  In that specific case, line~\ref{line:lock}
-forces abstract interpreter to transform unlocked state into locked one and
-locked state into an erroneous one. The latter is eventually reported by the
-tool as an error to user.  Analogical transitions are performed on
-line~\ref{line:unlock}.
+Thanks to the fact the automaton may be only in one state at a time, we can
+keep the automaton state in an integer. We do not introduce such an integer
+for each automaton instance\footnote{There may be multiple instances of the
+automata. For example the tools create a separate instance of locking
+automaton for each lock.} found in the code though. This would lead to false
+alarms. Especially in C code where two pointers may point to a single object.
 
-Since a single run is evaluated at once while executing symbolically, the lock
-may be only in one state at a time. Hence we introduce an integer for each
-lock used. The integer then corresponds exactly to the automaton state.  I.e.
-all function calls to \texttt{lock} and \texttt{unlock} are replaced by
-assignments to this integer by one or zero respectively. So far we simulate
-only the lock behavior, it reminds to describe the way error state is
-revealed.
+To avoid that, the tools leverages Andersen's points-to
+analysis~\cite{andersen} and reimplements the allocator to use memory pools.
+Both help all instances to be bound together properly. For example when the
+parametrization of automata instance is named differently in the code
+(\texttt{lock(A); B=A; unlock(B);}) or passed as a parameter with another
+name.
 
-Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
-so-called \texttt{assert} function may be used to provoke the executor to
-report a failure when a bad state is reached. The function (or macro more
-precisely) is used by developers for debugging purposes. It takes exactly one
-argument. When it evaluates to true, an error is reported. Both when a program
-containing the debug facility is run and when executed by the symbolic
-executor we use.
+In our implementation, there are two objects a pointer can reference. Either
+a global variable or a line where allocation of the object occurs.
 
-Thus our tool inserts an \texttt{assert} before each assignment to the lock
-state. To be precise it means the error state of the automaton is never
-reached. It is checked whether the following transition would be a failure.
-This approach simplifies slicing a bit. I.e. not all assignments are
-necessarily needed and might be sliced right away.
-
-The first parameter of the \texttt{assert} macro, the assertion, is check that
-the integer is zero when the code is about to take a lock and one in the
-opposite case. This can be seen in Fig.~\ref{fig:instrumentation}, the third
-column.
-
-\paragraph{Points-To Analysis} To be precise in decision about pointers in our
-tool, we implemented Andersen points-to analysis~\cite{andersen}. Primarily,
-it helps us in slicing to decide if two pointers point to the same object or
-not. Further it determines which functions may be called by indirect function
-calls, which locks point to the same allocated object during instrumentation
-phase even though the locks have a different name and so on.
+The latter introduces an imprecision into the analysis. An example of code
+where the behavior is incorrect in depicted in Fig.~\ref{fig:invalid_ptr}. All
+pointers in the list point to line~\ref{lst:alloc} where their allocation
+happens.
 
 \begin{figure}[!htb]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-char *copy(char *src, char *dst, int *L) {
-    int i, len;
-    __ISSE_ensure_unlocked(L);
-    len = 0;
-    if (src != NULL && dst != NULL) {
-	len = strlen(src);
-	__ISSE_lock(L);
-	lock(L);
-    }
-    i = 0;
-    while (i < len) {
-        dst[i] = src[i];
-	i++;
-    }
-    if (len > 0) {
-	__ISSE_unlock(L);
-	unlock(L);
-    }
-    __ISSE_ensure_unlocked(L);
-    return dst;
-}
+1 void make_list_and_lock(List *list, int len) {
+2   while (len--) {
+3     List_member *memb = alloc_member();(*@ \label{lst:alloc} @*)
+4     link_to_list(list, memb);
+5     lock(memb->lock);
+6   }
+7 }
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{\texttt{copy} function instrumented by functions manipulating
-    with locking automata pointed by \texttt{L}.}
-    \label{fig:copy_instrumented}
+    \caption{Invalid analysis output.}
+    \label{fig:invalid_ptr}
 \end{figure}
+
+The memory pools are created as follows:
+\begin{enumerate}
+\item All code locations supposed to fire a transition are found.
+\item A points-to set of the automaton parameter on the found locations is
+computed. Cardinality of the sets is finite, because the count of the pointed
+objects (global variables and allocation lines) is finite too.
+\item Memory is split into equal pools. Their count is equal to the number of
+points-to sets. They are numbered from zero to count-1.
+\end{enumerate}
+
+When the memory is split, the allocations where each automaton parameter is
+allocated are looked up. Such allocations are superseded by a pool allocator.
+It reserves a space in a pool with the index of the points-to set.
+
+This allows for easy reverse mapping from pointers to numbered points-to sets.
+An array of size as the count of the points-to sets (memory pools) is created.
+Type of members is integral. It is supposed to store the automata state. 
+
+Finally, it remains to generate transition functions from the input automaton.
+They take one argument -- the pointer to the parameter. Involving the reverse
+mapping, it finds the pool index. Then it performs a transition of the
+automaton state in the array over the integer at the pool index.
+
+Now, the instrumentation can starts. First, the array is put into the code.
+Next, for each location at point 1, a function call is added. Depending on the
+automaton specification, a corresponding function is called.
+
+An example of the transformation and pool manipulation functions is depicted
+in Fig.~\ref{fig:instrumentation_stuff}. It is designed to work with locking
+automaton with three states: locked, unlocked and error. So at locations where
+the original code called \texttt{lock}, \texttt{\_\_ISSE\_lock} is called.
+Similarly for other locations.
 
 \begin{figure}[!htb]
     \begin{center}
@@ -346,37 +340,68 @@ void __ISSE_unlock(const int *L) {
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{Functions implementing instrumentation of automata into a program.}
+    \caption{Functions instrumented to a program to perform automata
+    transitions.}
     \label{fig:instrumentation_stuff}
 \end{figure}
 
-\todol{Sjednocenim points-to mnozin ukazatelu ukazujicich na zamky dostaneme
-  \emph{konecnou} mnozinu zamku. Prvek teto mnoziny muze byt budto globalni
-  promenna, nebo se jedna o fiktivni objekt reprezentujici dymaickou alokaci
-  pameti na heapu (tj. fiktivni zamek reprezentuje vsechny objekty
-  naalokovane jednim volanim \texttt{malloc} - na danem radku v
-  kodu). Pouzijeme koncept "alokatoru" znamy z C++. Mame alokator $A$, ktery
-  deli fyzickou pamet programu na tolik \emph{memory pools}, kolik je prvku
-  v te konecne mnozine zamku. Memory pools jsou indexovany od $0$ az do
-  poctu zamku mnoziny minus jedna, a kazdy memory pool ma unikatni
-  index. Kazdemu zamku z mnoziny zamku odpovida unikatni memory pool. Memory
-  pool zamku, ktery je globalni promennou, obsahuje jen tu globalni
-  promennou. Memory pool fiktivniho zamku je (velka) cast heapu, v niz se
-  budou vyskytovat vsechny objekty alokovane na radku, pro nejz byl zaveden
-  ten fiktivni zamek. Dany radek instrumentujeme tak, ze misto puvodniho
-  volani \texttt{malloc} zavolame nas alokator $A$, kde mu predame index
-  memory poolu tohoto fiktivniho objektu. Alokator $A$ pak naalokuje a vrati
-  pozadovany kus pameti v danem memory poolu. Pro $A$ je pak jednoduche
-  zjisiti pro zadany ukazatel, do ktereho memory poolu patri, protoze si sam
-  organizuje memory pooly a alokace v nich. Mnozinu zamku vracenych z
-  points-to analyzy pak realizujeme tak, ze vytvorime pole tolika
-  \texttt{int}-u (inicializovanych na $0$), kolik je memory poolu. Index
-  memory poolu je soucasne indexem do pole. Na
-  obrazku~\ref{fig:instrumentation_stuff} funkce
-  \texttt{\_\_ISSE\_get\_memory\_pool\_index} predsavuje funkci alokatoru
-  $A$, vracejici pro zadany ukazatel \texttt{ptr} memory pool, do nejz ten
-  ukazatel ukazuje. Telo teto funkce resi pouze running example, takze jsou
-  tam jenom testy pro zamky odpovidajici globalnim promennym.}
+When the example from Section~\ref{sec:introduction} is fully instrumented, it
+looks like in Fig.~\ref{fig:copy_instrumented}. Also it can be seen there, how
+error state handling is done.
+
+Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
+so-called \texttt{assert} function may be used to provoke the executor to
+report a failure when a bad state is reached. The function (or macro more
+precisely) is used by developers for debugging purposes. It takes exactly one
+argument. When it evaluates to true, an error is reported. Both when a program
+containing the debug facility is run and when executed by the symbolic
+executor we use.
+
+Thus our tool inserts an \texttt{assert} before each assignment to the
+automaton state. To be precise it means the error state of the automaton is
+never reached. It is checked whether the following transition would be a
+failure.  This approach simplifies slicing a bit. I.e. not all assignments are
+necessarily needed and might be sliced right away.
+
+In the example, the first parameter of the \texttt{assert} macro, the
+assertion, is a check that the integer is zero when the code is about to take
+a lock and one in the opposite case.
+
+\begin{figure}[!htb]
+    \begin{center}
+    \begin{tabular}{l}
+    \begin{lstlisting}[language=C]
+char *copy(char *src, char *dst, int *L) {
+    int i, len;
+    __ISSE_ensure_unlocked(L);
+    len = 0;
+    if (src != NULL && dst != NULL) {
+	len = strlen(src);
+	__ISSE_lock(L);
+	lock(L);
+    }
+    i = 0;
+    while (i < len) {
+        dst[i] = src[i];
+	i++;
+    }
+    if (len > 0) {
+	__ISSE_unlock(L);
+	unlock(L);
+    }
+    __ISSE_ensure_unlocked(L);
+    return dst;
+}
+    \end{lstlisting}
+    \end{tabular}
+    \end{center}
+    \caption{\texttt{copy} function instrumented by functions that manipulate
+    with locking automata pointed by \texttt{L}.}
+    \label{fig:copy_instrumented}
+\end{figure}
+
+%Further it determines which functions may be called by indirect function
+%calls.
 
 %}}}
 %{{{ Slicing
