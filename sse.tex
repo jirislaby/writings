@@ -321,7 +321,7 @@ manipulation functions \texttt{\_\_ISSE\_lock} and \texttt{\_\_ISSE\_unlock}.
 They will be instrumented at the places where the original code called
 \texttt{lock} or \texttt{unlock} respectively. Finally, there is a function
 called \texttt{\_\_ISSE\_get\_memory\_pool\_index}. It serves the purpose of
-computing pool indices from pointers.\todo{ensure\_unlocked}
+computing pool indices from pointers.
 
 \begin{figure}[!htb]
     \begin{center}
@@ -361,8 +361,11 @@ void __ISSE_unlock(const int *L) {
 \end{figure}
 
 When the example from Section~\ref{sec:introduction} is fully instrumented, it
-looks like in Fig.~\ref{fig:copy_instrumented}. Also it can be seen there, how
-error state handling is done.
+looks like in Fig.~\ref{fig:copy_instrumented}. We have not described
+\texttt{\_\_ISSE\_ensure\_unlocked} yet. It is used to check the state before
+(initial state) and after (final state) the function is analyzed. In this
+ensuring function and in both state tranformation functions it can be seen,
+how the error state handling is done.
 
 Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
 so-called \texttt{assert} function may be used to provoke the executor to
@@ -374,13 +377,15 @@ executor we use.
 
 Thus our tool inserts an \texttt{assert} before each assignment to the
 automaton state. To be precise it means the error state of the automaton is
-never reached. It is checked whether the following transition would be a
-failure.  This approach simplifies slicing a bit. I.e. not all assignments are
-necessarily needed and might be sliced right away.
+never reached. It is checked whether the transition which is about to be
+fired would be a failure.  This approach simplifies slicing a bit. I.e.  not
+all assignments are necessarily needed and might be sliced right away.
 
-In the example, the first parameter of the \texttt{assert} macro, the
-assertion, is a check that the integer is zero when the code is about to take
-a lock and one in the opposite case.
+Obviously, in the example in Fig.~\ref{fig:instrumentation_stuff}, the
+parameter of the \texttt{assert} macro, the assertion, is a check that the
+integer is zero when the code is about to take a lock and one in the opposite
+case. For the initial and final state, it is expected to be zero, i.e.
+unlocked.
 
 \begin{figure}[!htb]
     \begin{center}
