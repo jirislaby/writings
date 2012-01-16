@@ -68,6 +68,8 @@ SE King~\cite{se}
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
+int L1, L2;
+
 char *copy(char *src, char *dst, int *L) {
 1  int i, len;
 2  len = 0;                              {U}
@@ -290,28 +292,36 @@ cardinality of the merged set. The pools are numbered from zero to count-1.
 When the memory is split, the allocation sites of each of the objects in the
 merged set are looked up. Such allocations are superseded by a pool allocator.
 It reserves a space in a specific pool. It is specified by the index of the
-pool where the object belongs to. This allows for easy reverse mapping from
-pointers to numbered pools.
+pool where the object belongs to. The size of the reserved space is the same
+as the requested size. This approach allows for an easy reverse mapping from
+pointers to (numbered) pools.
 
 It is also needed to store automata states somewhere. For this purpose, an
 array is created. Its size is designated by the count of the memory pools too.
-Type of members is integral as it fits the purpose of storing the automaton
-state.
+The type of members is integral as it fits the purpose of storing the
+automaton state.
 
 Finally, it remains to generate transition functions from the input automaton.
-They take one argument -- the pointer to the parameter. Involving the reverse
-mapping, it finds the pool index. Then it performs a transition of the
-automaton state in the array over the integer at the pool index.
+Since the only knowledge the functions need to know is the pointer to derive a
+pool index, they take it as the only argument. They involve the reverse
+mapping to find the index. Then they perform a transition of the automaton
+state in the array over the integer at the pool index.
 
-Now, the instrumentation can starts. First, the array is put into the code.
-Next, for each location at point 1, a function call is added. Depending on the
-automaton specification, a corresponding function is called.
+Now, the instrumentation can start. First, the array is inserted into the
+code. It is needed to be accessible by the transformation functions. Next, for
+each location from point 1, a function call is added. The function to be
+called is dependent upon the automaton specification.
 
 An example of the transformation and pool manipulation functions is depicted
 in Fig.~\ref{fig:instrumentation_stuff}. It is designed to work with locking
-automaton with three states: locked, unlocked and error. So at locations where
-the original code called \texttt{lock}, \texttt{\_\_ISSE\_lock} is called.
-Similarly for other locations.
+automaton with three states: locked, unlocked and error. Hence there is an
+array with locks. There are two of them, because in the original code, there
+were two (\texttt{L1} and \texttt{L2}). Further there are two automaton
+manipulation functions \texttt{\_\_ISSE\_lock} and \texttt{\_\_ISSE\_unlock}.
+They will be instrumented at the places where the original code called
+\texttt{lock} or \texttt{unlock} respectively. Finally, there is a function
+called \texttt{\_\_ISSE\_get\_memory\_pool\_index}. It serves the purpose of
+computing pool indices from pointers.\todo{ensure\_unlocked}
 
 \begin{figure}[!htb]
     \begin{center}
