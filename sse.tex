@@ -426,13 +426,44 @@ char *copy(char *src, char *dst, int *L) {
 
 \section{Slicing} \label{sec:slicing} \todo{M}
 
-Let us have a look at the instrumented program at Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part of the function \texttt{copy}, i.e.~the loop copying the characters, does not affect locking states of the instrumented automata. On the other hand, symbolic execution of such a code can be very expensive. Therefore, we use the program slicing technique to eliminate such a code from the analysed program. Slicing may bring considerable speed up for in the last phase of the algorithm, where we execute the program symbolically.
+Let us have a look at the instrumented program at
+Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part
+of the function \texttt{copy}, i.e.~the loop copying the characters, does not
+affect locking states of the instrumented automata. On the other hand,
+symbolic execution of such a code can be very expensive. Therefore, we use the
+program slicing technique to eliminate such a code from the analysed program.
+Slicing may bring considerable speed-up in the last phase of the algorithm,
+where we execute the program symbolically.
 
-We use interprocedural static slicing as proposed by Weiser in 1981~\cite{W81}. When slicing a program we first need to specify what behaviour we want to preserve. We do so by assigning a \emph{slicing criteria} to particular lines of the program. Slicing criterion at a given program line specifies a set of variables whose values at that line must be equal in both original and sliced program for each input data passed to both programs. Having slicing criteria set, we slice functions independently. Let us consider a function with slicing criteria. We assign a set of \emph{relevant variables} to each line of the functions. A variable is relevant, if its value has an impact (direct or indirect) to a value of a variable in some slicing criterion. Sets of relevant variables of the sliced function are initially empty, except those of lines with slicing criteria (these sets contain variables from their slicing criteria). Then, according to semantics of program commands we propagate relevance of variables between program lines and we insert discovered relevant variables into related sets. We apply the propagation until sets do not increase their size. From the content of the sets we can safely say, which program lines has no impact to the slicing criteria and we therefore remove those lines from the body of the function. Interprocedural slicing is about exchanging slicing criteria between functions through call sites. When we are done slicing individual functions, we have computed relevant variables at call sites and also at the entry locations (lines) to the functions. So, we propagate the criteria between called and calling functions. Then we slice the functions independently again. We repeat this process until no \emph{new} slicing criterion is passed between functions. 
+We use interprocedural static slicing as proposed by Weiser in
+1981~\cite{W81}. When slicing a program we first need to specify what
+behavior we want to preserve. We do so by assigning a \emph{slicing criteria}
+to particular lines of the program. Slicing criterion at a given program line
+specifies a set of variables whose values at that line must be equal in both
+original and sliced program for each input data passed to both programs.
+Having slicing criteria set, we slice functions independently. Let us consider
+a function with slicing criteria. We assign a set of \emph{relevant variables}
+to each line of the functions. A variable is relevant, if its value has an
+impact (direct or indirect) to a value of a variable in some slicing
+criterion. Sets of relevant variables of the sliced function are initially
+empty, except those of lines with slicing criteria (these sets contain
+variables from their slicing criteria). Then, according to semantics of
+program commands we propagate relevance of variables between program lines and
+we insert discovered relevant variables into related sets. We apply the
+propagation until sets do not increase their size. From the content of the
+sets we can safely say, which program lines have no impact to the slicing
+criteria and we therefore remove those lines from the body of the function.
+Interprocedural slicing is about exchanging slicing criteria between functions
+through call sites. When we are done slicing individual functions, we have
+computed relevant variables at call sites and also at the entry locations
+(lines) to the functions. So, we propagate the criteria between called and
+calling functions. Then we slice the functions independently again. We repeat
+this process until no \emph{new} slicing criterion is passed between
+functions.
 
 Propagation of slicing criteria between functions is mainly based on argument passing technique of the program. Nevertheless, besides argument passing we usually need to know what variables can be modified by which function. Weiser references technique~\cite{B78}, which does more then we actually need. Therefore, we have designed much more simple and satisfactory technique computing only \emph{modifies} function summaries. Modifies summary of a given function is simply a set of program variables, which are not local to the function, and which can be modified by the function. Having results from a points-to analysis, a computation of the summaries is straightforward.  An interested reader can find more details about interprocedural slicing here~\cite{W81}.
 
-Now we show, how to slice our instrumented example program. First we need to set slicing criteria preserving values of the instrumented automata. Obviously, the array \texttt{\_\_ISSE\_lock} is the variable, whose values we want to preserve in sliced program. It only remains where to put slicing criteria. The best places for the criteria are assertions in the functions at Figure~\ref{fig:instrumentation_stuff} operating on states of the automata. Note that we do not set any slicing criterion to function \texttt{\_\_ISSE\_get\_memory\_pool\_index} since it it does not operate with with the automata.
+Now we show, how to slice our instrumented example program. First we need to set slicing criteria preserving values of the instrumented automata. Obviously, the array \texttt{\_\_ISSE\_lock} is the variable, whose values we want to preserve in sliced program. It only remains where to put slicing criteria. The best places for the criteria are assertions in the functions at Figure~\ref{fig:instrumentation_stuff} operating on states of the automata. Note that we do not set any slicing criterion to function \texttt{\_\_ISSE\_get\_memory\_pool\_index} since it it does not operate with the automata.
 
 Having the criteria set the interprocedural slicing propagates another slicing criteria between functions. As variables \texttt{i} become relevant
 
@@ -548,12 +579,6 @@ Je otazka, jestli to sem davat?
   trace v originalnim programu urcite tim chybovym? Neutavi se SE na
   originalnim programu i pres znalost path condition chybove cesty z
   proslicovaneho programu?}
-
-%}}}
-%{{{ Trace Back Mapping
-
-\section{Trace Back Mapping}
-\label{sec:BackMapping} \todo{???}
 
 %}}}
 %{{{ Implementation
@@ -712,7 +737,7 @@ the points-to analysis time.}
 \section{Related Work}
 \label{sec:related} \todo{M}
 
-- Weiser - Program Slicing \cite{weiser}
+- Weiser - Program Slicing \cite{W81}
 
 - Bart - A Practical Interprocedural Data Flow Analysis Algorithm \cite{B78}
 
