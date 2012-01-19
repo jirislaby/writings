@@ -601,51 +601,13 @@ char *copy(char *src, char *dst, int *L) {
 
 \section{Slicing} \label{sec:slicing} \todo{M}
 
-Let us have a look at the instrumented program at
-Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part
-of the function \texttt{copy}, i.e.~the loop copying the characters, does not
-affect locking states of the instrumented automata. On the other hand,
-symbolic execution of such a code can be very expensive. Therefore, we use the
-program slicing technique to eliminate such a code from the analysed program.
-Slicing may bring considerable speed-up in the last phase of the algorithm,
-where we execute the program symbolically.
+Let us have a look at the instrumented program at Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part of the function \texttt{copy}, i.e.~the loop copying the characters, does not affect states of the instrumented automata. On the other hand, symbolic execution of such a code can be very expensive. Therefore, we use the program slicing technique to eliminate such a code from the analysed program. Slicing may bring considerable speed up for in the last phase of the algorithm, where we execute the program symbolically.
 
-We use interprocedural static slicing as proposed by Weiser in
-1981~\cite{W81}. When slicing a program we first need to specify what
-behavior we want to preserve. We do so by assigning a \emph{slicing criteria}
-to particular lines of the program. Slicing criterion at a given program line
-specifies a set of variables whose values at that line must be equal in both
-original and sliced program for each input data passed to both programs.
-Having slicing criteria set, we slice functions independently. Let us consider
-a function with slicing criteria. We assign a set of \emph{relevant variables}
-to each line of the functions. A variable is relevant, if its value has an
-impact (direct or indirect) to a value of a variable in some slicing
-criterion. Sets of relevant variables of the sliced function are initially
-empty, except those of lines with slicing criteria (these sets contain
-variables from their slicing criteria). Then, according to semantics of
-program commands we propagate relevance of variables between program lines and
-we insert discovered relevant variables into related sets. We apply the
-propagation until sets do not increase their size. From the content of the
-sets we can safely say, which program lines have no impact to the slicing
-criteria and we therefore remove those lines from the body of the function.
-Interprocedural slicing is about exchanging slicing criteria between functions
-through call sites. When we are done slicing individual functions, we have
-computed relevant variables at call sites and also at the entry locations
-(lines) to the functions. So, we propagate the criteria between called and
-calling functions. Then we slice the functions independently again. We repeat
-this process until no \emph{new} slicing criterion is passed between
-functions.
+%We use interprocedural static slicing as proposed by Weiser in 1981~\cite{W81}. When slicing a program we first need to specify what behaviour we want to preserve. We do so by assigning a \emph{slicing criteria} to particular lines of the program. Slicing criterion at a given program line specifies a set of variables whose values at that line must be equal in both original and sliced program for each input data passed to both programs. Having slicing criteria set, we slice functions independently. Let us consider a function with slicing criteria. We assign a set of \emph{relevant variables} to each line of the functions. A variable is relevant, if its value has an impact (direct or indirect) to a value of a variable in some slicing criterion. Sets of relevant variables of the sliced function are initially empty, except those of lines with slicing criteria (these sets contain variables from their slicing criteria). Then, according to semantics of program commands we propagate relevance of variables between program lines and we insert discovered relevant variables into related sets. We apply the propagation until sets do not increase their size. From the content of the sets we can safely say, which program lines has no impact to the slicing criteria and we therefore remove those lines from the body of the function. Interprocedural slicing is about exchanging slicing criteria between functions through call sites. When we are done slicing individual functions, we have computed relevant variables at call sites and also at the entry locations (lines) to the functions. So, we propagate the criteria between called and calling functions. Then we slice the functions independently again. We repeat this process until no \emph{new} slicing criterion is passed between functions. 
 
-Propagation of slicing criteria between functions is mainly based on argument passing technique of the program. Nevertheless, besides argument passing we usually need to know what variables can be modified by which function. Weiser references technique~\cite{B78}, which does more then we actually need. Therefore, we have designed much more simple and satisfactory technique computing only \emph{modifies} function summaries. Modifies summary of a given function is simply a set of program variables, which are not local to the function, and which can be modified by the function. Having results from a points-to analysis, a computation of the summaries is straightforward.  An interested reader can find more details about interprocedural slicing here~\cite{W81}.
+%Propagation of slicing criteria between functions is mainly based on argument passing technique of the program. Nevertheless, besides argument passing we usually need to know what variables can be modified by which function. Weiser references technique~\cite{B78}, which does more then we actually need. Therefore, we have designed much more simple but still satisfactory technique computing only \emph{modifies} function summaries. Modifies summary of a given function is simply a set of program variables, which are not local to the function, and which can be modified by the function. Having results from a points-to analysis, a computation of the summaries is straightforward.
 
-Now we show, how to slice our instrumented example program. First we need to set slicing criteria preserving values of the instrumented automata. Obviously, the array \texttt{\_\_ISSE\_lock} is the variable, whose values we want to preserve in sliced program. It only remains where to put slicing criteria. The best places for the criteria are assertions in the functions at Figure~\ref{fig:instrumentation_stuff} operating on states of the automata. Note that we do not set any slicing criterion to function \texttt{\_\_ISSE\_get\_memory\_pool\_index} since it it does not operate with the automata.
-
-Having the criteria set the interprocedural slicing propagates another slicing criteria between functions. As variables \texttt{i} become relevant
-
-
- into the function \texttt{copy} with relevant variable \texttt{L}.
-
- We obviously know, values of which variables we want to preserve. 
+To slice a program we only need to specify \emph{slicing criteria}. Having the criteria a slicing algorithm then eliminates the redundant code automatically. A simple definition of a slicing criterion is introduced in~\cite{W81} and it is sufficient for our purposes. According to the definition, we must only specify a set of variables and a program line. It is a task for a slicing algorithm to ensure that, roughly speaking, for each input data passed to both original and sliced programs values of the variables at that line are always equal in both programs. In our algorithm we have to preserve values of the instrumented automata. And the best lines where to put the criteria are consistency checks about automata states.
 
 \begin{figure}[!htb]
     \begin{center}
@@ -669,24 +631,21 @@ char *copy(char *src, char *dst, int *L) {
     \end{tabular}
     \end{center}
     \caption{Sliced function \texttt{copy} with respect to locks
-    manipulation.}
+    manipulation.\todol{caption more precisely}}
     \label{fig:copy_sliced}
 \end{figure}
-\todo{caption more precisely}
 
-\todol{Hlavne je potreba zminit, ze zmizel ten cyklus a tak bude SE konecna. Pritom ale musime rict, ze v kodu zustaly manipulace se zamky a hlavne asserty (hlidajici spravne stavy zamku), ktere umozni SE detekovat ty zamykaci chyby.}
 
-\todo{Je treba zmnit, ze kdyz se vyslicovany kod muze zacyklit, pak nase
-  technika muze dat false positive - ale i v tomto pripade je v kodu
-  pravdepodobne problem - existuje smysluplny nedosazitelny kod}.
+In our example program, we need to preserve a content of the array \texttt{\_\_ISSE\_lock} at all those program lines at Figure~\ref{fig:instrumentation_stuff}, where we call the function \texttt{assert}. Having the criteria set the interprocedural slicing~\cite{W81} recognises dependency of the array \texttt{\_\_ISSE\_lock} on the variable \texttt{L} of the function \texttt{copy}. Therefore, the code manipulating \texttt{L} is preserved, while the loop copying the characters is sliced away. The resulting sliced program is depicted at Figure~\ref{fig:copy_sliced}.
+
+It is important to note that some slicing techniques, including one in~\cite{W81} that we use, does not consider inputs for which the original program does not halt. Therefore, there is no way to guarantee that a sliced program will fail to halt whenever the original program fails to halt. This may be a source of false positives in our technique.
 
 %}}}
 %{{{ Symbolic Execution
 
-\section{Symbolic Execution}
-\label{sec:symexe} \todo{M}
+\section{Symbolic Execution} \label{sec:symexe} \todo{M}
 
-Je otazka, jestli to sem davat?
+Symbolic execution explores real paths in a given program. Therefore, if it reaches a line where we detect a bug, then we are sure the bug is real in the executed program, i.e.~it is \emph{not} a false positive. (This is of course true only under common assumption that an SMT solver is able to reason about satisfiability of path condition along the execution.) This is obvious but important advantage of symbolic execution for finding bugs. On the other hand, a number of the real paths is typically very large (or even infinite) even for small and simple programs. Therefore, symbolic execution is often very expensive. In our technique we are only concerned with those fragments of the original program having impact on a property we are checking for. Therefore, slicing of the analysed program before we start symbolic execution can bring considerable speed up of the execution.
 
 \begin{figure}[!htb]
     \centering
@@ -729,11 +688,19 @@ Je otazka, jestli to sem davat?
         \node [loc2] (15) [below of=14] {$12$}
             edge [pre] node {} (14);
     \end{tikzpicture} 
-    \caption{Symbolic execution tree of sliced function \texttt{copy}}
+    \caption{Symbolic execution tree of sliced function \texttt{copy} \todol{tento obrazek pripojit ke Obr.~\ref{fig:copy_sliced}}}
         \label{fig:copy_sliced:SET}
 \end{figure}
 
-\todol{Vyzvednout konecnost SETu proslicovaneho programu. Dal vyzvednout, ze diky assertu zdetekujeme na ceste 2,3,5,6,8,11 realnou chybu. Zadna dalsi hlaska (false positive) uz se nevygeneruje.}
+We demonstrate the speed up on our example with function \texttt{copy}. Let us first symbolically execute the instrumented function \texttt{copy} at Figure~\ref{fig:copy_instrumented}. If we assume $32$-bit integers for the type \texttt{int}, then we have more then $2^{16}$ different symbolic paths through the function. Absolute majority of the paths are caused by the \texttt{while} loop copying the strings. On the other hand, symbolic execution of the sliced function \texttt{copy} at Figure~\ref{fig:copy_sliced} has exactly three paths.
+
+Those three paths of the sliced function \texttt{copy} are depicted at Figure~\ref{fig:copy_sliced:SET}. We can easily check that only path $2,3,5,6,8,11$ violates some of the assertion in function depicted at Figure~\ref{fig:instrumentation_stuff}. More precisely, this path violates the assertion at function \texttt{\_\_SSE\_ensure\_unlocked} which means that it is possible to leave the function in locked state. Note that this path is also marked at Figure~\ref{fig:copy_sliced:SET}. The remaining two paths do not violate any of the discussed assertions and therefore there is no other bug related to property checked by our automata. It also means that double-unlock report from the abstract interpretation was false.
+
+%}}}
+%{{{ Trace Back Mapping
+
+\section{Trace Back Mapping}
+\label{sec:BackMapping} \todo{???}
 
 \todol{Zbyva poresit zpetne mapovani chyby do puvodniho neproslicovaneho
   programu. Napadly me dve moznosti. Prvni je trivialni az hloupa: Pro kazdy
@@ -907,8 +874,20 @@ error (BUG), false-positive (FP) and did not finished (TO).}
 %}}}
 %{{{ Related Work
 
-\section{Related Work}
-\label{sec:related} \todo{M}
+\section{Related Work} \label{sec:related} \todo{M}
+
+
+\todol{clanky resici lockovaci chyby}
+
+\todol{techniky a tooly zalozene na AI - xgcc (metal), Stanse, plus obecne tooly majici problemy s false positives: Coverity, ...}
+
+\todol{Slicing: ruzne typy slicingu (static, dynamic) apod., kde se pouziva - ze jde hlavne o debugovani, reverzni engineering, ... }
+
+\todol{Techniky zalozene na SE: Godfoidovy clanky DART, apod. pak nastroje jako Pex, Sage, Klee, zminit ze pouzivaji systematicke a heuristicke strategie pro navigaci v prostoru cest. Nevyhody - nastroje maji problemy projit velkou cast kodu. Hlavne problemy s cykly: Tam se daji ocitovat i nase techniky (CBA a APC)}
+
+
+
+
 
 - Weiser - Program Slicing \cite{W81}
 
