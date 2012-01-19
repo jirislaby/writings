@@ -10,6 +10,7 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows,shapes}
 \usetikzlibrary{plothandlers}
+\pagestyle{plain}
 
 %{{{ (La)TeX definitions
 
@@ -25,15 +26,13 @@
 
 \begin{document}
 
-%{{{ Title + Author
+%{{{ Title + Author + Abstract
 
-\title{On Synergy of Metal, Slicing, and Symbolic Execution}
+\title{On Synergy of Metal, Slicing,\\ and Symbolic Execution}
 \author{Ji\v{r}\'\i~Slab\'y, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
   \email{\{slaby,strejcek,trtik\}@fi.muni.cz}}
-
-%}}}
 
 \maketitle
 
@@ -50,67 +49,243 @@
   bug-finding tool. We provide several examples demonstrating the practical
   applicability of our technique.
 \end{abstract}
+%}}}
 
 %{{{ Intro
 
 \section{Introduction}
 \label{sec:introduction} \todo{H}
 
-SE King~\cite{se}
+The title of this paper refers to two popular bug-finding techniques:
+metacompilation and symbolic executions. The two techniques use completely
+different principles leading to different advantages and disadvantages.
 
-\textsc{Metal}~\cite{metal,pldi02}
-\textsc{Stanse}~\cite{stanse} 
-\textsc{Klee}~\cite{klee}
+\emph{Metacompilation}~\cite{metal,pldi02} is a static analysis technique
+looking for various kinds of errors specified by state machines. We explain
+the technique with use of the state machine $SM(x)$ of Figure~\ref{fig:sm},
+which describes errors in lock manipulation. Intuitively, the state machine
+represents possible courses of states of a lock $x$ along an execution of a
+program. The state of the lock is changed according to a transition of the
+state machine if the execution performs a program statement syntactically
+subsuming the label of the transition. We would like to decide whether there
+exists any program execution where an instance of state machine $SM(x)$
+assigned to some lock of the analyzed program reaches an error
+state. Unfortunately, this is not feasible due to potentially unbounded
+number of executions and unbounded execution length. Hence, we use static
+analysis to overapproximate the set of reachable states of state machines.
 
-\begin{figure}[!htb]
-    \begin{center}
-    \begin{tabular}{l}
-    \begin{lstlisting}[language=C]
-int L1, L2;
+\begin{figure}[t]
+  \centering
+    \tikzstyle{loc} = [circle,thick,draw,minimum size=8mm]
+    \tikzstyle{err} = [circle,thick,draw,minimum size=8mm,fill=red!10,draw=red]   
+    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+    \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+    \begin{tikzpicture}[node distance=20mm]
+        \node [loc] (U) {U}; 
+        \node (S) [left of=U,xshift=10mm] {}
+          edge [post] node {} (U);
+        \node [loc] (L) [right of=U,xshift=10mm] {L}
+          edge [pre,bend left=20] node [label=below:\texttt{lock($x$)}] {} (U)
+          edge [post,bend right=20] node [label=above:\texttt{unlock($x$)}] {} (U);
+        \node [err] (DU) [below of=U] {DU}
+          edge [pre,near start] node [label=left:\texttt{unlock($x$)}] {} (U);
+        \node [err] (DL) [below of=L] {DL}
+          edge [pre,near start] node [label=left:\texttt{lock($x$)}] {} (L);          
+        \node [err] (RL) [below of=L,xshift=13mm] {RL}
+          edge [pre,bend right=10,near start] node [label=right:\texttt{return}] {} (L);
+    \end{tikzpicture} 
+    \caption{State machine $SM(x)$ describing errors in manipulation with
+      lock $x$. The nodes U and L refer to states \emph{unlocked} and
+      \emph{locked}, respectively. The other three nodes refer to error
+      states: DU to \emph{double unlock}, DL to \emph{double lock}, and RL
+      to \emph{return in locked state}. The initial node is U.}
+  \label{fig:sm}  
+\end{figure}
 
-char *copy(char *src, char *dst, int *L) {
-1  int i, len;
-2  len = 0;                              {U}
-3  if (src != NULL && dst != NULL) {     {U}
-4      len = strlen(src);                {U}
-5      lock(L);                          {L}
-6  }
-7  i = 0;                                {U,L}
-8  while (i < len) {                     {U,L}
-9      dst[i] = src[i];                  {U,L}
-10     i++;                              {U,L}
-11 }
-12 if (len > 0)                          {U,L}
-13     unlock(L);                        {U,DU}
-14 return dst;                           {U,RL}
-}
-    \end{lstlisting}
-    \end{tabular}
-    \end{center}
+Let us assume that we want to check the program of Figure~\ref{fig:copy} for
+errors specified by the state machine $SM(x)$. First, we find all locks in
+the program and to each lock we assign an instance of the state machine. In
+our case, there is only one lock \texttt{L} and thus only one instance
+$SM(\texttt{L})$. For each program location, we compute a set
+overapproximating possible states of $SM(\texttt{L})$ after executions
+leading to the location. Roughly speaking, we initialize the set in the
+initial location to $\{U\}$ and the other sets to $\emptyset$. Then we
+repeatedly update the sets according to the effect of individual program
+statements until the fixed point is reached.
+% \item For each nonterminal program location $l$ and each state $s$ of set $S_l$,
+%   if the program statement associated to the location syntactically subsumes
+%   a label\footnote{Note that all occurence of \texttt{x} in the label are
+%     replaced by the lock corresponding to the instance of the state
+%     machine.} of some transition of $SM(\texttt{L})$ leading from $s$, then
+%   we the target state of the transition has to be in the sets associated to
+%   program locations reachable by the statement. Otherwise, the sets
+%   associated to program locations reachable by the statement have to contain
+%   the state directly the state $s$.
+The resulting sets for the program of Figure~\ref{fig:copy} are written
+directly in the code listing as comments.
+
+\begin{figure}[!b]
+  \centering
+  \begin{minipage}{0.7\linewidth}
+    \begin{verbatim}
+ 1: char *copy(char *src, char *dst, int n, int *L) { 
+ 2:    int i, len;                             // {U}
+ 3:    len = 0;                                // {U}
+ 4:    if (src != NULL && dst != NULL) {       // {U}
+ 5:       len = n;                             // {U}
+ 6:       lock(L);                             // {L}
+ 7:    }                                       // {U,L}
+ 8:    i = 0;                                  // {U,L}
+ 9:    while (i < len) {                       // {U,L}
+10:       dst[i] = src[i];                     // {U,L}
+11:       i++;                                 // {U,L}
+12:    }                                       // {U,L}
+13:    if (len > 0) {                          // {U,L}
+14:       unlock(L);                           // {DU,U}
+15:    }                                       // {U,L}
+15:    return dst;                             // {U,RL}
+16: }
+    \end{verbatim}
+  \end{minipage}
     \caption{Function \texttt{copy} copying a source string \texttt{src}
       into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel
       writes.}
     \label{fig:copy}
 \end{figure}
 
-\todo{Neomezit se na jeden lock? Pro uvod by to bylo rozumejsi, pak se pri
-  instrumentaci vysvetli ta komplikace s points-to analyzou.} 
+As we can see, the sets contain two error states: \emph{double unlock} after
+the \texttt{unlock(L)} statement and \emph{return in locked state} in the
+terminal location. If we analyze the computation of the sets, we can see
+that the first error corresponds only to the execution going through lines
+1,2,3,4,8,9,13,14. This execution path is not a real one due to the value of
+\texttt{len}, which is set to 0 at line 3 and assumed to satisfy \texttt{len
+  > 0} at line 13. To sum up, the first error is \emph{false positive}. The
+second error corresponds to executions passing lines 1,2,3,4,5,6,7,8, then
+iterating the \texttt{while}-loop and finally passing lines 13,15. All these
+paths are also false positives except the one that perform zero iterations
+of the \texttt{while}-loop, which is the only real execution leading to a
+the only real locking error in the program.
 
-\begin{itemize}
-\item Dodelat automat pro lockovaci chyby (obrazek).
-\item Popsat vsechny tri lockovaci chyby ve Figure~\ref{fig:copy} z AI jeden
-  je false positive (trace = 1,2,3,7,8,12,13) vedouci na radek 13 s
-  double-unlockem (DU), druhy jak by smet (trace = 5,7,8,9,10,12,14) vedouci
-  na radek 14, kde se opousti funkce v lock stavu (RL), ale ten treti je
-  realna chyba (trace = 5,7,8,12,14) vedouci na radek 14, kde se opousti
-  funkce v lock stavu (RL)
-\item Popsat priciny false positivu: nerealne cesty a syntakticke
-  automaty. (Prakticke priciny bych nechal do zaveru k future work.)
-\item Nas prinos: metal + slic. + SE a semanticke automaty. Zduraznit, ze
-  slicing muze prinest konecnost vypoctu SE a tim potvrdit bezchybnost kodu
-  (kod ma typicky nekonecne mnoho cest vypoctu a tudiz se SE nedopocita). 
-\item struktura clanku.
-\end{itemize}
+To sum up, metacompilation is highly flexible, fast, and thus applicable on
+extremely large software projects (e.g.~Linux Kernel). It examines all the
+code and finds many errors. Unfortunately, some of the errors are false
+positives. The main source of false positives comes from the fact that the
+analysis does not work with data values. Therefore, when a branching
+statement is processed, the analysis cannot decide which states of a state
+machine are reachable on the positive branch and which on the negative one.
+This can be illustrated on the program of Figure~\ref{fig:copy}, where the
+set $\{U,L\}$ assigned to line 12 is correct, but the analysis does not have
+enough information to see that the lock \texttt{L} cannot be in state U
+whenever the condition on line 13 is valid.
+
+At this point, we would like to emphasize that metacompilation actually uses
+a more sophisticated algorithm enriched with many techniques for partial
+elimination of false positives (see~\cite{pldi02} for details). We also note
+that metacompilation uses a dedicated language called \emph{metal} for
+description of state machines. The best known implementation of
+metacompilation is the tool called \emph{xgcc}, but the idea of error
+specification using state machines appears also in other tools,
+e.g.~ESP~\cite{esp} or STANSE~\cite{stanse}.
+
+\medskip In contrast to metacompilation, \emph{symbolic execution}~\cite{se}
+analyzes each execution path separately. In contrast to standard execution,
+symbolic execution replaces input data by symbols representing arbitrary
+values. Executed statements then manipulate expressions over the symbols
+rather than exact values. For each execution path, symbolic execution builds
+a formula called \emph{path condition}, which is a necessary and sufficient
+condition on input data to drive the execution along the path.  Whenever
+symbolic execution reaches a branching statement, it uses the current path
+condition to check if any of the branches is unfeasible. If this is the
+case, the computation proceed to the other branch. Otherwise, the
+computation is forked and it continues in both branches. Moreover, we add
+the branching condition to the path condition on the positive branch and its
+negation to the path condition on the negative branch.
+% This approach ensures that the technique does not follow unfeasible
+% paths. Hence, if the symbolic execution detects some error (e.g.~double
+% lock) it cannot be a false positive.
+
+The main advantage of symbolic execution is that it works only with feasible
+executions and hence it does not report any false positives. A minor
+disadvanate is that implementations of this technique usually detects only
+few kinds of error (e.g.~violation of an assert statement). To detect a
+specific kind of error, the program has to be modified to reduce the error
+to one of the automatically detected errors. The main disadvantage of the
+technique is its high compuation cost. In fact, symbolic execution usually
+explores only a part of a program of industrial size. In particular,
+programs containing loops or recursion have typically large or even infinite
+number of executions and cannot be completely analyzed by symbolic
+execution.
+
+\medskip In this paper, we introduce a new technique offering flexibility of
+of metacompilation and zero false positive rate of symbolic execution. The
+basic idea is very simple: we use the concept of state machines to get
+flexibility in error specification. Then we instrument a program to be
+analyzed with a code for tracking behaviour of the state machines. The
+instrumented program is then reduced using the slicing method introduced
+in~\cite{W81}.\todo{Je to spravny clanek o slicingu?} The sliced program has
+to meet the criterion to be equivalent to the instrumented program with
+respect to reachability of error states of tracked state machines. Note that
+slicing can remove big portions of the code, including cycles and function
+calls. Hence, an original program with infinite number of execution paths
+can be reduced to a program with a finite number of execution
+paths. Finally, we executed the sliced program symbolically.
+
+Our technique can be used in two ways according to the applied symbolic
+execution tool. If we apply a symbolic executor that prefers to explore more
+parts of the code (for example, it can explore only the execution iterating
+each program cycle at most twice), we can use the technique as a general
+bug-finding technique reporting only real errors. On the contrary, if we use
+a symbolic executor exploring all execution paths, we can use our technique
+for basic classification of error reports produced by other tools (e.g.~xgcc
+or STANSE). For each such an error report, we can instrument the
+corresponding code only with the state machine describing the reported
+error. If our technique founds the same error, it is a real one. If our
+technique explores all execution paths of the sliced code without detecting
+the error, it is a false positive. If our technique runs out of resources,
+we cannot decide whether the error is a real one or just a false positive.
+We have developed a prototype implementation of our technique. Our
+experimental results indicate that the technique can be applied to classify
+error reports produced by STANSE applied to Linux kernel.
+
+We emphasize the synergy of the three steps of our technique: specification
+of errors with state machines (inspired by metacompilation) and
+intrumentation of the original program with the code emulating the state
+machines allows us to clearly specify the slicing criteria. Hence, the
+sliced program contains only the code relevant to the considered
+errors. Further, slicing can substantially reduce the size of the code,
+which can remarkably improve performance of the symbolic
+execution. 
+
+Let us note that usage of symbolic execution instead of classic static
+analysis brings us another benefit: while in metacompilation the state
+machines are associated to synactic objects (e.g.~locks or pointers), here
+we can associate state machines to actual values of these objects. This can
+potentially lead to better precision of error description. On the other
+hand, adoption of this feature can lead to unbounded number of state
+machines tracked by the instrumented program, which can lower performance of
+our technique. \todo{Co s timhle odstavcem?}
+
+\medskip The rest of the paper is organized as
+follows. Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe}
+deal with program instrumentation, slicing, and symbolic execution,
+respectively. 
+% Section~\ref{sec:BackMapping} discusses extraction of
+% counterexamples.\todo{Chceme to tu nechat?}
+Experimental implementation of our technique and some experimental results
+are discussed in Section~\ref{sec:impl}. Section~\ref{sec:related} is
+devoted to related work while Section~\ref{sec:future} indicates some
+directions driving our future research. Finally, the last section summarizes
+presented results.
+
+\texttt{Tool by se mohl jmenovat synergyton nebo synegytron.}
+
+% \begin{itemize}
+% \item Popsat priciny false positivu: nerealne cesty a syntakticke
+%   automaty. (Prakticke priciny bych nechal do zaveru k future work.)
+% \item Nas prinos: metal + slic. + SE a semanticke automaty. Zduraznit, ze
+%   slicing muze prinest konecnost vypoctu SE a tim potvrdit bezchybnost kodu
+%   (kod ma typicky nekonecne mnoho cest vypoctu a tudiz se SE nedopocita). 
+% \end{itemize}
 
 %{{{ Obrazek nekonecneho stromu symbolicke exekuce na neproslicovanem kodu
 
@@ -583,7 +758,7 @@ Je otazka, jestli to sem davat?
 %}}}
 %{{{ Implementation
 
-\section{Implementation}
+\section{Implementation and Experimental Results}
 \label{sec:impl}
 We decided to verify the functionality on the C code. The main reason is that
 many projects with open-source license (and source code available) are written
@@ -630,11 +805,8 @@ main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
 \label{fig:phases}
 \end{figure}
 
-%}}}
-%{{{ Experiments
-
 \subsection{Experiments}
-\label{sec:experiments}
+\label{ssec:experiments}
 
 The implementation described above was evaluated on a real code too. The
 evaluation was performed on the Linux kernel. It is a large and well tested
