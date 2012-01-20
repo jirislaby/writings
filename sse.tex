@@ -399,23 +399,32 @@ explored. Other paths are explored separately in different runs.
 %is to instrument the code before the execution itself.  That results in a
 %separate module without touching the executor's code.
 
-%Thanks to that, we can keep the automaton state in an integer. We do not
-%introduce such an integer for each automaton instance\footnote{There may be
-%multiple instances of the automata. For example the tools create a separate
-%instance of locking automaton for each lock.} found in the code though. This
-%would lead to false alarms. Especially in C code where two pointers may point
-%to a single object.
+Thanks to that, we can keep the automaton state in an integer. This indeed
+requires an unique mapping of states to integers -- the states are simply
+numbered.
 
-%To avoid that, the tool leverages Andersen's points-to
-%analysis~\cite{andersen} and reimplements the allocator a bit. Both help all
-%instances to be bound together properly. For example when the parametrization
-%of automata instance is named differently in the code (\texttt{lock(A); B=A;
-%unlock(B);}) or passed as a parameter with another name.
-%
-%In our implementation, there are two objects a pointer can reference. Either
-%a global variable or a program location where the allocation of the object
-%occurs.
-%
+Now let us describe how we map the integer and an instance of the $SM(x)$ for
+some $x$. Generally, count of $x$ may be infinite during the program run time.
+For example a filesystem code may want to create a lock in a loop for each
+node. Anyway, they can be materialized only on finite count of code locations.
+Either by a heap allocator, on the stack, or they are global variables. 
+
+We limit the overall count of the lock instances for each such location to 10.
+If the number of allocations grows over this boundary at that place, a global
+\emph{unsound} flag is set and we do not create any more SM instances there.
+After the analysis finishes, the flag is checked and the tool reports a
+warning if it is true.
+
+In languages like C pointers are allowed and SMs are often parametrized by
+them. This means, two pointers may reference a single object (\texttt{lock(A);
+B=A; unlock(B);}). And so a single SM should be referenced in that case too.
+The tool copes with that by using the Andersen's points-to
+analysis~\cite{andersen}.
+
+In our implementation, there are three objects a pointer can reference. Either
+a global variable or a program location where the allocation of the object
+occurs (no matter if allocated on the stack or in the heap).
+
 %The latter introduces an imprecision into the analysis. An example of code
 %where the behavior is incorrect is depicted in Fig.~\ref{fig:invalid_ptr}. All
 %pointers in the list point to line~\ref{lst:alloc} where their allocation
@@ -448,6 +457,21 @@ explored. Other paths are explored separately in different runs.
     \caption{Code where analyses may fail.}
     \label{fig:invalid_ptr}
 \end{figure}
+
+\begin{itemize}
+\item find each lock usage
+\item points-to analysis
+\item create merged set
+\item number the members
+\item create an array with automata allocated count. size is card
+\item create an array with automata states. size is card * 10
+\item create a map of pointer -> index
+\item instrument each allocation site with
+  - increment of allocated count and check whether it is over 10. if so, set
+    global imprecision flag
+  - add pointer -> index map (ptr is what returned allocator, index is merged
+    set number * 10 + allocated count)
+\end{itemize}
 
 %The memory pools are created as follows:
 %\begin{enumerate}
