@@ -1,6 +1,7 @@
 % vim: tw=78 ai spell spelllang=en
 
 \documentclass[10pt]{llncs}
+\usepackage{bold-extra}
 \usepackage{color}
 \usepackage{url}
 \usepackage{graphicx}
@@ -20,7 +21,7 @@
 \newcommand\todo[1]{\nb{\Color{red}{#1}}}
 \newcommand{\todol}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
 \newcommand{\rem}[1]{{\scriptsize{{\textcolor{blue}{[#1]}}}}}
-\lstset{basicstyle=\scriptsize,escapeinside={(*@}{@*)}}
+\lstset{basicstyle=\ttfamily\footnotesize,escapeinside={(*@}{@*)}}
 
 %}}}
 
@@ -77,11 +78,11 @@ analysis to overapproximate the set of reachable states of state machines.
 \begin{figure}[t]
   \centering
     \tikzstyle{loc} = [circle,thick,draw,minimum size=8mm]
-    \tikzstyle{err} = [circle,thick,draw,minimum size=8mm,fill=red!10,draw=red]   
+    \tikzstyle{err} = [circle,thick,draw,minimum size=8mm,fill=red!10,draw=red]
     \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
     \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
     \begin{tikzpicture}[node distance=20mm]
-        \node [loc] (U) {U}; 
+        \node [loc] (U) {U};
         \node (S) [left of=U,xshift=10mm] {}
           edge [post] node {} (U);
         \node [loc] (L) [right of=U,xshift=10mm] {L}
@@ -90,16 +91,16 @@ analysis to overapproximate the set of reachable states of state machines.
         \node [err] (DU) [below of=U] {DU}
           edge [pre,near start] node [label=left:\texttt{unlock($x$)}] {} (U);
         \node [err] (DL) [below of=L] {DL}
-          edge [pre,near start] node [label=left:\texttt{lock($x$)}] {} (L);          
+          edge [pre,near start] node [label=left:\texttt{lock($x$)}] {} (L);
         \node [err] (RL) [below of=L,xshift=13mm] {RL}
           edge [pre,bend right=10,near start] node [label=right:\texttt{return}] {} (L);
-    \end{tikzpicture} 
+    \end{tikzpicture}
     \caption{State machine $SM(x)$ describing errors in manipulation with
       lock $x$. The nodes U and L refer to states \emph{unlocked} and
       \emph{locked}, respectively. The other three nodes refer to error
       states: DU to \emph{double unlock}, DL to \emph{double lock}, and RL
       to \emph{return in locked state}. The initial node is U.}
-  \label{fig:sm}  
+  \label{fig:sm}
 \end{figure}
 
 Let us assume that we want to check the program of Figure~\ref{fig:copy} for
@@ -126,9 +127,9 @@ directly in the code listing as comments.
 
 \begin{figure}[!b]
   \centering
-  \begin{minipage}{0.7\linewidth}
-    \begin{verbatim}
- 1: char *copy(char *src, char *dst, int n, int *L) { 
+  \begin{tabular}{c}
+    \begin{lstlisting}[language=C]
+ 1: char *copy(char *dst, char *src, int n, int *L) {
  2:    int i, len;                             // {U}
  3:    len = 0;                                // {U}
  4:    if (src != NULL && dst != NULL) {       // {U}
@@ -145,8 +146,8 @@ directly in the code listing as comments.
 15:    }                                       // {U,L}
 15:    return dst;                             // {U,RL}
 16: }
-    \end{verbatim}
-  \end{minipage}
+    \end{lstlisting}
+  \end{tabular}
     \caption{Function \texttt{copy} copying a source string \texttt{src}
       into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel
       writes.}
@@ -185,7 +186,7 @@ that metacompilation uses a dedicated language called \emph{metal} for
 description of state machines. The best known implementation of
 metacompilation is the tool called \emph{xgcc}, but the idea of error
 specification using state machines appears also in other tools,
-e.g.~ESP~\cite{esp} or STANSE~\cite{stanse}.
+e.g.~\textsc{Esp}~\cite{esp} or \textsc{Stanse}~\cite{stanse}.
 
 \medskip In contrast to metacompilation, \emph{symbolic execution}~\cite{se}
 analyzes each execution path separately. In contrast to standard execution,
@@ -254,7 +255,7 @@ machines allows us to clearly specify the slicing criteria. Hence, the
 sliced program contains only the code relevant to the considered
 errors. Further, slicing can substantially reduce the size of the code,
 which can remarkably improve performance of the symbolic
-execution. 
+execution.
 
 Let us note that usage of symbolic execution instead of classic static
 analysis brings us another benefit: while in metacompilation the state
@@ -268,7 +269,7 @@ our technique. \todo{Co s timhle odstavcem?}
 \medskip The rest of the paper is organized as
 follows. Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe}
 deal with program instrumentation, slicing, and symbolic execution,
-respectively. 
+respectively.
 % Section~\ref{sec:BackMapping} discusses extraction of
 % counterexamples.\todo{Chceme to tu nechat?}
 Experimental implementation of our technique and some experimental results
@@ -284,7 +285,7 @@ presented results.
 %   automaty. (Prakticke priciny bych nechal do zaveru k future work.)
 % \item Nas prinos: metal + slic. + SE a semanticke automaty. Zduraznit, ze
 %   slicing muze prinest konecnost vypoctu SE a tim potvrdit bezchybnost kodu
-%   (kod ma typicky nekonecne mnoho cest vypoctu a tudiz se SE nedopocita). 
+%   (kod ma typicky nekonecne mnoho cest vypoctu a tudiz se SE nedopocita).
 % \end{itemize}
 
 %{{{ Obrazek nekonecneho stromu symbolicke exekuce na neproslicovanem kodu
@@ -370,10 +371,10 @@ presented results.
 %             edge [dotted,thick] node {} (27);
 %         \node [] (TINF) [below of=27,right of=27] {}
 %             edge [dotted,thick] node {} (27);
-%     \end{tikzpicture} 
+%     \end{tikzpicture}
 %     \caption{Symbolic execution tree of function \texttt{copy}}
 %         \label{fig:copy:SET}
-% \end{figure} 
+% \end{figure}
 
 %}}}
 
@@ -500,10 +501,9 @@ computing pool indices from pointers.
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-int __ISSE_lock[2] = { 0, 0 }; 
+int __ISSE_lock[2] = { 0, 0 };
 
-int __ISSE_get_memory_pool_index(const int *ptr)
-{
+int __ISSE_get_memory_pool_index(const int *ptr) {
     if (ptr == &L1) return 0;
     if (ptr == &L2) return 1;
     return -1; /* unreachable */
@@ -564,12 +564,12 @@ unlocked.
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-char *copy(char *src, char *dst, int *L) {
+char *copy(char *dst, char *src, int n, int *L) {
     int i, len;
     __ISSE_ensure_unlocked(L);
     len = 0;
     if (src != NULL && dst != NULL) {
-	len = strlen(src);
+	len = n;
 	__ISSE_lock(L);
 	lock(L);
     }
@@ -603,22 +603,63 @@ char *copy(char *src, char *dst, int *L) {
 
 Let us have a look at the instrumented program at Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part of the function \texttt{copy}, i.e.~the loop copying the characters, does not affect states of the instrumented automata. On the other hand, symbolic execution of such a code can be very expensive. Therefore, we use the program slicing technique to eliminate such a code from the analysed program. Slicing may bring considerable speed up for in the last phase of the algorithm, where we execute the program symbolically.
 
-%We use interprocedural static slicing as proposed by Weiser in 1981~\cite{W81}. When slicing a program we first need to specify what behaviour we want to preserve. We do so by assigning a \emph{slicing criteria} to particular lines of the program. Slicing criterion at a given program line specifies a set of variables whose values at that line must be equal in both original and sliced program for each input data passed to both programs. Having slicing criteria set, we slice functions independently. Let us consider a function with slicing criteria. We assign a set of \emph{relevant variables} to each line of the functions. A variable is relevant, if its value has an impact (direct or indirect) to a value of a variable in some slicing criterion. Sets of relevant variables of the sliced function are initially empty, except those of lines with slicing criteria (these sets contain variables from their slicing criteria). Then, according to semantics of program commands we propagate relevance of variables between program lines and we insert discovered relevant variables into related sets. We apply the propagation until sets do not increase their size. From the content of the sets we can safely say, which program lines has no impact to the slicing criteria and we therefore remove those lines from the body of the function. Interprocedural slicing is about exchanging slicing criteria between functions through call sites. When we are done slicing individual functions, we have computed relevant variables at call sites and also at the entry locations (lines) to the functions. So, we propagate the criteria between called and calling functions. Then we slice the functions independently again. We repeat this process until no \emph{new} slicing criterion is passed between functions. 
+%We use interprocedural static slicing as proposed by Weiser in
+%1981~\cite{W81}. When slicing a program we first need to specify what
+%behaviour we want to preserve. We do so by assigning a \emph{slicing
+%criteria} to particular lines of the program. Slicing criterion at a given
+%program line specifies a set of variables whose values at that line must be
+%equal in both original and sliced program for each input data passed to both
+%programs. Having slicing criteria set, we slice functions independently. Let
+%us consider a function with slicing criteria. We assign a set of
+%\emph{relevant variables} to each line of the functions. A variable is
+%relevant, if its value has an impact (direct or indirect) to a value of a
+%variable in some slicing criterion. Sets of relevant variables of the sliced
+%function are initially empty, except those of lines with slicing criteria
+%(these sets contain variables from their slicing criteria). Then, according
+%to semantics of program commands we propagate relevance of variables between
+%program lines and we insert discovered relevant variables into related sets.
+%We apply the propagation until sets do not increase their size. From the
+%content of the sets we can safely say, which program lines has no impact to
+%the slicing criteria and we therefore remove those lines from the body of the
+%function. Interprocedural slicing is about exchanging slicing criteria
+%between functions through call sites. When we are done slicing individual
+%functions, we have computed relevant variables at call sites and also at the
+%entry locations (lines) to the functions. So, we propagate the criteria
+%between called and calling functions. Then we slice the functions
+%independently again. We repeat this process until no \emph{new} slicing
+%criterion is passed between functions.
 
-%Propagation of slicing criteria between functions is mainly based on argument passing technique of the program. Nevertheless, besides argument passing we usually need to know what variables can be modified by which function. Weiser references technique~\cite{B78}, which does more then we actually need. Therefore, we have designed much more simple but still satisfactory technique computing only \emph{modifies} function summaries. Modifies summary of a given function is simply a set of program variables, which are not local to the function, and which can be modified by the function. Having results from a points-to analysis, a computation of the summaries is straightforward.
+%Propagation of slicing criteria between functions is mainly based on argument
+%passing technique of the program. Nevertheless, besides argument passing we
+%usually need to know what variables can be modified by which function. Weiser
+%references technique~\cite{B78}, which does more then we actually need.
+%Therefore, we have designed much more simple but still satisfactory technique
+%computing only \emph{modifies} function summaries. Modifies summary of a
+%given function is simply a set of program variables, which are not local to
+%the function, and which can be modified by the function. Having results from
+%a points-to analysis, a computation of the summaries is straightforward.
 
-To slice a program we only need to specify \emph{slicing criteria}. Having the criteria a slicing algorithm then eliminates the redundant code automatically. A simple definition of a slicing criterion is introduced in~\cite{W81} and it is sufficient for our purposes. According to the definition, we must only specify a set of variables and a program line. It is a task for a slicing algorithm to ensure that, roughly speaking, for each input data passed to both original and sliced programs values of the variables at that line are always equal in both programs. In our algorithm we have to preserve values of the instrumented automata. And the best lines where to put the criteria are consistency checks about automata states.
+To slice a program we only need to specify \emph{slicing criteria}. Having the
+criteria a slicing algorithm then eliminates the redundant code automatically.
+A simple definition of a slicing criterion is introduced in~\cite{W81} and it
+is sufficient for our purposes. According to the definition, we must only
+specify a set of variables and a program line. It is a task for a slicing
+algorithm to ensure that, roughly speaking, for each input data passed to both
+original and sliced programs values of the variables at that line are always
+equal in both programs. In our algorithm we have to preserve values of the
+instrumented automata. And the best lines where to put the criteria are
+consistency checks about automata states.
 
 \begin{figure}[!htb]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-char *copy(char *src, char *dst, int *L) {
+char *copy(char *dst, char *src, int n, int *L) {
 1  int len;
 2  __ISSE_ensure_unlocked(L);
 3  len = 0;
 4  if (src != NULL && dst != NULL) {
-5      len = strlen(src);
+5      len = n;
 6      __ISSE_lock(L);
 7  }
 8  if (len > 0) {
@@ -636,16 +677,39 @@ char *copy(char *src, char *dst, int *L) {
 \end{figure}
 
 
-In our example program, we need to preserve a content of the array \texttt{\_\_ISSE\_lock} at all those program lines at Figure~\ref{fig:instrumentation_stuff}, where we call the function \texttt{assert}. Having the criteria set the interprocedural slicing~\cite{W81} recognises dependency of the array \texttt{\_\_ISSE\_lock} on the variable \texttt{L} of the function \texttt{copy}. Therefore, the code manipulating \texttt{L} is preserved, while the loop copying the characters is sliced away. The resulting sliced program is depicted at Figure~\ref{fig:copy_sliced}.
+In our example program, we need to preserve a content of the array
+\texttt{\_\_ISSE\_lock} at all those program lines at
+Figure~\ref{fig:instrumentation_stuff}, where we call the function
+\texttt{assert}. Having the criteria set the interprocedural
+slicing~\cite{W81} recognises dependency of the array \texttt{\_\_ISSE\_lock}
+on the variable \texttt{L} of the function \texttt{copy}. Therefore, the code
+manipulating \texttt{L} is preserved, while the loop copying the characters is
+sliced away. The resulting sliced program is depicted at
+Figure~\ref{fig:copy_sliced}.
 
-It is important to note that some slicing techniques, including one in~\cite{W81} that we use, does not consider inputs for which the original program does not halt. Therefore, there is no way to guarantee that a sliced program will fail to halt whenever the original program fails to halt. This may be a source of false positives in our technique.
+It is important to note that some slicing techniques, including one
+in~\cite{W81} that we use, does not consider inputs for which the original
+program does not halt. Therefore, there is no way to guarantee that a sliced
+program will fail to halt whenever the original program fails to halt. This
+may be a source of false positives in our technique.
 
 %}}}
 %{{{ Symbolic Execution
 
 \section{Symbolic Execution} \label{sec:symexe} \todo{M}
 
-Symbolic execution explores real paths in a given program. Therefore, if it reaches a line where we detect a bug, then we are sure the bug is real in the executed program, i.e.~it is \emph{not} a false positive. (This is of course true only under common assumption that an SMT solver is able to reason about satisfiability of path condition along the execution.) This is obvious but important advantage of symbolic execution for finding bugs. On the other hand, a number of the real paths is typically very large (or even infinite) even for small and simple programs. Therefore, symbolic execution is often very expensive. In our technique we are only concerned with those fragments of the original program having impact on a property we are checking for. Therefore, slicing of the analysed program before we start symbolic execution can bring considerable speed up of the execution.
+Symbolic execution explores real paths in a given program. Therefore, if it
+reaches a line where we detect a bug, then we are sure the bug is real in the
+executed program, i.e.~it is \emph{not} a false positive. (This is of course
+true only under common assumption that an SMT solver is able to reason about
+satisfiability of path condition along the execution.) This is obvious but
+important advantage of symbolic execution for finding bugs. On the other hand,
+a number of the real paths is typically very large (or even infinite) even for
+small and simple programs. Therefore, symbolic execution is often very
+expensive. In our technique we are only concerned with those fragments of the
+original program having impact on a property we are checking for. Therefore,
+slicing of the analysed program before we start symbolic execution can bring
+considerable speed up of the execution.
 
 \begin{figure}[!htb]
     \centering
@@ -666,7 +730,7 @@ Symbolic execution explores real paths in a given program. Therefore, if it reac
             edge [pre] node {} (3);
         \node [loc2] (5) [below of=4] {$12$}
             edge [pre] node {} (4);
- 
+
         % ->true branch
         \node [loc] (7) [right of=2,below of=2] {$5$}
             edge [pre] node [label=above:~~T] {} (2);
@@ -687,14 +751,30 @@ Symbolic execution explores real paths in a given program. Therefore, if it reac
             edge [pre] node {} (13);
         \node [loc2] (15) [below of=14] {$12$}
             edge [pre] node {} (14);
-    \end{tikzpicture} 
+    \end{tikzpicture}
     \caption{Symbolic execution tree of sliced function \texttt{copy} \todol{tento obrazek pripojit ke Obr.~\ref{fig:copy_sliced}}}
         \label{fig:copy_sliced:SET}
 \end{figure}
 
-We demonstrate the speed up on our example with function \texttt{copy}. Let us first symbolically execute the instrumented function \texttt{copy} at Figure~\ref{fig:copy_instrumented}. If we assume $32$-bit integers for the type \texttt{int}, then we have more then $2^{16}$ different symbolic paths through the function. Absolute majority of the paths are caused by the \texttt{while} loop copying the strings. On the other hand, symbolic execution of the sliced function \texttt{copy} at Figure~\ref{fig:copy_sliced} has exactly three paths.
+We demonstrate the speed up on our example with function \texttt{copy}. Let us
+first symbolically execute the instrumented function \texttt{copy} at
+Figure~\ref{fig:copy_instrumented}. If we assume $32$-bit integers for the
+type \texttt{int}, then we have more then $2^{16}$ different symbolic paths
+through the function. Absolute majority of the paths are caused by the
+\texttt{while} loop copying the strings. On the other hand, symbolic execution
+of the sliced function \texttt{copy} at Figure~\ref{fig:copy_sliced} has
+exactly three paths.
 
-Those three paths of the sliced function \texttt{copy} are depicted at Figure~\ref{fig:copy_sliced:SET}. We can easily check that only path $2,3,5,6,8,11$ violates some of the assertion in function depicted at Figure~\ref{fig:instrumentation_stuff}. More precisely, this path violates the assertion at function \texttt{\_\_SSE\_ensure\_unlocked} which means that it is possible to leave the function in locked state. Note that this path is also marked at Figure~\ref{fig:copy_sliced:SET}. The remaining two paths do not violate any of the discussed assertions and therefore there is no other bug related to property checked by our automata. It also means that double-unlock report from the abstract interpretation was false.
+Those three paths of the sliced function \texttt{copy} are depicted at
+Figure~\ref{fig:copy_sliced:SET}. We can easily check that only path
+$2,3,5,6,8,11$ violates some of the assertion in function depicted at
+Figure~\ref{fig:instrumentation_stuff}. More precisely, this path violates the
+assertion at function \texttt{\_\_SSE\_ensure\_unlocked} which means that it
+is possible to leave the function in locked state. Note that this path is also
+marked at Figure~\ref{fig:copy_sliced:SET}. The remaining two paths do not
+violate any of the discussed assertions and therefore there is no other bug
+related to property checked by our automata. It also means that double-unlock
+report from the abstract interpretation was false.
 
 %}}}
 %{{{ Trace Back Mapping
@@ -732,31 +812,34 @@ many projects with open-source license (and source code available) are written
 in C. Hence there is a fair codebase available for checking.
 
 The tool is not implemented from scratch. It is written as a module for the
-LLVM framework~\cite{llvm}. This provides us with a C parser (and compiler)
-for free and a documented application programming interface. Also for LLVM
-a symbolic executor exists already. It is called \textsc{Klee}.
+\textsc{Llvm} framework~\cite{llvm}. This provides us with a C parser (and
+compiler) for free and a documented application programming interface. Also
+for \textsc{Llvm} a symbolic executor exists already. It is called
+\textsc{Klee}.
 
 Before we can really run the executor, several steps have to be performed
-first. Initially, the tool turns the C code into LLVM bytecode. For this
-purpose a compiler from the LLVM framework called \textsc{clang} is used.
-Optimizations are turned off as required by \textsc{Klee}. 
+first. Initially, the tool turns the C code into \textsc{Llvm} bytecode. For
+this purpose a compiler from the \textsc{Llvm} framework called \textsc{clang}
+is used.  Optimizations are turned off as required by \textsc{Klee}.
 
-Next the LLVM code is instrumented (Section~\ref{sec:instr}) by an LLVM module
-called \texttt{Prepare}. Although the technique is universal, we narrowed it
-down for the sake of pilot testing and simplicity. The set of checked
-properties is thus limited to locking errors only. This comprises checks for
-inappropriate leaving functions with lock held, double locks and double
-unlocks. We plan to augment the checked properties set in the future.
+Next the \textsc{Llvm} code is instrumented (Section~\ref{sec:instr}) by an
+\textsc{Llvm} module called \texttt{Prepare}. Although the technique is
+universal, we narrowed it down for the sake of pilot testing and simplicity.
+The set of checked properties is thus limited to locking errors only. This
+comprises checks for inappropriate leaving functions with lock held, double
+locks and double unlocks. We plan to augment the checked properties set in the
+future.
 
-Further, the instrumented bytecode is sliced by an LLVM inter-procedural
-slicer to eliminate irrelevant code (Section~\ref{sec:slicing}). This is done
-by a separate LLVM module named \texttt{Slicer}.
+Further, the instrumented bytecode is sliced by an \textsc{Llvm}
+inter-procedural slicer to eliminate irrelevant code
+(Section~\ref{sec:slicing}). This is done by a separate \textsc{Llvm} module
+named \texttt{Slicer}.
 
-Given the sliced input, the LLVM bytecode is parsed by the \texttt{Kleerer}
-LLVM module. This pass creates a separate file with LLVM bytecode for each
-function present in the source file. To all the created files, it also adds a
-\texttt{main} function. This is where the analysis starts -- in each of the
-files it calls a different function.
+Given the sliced input, the \textsc{Llvm} bytecode is parsed by the
+\texttt{Kleerer} \textsc{Llvm} module. This pass creates a separate file with
+\textsc{Llvm} bytecode for each function present in the source file. To all
+the created files, it also adds a \texttt{main} function. This is where the
+analysis starts -- in each of the files it calls a different function.
 
 Finally a symbolic execution is performed by \textsc{Klee}
 (Section~\ref{sec:symexe}). \todo{Describe what we do with the output\dots}
@@ -764,7 +847,8 @@ Finally a symbolic execution is performed by \textsc{Klee}
 \begin{figure}[htb]
 \begin{center}
 \todol{Do we want this figure (picture needed)?} \\
-C $\rightarrow$ LLVM compiler (clang) $\rightarrow$ Instrumentation (Prepare) $\rightarrow$ slicing (Slicer) $\rightarrow$
+C $\rightarrow$ \textsc{Llvm} compiler (\textsc{clang}) $\rightarrow$
+Instrumentation (Prepare) $\rightarrow$ slicing (Slicer) $\rightarrow$
 main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
 \end{center}
 \caption{Phases of our tool}
@@ -779,12 +863,12 @@ evaluation was performed on the Linux kernel. It is a large and well tested
 piece of software. Also it is generally of high interest to be bug-free.
 Otherwise systems could be indeed compromised rather easily.
 
-All tests performed were run on a standard office machine. On a hardware
-level, its configuration is a dual-core processor, 6\,GiB of memory.
-Operating system installed is Linux. \textsc{Klee} is run on the instrumented
-and sliced LLVM code. We specify \textsc{Klee} parameters to add an upper
-bound on solver and overall time. The former is set to 3 seconds, the latter
-to 30. We tried to double these times several times with no real effect.
+All tests performed were run on a machine with an Intel E6850 dual-core
+processor at 3\,GHz, with 6\,GiB of memory.  Operating system installed is
+Linux. \textsc{Klee} is run on the instrumented and sliced \textsc{Llvm} code.
+We specify \textsc{Klee} parameters to add an upper bound on solver and
+overall time. The former is set to 3 seconds, the latter to 30. We tried to
+double these times several times with no real effect.
 
 We do not pass optimize option for \textsc{Klee} because it causes
 \textsc{Klee} to crash under some circumstances. The optimization might
@@ -805,6 +889,7 @@ tool is either:
 abstract interpretation tool did or
 \item confirmation of a false positive -- does not report anything at that
 location or
+\item message about unsound analysis -- ETOOMANYLOCKSALLOCATED or
 \item message about unfinished computation -- due to various errors.
 \end{itemize}
 
@@ -838,27 +923,27 @@ the files and their sum as well.
 \begin{tabular}{|l|c|c|c|c|c|c|c|} \hline
 \multirow{2}{*}{\textbf{Function}} &
   \multicolumn{5}{|c|}{\textbf{Running Time} (s)} &
-  \multirow{2}{*}{\textbf{Result}} & \textbf{Factual} \\
- & \textbf{Compilation} & \textbf{Instr.$^{\dagger}$} &
+  \multirow{2}{*}{\textbf{Result}} & \textbf{Factual} \\ \cline{2-6}
+ & \textbf{Comp.} & \textbf{Instr.$^{\dagger}$} &
    \textbf{Slicing} & \textbf{SE} & \textbf{Total} &
  & \textbf{State} \\ \hline \hline
-\texttt{jfs\_quota\_write} & 1.25 & 0.18 & 0.14 & 5.09 & TBD &
+\texttt{jfs\_quota\_write} & 1.25 & 0.18 & 0.15 & 5.09 & 6.67 &
 	BUG & BUG \\ \hline
-\texttt{qlge\_set\_mac\_address} & 2.70 & 0.72 & 0.51 & 13.28 & TBD &
-	BUG & BUG \\ \hline \hline
-\texttt{queue\_refill} & 1.76 & 0.29 & 0.23 & 0.62 & TBD &
+\texttt{qlge\_set\_mac\_address} & 2.70 & 0.72 & 26.75 & 13.28 & 43.45 &
+	BUG & BUG \\ \hline
+\texttt{hidraw\_read} & 1.06 & 0.18 & 0.14 &
+	\multicolumn{3}{|c|}{Timeout} & BUG \\ \hline \hline
+\texttt{queue\_refill} & 1.76 & 0.29 & 1.72 & 0.62 & 4.39 &
 	FP & FP \\ \hline
-\texttt{sisusbcon\_set\_palette} & 1.50 & 0.24 & 0.21 & 17.19 & TBD &
-	FP & FP \\ \hline \hline
-\texttt{hidraw\_read} & 1.03 & 0.16 & 0.12 & 56.11 & TBD &
-	TO & N/A \\ \hline
-\texttt{wa\_urb\_enqueue\_run} & 1.45 & 0.27 & 0.23 & 32.52 & TBD &
-	TO & N/A \\ \hline
+\texttt{sisusbcon\_set\_palette} & 1.50 & 0.24 & 0.27 & 17.19 & 19.20 &
+	FP & FP \\ \hline
+\texttt{jffs2\_reserve\_space} & 1.04 & 0.18 & 0.22 &
+	\multicolumn{3}{|c|}{Timeout} & FP \\ \hline
 \end{tabular}
-\caption{Technique run on several files. $\dagger$ Instrumentation including
-the points-to analysis time. The last two columns specify what our tool
-reported (Result) and what it was in fact (Factual State). It may be a real
-error (BUG), false-positive (FP) and did not finished (TO).}
+\caption{The technique run on several files. $^{\dagger}$ Instrumentation
+including the points-to analysis time. The last two columns specify what our
+tool reported (Result) and what it was in fact (Factual State). It may be a
+real error (BUG), false-positive (FP).}
 \label{tab:results}
 \end{table}
 
@@ -866,10 +951,10 @@ error (BUG), false-positive (FP) and did not finished (TO).}
 % drivers/net/qlge/qlge_main.c qlge_set_mac_address
 % drivers/net/ns83820.c queue_refill
 % drivers/usb/misc/sisusbvga/sisusb_con.c sisusbcon_set_palette
-% drivers/hid/hidraw.c hidraw_read
-% drivers/usb/wusbcore/wa-xfer.c wa_urb_enqueue_run
+% fs/jffs2/nodemgmt.c jffs2_reserve_space (to po 5m40s)
+% drivers/hid/hidraw.c hidraw_read (to po 10m)
 
-% klee -max-stp-time=5 -max-time=30
+% klee -max-stp-time=10 -max-time=300
 
 %}}}
 %{{{ Related Work
