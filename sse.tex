@@ -384,10 +384,6 @@ presented results.
 \section{Instrumentation}
 \label{sec:instr}
 
-We want to find a similar set of errors to those found by tools like those
-using \textsc{Metal}~\cite{metal}. These tools use abstract interpretation as
-an algorithm and automata for program behavior description.
-
 Abstract interpretation loads the automata before the analysis and then fires
 transitions and remembers states while computing a fix-point. Generally there
 may be multiple states for each program location. It is due to exploring all
@@ -395,80 +391,82 @@ paths of the program in a single run.
 
 With the symbolic execution, this is slightly different. It is sufficient to
 remember an actual state of the automata for a program path currently
-explored. Other paths are explored separately in a different runs.
+explored. Other paths are explored separately in different runs.
 
-There are two approaches to track the automata states. First, to implement the
-functionality directly into the executor. This would be an intrusive change to
-a compact code which is intended to do a dedicated job.  The second approach
-is to instrument the code before the execution itself.  That results in a
-separate module without touching the executor's code.
+%There are two approaches to track the automata states. First, to implement the
+%functionality directly into the executor. This would be an intrusive change to
+%a compact code which is intended to do a dedicated job.  The second approach
+%is to instrument the code before the execution itself.  That results in a
+%separate module without touching the executor's code.
 
-%\begin{figure}[htb]
-%\begin{center}
-%\includegraphics[width=3cm]{lock_unlock}
-%\end{center}
-%\caption{An automaton describing locking behavior}
-%\label{fig:automaton}
-%\end{figure}
+%Thanks to that, we can keep the automaton state in an integer. We do not
+%introduce such an integer for each automaton instance\footnote{There may be
+%multiple instances of the automata. For example the tools create a separate
+%instance of locking automaton for each lock.} found in the code though. This
+%would lead to false alarms. Especially in C code where two pointers may point
+%to a single object.
 
-Thanks to the fact the automaton may be only in one state at a time, we can
-keep the automaton state in an integer. We do not introduce such an integer
-for each automaton instance\footnote{There may be multiple instances of the
-automata. For example the tools create a separate instance of locking
-automaton for each lock.} found in the code though. This would lead to false
-alarms. Especially in C code where two pointers may point to a single object.
-
-To avoid that, the tools leverages Andersen's points-to
-analysis~\cite{andersen} and reimplements the allocator to use memory pools.
-Both help all instances to be bound together properly. For example when the
-parametrization of automata instance is named differently in the code
-(\texttt{lock(A); B=A; unlock(B);}) or passed as a parameter with another
-name.
-
-In our implementation, there are two objects a pointer can reference. Either
-a global variable or a line where allocation of the object occurs.
-
-The latter introduces an imprecision into the analysis. An example of code
-where the behavior is incorrect in depicted in Fig.~\ref{fig:invalid_ptr}. All
-pointers in the list point to line~\ref{lst:alloc} where their allocation
-happens.
+%To avoid that, the tool leverages Andersen's points-to
+%analysis~\cite{andersen} and reimplements the allocator a bit. Both help all
+%instances to be bound together properly. For example when the parametrization
+%of automata instance is named differently in the code (\texttt{lock(A); B=A;
+%unlock(B);}) or passed as a parameter with another name.
+%
+%In our implementation, there are two objects a pointer can reference. Either
+%a global variable or a program location where the allocation of the object
+%occurs.
+%
+%The latter introduces an imprecision into the analysis. An example of code
+%where the behavior is incorrect is depicted in Fig.~\ref{fig:invalid_ptr}. All
+%pointers in the list point to line~\ref{lst:alloc} where their allocation
+%happens.
 
 \begin{figure}[!htb]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-1 void make_list_and_lock(List *list, int len) {
-2   while (len--) {
-3     List_member *memb = alloc_member();(*@ \label{lst:alloc} @*)
-4     link_to_list(list, memb);
-5     lock(memb->lock);
-6   }
-7 }
+ 1: void create_list(List *list, int count) {
+ 2:   List_member *memb;
+ 3:   while (count--) {
+ 4:     memb = alloc_list_member();(*@ \label{lst:alloc} @*)
+ 5:     if (memb->should_lock)
+ 6:       lock(memb->lock);
+ 7:     link_to_list(list, memb);
+ 8:   }
+ 9:   process_list(list);
+10:   for (memb = list->start; memb; memb = memb->next) {
+11:     if (memb->error_state)
+12:       continue;
+13:     print_result(memb);
+14:     if (memb->should_lock)
+15:       unlock(memb->lock);
+16:   }
+17: }
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{Invalid analysis output.}
+    \caption{Code where analyses may fail.}
     \label{fig:invalid_ptr}
 \end{figure}
 
-The memory pools are created as follows:
-\begin{enumerate}
-\item All code locations supposed to fire a transition are found.
-\item A points-to set of the automaton parameter on the found locations is
-computed. Cardinalities of the sets are finite, because the count of the
-pointed objects (global variables and allocation lines) is finite too.
-\item All the sets are merged together to obtain all possible automaton
-parameter objects. Again, the merged set is finite.
-\item Memory is split into equally sized pools. Their count is equal to the
-cardinality of the merged set. The pools are numbered from zero to count-1.
-\end{enumerate}
-
-When the memory is split, the allocation sites of each of the objects in the
-merged set are looked up. Such allocations are superseded by a pool allocator.
-It reserves a space in a specific pool. It is specified by the index of the
-pool where the object belongs to. The size of the reserved space is the same
-as the requested size. This approach allows for an easy reverse mapping from
-pointers to (numbered) pools.
+%The memory pools are created as follows:
+%\begin{enumerate}
+%\item All code locations supposed to fire a transition are found.
+%\item A points-to set of the automaton parameter on the found locations is
+%computed. Cardinalities of the sets are finite, because the count of the
+%pointed objects (global variables and allocation lines) is finite too.
+%\item All the sets are merged together to obtain all possible automaton
+%parameter objects. Again, the merged set is finite.
+%\item Memory is split into equally sized pools. Their count is equal to the
+%cardinality of the merged set. The pools are numbered from zero to count-1.
+%\end{enumerate}
+%
+%When the memory is split, the allocation sites of each of the objects in the
+%merged set are looked up. Such allocations are superseded by a pool allocator.
+%It reserves a space in a specific pool. It is specified by the index of the
+%pool where the object belongs to. The size of the reserved space is the same
+%as the requested size. This approach allows for an easy reverse mapping from
+%pointers to (numbered) pools.
 
 It is also needed to store automata states somewhere. For this purpose, an
 array is created. Its size is designated by the count of the memory pools too.
@@ -867,7 +865,7 @@ All tests performed were run on a machine with an Intel E6850 dual-core
 processor at 3\,GHz, with 6\,GiB of memory.  Operating system installed is
 Linux. \textsc{Klee} is run on the instrumented and sliced \textsc{Llvm} code.
 We specify \textsc{Klee} parameters to add an upper bound on solver and
-overall time. The former is set to 3 seconds, the latter to 30. We tried to
+overall time. The former is set to 10 seconds, the latter to 300. We tried to
 double these times several times with no real effect.
 
 We do not pass optimize option for \textsc{Klee} because it causes
