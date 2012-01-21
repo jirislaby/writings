@@ -415,15 +415,57 @@ If the number of allocations grows over this boundary at that place, a global
 After the analysis finishes, the flag is checked and the tool reports a
 warning if it is true.
 
-In languages like C pointers are allowed and SMs are often parametrized by
+In languages like C, pointers are allowed and SMs are often parametrized by
 them. This means, two pointers may reference a single object (\texttt{lock(A);
 B=A; unlock(B);}). And so a single SM should be referenced in that case too.
 The tool copes with that by using the Andersen's points-to
 analysis~\cite{andersen}.
 
-In our implementation, there are three objects a pointer can reference. Either
-a global variable or a program location where the allocation of the object
+In our implementation, there are two objects a pointer can reference. Either a
+global variable or a program location where the allocation of the object
 occurs (no matter if allocated on the stack or in the heap).
+
+To that extent, we have a bounded set of SM instances and locations where
+these instances emerge. Thus, we add to the code an integer for SMs and
+counter for allocations. In more detail, the instrumentation works as follows:
+\begin{enumerate}
+\item All functions manipulating with $SM(x)$ are found
+\item Points-to sets of all such $x$'s is computed
+\item All points-to sets are merged (to obtain all locations where SMs should
+	be created)
+\item For all members of the merged set we perform a task depending on a type:
+\begin{itemize}
+\item Global variable -- a new global integer variable is added to hold the SM
+state
+\item Allocation location -- the code is instrumented so that the allocation
+location now contains a) a static array for 10 SM states, b) a static
+allocation counter and c) a call to our allocation function.
+\end{itemize}
+\end{enumerate}
+
+\begin{figure}[!htb]
+  \begin{center}
+  \begin{tabular}{c}
+    \begin{lstlisting}[language=C]
+int __ISSE_allocate(size_t size, int *counter) {
+    if (ptr == &L1) return 0;
+    if (ptr == &L2) return 1;
+    return -1; /* unreachable */
+}
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+    \caption{Function \texttt{copy} copying a source string \texttt{src}
+      into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel
+      writes.}
+    \label{fig:copy}
+\end{figure}
+
+increment of the counter, d) check if the count is over
+10, if so, unsound flag is set to true and d) the allocation proper.
+
+Finally each location from point is instrumented with a function performing
+the SM transition. The parameters are
 
 %The latter introduces an imprecision into the analysis. An example of code
 %where the behavior is incorrect is depicted in Fig.~\ref{fig:invalid_ptr}. All
@@ -457,21 +499,6 @@ occurs (no matter if allocated on the stack or in the heap).
     \caption{Code where analyses may fail.}
     \label{fig:invalid_ptr}
 \end{figure}
-
-\begin{itemize}
-\item find each lock usage
-\item points-to analysis
-\item create merged set
-\item number the members
-\item create an array with automata allocated count. size is card
-\item create an array with automata states. size is card * 10
-\item create a map of pointer -> index
-\item instrument each allocation site with
-  - increment of allocated count and check whether it is over 10. if so, set
-    global imprecision flag
-  - add pointer -> index map (ptr is what returned allocator, index is merged
-    set number * 10 + allocated count)
-\end{itemize}
 
 %The memory pools are created as follows:
 %\begin{enumerate}
@@ -523,13 +550,6 @@ computing pool indices from pointers.
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-int __ISSE_lock[2] = { 0, 0 };
-
-int __ISSE_get_memory_pool_index(const int *ptr) {
-    if (ptr == &L1) return 0;
-    if (ptr == &L2) return 1;
-    return -1; /* unreachable */
-}
 
 void __ISSE_ensure_unlocked(const int *L) {
     int i = __ISSE_get_memory_pool_index(L);
