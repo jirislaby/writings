@@ -439,7 +439,8 @@ counter for allocations. In more detail, the instrumentation works as follows:
 state
 \item Allocation location -- the code is instrumented so that the allocation
 location now contains a) a static array for 10 SM states, b) a static
-allocation counter and c) a call to our allocation function.
+allocation counter, c) call to the original allocation function and d) a call
+to our allocation function.
 \end{itemize}
 \end{enumerate}
 
@@ -447,18 +448,16 @@ allocation counter and c) a call to our allocation function.
   \begin{center}
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
-int __ISSE_allocate(size_t size, int *counter) {
-    if (ptr == &L1) return 0;
-    if (ptr == &L2) return 1;
-    return -1; /* unreachable */
+void __ISSE_allocate(void *new_memory, int *counter) {
+  if (counter > 10)
+    return;
+  counter++;
 }
   \end{lstlisting}
   \end{tabular}
   \end{center}
-    \caption{Function \texttt{copy} copying a source string \texttt{src}
-      into a buffer \texttt{dst} using a lock \texttt{L} to prevent parallel
-      writes.}
-    \label{fig:copy}
+    \caption{Function that takes care of allocations.}
+    \label{fig:instr_funs}
 \end{figure}
 
 increment of the counter, d) check if the count is over
@@ -849,15 +848,11 @@ report from the abstract interpretation was false.
 
 \section{Implementation and Experimental Results}
 \label{sec:impl}
-We decided to verify the functionality on the C code. The main reason is that
-many projects with open-source license (and source code available) are written
-in C. Hence there is a fair codebase available for checking.
-
-The tool is not implemented from scratch. It is written as a module for the
-\textsc{Llvm} framework~\cite{llvm}. This provides us with a C parser (and
-compiler) for free and a documented application programming interface. Also
-for \textsc{Llvm} a symbolic executor exists already. It is called
-\textsc{Klee}.
+We decided to verify the functionality on the C code. Thanks to that, the tool
+does not have to be implemented from scratch. It is written as a module for
+the \textsc{Llvm} framework~\cite{llvm}. This provides us with a C compiler
+for free and a documented application programming interface. Also for
+\textsc{Llvm} a symbolic executor exists already. It is called \textsc{Klee}.
 
 Before we can really run the executor, several steps have to be performed
 first. Initially, the tool turns the C code into \textsc{Llvm} bytecode. For
@@ -867,10 +862,10 @@ is used.  Optimizations are turned off as required by \textsc{Klee}.
 Next the \textsc{Llvm} code is instrumented (Section~\ref{sec:instr}) by an
 \textsc{Llvm} module called \texttt{Prepare}. Although the technique is
 universal, we narrowed it down for the sake of pilot testing and simplicity.
-The set of checked properties is thus limited to locking errors only. This
-comprises checks for inappropriate leaving functions with lock held, double
-locks and double unlocks. We plan to augment the checked properties set in the
-future.
+The set of checked (instrumented) properties is thus limited to locking errors
+only. This comprises checks for inappropriate leaving functions with lock
+held, double locks and double unlocks. We plan to augment the checked
+properties set in the future.
 
 Further, the instrumented bytecode is sliced by an \textsc{Llvm}
 inter-procedural slicer to eliminate irrelevant code
