@@ -250,7 +250,7 @@ describing the reported error. If our technique finds the same error, it is
 a real one. If our technique explores all execution paths of the sliced code
 without detecting the error, it is a false positive. If our technique runs
 out of resources, we cannot decide whether the error is a real one or just a
-false positive. 
+false positive.
 
 We have developed an experimental tool implementing our technique. The tool
 instruments a program with a state machine describing locking errors (we use
@@ -413,7 +413,7 @@ Now let us describe how we map the integer and an instance of the $SM(x)$ for
 some $x$. Generally, count of $x$ may be infinite during the program run time.
 For example a filesystem code may want to create a lock in a loop for each
 node. Anyway, they can be materialized only on finite count of code locations.
-Either by a heap allocator, on the stack, or they are global variables. 
+Either by a heap allocator, on the stack, or they are global variables.
 
 We limit the overall count of the lock instances for each such location to 10.
 If the number of allocations grows over this boundary at that place, a global
@@ -826,7 +826,7 @@ Next the \textsc{Llvm} code is instrumented (Section~\ref{sec:instr}) by an
 \textsc{Llvm} module called \texttt{Prepare}. Although the technique is
 universal, we narrowed it down for the sake of pilot testing and simplicity.
 The set of checked (instrumented) properties is thus limited to locking errors
-only. This comprises checks for inappropriate leaving functions with lock
+only. This comprises checks for inappropriate leaving functions with a lock
 held, double locks and double unlocks. We plan to augment the checked
 properties set in the future.
 
@@ -836,13 +836,16 @@ inter-procedural slicer to eliminate irrelevant code
 named \texttt{Slicer}.
 
 Given the sliced input, the \textsc{Llvm} bytecode is parsed by the
-\texttt{Kleerer} \textsc{Llvm} module. This pass creates a separate file with
-\textsc{Llvm} bytecode for each function present in the source file. To all
-the created files, it also adds a \texttt{main} function. This is where the
-analysis starts -- in each of the files it calls a different function.
+\texttt{Kleerer} \textsc{Llvm} module. This pass is needed because we perform
+checking on a per-file basis and there is usually no place in the files where
+the analysis may start. The module takes each function present in the source
+file and creates a separate file with \textsc{Llvm} bytecode. To all the
+files, it also adds a \texttt{main} function. This is where the analysis
+starts.
 
-Finally a symbolic execution is performed by \textsc{Klee}
-(Section~\ref{sec:symexe}). \todo{Describe what we do with the output\dots}
+Finally the SE is performed by \textsc{Klee} (Section~\ref{sec:symexe}).
+Currently, its output has to be analyzed by a user. We will automatize the
+output analysis in the future as it is a straightforward extension.
 
 %\begin{figure}[htb]
 %\begin{center}
@@ -861,26 +864,27 @@ Finally a symbolic execution is performed by \textsc{Klee}
 The implementation described above was evaluated on a real code too. The
 evaluation was performed on the Linux kernel. It is a large and well tested
 piece of software. Also it is generally of high interest to be bug-free.
-Otherwise systems could be indeed compromised rather easily.
+Otherwise systems could be indeed compromised rather easily. We used version
+2.6.28.
 
 All tests performed were run on a machine with an Intel E6850 dual-core
-processor at 3\,GHz, with 6\,GiB of memory.  Operating system installed is
-Linux. \textsc{Klee} is run on the instrumented and sliced \textsc{Llvm} code.
-We specify \textsc{Klee} parameters to add an upper bound on solver and
-overall time. The former is set to 10 seconds, the latter to 300. We tried to
-double these times several times with no real effect.
+processor at 3\,GHz, with 6\,GiB of memory. Operating system installed is
+Linux.
 
-We do not pass optimize option for \textsc{Klee} because it causes
-\textsc{Klee} to crash under some circumstances. The optimization might
-further speed the analysis up. The crashes are yet to be investigated.
+We specify \textsc{Klee} parameters to add an upper bound on solver and
+overall time. The former is set to 10 seconds, the latter to 300. Increasing
+these times brings no real effect. Optimize option is not passed to
+\textsc{Klee} because it causes \textsc{Klee} to crash for most of the input.
+The optimization might further speed the analysis up. Hence the crashes are
+yet to be investigated.
 
 At this early stage of the tool, the evaluation is not performed on the whole
-kernel. It is because it still does not scale that much. We plan to extend
-the tool to be capable of handling whole kernel. We limited our testing to a
-set of files. We aimed the technique at the functions where abstract
-interpretation tools reported a trace. Be it a real error or false positive.
-We consulted the files with upstream developers to sort out which are in each
-category.
+kernel. It is because no automation of the processes is implemented and the
+tool is not capable to analyse all the files yet. We plan to change this to
+handle the whole kernel. Here, we aimed the technique at the functions where
+abstract interpretation tools reported a trace. Be it a real error or false
+positive. We consulted the files with upstream developers to sort out which
+are in each of the categories.
 
 This helped us to classify the results provided by our tool. The output of the
 tool is either:
@@ -890,35 +894,36 @@ abstract interpretation tool did or
 \item confirmation of a false positive -- does not report anything at that
 location or
 \item message about unsound analysis -- reports a warning that output of the
-tool may not be correct or
+tool may not be correct or\todo{is it there now?}
 \item message about unfinished computation -- due to various errors.
 \end{itemize}
 
 The last category stems from two sources. First, the tool hits a limit of
-symbolic execution and times out. This happens especially when locks are
-dependent upon loops. Then the loops are not sliced away and symbolic
-execution does not finish in the bounded time.
+the SE and times out. This happens especially when locks are dependent upon
+loops. Then the loops are not sliced away and symbolic execution does not
+finish in the specified time.
 
 Second, memory errors occur. This is due to our handling of functions input.
 For each parameter of a function analyzed, a symbolic memory is allocated.
 Size is determined from the parameter size. Plus, when the parameter is a
-pointer, the size is multiplied by 4000. So for example 4 bytes for integer,
-and 16000 for integer pointer. Further, for the pointer case, we pass a
-pointer to the middle of the array (functions might dereference memory at
-negative index). The idea behind is explained in~\cite{ucklee}.
+pointer, the size is multiplied by 4000. So for example 4 bytes for
+a non-pointer integer, and 16000 for an integer pointer. Further, for the
+pointer case, we use a pointer to the middle of the array (functions might
+dereference memory at negative index). The idea behind is explained
+in~\cite{ucklee}.
 
-Despite we use this feature, functions may touch a memory out-of-bounds this
-array. Typically when a structure is passed to a function and the structure
-contains another pointer. It is uninitialized and points to an invalid
-memory. To remedy the inconvenience, we plan to implement the same on-demand
-handling \textsc{UcKlee}~\cite{ucklee} does.
+Despite we use this feature, functions may touch a memory which is out of
+bounds still. Typically when a structure is passed to a function and the
+structure itself contains another pointer. It is uninitialized and points to
+an invalid memory. To remedy the inconvenience, we plan to implement the same
+on-demand handling \textsc{UcKlee}~\cite{ucklee} does.
 
 Here, we present examples from each of the three categories above for those
 files where we are sure about the results. That is, upstream developers
-confirmed the results are either an error or false positive and we are able
-with our limited knowledge to reason about the files. They are presented in
-Table~\ref{tab:results}. It contains running times of each step performed on
-the files and their sum as well. Also it sketches the effect of slicing.
+confirmed that the results are either an error or false positive and we are
+able with our limited knowledge to reason about the files. They are presented
+in Table~\ref{tab:results}. It contains running times of each step performed
+on the files and their sum as well. Also it sketches an effect of the slicing.
 
 \begin{table}[t]
 \begin{tabular}{|l|c|c|c|c|c|c|c|c|} \hline
@@ -984,7 +989,7 @@ static analysis tool also uses state machines for description of checked
 program properties. The description is based on parametrised abstract syntax
 trees. Although this tool found hundreds of real bugs in the Linux kernel, it
 suffers from high rate of false positives, since its false positive
-suppression algorithms are very limited. 
+suppression algorithms are very limited.
 
 Program analysis tools based on symbolic execution~\cite{se} mainly discover
 low-level bugs like zero division, illegal memory access, assertion failure
