@@ -134,7 +134,7 @@ directly in the code listing as comments.
  3:    len = 0;                                // {U}
  4:    if (src != NULL && dst != NULL) {       // {U}
  5:       len = n;                             // {U}
- 6:       lock(L);                             // {L}
+ 6:       lock(L);                             // {L}(*@\label{line:copy_lock}@*)
  7:    }                                       // {U,L}
  8:    i = 0;                                  // {U,L}
  9:    while (i < len) {                       // {U,L}
@@ -142,10 +142,10 @@ directly in the code listing as comments.
 11:       i++;                                 // {U,L}
 12:    }                                       // {U,L}
 13:    if (len > 0) {                          // {U,L}
-14:       unlock(L);                           // {DU,U}
+14:       unlock(L);                           // {DU,U}(*@\label{line:copy_unlock}@*)
 15:    }                                       // {U,L}
-15:    return dst;                             // {U,RL}
-16: }
+16:    return dst;                             // {U,RL}(*@\label{line:copy_ret}@*)
+17: }
     \end{lstlisting}
   \end{tabular}
     \caption{Function \texttt{copy} copying a source string \texttt{src}
@@ -389,51 +389,82 @@ presented results.
 
 \section{Instrumentation} \label{sec:instr}
 
-The purpose of the instrumentation phase of our algorithm is to insert code implementing state machine (describing checked property) into an analysed program. But semantics of the program being instrumented may not be changed. A result from this phase is therefore a new program computing two independent things at once. It still has its original functionality, but it also simultaneously updates instrumented state machines. We show the process for the function \texttt{copy} depicted at Figure~\ref{fig:copy}. We suppose the function \texttt{copy} is used in a context of a function \texttt{foo} listed at Figure~\ref{fig:foo}. There we see that function \texttt{copy} can be called with two locks \texttt{L1} and \texttt{L2}. The locks guard writes into buffers \texttt{buf1} and \texttt{buf2} respectively.
+The purpose of the instrumentation phase of our algorithm is to insert a code
+implementing a state machine (describing checked property) into an analysed
+program. Nevertheless, the semantics of the program being instrumented must
+not be changed.  A result of this phase is therefore a new program doing
+two independent computations at once. It still has its original functionality,
+but it also simultaneously updates instrumented state machines. We show the
+process for the function \texttt{copy} depicted in Fig.~\ref{fig:copy}. We
+suppose the function \texttt{copy} is used in a context of a function
+\texttt{foo} listed in Fig.~\ref{fig:foo}. There we see that \texttt{copy} can
+be called with two locks \texttt{L1} and \texttt{L2}. The locks guard writes
+into buffers \texttt{buf1} and \texttt{buf2} respectively.
 
 \begin{figure}[!htb]
   \centering
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
-char* buf1;
-char* buf2;
+char *buf1, *buf2;
 
-int L1;
-int L2;
-    
-void foo(char* src, int n) {
+int L1, L2;
+
+void foo(char *src, int n) {
    ...
-   copy(src,buf1,n,&L1);
+   copy(src, buf1, n, &L1);
    ...
-   copy(src,buf2,n,&L2);
+   copy(src, buf2, n, &L2);
    ...
-}    
+}
     \end{lstlisting}
   \end{tabular}
-	\caption{Example of a possible use of function \texttt{copy} inside a function \texttt{foo}.}
+	\caption{Example of a possible use of function \texttt{copy}.}
 	\label{fig:foo}
 \end{figure}
 
-We start the instrumentation by recognition of code fragments in the analysed program involving lock manipulations. More precisely, we look for all those code fragments matching edge labels of the state machine at Figure~\ref{fig:sm}. In function \texttt{copy} there are three such fragments (see Figure~\ref{fig:copy}). The first one is the call to function \texttt{lock} at line 6. The second is a call to function \texttt{unlock} at line 14. And the last one is the return statement at line 15.
+We start the instrumentation by recognizing the code fragments in the analysed
+program which manipulate with locks. More precisely, we look for all those
+code fragments matching edge labels of the state machine in Fig.~\ref{fig:sm}.
+In function \texttt{copy} there are three such fragments (see
+Fig.~\ref{fig:copy}). The first one is call to \texttt{lock} at
+line~\ref{line:copy_lock}. The second is a call to \texttt{unlock} at
+line~\ref{line:copy_unlock}. And the last one is the return statement at
+line~\ref{line:copy_ret}.
 
-Next we determine a set of all locks manipulated in the program. Form recognised code fragments (and according to structure of edge labels of the state machine at Figure~\ref{fig:sm}) we obtain that pointer variable \texttt{L} of the function \texttt{copy} is the only program variable through which the program manipulates with locks (we assume a code represented by dots at function \texttt{foo} does not involve lock manipulations). Therefore, from its points-to set we get a set $\{ \texttt{L1}, \texttt{L2} \}$ of all the locks the program manipulate with.
+Next we determine a set of all locks with which the program manipulates. From
+recognized code fragments (and according to the structure of edge labels of
+the state machine in Fig.~\ref{fig:sm}), we find out that a pointer variable
+\texttt{L} in \texttt{copy} is the only program variable through which the
+program manipulates with locks. (We assume the code represented by dots in
+\texttt{foo} is not involved in the lock manipulation.) Therefore, from
+\texttt{L}'s points-to set we obtain a set $\{ \texttt{L1}, \texttt{L2} \}$ of
+all possible locks the program manipulates with.
 
-Now we need to introduce for each lock in the set a unique instance of the state machine from Figure~\ref{fig:sm}. So, we introduce state machines \texttt{smL1} and \texttt{smL2} for locks \texttt{L1} and \texttt{L2} respectively. The situation is depicted in Figure~\ref{fig:mapping}. We further need to explicitly specify mapping from locks and their state machines. The mapping is basically a function (preferably with constant complexity) from addresses of program objects (e.g.~locks) to addresses of related state machines. At Figure~\ref{fig:mapping} there we show an implementation of a function \texttt{smGetMachine} mapping addresses of locks \texttt{L1} and \texttt{L2} to addresses of related state machines. Note that lines marked by \texttt{*} represent the code we have instrumented into the original program.
+Now we need to introduce a unique instance of the state machine from
+Fig.~\ref{fig:sm} for each lock in the set.  So, we introduce state machines
+\texttt{smL1} and \texttt{smL2} for locks \texttt{L1} and \texttt{L2}
+respectively. The situation is depicted in Fig.~\ref{fig:mapping}. We
+further need to explicitly specify a mapping from locks to their state
+machines. The mapping is basically a function (preferably with constant
+complexity) from addresses of program objects (e.g.~locks) to addresses of
+related state machines. In Fig.~\ref{fig:mapping} there it is shown an
+implementation of a function \texttt{smGetMachine}. It maps addresses of locks
+\texttt{L1} and \texttt{L2} to addresses of related state machines. Note that
+lines marked by \texttt{*} represent the code we have instrumented into the
+original program.
 
 \begin{figure}[!htb]
   \centering
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
-  int L1;
-  int L2;
-  
-* int smL1;
-* int smL2;
-* 
-* int* smGetMachine(int* p) {
+  int L1, L2;
+
+* int smL1, smL2;
+*
+* int *smGetMachine(int *p) {
 *     if (p == &L1) return &smL1;
 *     if (p == &L2) return &smL2;
-*     return 0; /* unreachable */
+*     return NULL; /* unreachable */
 * }
     \end{lstlisting}
   \end{tabular}
@@ -441,7 +472,13 @@ Now we need to introduce for each lock in the set a unique instance of the state
 	\label{fig:mapping}
 \end{figure}
 
-Although we have already instrumented the program with state machines, there is no code manipulating them. Therefore, we depict at Figure~\ref{fig:fire} a possible implementation of the state machine from Figure~\ref{fig:sm}. Note that we represent both states of the machine and names of transitions by integer constants. Also note that pointer argument \texttt{SM} of the function \texttt{smFire} points to an instrumented state machine, whose transition has to be fired.
+Although we have already instrumented the program with state machines, there
+is no code manipulating them. Therefore, we depict in Fig.~\ref{fig:fire} a
+possible implementation of the state machine of Fig.~\ref{fig:sm}. Note that
+we represent both states of the machine and names of transitions by integer
+constants. Also note that the pointer argument \texttt{SM} of \texttt{smFire}
+function points to an instrumented state machine, whose transition has to be
+fired.
 
 \begin{figure}[!htb]
   \centering
@@ -456,29 +493,29 @@ Although we have already instrumented the program with state machines, there is 
 * const int smLOCK   = 0; /* transition lock(x) */
 * const int smUNLOCK = 1; /* transition unlock(x) */
 * const int smRETURN = 2; /* transition return */
- 
-* void smFire(int* SM, int transition) {
+
+* void smFire(int *SM, int transition) {
 *     switch (*SM) {
-*         case smU:
-*             switch (transition) {
-*                 case smLOCK:
-*                     *SM = 1;
-*                     break;
-*                 case smUNLOCK:
-*                     assert(false); /* double unlock */
-*                     break;
-*                 default: break;  
-*             }
+*     case smU:
+*         switch (transition) {
+*         case smLOCK:
+*             *SM = 1;
 *             break;
-*         case smL:
-*             switch (transition) {
-*                 ...
-*                 case smRETURN:
-*                     assert(false); /* return in locked */
-*                     break;
-*                 ...
-*             }
+*         case smUNLOCK:
+*             assert(false); /* double unlock */
 *             break;
+*         default: break;  
+*         }
+*         break;
+*     case smL:
+*         switch (transition) {
+*         ...
+*         case smRETURN:
+*             assert(false); /* return in locked */
+*             break;
+*         ...
+*         }
+*         break;
 *         ...
 *     }
 * }
@@ -488,7 +525,14 @@ Although we have already instrumented the program with state machines, there is 
 	\label{fig:fire}
 \end{figure}
 
-It remains to instrument the recognised fragments in the function \texttt{copy}. For each fragment we know its related transition of the state machine and we also know what objects the fragment manipulates with (if any). Therefore, we first retrieve an address a state machine related to manipulated objects (if any) by using the function \texttt{smGetMachine} and then we fire the transition by calling the function \texttt{smFire}. We show the instrumented version of function \texttt{copy} at Figure~\ref{fig:copy_instrumented}. Note that instrumented lines are highlighted by symbol \texttt{*}.
+It remains to instrument the recognised fragments in \texttt{copy}. For each
+fragment we know its related transition of the state machine and we also know
+what objects the fragment manipulates with (if any). Therefore, we first
+retrieve an address of state machine related to manipulated objects (if any) by
+using the function \texttt{smGetMachine} and then we fire the transition by
+calling the function \texttt{smFire}. We show the instrumented version of
+\texttt{copy} in Fig.~\ref{fig:copy_instrumented}. Note that instrumented
+lines are highlighted by \texttt{*} again.
 
 \begin{figure}[!htb]
     \begin{center}
@@ -523,7 +567,7 @@ It remains to instrument the recognised fragments in the function \texttt{copy}.
 \end{figure}
 
 %\todol{doplnit recognition:} In practice we require a description language expressive enough to recognize wide range of possible expressions.
-%\todol{doplnit constant function mapping (malloc):} 
+%\todol{doplnit constant function mapping (malloc):}
 
 
 %}}}
