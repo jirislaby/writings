@@ -387,231 +387,123 @@ presented results.
 %}}}
 %{{{ Instrumentation
 
-\section{Instrumentation}
-\label{sec:instr}
+\section{Instrumentation} \label{sec:instr}
 
-Abstract interpretation loads the automata before the analysis and then fires
-transitions and remembers states while computing a fix-point. Generally there
-may be multiple states for each program location. It is due to exploring all
-paths of the program in a single run.
-
-With the SE, this is slightly different. It is sufficient to remember an
-actual state of the automata for a program path currently explored. Other
-paths are explored separately in different runs.
-
-%There are two approaches to track the automata states. First, to implement the
-%functionality directly into the executor. This would be an intrusive change to
-%a compact code which is intended to do a dedicated job.  The second approach
-%is to instrument the code before the execution itself.  That results in a
-%separate module without touching the executor's code.
-
-Thanks to that, we can keep the automaton state in an integer. This indeed
-requires an unique mapping of states to integers -- the states are simply
-numbered.
-
-Now let us describe how we map the integer and an instance of the $SM(x)$ for
-some $x$. Generally, count of $x$ may be infinite during the program run time.
-For example a filesystem code may want to create a lock in a loop for each
-node. Anyway, they can be materialized only on finite count of code locations.
-Either by a heap allocator, on the stack, or they are global variables.
-
-We limit the overall count of the lock instances for each such location to 10.
-If the number of allocations grows over this boundary at that place, a global
-\emph{unsound} flag is set and we do not create any more SM instances there.
-After the analysis finishes, the flag is checked and the tool reports a
-warning if it is true.
-
-In languages like C, pointers are allowed and SMs are often parametrized by
-them. This means, two pointers may reference a single object (\texttt{lock(A);
-B=A; unlock(B);}). And so a single SM should be referenced in that case too.
-The tool copes with that by using the Andersen's points-to
-analysis~\cite{andersen}.
-
-In our implementation, there are two objects a pointer can reference. Either a
-global variable or a program location where the allocation of the object
-occurs (no matter if allocated on the stack or in the heap).
-
-To that extent, we have a bounded set of SM instances and locations where
-these instances emerge. Thus, we add to the code an integer for SMs and
-counter for allocations. In more detail, the instrumentation works as follows:
-\begin{enumerate}
-\item All functions manipulating with $SM(x)$ are found
-\item Points-to sets of all such $x$'s is computed
-\item All points-to sets are merged (to obtain all locations where SMs should
-	be created)
-\item For all members of the merged set we perform a task depending on a type:
-\begin{itemize}
-\item Global variable -- a new global integer variable is added to hold the SM
-state
-\item Allocation location -- the code is instrumented so that the allocation
-location now contains a) a static array for 10 SM states, b) a static
-allocation counter, c) call to the original allocation function and d) a call
-to our allocation function.
-\end{itemize}
-\end{enumerate}
+The purpose of the instrumentation phase of our algorithm is to insert code implementing state machine (describing checked property) into an analysed program. But semantics of the program being instrumented may not be changed. A result from this phase is therefore a new program computing two independent things at once. It still has its original functionality, but it also simultaneously updates instrumented state machines. We show the process for the function \texttt{copy} depicted at Figure~\ref{fig:copy}. We suppose the function \texttt{copy} is used in a context of a function \texttt{foo} listed at Figure~\ref{fig:foo}. There we see that function \texttt{copy} can be called with two locks \texttt{L1} and \texttt{L2}. The locks guard writes into buffers \texttt{buf1} and \texttt{buf2} respectively.
 
 \begin{figure}[!htb]
-  \begin{center}
+  \centering
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
-void __ISSE_allocate(void *new_memory, int *counter) {
-  if (counter > 10)
-    return;
-  counter++;
-}
-  \end{lstlisting}
+char* buf1;
+char* buf2;
+
+int L1;
+int L2;
+    
+void foo(char* src, int n) {
+   ...
+   copy(src,buf1,n,&L1);
+   ...
+   copy(src,buf2,n,&L2);
+   ...
+}    
+    \end{lstlisting}
   \end{tabular}
-  \end{center}
-    \caption{Function that takes care of allocations.}
-    \label{fig:instr_funs}
+	\caption{Example of a possible use of function \texttt{copy} inside a function \texttt{foo}.}
+	\label{fig:foo}
 \end{figure}
 
-increment of the counter, d) check if the count is over
-10, if so, unsound flag is set to true and d) the allocation proper.
+We start the instrumentation by recognition of code fragments in the analysed program involving lock manipulations. More precisely, we look for all those code fragments matching edge labels of the state machine at Figure~\ref{fig:sm}. In function \texttt{copy} there are three such fragments (see Figure~\ref{fig:copy}). The first one is the call to function \texttt{lock} at line 6. The second is a call to function \texttt{unlock} at line 14. And the last one is the return statement at line 15.
 
-Finally each location from point is instrumented with a function performing
-the SM transition. The parameters are
+Next we determine a set of all locks manipulated in the program. Form recognised code fragments (and according to structure of edge labels of the state machine at Figure~\ref{fig:sm}) we obtain that pointer variable \texttt{L} of the function \texttt{copy} is the only program variable through which the program manipulates with locks (we assume a code represented by dots at function \texttt{foo} does not involve lock manipulations). Therefore, from its points-to set we get a set $\{ \texttt{L1}, \texttt{L2} \}$ of all the locks the program manipulate with.
 
-%The latter introduces an imprecision into the analysis. An example of code
-%where the behavior is incorrect is depicted in Fig.~\ref{fig:invalid_ptr}. All
-%pointers in the list point to line~\ref{lst:alloc} where their allocation
-%happens.
+Now we need to introduce for each lock in the set a unique instance of the state machine from Figure~\ref{fig:sm}. So, we introduce state machines \texttt{smL1} and \texttt{smL2} for locks \texttt{L1} and \texttt{L2} respectively. The situation is depicted in Figure~\ref{fig:mapping}. We further need to explicitly specify mapping from locks and their state machines. The mapping is basically a function (preferably with constant complexity) from addresses of program objects (e.g.~locks) to addresses of related state machines. At Figure~\ref{fig:mapping} there we show an implementation of a function \texttt{smGetMachine} mapping addresses of locks \texttt{L1} and \texttt{L2} to addresses of related state machines. Note that lines marked by \texttt{*} represent the code we have instrumented into the original program.
 
 \begin{figure}[!htb]
-    \begin{center}
-    \begin{tabular}{l}
+  \centering
+  \begin{tabular}{c}
     \begin{lstlisting}[language=C]
- 1: void create_list(List *list, int count) {
- 2:   List_member *memb;
- 3:   while (count--) {
- 4:     memb = alloc_list_member();(*@ \label{lst:alloc} @*)
- 5:     if (memb->should_lock)
- 6:       lock(memb->lock);
- 7:     link_to_list(list, memb);
- 8:   }
- 9:   process_list(list);
-10:   for (memb = list->start; memb; memb = memb->next) {
-11:     if (memb->error_state)
-12:       continue;
-13:     print_result(memb);
-14:     if (memb->should_lock)
-15:       unlock(memb->lock);
-16:   }
-17: }
+  int L1;
+  int L2;
+  
+* int smL1;
+* int smL2;
+* 
+* int* smGetMachine(int* p) {
+*     if (p == &L1) return &smL1;
+*     if (p == &L2) return &smL2;
+*     return 0; /* unreachable */
+* }
     \end{lstlisting}
-    \end{tabular}
-    \end{center}
-    \caption{Code where analyses may fail.}
-    \label{fig:invalid_ptr}
+  \end{tabular}
+	\caption{A mapping from locks to related state machines.}
+	\label{fig:mapping}
 \end{figure}
 
-It is also needed to store automata states somewhere. For this purpose, an
-array is created. Its size is designated by the count of the memory pools too.
-The type of members is integral as it fits the purpose of storing the
-automaton state.
-
-Finally, it remains to generate transition functions from the input automaton.
-Since the only knowledge the functions need to know is the pointer to derive a
-pool index, they take it as the only argument. They involve the reverse
-mapping to find the index. Then they perform a transition of the automaton
-state in the array over the integer at the pool index.
-
-Now, the instrumentation can start. First, the array is inserted into the
-code. It is needed to be accessible by the transformation functions. Next, for
-each location from point 1, a function call is added. The function to be
-called is dependent upon the automaton specification.
-
-An example of the transformation and pool manipulation functions is depicted
-in Fig.~\ref{fig:instrumentation_stuff}. It is designed to work with locking
-automaton with three states: locked, unlocked and error. Hence there is an
-array with locks. There are two of them, because in the original code, there
-were two (\texttt{L1} and \texttt{L2}). Further there are two automaton
-manipulation functions \texttt{\_\_ISSE\_lock} and \texttt{\_\_ISSE\_unlock}.
-They will be instrumented at the places where the original code called
-\texttt{lock} or \texttt{unlock} respectively. Finally, there is a function
-called \texttt{\_\_ISSE\_get\_memory\_pool\_index}. It serves the purpose of
-computing pool indices from pointers.
+Although we have already instrumented the program with state machines, there is no code manipulating them. Therefore, we depict at Figure~\ref{fig:fire} a possible implementation of the state machine from Figure~\ref{fig:sm}. Note that we represent both states of the machine and names of transitions by integer constants. Also note that pointer argument \texttt{SM} of the function \texttt{smFire} points to an instrumented state machine, whose transition has to be fired.
 
 \begin{figure}[!htb]
-    \begin{center}
-    \begin{tabular}{l}
+  \centering
+  \begin{tabular}{c}
     \begin{lstlisting}[language=C]
-void __ISSE_ensure_unlocked(const int *L) {
-    int i = __ISSE_get_memory_pool_index(L);
-    assert(__ISSE_lock[i] == 0);
-}
+* const int smU  = 0;   /* state U */
+* const int smL  = 1;   /* state L */
+* const int smDU = 2;   /* state DU */
+* const int smDL = 3;   /* state DL */
+* const int smRL = 4;   /* state RL */
 
-void __ISSE_lock(const int *L) {
-    int i = __ISSE_get_memory_pool_index(L);
-    assert(__ISSE_lock[i] == 0);
-    __ISSE_lock[i] = 1;
-}
-
-void __ISSE_unlock(const int *L) {
-    int i = __ISSE_get_memory_pool_index(L);
-    assert(__ISSE_lock[i] == 1);
-    __ISSE_lock[i] = 0;
-}
+* const int smLOCK   = 0; /* transition lock(x) */
+* const int smUNLOCK = 1; /* transition unlock(x) */
+* const int smRETURN = 2; /* transition return */
+ 
+* void smFire(int* SM, int transition) {
+*     switch (*SM) {
+*         case smU:
+*             switch (transition) {
+*                 case smLOCK:
+*                     *SM = 1;
+*                     break;
+*                 case smUNLOCK:
+*                     assert(false); /* double unlock*/
+*                     break;
+*                 default: break;  
+*             }
+*         ...
+*     }
+* }
     \end{lstlisting}
-    \end{tabular}
-    \end{center}
-    \caption{Functions instrumented to a program to perform automata
-    transitions.}
-    \label{fig:instrumentation_stuff}
+  \end{tabular}
+	\caption{A function \texttt{smFire} implementing locking state machine.}
+	\label{fig:fire}
 \end{figure}
 
-The instrumented code of Fig.~\ref{fig:copy} is shown in
-Fig.~\ref{fig:copy_instrumented}. We have not described
-\texttt{\_\_ISSE\_ensure\_unlocked} yet. It is used to check the state before
-(initial state) and after (final state) the function is analyzed. In this
-ensuring function and in both state tranformation functions it can be seen,
-how the error state handling is done.
-
-Thanks to the symbolic executor we use (cf. Section~\ref{sec:impl}), a
-so-called \texttt{assert} function may be used to provoke the executor to
-report a failure when a bad state is reached. The function (or macro more
-precisely) is used by developers for debugging purposes. It takes exactly one
-argument. When it evaluates to true, an error is reported. Both when a program
-containing the debug facility is run and when executed by the symbolic
-executor we use.
-
-Thus our tool inserts an \texttt{assert} before each assignment to the
-automaton state. To be precise it means the error state of the automaton is
-never reached. It is checked whether the transition which is about to be
-fired would be a failure.  This approach simplifies slicing a bit. I.e.  not
-all assignments are necessarily needed and might be sliced right away.
-
-Obviously, in the example in Fig.~\ref{fig:instrumentation_stuff}, the
-parameter of the \texttt{assert} macro, the assertion, is a check that the
-integer is zero when the code is about to take a lock and one in the opposite
-case. For the initial and final state, it is expected to be zero, i.e.
-unlocked.
+It remains to instrument the recognised fragments in the function \texttt{copy}. For each fragment we know its related transition of the state machine and we also know what objects the fragment manipulates with (if any). Therefore, we first retrieve an address a state machine related to manipulated objects (if any) by using the function \texttt{smGetMachine} and then we fire the transition by calling the function \texttt{smFire}. We show the instrumented version of function \texttt{copy} at Figure~\ref{fig:copy_instrumented}. Note that instrumented lines are highlighted by symbol \texttt{*}.
 
 \begin{figure}[!htb]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-char *copy(char *dst, char *src, int n, int *L) {
-    int i, len;
-    __ISSE_ensure_unlocked(L);
-    len = 0;
-    if (src != NULL && dst != NULL) {
-	len = n;
-	__ISSE_lock(L);
-	lock(L);
-    }
-    i = 0;
-    while (i < len) {
+  char *copy(char *dst, char *src, int n, int *L) {
+     int i, len;
+     len = 0;
+     if (src != NULL && dst != NULL) {
+        len = n;
+*       smFire(smGetMachine(L),smLOCK);
+        lock(L);
+     }
+     i = 0;
+     while (i < len) {
         dst[i] = src[i];
-	i++;
-    }
-    if (len > 0) {
-	__ISSE_unlock(L);
-	unlock(L);
-    }
-    __ISSE_ensure_unlocked(L);
-    return dst;
-}
+        i++;
+     }
+     if (len > 0) {
+*       smFire(smGetMachine(L),smUNLOCK);
+        unlock(L);
+     }
+*    smFire(smGetMachine(L),smRETURN);
+     return dst;
+  }
     \end{lstlisting}
     \end{tabular}
     \end{center}
@@ -620,8 +512,9 @@ char *copy(char *dst, char *src, int n, int *L) {
     \label{fig:copy_instrumented}
 \end{figure}
 
-%Further it determines which functions may be called by indirect function
-%calls.
+%\todol{doplnit recognition:} In practice we require a description language expressive enough to recognize wide range of possible expressions.
+%\todol{doplnit constant function mapping (malloc):} 
+
 
 %}}}
 %{{{ Slicing
