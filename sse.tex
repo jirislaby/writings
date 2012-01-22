@@ -163,13 +163,13 @@ that the first error corresponds to executions going through lines
 \texttt{len}, which is set to 0 at line 3 and assumed to satisfy \texttt{len
   > 0} at line 13. Hence, the first error is a \emph{false positive}. The
 second error corresponds to executions passing lines 1,2,3,4,5,6,7,8, then
-iterating the \texttt{while}-loop and finally going through lines 13,15. All
+iterating the \texttt{while}-loop and finally going through lines 13,16. All
 these paths are also infeasible except the one that performs zero iterations
 of the \texttt{while}-loop, which is the only real execution leading to
 the only real locking error in the program.
 
 To sum up, metacompilation is highly flexible, fast, and thus applicable on
-extremely large software projects (e.g.~Linux kernel). It examines all the
+extremely large software projects (e.g.~the Linux kernel). It examines all the
 code and finds many errors. Unfortunately, some of the errors are false
 positives. The main source of false positives is related to the fact that
 the analysis does not work with data values. In particular, the analysis
@@ -178,16 +178,16 @@ machines.
 % Therefore, when a branching statement is processed, the analysis cannot
 % decide which states of state machines are reachable on the positive branch
 % and which on the negative one.
-Drawback of this aprach can be illustrated by the \emph{double unlock} false
-posite detected in the program of Figure~\ref{fig:copy} because the analysis
-does not know that the condition on line 13 holds only if the state machine
-$SM(\texttt{L})$ is in state $L$.
+A drawback of this approach may be illustrated by the \emph{double unlock}
+false positive detected in the program of Figure~\ref{fig:copy} because the
+analysis does not know that the condition at line 13 holds only if the state
+machine $SM(\texttt{L})$ is in state $L$.
 
 At this point, we would like to emphasize that metacompilation actually uses
 a more sophisticated algorithm enriched with many techniques for partial
 elimination of false positives (see~\cite{pldi02} for
 details). Metacompilation employs a dedicated language for description of
-state machines called \emph{metal} and mentioned in the title of this
+state machines called \textsc{Metal} and mentioned in the title of this
 paper. The idea of error specification using state machines appears in
 several tools including the original implementation of metacompilation
 called \textsc{xgcc}~\cite{pldi02}, \textsc{Esp}~\cite{DLS02} or
@@ -213,9 +213,9 @@ The main advantage of symbolic execution is that it works only with feasible
 executions (assuming that we can decide satisfiability of a path condition)
 and hence it does not report any false positives. A minor disadvantage is
 that implementations of this technique usually detect only low-level errors
-leading to crash.% (e.g.~segmentation fault).
+leading to crash. %(e.g.~segmentation fault).
 To detect a specific kind of error, the program has to be modified to reduce
-the error to a detected one (typically violation of an assert
+the error to a detected one (typically violation of an \texttt{assert}
 statement). The main disadvantage of the technique is its high compuation
 cost. In particular, programs containing loops or recursion have typically
 large or even infinite number of execution paths and cannot be completely
@@ -231,22 +231,22 @@ program is then reduced using the slicing method introduced
 in~\cite{W81}.\todo{Je to spravny clanek o slicingu?} The sliced program has
 to meet the criterion to be equivalent to the instrumented program with
 respect to reachability of error states of tracked state machines. Note that
-slicing can remove big portions of the code, including cycles and function
-calls. Hence, an original program with infinite number of execution
-paths can be reduced to a program with a finite number of execution
+slicing may remove big portions of the code, including loops and function
+calls. Hence, an original program with an infinite number of execution
+paths may be reduced to a program with a finite number of execution
 paths. Finally, we execute the sliced program symbolically.
 
-Our technique can be used in two ways according to the applied symbolic
+Our technique may be used in two ways according to the applied symbolic
 execution tool. If we apply a symbolic executor that prefers to explore more
 parts of the code (for example, it can explore only the execution paths
-iterating each program cycle at most twice), we can use the technique as a
+iterating each program loop at most twice), we may use the technique as a
 general bug-finding technique reporting only real errors. Note that this
-approach can miss errors appearing only on unexplored paths. On the
+approach may miss errors appearing only on unexplored paths. On the
 contrary, if we use a symbolic executor exploring all execution paths, we
-can use our technique for basic classification of error reports produced by
+may use our technique for basic classification of error reports produced by
 other tools (e.g.~\textsc{xgcc} or \textsc{Stanse}). For each such an error
-report, we can instrument the corresponding code only with the state machine
-describing the reported error. If our technique finds the same error, it is
+report, we may instrument the corresponding code only with the state machine
+describing that reported error. If our technique finds the same error, it is
 a real one. If our technique explores all execution paths of the sliced code
 without detecting the error, it is a false positive. If our technique runs
 out of resources, we cannot decide whether the error is a real one or just a
@@ -263,27 +263,26 @@ applied to the Linux kernel.
 \medskip We emphasize the synergy of the three known methods combined in the
 presented technique:
 \begin{itemize}
-\item Specification of errors with state machines (inspired by
+\item Specification of errors by state machines (inspired by
   metacompilation) and instrumentation of a given program with a code
   emulating the state machines provide us simple slicing criteria: to
   preserve values of structures representing states of state
   machines. Hence, the sliced program contains only the code relevant to the
-  considered errors.
-\item Slicing can substantially reduce the size of the code, which can
+  considered errors.\note{dlouhy, tezkopadny odstavec}
+\item Slicing may substantially reduce the size of the code, which in turn may
   remarkably improve performance of the symbolic execution.
 \item Application of symbolic execution brings us another benefit. While in
-  metacompilation the state machines are associated to synactic objects
-  (e.g.~lock variables appearing in a program), we can associate state
-  machines to actual values of these objects. This leads to higher precision
-  of error detection, which can potentially result in detection of real
+  metacompilation, the state machines are associated to syntactic objects
+  (e.g.~lock variables appearing in a program), we may associate state
+  machines to actual values of these objects. This leads to a higher precision
+  of error detection, which may potentially result in a detection of real
   errors missed by metacompilation. \todo{Co s tim? Ukazat na prikladu tady
     nebo ve vlastni kapitole?  Nebo smazat? Nebo nechat tak?}
 \end{itemize}
 
-The rest of the paper is organized as
-follows. Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe}
-deal with program instrumentation, slicing, and symbolic execution,
-respectively.
+The rest of the paper is organized as follows.
+Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe} deal with
+program instrumentation, slicing, and symbolic execution, respectively.
 % Section~\ref{sec:BackMapping} discusses extraction of
 % counterexamples.\todo{Chceme to tu nechat?}
 Experimental implementation of our technique and some experimental results
@@ -912,7 +911,7 @@ instrumentation and slicing may be silently ignored with respect to the SE.
 In the kernel, there are few exception like \texttt{qlge\_set\_mac\_address}
 presented here.  Slicing in this case is a bit expensive due to circular
 inter-procedural dependencies of the slicing criteria. So that many states are
-transferred over calls until the fix-point is reached. In any case, the time
+transferred over calls until the fixed point is reached. In any case, the time
 of slicing was not more than a minute.
 
 Other than that, the vast majority of the analysis time is spent with the SE.
