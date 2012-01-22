@@ -171,9 +171,10 @@ the only real locking error in the program.
 To sum up, metacompilation is highly flexible, fast, and thus applicable on
 extremely large software projects (e.g.~Linux kernel). It examines all the
 code and finds many errors. Unfortunately, some of the errors are false
-positives. The main source of false positives comes from the fact that the
-analysis does not work with data values. In particular, the analysis does
-not track connections between variable values and states of state machines.
+positives. The main source of false positives is related to the fact that
+the analysis does not work with data values. In particular, the analysis
+does not track connections between variable values and states of state
+machines.
 % Therefore, when a branching statement is processed, the analysis cannot
 % decide which states of state machines are reachable on the positive branch
 % and which on the negative one.
@@ -212,13 +213,14 @@ The main advantage of symbolic execution is that it works only with feasible
 executions (assuming that we can decide satisfiability of a path condition)
 and hence it does not report any false positives. A minor disadvantage is
 that implementations of this technique usually detect only low-level errors
-leading to crash (e.g.~segmentation fault). To detect a specific kind of
-error, the program has to be modified to reduce the error to a detected one
-(typically violation of an assert statement). The main disadvantage of the
-technique is its high compuation cost. In particular, programs containing
-loops or recursion have typically large or even infinite number of execution
-paths and cannot be completely analyzed by symbolic execution. Hence,
-symbolic execution usually explores only a part of an analyzed program.
+leading to crash.% (e.g.~segmentation fault).
+To detect a specific kind of error, the program has to be modified to reduce
+the error to a detected one (typically violation of an assert
+statement). The main disadvantage of the technique is its high compuation
+cost. In particular, programs containing loops or recursion have typically
+large or even infinite number of execution paths and cannot be completely
+analyzed by symbolic execution. Hence, symbolic execution usually explores
+only a part of an analyzed program.
 
 \medskip In this paper, we introduce a new technique offering a flexibility
 of metacompilation and zero false positive rate of symbolic execution. The
@@ -248,44 +250,37 @@ describing the reported error. If our technique finds the same error, it is
 a real one. If our technique explores all execution paths of the sliced code
 without detecting the error, it is a false positive. If our technique runs
 out of resources, we cannot decide whether the error is a real one or just a
-false positive. We have developed a prototype implementation of our
-technique
+false positive. 
 
-\textbf{TADY!}
+We have developed an experimental tool implementing our technique. The tool
+instruments a program with a state machine describing locking errors (we use
+a single-purpose instrumentation so far), then it applies an interprocedural
+slicing to the instrumented code, and it passes the sliced code to symbolic
+executor \textsc{Klee}~\cite{klee}. Our experimental results indicate that
+the technique can indeed classify error reports produced by \textsc{Stanse}
+applied to the Linux kernel.
 
- which
+\medskip We emphasize the synergy of the three known methods combined in the
+presented technique:
 \begin{itemize}
-\item instruments a program with a state machine describing
-  locking errors (we use a single-purpose instrumentation so far),
-\item slices the program and
-\item calls symboic executor \textsc{Klee}~\cite{klee}.
+\item Specification of errors with state machines (inspired by
+  metacompilation) and instrumentation of a given program with a code
+  emulating the state machines provide us simple slicing criteria: to
+  preserve values of structures representing states of state
+  machines. Hence, the sliced program contains only the code relevant to the
+  considered errors.
+\item Slicing can substantially reduce the size of the code, which can
+  remarkably improve performance of the symbolic execution.
+\item Application of symbolic execution brings us another benefit. While in
+  metacompilation the state machines are associated to synactic objects
+  (e.g.~lock variables appearing in a program), we can associate state
+  machines to actual values of these objects. This leads to higher precision
+  of error detection, which can potentially result in detection of real
+  errors missed by metacompilation. \todo{Co s tim? Ukazat na prikladu tady
+    nebo ve vlastni kapitole?  Nebo smazat? Nebo nechat tak?}
 \end{itemize}
 
-The implementation contains an instrumentatio
-
- Our experimental results indicate that the technique can indeed
-classify error reports produced by \emph{Stanse} applied to the Linux kernel.
-
-We emphasize the synergy of the three steps of our technique:
-\begin{itemize}
-\item specification of errors with state machines (inspired by
-  metacompilation) and instrumentation of the original program with the code
-  emulating the state machines allows us to clearly specify the slicing
-  criteria. Hence, the sliced program contains only the code relevant to the
-  considered errors. Further, slicing can substantially reduce the size of
-  the code, which can remarkably improve performance of the symbolic
-  execution.
-\end{itemize}
-Let us note that usage of symbolic execution instead of classic static
-analysis brings us another benefit: while in metacompilation the state
-machines are associated to synactic objects (e.g.~locks or pointers), here
-we can associate state machines to actual values of these objects. This can
-potentially lead to better precision of error description. On the other
-hand, adoption of this feature can lead to unbounded number of state
-machines tracked by the instrumented program, which can lower performance of
-our technique. \todo{Co s timhle odstavcem?}
-
-\medskip The rest of the paper is organized as
+The rest of the paper is organized as
 follows. Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe}
 deal with program instrumentation, slicing, and symbolic execution,
 respectively.
@@ -297,15 +292,7 @@ devoted to related work while Section~\ref{sec:future} indicates some
 directions driving our future research. Finally, the last section summarizes
 presented results.
 
-\texttt{Tool by se mohl jmenovat synergyton.}
-
-% \begin{itemize}
-% \item Popsat priciny false positivu: nerealne cesty a syntakticke
-%   automaty. (Prakticke priciny bych nechal do zaveru k future work.)
-% \item Nas prinos: metal + slic. + SE a semanticke automaty. Zduraznit, ze
-%   slicing muze prinest konecnost vypoctu SE a tim potvrdit bezchybnost kodu
-%   (kod ma typicky nekonecne mnoho cest vypoctu a tudiz se SE nedopocita).
-% \end{itemize}
+%\texttt{Tool by se mohl jmenovat synergyton.}
 
 %{{{ Obrazek nekonecneho stromu symbolicke exekuce na neproslicovanem kodu
 
