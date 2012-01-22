@@ -395,9 +395,9 @@ program. Nevertheless, the semantics of the program being instrumented must
 not be changed.  A result of this phase is therefore a new program doing
 two independent computations at once. It still has its original functionality,
 but it also simultaneously updates instrumented state machines. We show the
-process for the function \texttt{copy} depicted in Fig.~\ref{fig:copy}. We
+process for the function \texttt{copy} depicted in Figure~\ref{fig:copy}. We
 suppose the function \texttt{copy} is used in a context of a function
-\texttt{foo} listed in Fig.~\ref{fig:foo}. There we see that \texttt{copy} can
+\texttt{foo} listed in Figure~\ref{fig:foo}. There we see that \texttt{copy} can
 be called with two locks \texttt{L1} and \texttt{L2}. The locks guard writes
 into buffers \texttt{buf1} and \texttt{buf2} respectively.
 
@@ -424,16 +424,16 @@ void foo(char *src, int n) {
 
 We start the instrumentation by recognizing the code fragments in the analysed
 program which manipulate with locks. More precisely, we look for all those
-code fragments matching edge labels of the state machine in Fig.~\ref{fig:sm}.
+code fragments matching edge labels of the state machine in Figure~\ref{fig:sm}.
 In function \texttt{copy} there are three such fragments (see
-Fig.~\ref{fig:copy}). The first one is call to \texttt{lock} at
+Figure~\ref{fig:copy}). The first one is call to \texttt{lock} at
 line~\ref{line:copy_lock}. The second is a call to \texttt{unlock} at
 line~\ref{line:copy_unlock}. And the last one is the return statement at
 line~\ref{line:copy_ret}.
 
 Next we determine a set of all locks with which the program manipulates. From
 recognized code fragments (and according to the structure of edge labels of
-the state machine in Fig.~\ref{fig:sm}), we find out that a pointer variable
+the state machine in Figure~\ref{fig:sm}), we find out that a pointer variable
 \texttt{L} in \texttt{copy} is the only program variable through which the
 program manipulates with locks. (We assume the code represented by dots in
 \texttt{foo} is not involved in the lock manipulation.) Therefore, from
@@ -441,13 +441,13 @@ program manipulates with locks. (We assume the code represented by dots in
 all possible locks the program manipulates with.
 
 Now we need to introduce a unique instance of the state machine from
-Fig.~\ref{fig:sm} for each lock in the set.  So, we introduce state machines
+Figure~\ref{fig:sm} for each lock in the set.  So, we introduce state machines
 \texttt{smL1} and \texttt{smL2} for locks \texttt{L1} and \texttt{L2}
-respectively. The situation is depicted in Fig.~\ref{fig:mapping}. We
+respectively. The situation is depicted in Figure~\ref{fig:mapping}. We
 further need to explicitly specify a mapping from locks to their state
 machines. The mapping is basically a function (preferably with constant
 complexity) from addresses of program objects (e.g.~locks) to addresses of
-related state machines. In Fig.~\ref{fig:mapping} there it is shown an
+related state machines. In Figure~\ref{fig:mapping} there it is shown an
 implementation of a function \texttt{smGetMachine}. It maps addresses of locks
 \texttt{L1} and \texttt{L2} to addresses of related state machines. Note that
 lines marked by \texttt{*} represent the code we have instrumented into the
@@ -473,8 +473,8 @@ original program.
 \end{figure}
 
 Although we have already instrumented the program with state machines, there
-is no code manipulating them. Therefore, we depict in Fig.~\ref{fig:fire} a
-possible implementation of the state machine of Fig.~\ref{fig:sm}. Note that
+is no code manipulating them. Therefore, we depict in Figure~\ref{fig:fire} a
+possible implementation of the state machine of Figure~\ref{fig:sm}. Note that
 we represent both states of the machine and names of transitions by integer
 constants. Also note that the pointer argument \texttt{SM} of \texttt{smFire}
 function points to an instrumented state machine, whose transition has to be
@@ -531,7 +531,7 @@ what objects the fragment manipulates with (if any). Therefore, we first
 retrieve an address of state machine related to manipulated objects (if any) by
 using the function \texttt{smGetMachine} and then we fire the transition by
 calling the function \texttt{smFire}. We show the instrumented version of
-\texttt{copy} in Fig.~\ref{fig:copy_instrumented}. Note that instrumented
+\texttt{copy} in Figure~\ref{fig:copy_instrumented}. Note that instrumented
 lines are highlighted by \texttt{*} again.
 
 \begin{figure}[!htb]
@@ -576,7 +576,7 @@ lines are highlighted by \texttt{*} again.
 \section{Slicing} \label{sec:slicing}
 
 Let us have a look at the instrumented program in
-Fig.~\ref{fig:copy_instrumented}. We can easily observe, that the main part
+Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part
 of the function \texttt{copy}, i.e.~the loop copying the characters, does not
 affect states of the instrumented automata. On the other hand, SE of such a
 code can be very expensive. Therefore, we use the program slicing technique to
@@ -660,7 +660,7 @@ In our example program, we need to preserve content of the instrumented state ma
 recognises dependency of both state machines on the pointer variable
 \texttt{L} of the function \texttt{copy}. Therefore, the code manipulating
 \texttt{L} is preserved, while the loop copying the characters is sliced away.
-The resulting sliced program is depicted in Fig.~\ref{fig:copy_sliced}.
+The resulting sliced program is depicted in Figure~\ref{fig:copy_sliced}.
 
 It is important to note that some slicing techniques, including one
 in~\cite{W81} that we use, do not consider inputs for which the original
@@ -732,18 +732,22 @@ slicing of the analysed program brings a considerable speed-up of the execution.
 
 We demonstrate the speed-up on our example with function \texttt{copy}. Let us
 first symbolically execute the original function \texttt{copy} at
-Fig.~\ref{fig:copy}. If we assume that a bit-width of the
+Figure~\ref{fig:copy}. If we assume that a bit-width of the
 \texttt{int} is $32$, we have more than $2^{16}$\todo{hm?} different symbolic
 paths through the function. The absolute majority of the paths is caused by
 the \texttt{while} loop copying the strings. On the other hand, SE of the
-sliced function \texttt{copy} in Fig.~\ref{fig:copy_sliced} has to visit
+sliced function \texttt{copy} in Figure~\ref{fig:copy_sliced} has to visit
 exactly three paths.
 
-Those paths are depicted in Fig.~\ref{fig:copy_sliced:SET}. We can check that only path $2,3,5,6,8,11$ violates the second assertion in function \texttt{smFire} (see Fig.~\ref{fig:fire}). In other words, the path is a witness that we can leave the function \texttt{copy} in locked state. Note that
-this path is also marked in Fig.~\ref{fig:copy_sliced:SET}. The remaining
-two paths do not violate any of the discussed assertions and therefore there
-is no other bug related to property checked by our state machine. It also
-means that the double-unlock report from the abstract interpretation was false.
+Those paths are depicted in Figure~\ref{fig:copy_sliced:SET}. We can check
+that only path $2,3,5,6,8,11$ violates the second assertion in function
+\texttt{smFire} (see Figure~\ref{fig:fire}). In other words, the path is a
+witness that we can leave the function \texttt{copy} in locked state. Note
+that this path is also marked in Figure~\ref{fig:copy_sliced:SET}. The
+remaining two paths do not violate any of the discussed assertions and
+therefore there is no other bug related to property checked by our state
+machine. It also means that the double-unlock report from the abstract
+interpretation was false.
 
 %}}}
 %{{{ Implementation
