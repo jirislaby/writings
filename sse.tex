@@ -55,10 +55,10 @@
 %{{{ Intro
 
 \section{Introduction}
-\label{sec:introduction} \todo{H}
+\label{sec:introduction}
 
 The title of this paper refers to two popular bug-finding techniques:
-metacompilation and symbolic executions. The two techniques use completely
+metacompilation and symbolic execution (SE). The two techniques use completely
 different principles leading to different advantages and disadvantages.
 
 \emph{Metacompilation}~\cite{metal,pldi02} is a static analysis technique
@@ -189,87 +189,83 @@ specification using state machines appears also in other tools,
 e.g.~\textsc{Esp}~\cite{DLS02} or \textsc{Stanse}~\cite{stanse}.
 
 \medskip In contrast to metacompilation, \emph{symbolic execution}~\cite{se}
-analyzes each execution path separately. In contrast to standard execution,
-symbolic execution replaces input data by symbols representing arbitrary
-values. Executed statements then manipulate expressions over the symbols
-rather than exact values. For each execution path, symbolic execution builds
-a formula called \emph{path condition}, which is a necessary and sufficient
-condition on input data to drive the execution along the path.  Whenever
-symbolic execution reaches a branching statement, it uses the current path
-condition to check if any of the branches is unfeasible. If this is the
-case, the computation proceed to the other branch. Otherwise, the
-computation is forked and it continues in both branches. Moreover, we add
-the branching condition to the path condition on the positive branch and its
-negation to the path condition on the negative branch.
+analyzes each execution path separately. In contrast to standard execution, SE
+replaces input data by symbols representing arbitrary values. Executed
+statements then manipulate expressions over the symbols rather than exact
+values. For each execution path, SE builds a formula called \emph{path
+condition}, which is a necessary and sufficient condition on input data to
+drive the execution along the path.  Whenever SE reaches a branching
+statement, it uses the current path condition to check if any of the branches
+is unfeasible. If this is the case, the computation proceed to the other
+branch. Otherwise, the computation is forked and it continues in both
+branches. Moreover, we add the branching condition to the path condition on
+the positive branch and its negation to the path condition on the negative
+branch.
 % This approach ensures that the technique does not follow unfeasible
-% paths. Hence, if the symbolic execution detects some error (e.g.~double
-% lock) it cannot be a false positive.
+% paths. Hence, if the SE detects some error (e.g.~double lock) it cannot be a
+% false positive.
 
-The main advantage of symbolic execution is that it works only with feasible
-executions and hence it does not report any false positives. A minor
-disadvanate is that implementations of this technique usually detects only
-few kinds of error (e.g.~violation of an assert statement). To detect a
-specific kind of error, the program has to be modified to reduce the error
-to one of the automatically detected errors. The main disadvantage of the
-technique is its high compuation cost. In fact, symbolic execution usually
-explores only a part of a program of industrial size. In particular,
-programs containing loops or recursion have typically large or even infinite
-number of executions and cannot be completely analyzed by symbolic
-execution.
+The main advantage of SE is that it works only with feasible executions and
+hence it does not report any false positives. A minor disadvantage is that
+implementations of this technique usually detects only few kinds of error
+(e.g.~violation of an assert statement). To detect a specific kind of error,
+the program has to be modified to reduce the error to one of the automatically
+detected errors. The main disadvantage of the technique is its high
+computation cost. In fact, SE usually explores only a part of
+a program of industrial size. In particular, programs containing loops or
+recursion have typically large or even infinite number of executions and
+cannot be completely analyzed by SE.
 
 \medskip In this paper, we introduce a new technique offering flexibility of
-of metacompilation and zero false positive rate of symbolic execution. The
-basic idea is very simple: we use the concept of state machines to get
-flexibility in error specification. Then we instrument a program to be
-analyzed with a code for tracking behaviour of the state machines. The
-instrumented program is then reduced using the slicing method introduced
-in~\cite{W81}.\todo{Je to spravny clanek o slicingu?} The sliced program has
-to meet the criterion to be equivalent to the instrumented program with
+of metacompilation and zero false positive rate of SE. The basic idea is very
+simple: we use the concept of state machines to get flexibility in error
+specification. Then we instrument a program to be analyzed with a code for
+tracking behaviour of the state machines. The instrumented program is then
+reduced using the slicing method introduced in~\cite{W81}. The sliced program
+has to meet the criterion to be equivalent to the instrumented program with
 respect to reachability of error states of tracked state machines. Note that
 slicing can remove big portions of the code, including cycles and function
-calls. Hence, an original program with infinite number of execution paths
-can be reduced to a program with a finite number of execution
-paths. Finally, we executed the sliced program symbolically.
+calls. Hence, an original program with infinite number of execution paths can
+be reduced to a program with a finite number of execution paths. Finally, we
+executed the sliced program symbolically.
 
-Our technique can be used in two ways according to the applied symbolic
-execution tool. If we apply a symbolic executor that prefers to explore more
-parts of the code (for example, it can explore only the execution iterating
-each program cycle at most twice), we can use the technique as a general
-bug-finding technique reporting only real errors. On the contrary, if we use
-a symbolic executor exploring all execution paths, we can use our technique
-for basic classification of error reports produced by other tools (e.g.~xgcc
-or STANSE). For each such an error report, we can instrument the
-corresponding code only with the state machine describing the reported
-error. If our technique founds the same error, it is a real one. If our
-technique explores all execution paths of the sliced code without detecting
-the error, it is a false positive. If our technique runs out of resources,
-we cannot decide whether the error is a real one or just a false positive.
-We have developed a prototype implementation of our technique. Our
-experimental results indicate that the technique can be applied to classify
-error reports produced by STANSE applied to Linux kernel.
+Our technique can be used in two ways according to the applied SE tool. If we
+apply a symbolic executor that prefers to explore more parts of the code (for
+example, it can explore only the execution iterating each program cycle at
+most twice), we can use the technique as a general bug-finding technique
+reporting only real errors. On the contrary, if we use a symbolic executor
+exploring all execution paths, we can use our technique for basic
+classification of error reports produced by other tools (e.g.~\textsc{Xgcc} or
+\textsc{Stanse}).  For each such an error report, we can instrument the
+corresponding code only with the state machine describing the reported error.
+If our technique founds the same error, it is a real one. If our technique
+explores all execution paths of the sliced code without detecting the error,
+it is a false positive.  If our technique runs out of resources, we cannot
+decide whether the error is a real one or just a false positive.  We have
+developed a prototype implementation of our technique. Our experimental
+results indicate that the technique can be applied to classify error reports
+produced by \textsc{Stanse} applied to the Linux kernel.
 
-We emphasize the synergy of the three steps of our technique: specification
-of errors with state machines (inspired by metacompilation) and
-intrumentation of the original program with the code emulating the state
-machines allows us to clearly specify the slicing criteria. Hence, the
-sliced program contains only the code relevant to the considered
-errors. Further, slicing can substantially reduce the size of the code,
-which can remarkably improve performance of the symbolic
-execution.
+We emphasize the synergy of the three steps of our technique: specification of
+errors with state machines (inspired by metacompilation) and instrumentation
+of the original program with the code emulating the state machines allows us
+to clearly specify the slicing criteria. Hence, the sliced program contains
+only the code relevant to the considered errors. Further, slicing can
+substantially reduce the size of the code, which can remarkably improve
+performance of the SE.
 
-Let us note that usage of symbolic execution instead of classic static
-analysis brings us another benefit: while in metacompilation the state
-machines are associated to synactic objects (e.g.~locks or pointers), here
-we can associate state machines to actual values of these objects. This can
-potentially lead to better precision of error description. On the other
-hand, adoption of this feature can lead to unbounded number of state
-machines tracked by the instrumented program, which can lower performance of
-our technique. \todo{Co s timhle odstavcem?}
+Let us note that usage of SE instead of classic static analysis brings us
+another benefit: while in metacompilation the state machines are associated to
+syntactic objects (e.g.~locks or pointers), here we can associate state
+machines to actual values of these objects. This can potentially lead to
+better precision of error description. On the other hand, adoption of this
+feature can lead to unbounded number of state machines tracked by the
+instrumented program, which can lower performance of our technique. \todo{Co s
+timhle odstavcem?}
 
-\medskip The rest of the paper is organized as
-follows. Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe}
-deal with program instrumentation, slicing, and symbolic execution,
-respectively.
+\medskip The rest of the paper is organized as follows.
+Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe} deal with
+program instrumentation, slicing, and SE, respectively.
 % Section~\ref{sec:BackMapping} discusses extraction of
 % counterexamples.\todo{Chceme to tu nechat?}
 Experimental implementation of our technique and some experimental results
@@ -389,9 +385,9 @@ transitions and remembers states while computing a fix-point. Generally there
 may be multiple states for each program location. It is due to exploring all
 paths of the program in a single run.
 
-With the symbolic execution, this is slightly different. It is sufficient to
-remember an actual state of the automata for a program path currently
-explored. Other paths are explored separately in different runs.
+With the SE, this is slightly different. It is sufficient to remember an
+actual state of the automata for a program path currently explored. Other
+paths are explored separately in different runs.
 
 %There are two approaches to track the automata states. First, to implement the
 %functionality directly into the executor. This would be an intrusive change to
@@ -499,25 +495,6 @@ the SM transition. The parameters are
     \label{fig:invalid_ptr}
 \end{figure}
 
-%The memory pools are created as follows:
-%\begin{enumerate}
-%\item All code locations supposed to fire a transition are found.
-%\item A points-to set of the automaton parameter on the found locations is
-%computed. Cardinalities of the sets are finite, because the count of the
-%pointed objects (global variables and allocation lines) is finite too.
-%\item All the sets are merged together to obtain all possible automaton
-%parameter objects. Again, the merged set is finite.
-%\item Memory is split into equally sized pools. Their count is equal to the
-%cardinality of the merged set. The pools are numbered from zero to count-1.
-%\end{enumerate}
-%
-%When the memory is split, the allocation sites of each of the objects in the
-%merged set are looked up. Such allocations are superseded by a pool allocator.
-%It reserves a space in a specific pool. It is specified by the index of the
-%pool where the object belongs to. The size of the reserved space is the same
-%as the requested size. This approach allows for an easy reverse mapping from
-%pointers to (numbered) pools.
-
 It is also needed to store automata states somewhere. For this purpose, an
 array is created. Its size is designated by the count of the memory pools too.
 The type of members is integral as it fits the purpose of storing the
@@ -549,7 +526,6 @@ computing pool indices from pointers.
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
-
 void __ISSE_ensure_unlocked(const int *L) {
     int i = __ISSE_get_memory_pool_index(L);
     assert(__ISSE_lock[i] == 0);
@@ -574,8 +550,8 @@ void __ISSE_unlock(const int *L) {
     \label{fig:instrumentation_stuff}
 \end{figure}
 
-When the example from Section~\ref{sec:introduction} is fully instrumented, it
-looks like in Fig.~\ref{fig:copy_instrumented}. We have not described
+The instrumented code of Fig.~\ref{fig:copy} is shown in
+Fig.~\ref{fig:copy_instrumented}. We have not described
 \texttt{\_\_ISSE\_ensure\_unlocked} yet. It is used to check the state before
 (initial state) and after (final state) the function is analyzed. In this
 ensuring function and in both state tranformation functions it can be seen,
@@ -640,9 +616,16 @@ char *copy(char *dst, char *src, int n, int *L) {
 %}}}
 %{{{ Slicing
 
-\section{Slicing} \label{sec:slicing} \todo{M}
+\section{Slicing} \label{sec:slicing}
 
-Let us have a look at the instrumented program at Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part of the function \texttt{copy}, i.e.~the loop copying the characters, does not affect states of the instrumented automata. On the other hand, symbolic execution of such a code can be very expensive. Therefore, we use the program slicing technique to eliminate such a code from the analysed program. Slicing may bring considerable speed up for in the last phase of the algorithm, where we execute the program symbolically.
+Let us have a look at the instrumented program in
+Fig.~\ref{fig:copy_instrumented}. We can easily observe, that the main part
+of the function \texttt{copy}, i.e.~the loop copying the characters, does not
+affect states of the instrumented automata. On the other hand, SE of such a
+code can be very expensive. Therefore, we use the program slicing technique to
+eliminate such a code from the analysed program. Slicing may bring a
+considerable speed-up in the last phase of the algorithm, where we execute the
+program symbolically.
 
 %We use interprocedural static slicing as proposed by Weiser in
 %1981~\cite{W81}. When slicing a program we first need to specify what
@@ -681,15 +664,15 @@ Let us have a look at the instrumented program at Figure~\ref{fig:copy_instrumen
 %a points-to analysis, a computation of the summaries is straightforward.
 
 To slice a program we only need to specify \emph{slicing criteria}. Having the
-criteria a slicing algorithm then eliminates the redundant code automatically.
+criteria a slicing algorithm then eliminates redundant code automatically.
 A simple definition of a slicing criterion is introduced in~\cite{W81} and it
-is sufficient for our purposes. According to the definition, we must only
-specify a set of variables and a program line. It is a task for a slicing
+is sufficient for our purposes. According to the definition, we only have to
+specify a set of variables and a program line. It is a task for the slicing
 algorithm to ensure that, roughly speaking, for each input data passed to both
-original and sliced programs values of the variables at that line are always
+original and sliced programs, values of the variables at that line are always
 equal in both programs. In our algorithm we have to preserve values of the
-instrumented automata. And the best lines where to put the criteria are
-consistency checks about automata states.
+instrumented automata. And the best places to put the criteria are consistency
+checks of automata states.
 
 \begin{figure}[!htb]
     \begin{center}
@@ -712,24 +695,22 @@ char *copy(char *dst, char *src, int n, int *L) {
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{Sliced function \texttt{copy} with respect to locks
+    \caption{Sliced \texttt{copy} function with respect to locks
     manipulation.\todol{caption more precisely}}
     \label{fig:copy_sliced}
 \end{figure}
 
-
-In our example program, we need to preserve a content of the array
-\texttt{\_\_ISSE\_lock} at all those program lines at
-Figure~\ref{fig:instrumentation_stuff}, where we call the function
-\texttt{assert}. Having the criteria set the interprocedural
-slicing~\cite{W81} recognises dependency of the array \texttt{\_\_ISSE\_lock}
-on the variable \texttt{L} of the function \texttt{copy}. Therefore, the code
-manipulating \texttt{L} is preserved, while the loop copying the characters is
-sliced away. The resulting sliced program is depicted at
-Figure~\ref{fig:copy_sliced}.
+In our example program, we need to preserve a content of the
+\texttt{\_\_ISSE\_lock} array at all those program lines in
+Fig.~\ref{fig:instrumentation_stuff}, where we call the \texttt{assert}
+function. Having the criteria set, the interprocedural slicing~\cite{W81}
+recognises dependency of the \texttt{\_\_ISSE\_lock} array on the variable
+\texttt{L} of the function \texttt{copy}. Therefore, the code manipulating
+\texttt{L} is preserved, while the loop copying the characters is sliced away.
+The resulting sliced program is depicted in Fig.~\ref{fig:copy_sliced}.
 
 It is important to note that some slicing techniques, including one
-in~\cite{W81} that we use, does not consider inputs for which the original
+in~\cite{W81} that we use, do not consider inputs for which the original
 program does not halt. Therefore, there is no way to guarantee that a sliced
 program will fail to halt whenever the original program fails to halt. This
 may be a source of false positives in our technique.
@@ -739,18 +720,17 @@ may be a source of false positives in our technique.
 
 \section{Symbolic Execution} \label{sec:symexe} \todo{M}
 
-Symbolic execution explores real paths in a given program. Therefore, if it
-reaches a line where we detect a bug, then we are sure the bug is real in the
-executed program, i.e.~it is \emph{not} a false positive. (This is of course
-true only under common assumption that an SMT solver is able to reason about
-satisfiability of path condition along the execution.) This is obvious but
-important advantage of symbolic execution for finding bugs. On the other hand,
-a number of the real paths is typically very large (or even infinite) even for
-small and simple programs. Therefore, symbolic execution is often very
+The SE explores real paths in a given program. Therefore, if it reaches a line
+where we detect a bug, then we are sure the bug is real in the executed
+program, i.e.~it is \emph{not} a false positive. (This is of course true only
+under common assumption that an SMT solver is able to reason about
+satisfiability of a path condition along the execution.) Although this is
+obvious, it is an important advantage of the SE when finding bugs.  On the
+other hand, a number of the real paths is typically very large (or even
+infinite) even for small and simple programs. Therefore, the SE is often very
 expensive. In our technique we are only concerned with those fragments of the
 original program having impact on a property we are checking for. Therefore,
-slicing of the analysed program before we start symbolic execution can bring
-considerable speed up of the execution.
+slicing of the analysed program brings a considerable speed-up of the execution.
 
 \begin{figure}[!htb]
     \centering
@@ -797,51 +777,24 @@ considerable speed up of the execution.
         \label{fig:copy_sliced:SET}
 \end{figure}
 
-We demonstrate the speed up on our example with function \texttt{copy}. Let us
-first symbolically execute the instrumented function \texttt{copy} at
-Figure~\ref{fig:copy_instrumented}. If we assume $32$-bit integers for the
-type \texttt{int}, then we have more then $2^{16}$ different symbolic paths
-through the function. Absolute majority of the paths are caused by the
-\texttt{while} loop copying the strings. On the other hand, symbolic execution
-of the sliced function \texttt{copy} at Figure~\ref{fig:copy_sliced} has
+We demonstrate the speed-up on our example with function \texttt{copy}. Let us
+first symbolically execute the instrumented function \texttt{copy} in
+Fig.~\ref{fig:copy_instrumented}. If we assume that a bit-width of the
+\texttt{int} is $32$, we have more than $2^{16}$\todo{hm?} different symbolic
+paths through the function. The absolute majority of the paths is caused by
+the \texttt{while} loop copying the strings. On the other hand, SE of the
+sliced function \texttt{copy} in Fig.~\ref{fig:copy_sliced} has to visit
 exactly three paths.
 
-Those three paths of the sliced function \texttt{copy} are depicted at
-Figure~\ref{fig:copy_sliced:SET}. We can easily check that only path
-$2,3,5,6,8,11$ violates some of the assertion in function depicted at
-Figure~\ref{fig:instrumentation_stuff}. More precisely, this path violates the
-assertion at function \texttt{\_\_SSE\_ensure\_unlocked} which means that it
-is possible to leave the function in locked state. Note that this path is also
-marked at Figure~\ref{fig:copy_sliced:SET}. The remaining two paths do not
-violate any of the discussed assertions and therefore there is no other bug
-related to property checked by our automata. It also means that double-unlock
-report from the abstract interpretation was false.
-
-%}}}
-%{{{ Trace Back Mapping
-
-\section{Trace Back Mapping}
-\label{sec:BackMapping} \todo{???}
-
-\todol{Zbyva poresit zpetne mapovani chyby do puvodniho neproslicovaneho
-  programu. Napadly me dve moznosti. Prvni je trivialni az hloupa: Pro kazdy
-  radek v proslicovanem programu muzu najit odpovidajici radek v programu
-  originalnim. Proto ty radky v originalnim programu, ktere odpovidaji
-  chybove ceste v proslicovanem programu, oznacim modre. Dostanu tak modrou
-  prerusovanou cestu v originalnim programu. Kazde dva kusy cesty pak
-  propojim pres sede oznacenou cast kodu, pres niz se muze dojit z jedno
-  kusu do druheho. Sede casti se tedy urcuji jako sjednoceni cest v CFG
-  napojujici jeden kus modre cesty na druhy. Druha moznost, jak trace
-  mapovat zpet, je uz zajimavejsi: Vezmu si path condition chybove cesty z
-  proslicovaneho programu. Pak spustim SE na originalnim programu s path
-  condition inicialne nastavenou na tu z chybove cesty v proslicovanem
-  programu. Jakmile dorazim v originalnim programu do lokace odpovidajici
-  cilove lokaci chybove cesty v proslicovanem programu, tak jsem nasel
-  chybovy trace v originalnim programu. Tady ale vyvstava hodne otazek k
-  zodpovezeni, na ktere nam mozna nevyjde cas. Hlavne: Bude nalezeny chybovy
-  trace v originalnim programu urcite tim chybovym? Neutavi se SE na
-  originalnim programu i pres znalost path condition chybove cesty z
-  proslicovaneho programu?}
+Those paths are depicted in Fig.~\ref{fig:copy_sliced:SET}. We can easily
+check that only path $2,3,5,6,8,11$ violates some of the assertions in function
+depicted in Fig.~\ref{fig:instrumentation_stuff}. More precisely, this path
+violates the assertion in function \texttt{\_\_SSE\_ensure\_unlocked} which
+means that it is possible to leave the function in a locked state. Note that
+this path is also marked in Fig.~\ref{fig:copy_sliced:SET}. The remaining
+two paths do not violate any of the discussed assertions and therefore there
+is no other bug related to property checked by our state machine. It also
+means that the double-unlock report from the abstract interpretation was false.
 
 %}}}
 %{{{ Implementation
@@ -881,16 +834,16 @@ analysis starts -- in each of the files it calls a different function.
 Finally a symbolic execution is performed by \textsc{Klee}
 (Section~\ref{sec:symexe}). \todo{Describe what we do with the output\dots}
 
-\begin{figure}[htb]
-\begin{center}
-\todol{Do we want this figure (picture needed)?} \\
-C $\rightarrow$ \textsc{Llvm} compiler (\textsc{clang}) $\rightarrow$
-Instrumentation (Prepare) $\rightarrow$ slicing (Slicer) $\rightarrow$
-main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
-\end{center}
-\caption{Phases of our tool}
-\label{fig:phases}
-\end{figure}
+%\begin{figure}[htb]
+%\begin{center}
+%\todol{Do we want this figure (picture needed)?} \\
+%C $\rightarrow$ \textsc{Llvm} compiler (\textsc{clang}) $\rightarrow$
+%Instrumentation (Prepare) $\rightarrow$ slicing (Slicer) $\rightarrow$
+%main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
+%\end{center}
+%\caption{Phases of our tool}
+%\label{fig:phases}
+%\end{figure}
 
 \subsection{Experiments}
 \label{ssec:experiments}
@@ -926,7 +879,8 @@ tool is either:
 abstract interpretation tool did or
 \item confirmation of a false positive -- does not report anything at that
 location or
-\item message about unsound analysis -- ETOOMANYLOCKSALLOCATED or
+\item message about unsound analysis -- reports a warning that output of the
+tool may not be correct or
 \item message about unfinished computation -- due to various errors.
 \end{itemize}
 
@@ -950,35 +904,35 @@ memory. To remedy the inconvenience, we plan to implement the same on-demand
 handling \textsc{UcKlee}~\cite{ucklee} does.
 
 Here, we present examples from each of the three categories above for those
-files where we are sure about the results. I.e. upstream developers confirmed
-they are either error or false positive and we are able with our limited
-knowledge to reason about the files. They are presented in
+files where we are sure about the results. That is, upstream developers
+confirmed the results are either an error or false positive and we are able
+with our limited knowledge to reason about the files. They are presented in
 Table~\ref{tab:results}. It contains running times of each step performed on
-the files and their sum as well.
+the files and their sum as well. Also it sketches the effect of slicing.
 
 \begin{table}[t]
-\begin{tabular}{|l|c|c|c|c|c|c|c|} \hline
+\begin{tabular}{|l|c|c|c|c|c|c|c|c|} \hline
 \multirow{2}{*}{\textbf{Function}} &
-  \multicolumn{5}{|c|}{\textbf{Running Time} (s)} &
+  \multicolumn{5}{|c|}{\textbf{Running Time} (s)} & \textbf{Sliced} &
   \multirow{2}{*}{\textbf{Result}} & \textbf{Factual} \\ \cline{2-6}
  & \textbf{Comp.} & \textbf{Instr.$^{\dagger}$} &
-   \textbf{Slicing} & \textbf{SE} & \textbf{Total} &
+   \textbf{Slic.} & \textbf{SE} & \textbf{Total} & (\%) &
  & \textbf{State} \\ \hline \hline
-\texttt{jfs\_quota\_write} & 1.25 & 0.18 & 0.15 & 5.09 & 6.67 &
+\texttt{jfs\_quota\_write} & 1.25 & 0.18 & 0.15 & 5.09 & 6.67 & 67.8 &
 	BUG & BUG \\ \hline
-\texttt{qlge\_set\_mac\_address} & 2.70 & 0.72 & 26.75 & 13.28 & 43.45 &
+\texttt{qlge\_set\_mac\_address} & 2.70 & 0.72 & 26.75 & 13.28 & 43.45 & 66.5 &
 	BUG & BUG \\ \hline
 \texttt{hidraw\_read} & 1.06 & 0.18 & 0.14 &
-	\multicolumn{3}{|c|}{Timeout} & BUG \\ \hline \hline
-\texttt{queue\_refill} & 1.76 & 0.29 & 1.72 & 0.62 & 4.39 &
+	\multicolumn{2}{|c|}{Timeout} & 67.0 & N/A & BUG \\ \hline \hline
+\texttt{queue\_refill} & 1.76 & 0.29 & 1.72 & 0.62 & 4.39 & 72.9 &
 	FP & FP \\ \hline
-\texttt{sisusbcon\_set\_palette} & 1.50 & 0.24 & 0.27 & 17.19 & 19.20 &
+\texttt{sisusbcon\_set\_palette} & 1.50 & 0.24 & 0.27 & 17.19 & 19.20 & 76.0 &
 	FP & FP \\ \hline
 \texttt{jffs2\_reserve\_space} & 1.04 & 0.18 & 0.22 &
-	\multicolumn{3}{|c|}{Timeout} & FP \\ \hline
+	\multicolumn{2}{|c|}{Timeout} & 46.8 & N/A & FP \\ \hline
 \end{tabular}
-\caption{The technique run on several files. $^{\dagger}$ Instrumentation
-including the points-to analysis time. The last two columns specify what our
+\caption{The technique run on several files. $^{\dagger}$Instrumentation
+includes the points-to analysis time. The last two columns specify what our
 tool reported (Result) and what it was in fact (Factual State). It may be a
 real error (BUG), false-positive (FP).}
 \label{tab:results}
@@ -996,13 +950,74 @@ real error (BUG), false-positive (FP).}
 %}}}
 %{{{ Related Work
 
-\section{Related Work} \label{sec:related} \todo{M}
+\section{Related Work} \label{sec:related}
 
-A description of program properties in language \textsc{Metal} and meta-level compilation is discussed in~\cite{metal,pldi02,CEH02,ECC00}. The technique presented in~\cite{metal} found a thousands of bugs in real system code. It provides easy description of properties to be checked for and fast analysis. Nevertheless, it suffers from false positives. Since false positives rate has huge impact on practical usability, an important part of the technique are false positive suppression algorithms like killing variables and expressions, synonyms, false path prunning, and others. Besides the suppression algorithms bug-reports from the tool are further ranked to even more decrease the negative impact of false positives. There are generic and statistical ranking algorithms ordering bug-reports. An extension introduced in~\cite{ECH01} provides automatic inference of some temporal properties based on statistical analysis of assumed programmer's beliefs. The rechnique \textsc{ESP}~\cite{DLS02} uses a similar language to \textsc{Metal} for properties description. The properties are verified by an interprocedural dataflow algorithm based on~\cite{RHS95}. And false positives are suppressed by the abstract simulation pruning algorithm. A static analysis tool \textsc{Stanse}~\cite{stanse} also uses state machines for description of checked program properties. The description is based on parametrised abstract syntax trees. Although this tool found tens of real bugs in Linux kernel, it suffers from high rate of false positives, since its false positive suppression algorithms are very limited. 
+A description of program properties in \textsc{Metal} language and meta-level
+compilation is discussed in~\cite{CEH02,ECC00,metal,pldi02}. The technique
+presented in~\cite{metal} found a thousands of bugs in real system code. It
+provides an easy description of properties to be checked for and a fast
+analysis.
+Nevertheless, it suffers from false positives. Since false positive rate has
+huge impact on practical usability, an important part of the technique are
+false positive suppression algorithms like killing variables and expressions,
+synonyms, false path pruning, and others. Besides the suppression algorithms,
+bug-reports from the tool are further ranked to decrease the negative impact
+of false positives even more. There are generic and statistical ranking
+algorithms ordering bug-reports. An extension introduced in~\cite{ECH01}
+provides an automatic inference of some temporal properties based on
+statistical analysis of assumed programmer's beliefs. The
+\textsc{ESP}~\cite{DLS02} technique uses a similar language to \textsc{Metal}
+for properties description. The properties are verified by an interprocedural
+dataflow algorithm based on~\cite{RHS95}. And false positives are suppressed
+by abstract simulation pruning algorithm. \textsc{Stanse}~\cite{stanse}, a
+static analysis tool also uses state machines for description of checked
+program properties. The description is based on parametrised abstract syntax
+trees. Although this tool found hundreds of real bugs in the Linux kernel, it
+suffers from high rate of false positives, since its false positive
+suppression algorithms are very limited. 
 
-Program analysis tools based on symbolic execution~\cite{se} mainly discover low-level bugs like zero divisions, illegal memory accesses, assertion failures and so on. But they typically does not have problems with false positives. On the other hand, they have a problem with scalability to large programs. There has been developed a lot of techniques improving the scalability to programs used in practise. Modern techniques are mostly hybrid. They usually combine symbolic execution with concrete one~\cite{PKS05,SMA05,TdH08,GLM08:fuzzing,GLM08:active_props,GLE09}. There are also hybrid techniques combining symbolic execution with a complementary static analysis~\cite{GNRT10,GMR09,Beckmanetal08,NRTT09,Gulavanietal06}. Compositional approaches are mostly based on computation of function summaries~\cite{G07,AGT08}. Reusing them at call sites typically leads to an interesting performance improvements. A search strategy Fitnex~\cite{XTHS09} implemented in \textsc{Pex}~\cite{TdH08} guides a path exploration to a particular target location using a fitness function. The function measures how close an already discovered feasible path is to the target. The LESE~\cite{SPmCS09} approach introduces symbolic variables for the number of times each loop was executed. The symbolic variables are linked with features of a known grammar generating inputs. Using these links, the grammar can control the numbers of loop iterations performed on a generated input. A technique presented in~\cite{GL11} analyses loops on-the-fly, i.e.~during simultaneous concrete and symbolic execution of a program for a concrete input. The loop analysis infers variables that are modified by a constant value in each loop iteration. These variables are used to build loop summaries expressed in a form of pre a post conditions. Another approach to effective symbolic execution introduced in ~\cite{BCE08,Cadar08,klee} is based on recording of already seen behaviour and pruning its repetition. An algorithm in~\cite{ST11} constructs a nontrivial necessary condition on input values to drive the program execution to the given location. And technique presented in~\cite{OT11} introduces for each recurrent variable a pair of counters for two different paths around loops. Each counter keeps an information about the number of iterations around one path since the last iteration around the other one. Finally, there is an orthogonal line of research which tries to improve the symbolic execution for programs with some special types of inputs. Some techniques deal with programs manipulating strings~\cite{BTV09,XGM08}, and some other techniques reduce input space using given an input grammar~\cite{GKL08,SPmCS09}.
+Program analysis tools based on symbolic execution~\cite{se} mainly discover
+low-level bugs like zero division, illegal memory access, assertion failure
+and so on. But they typically do not have problems with false positives. On
+the other hand, they have a problem with scalability to large programs. There
+has been developed a lot of techniques improving the scalability to programs
+used in practice. Modern techniques are mostly hybrid. They usually combine
+symbolic execution with concrete
+one~\cite{PKS05,GLM08:active_props,GLM08:fuzzing,GLE09,SMA05,TdH08}. There are
+also hybrid techniques combining symbolic execution with a complementary
+static analysis~\cite{Beckmanetal08,GNRT10,Gulavanietal06,GMR09,NRTT09}.
+Compositional approaches are mostly based on computation of function
+summaries~\cite{G07,AGT08}. Reusing them at call sites typically leads to
+interesting performance improvements. Fitnex~\cite{XTHS09}, a search strategy
+implemented in \textsc{Pex}~\cite{TdH08} guides a path exploration to a
+particular target location using fitness function. The function measures how
+close an already discovered feasible path is to the target. The
+LESE~\cite{SPmCS09} approach introduces symbolic variables for the number of
+times each loop was executed. The symbolic variables are linked with features
+of a known grammar generating inputs. Using these links, the grammar can
+control the numbers of loop iterations performed on a generated input. A
+technique presented in~\cite{GL11} analyses loops on-the-fly, i.e.~during
+simultaneous concrete and symbolic executions of a program for a concrete
+input. The loop analysis infers variables that are modified by a constant
+value in each loop iteration. These variables are used to build loop summaries
+expressed in a form of pre a post conditions. Another approach to effective
+symbolic execution introduced in ~\cite{BCE08,klee,Cadar08} is based on
+recording of already seen behaviour and pruning its repetition. An algorithm
+in~\cite{ST11} constructs a nontrivial necessary condition on input values to
+drive the program execution to a given location. And technique presented
+in~\cite{OT11} introduces a pair of counters for two different paths around
+loop for each recurrent variable. Each counter keeps an information about the
+number of iterations around one path since the last iteration around the other
+one. Finally, there is an orthogonal line of research which tries to improve
+the symbolic execution for programs with some special types of inputs. Some
+techniques deal with programs manipulating strings~\cite{BTV09,XGM08}, and
+some other techniques reduce input space using given an input
+grammar~\cite{GKL08,SPmCS09}.
 
-The interprocedural static slicing was introduced by Weiser~\cite{W81}. But nowadays, there are many different approaches to program slicing. They are surveyed by several authors~\cite{L01,T95,BG}. Applications of slicing include program debugging, reverse engineering and regression testing~\cite{GHS92}.
+The interprocedural static slicing was introduced by Weiser~\cite{W81}. But
+nowadays, there are many different approaches to program slicing. They are
+surveyed by several authors~\cite{BG,L01,T95}. Applications of slicing include
+program debugging, reverse engineering and regression testing~\cite{GHS92}.
 
 %}}}
 %{{{ Future Work
