@@ -606,11 +606,12 @@ where the instrumented lines are highlighted by~\texttt{*}.
 Let us have a look at the instrumented program in
 Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main
 part of the function \texttt{copy}, i.e.~the loop copying the characters,
-does not affect states of the instrumented automata. On the other hand,
-symbolic execution of such a code can be very expensive. Therefore, we use
-the program slicing technique to eliminate such a code from the analysed
-program. Slicing may bring a considerable speed-up in the last phase of the
-algorithm, where we execute the program symbolically.
+does not affect states of the instrumented state machines. Symbolic
+execution of such a code is very expensive. Therefore, we use the slicing
+technique~\cite{Wei84} to eliminate such a code from the instrumented
+program.
+% Slicing may bring a considerable speed-up in the last phase of the
+% algorithm, where we execute the program symbolically.
 
 %We use interprocedural static slicing as proposed by Weiser in
 %1981~\cite{Wei84}. When slicing a program we first need to specify what
@@ -648,53 +649,72 @@ algorithm, where we execute the program symbolically.
 %the function, and which can be modified by the function. Having results from
 %a points-to analysis, a computation of the summaries is straightforward.
 
-To slice a program we only need to specify \emph{slicing criteria}. Having the
-criteria a slicing algorithm then eliminates redundant code automatically.
-A simple definition of a slicing criterion is introduced in~\cite{Wei84} and it
-is sufficient for our purposes. According to the definition, we only have to
-specify a set of variables and a program line. It is a task for the slicing
-algorithm to ensure that, roughly speaking, for each input data passed to both
-original and sliced programs, values of the variables at that line are always
-equal in both programs. In our algorithm we have to preserve values of the
-instrumented automata. And the best places to put the criteria are consistency
-checks of automata states.
+The input of the slicing algorithm is a program to be sliced and so-called
+\emph{slicing criteria}. A slicing criterion is a pair of a program location
+and a set of program variables. The slicing algorithm removes program
+statements that do not affect any slicing criterion. More precisely, for
+each input data passed to both original and sliced programs, values of the
+variable set of each slicing criterion at the corresponding location are
+always equal in both programs. Our analysis is interested only in states of
+the instrumented automata, especially in location corresponding to errors.
+Hence, we set the slicing criteria to be all pairs of a location before an
+\texttt{assert} statement of \texttt{smFire} function and the set of all
+variables representing current states of the corresponding state machines.
 
 \begin{figure}[!htb]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
- 1: char *copy(char *dst, char *src, int n, int *L) {
- 2:    int len;
- 3:    len = 0;
- 4:    if (src != NULL && dst != NULL) {
- 5:       len = n;
- 6:       smFire(smGetMachine(L), smLOCK);
- 7:    }
- 8:    if (len > 0) {
- 9:       smFire(smGetMachine(L), smUNLOCK);
+ 1: char *buf1, *buf2;
+ 2: int L1, L2;
+ 3:
+ 4: char *copy(char *dst, char *src, int n, int *L) {
+ 5:    int len;
+ 6:    len = 0;
+ 7:    if (src != NULL && dst != NULL) {
+ 8:       len = n;
+ 9:       smFire(smGetMachine(L), smLOCK);
 10:    }
-11:    smFire(smGetMachine(L), smRETURN);
-12:    return dst;
-13: }
+11:    if (len > 0) {
+12:       smFire(smGetMachine(L), smUNLOCK);
+13:    }
+14:    smFire(smGetMachine(L), smRETURN);
+15:    return dst;
+16: }
+17:
+18: void foo(char *src, int n) {
+19:    copy(src, buf1, n, &L1);
+20:    copy(src, buf2, n, &L2);
+21: }
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{Sliced \texttt{copy} function with respect to locks
-    manipulation.\todol{caption more precisely}}
+    \caption{Functions \texttt{foo} and \texttt{copy} after slicing.}
     \label{fig:copy_sliced}
 \end{figure}
 
-In our example program, we need to preserve content of the instrumented state machines \texttt{smL1} and \texttt{smL2}. We put slicing criteria into those lines of code, where we detect transitions of state machines into error states. These lines of code are at function \texttt{smFire} and they are represented by calls to function \texttt{assert}. Having the criteria set, the interprocedural slicing~\cite{Wei84}
-recognises dependency of both state machines on the pointer variable
-\texttt{L} of the function \texttt{copy}. Therefore, the code manipulating
-\texttt{L} is preserved, while the loop copying the characters is sliced away.
-The resulting sliced program is depicted in Figure~\ref{fig:copy_sliced}.
+In the instrumented program of Figures~\ref{fig:fire}
+and~\ref{fig:copy_instrumented}, we want to preserve variables \texttt{smL1}
+and \texttt{smL2}. We put slicing criteria into the lines of code detecting
+transitions of state machines into error states. In other words, the slicing
+criteria for our running example are pairs
+(27,\{\texttt{smL1},\texttt{smL2}\}), (34,\{\texttt{smL1},\texttt{smL2}\}),
+(40,\{\texttt{smL1},\texttt{smL2}\}), where the number refer to lines in the
+code of Figure~\ref{fig:fire}. The result of the slicing procedure is
+presented in Figures~\ref{fig:copy_sliced} and~\ref{fig:fire} (the code in
+the latter figure is not changed by the slicing). Note that the sliced code
+does not contain the \texttt{while}-loop and also the \texttt{lock} and
+\texttt{unlock} commands.
 
-It is important to note that some slicing techniques, including one
+It is important to note that some slicing techniques, including the one
 in~\cite{Wei84} that we use, do not consider inputs for which the original
-program does not halt. Therefore, there is no way to guarantee that a sliced
+program does not halt.
+% The problem arises when the sliced code contains an error, such that all
+% executions exhibiting the error do not reach the error in the original
+% code as they loop in some code that sliced.
+Therefore, there is no way to guarantee that a sliced
 program will fail to halt whenever the original program fails to halt. This
-may be a source of false positives in our technique.
+is the only principal source of potential false positives in our technique.
 
 %}}}
 %{{{ Symbolic Execution
@@ -907,7 +927,7 @@ same on-demand memory handling \textsc{UcKlee}~\cite{ucklee} does.
   instrumented \textsc{Llvm} code.  The column \textbf{Result} specifies the
   result of our tool: BUG means that the tool found a real error, FP means
   that the analysis finished without error found (i.e.~the original error
-  report is a false positive), TO that the SE computation did not finish in
+  report is a false positive), TO that the symbolic execution did not finish in
   time and ME denotes an occurrence of memory error. The last column specifies
   the factual state of the error report.}
 \label{tab:results}
