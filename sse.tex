@@ -472,17 +472,6 @@ machines are associated to dynamically allocated objects.
 % 	\label{fig:mapping}
 % \end{figure}
 
-% Although we have already instrumented the program with state machines, there
-% is no code manipulating them.
-Figure~\ref{fig:fire} contains also many constants and a function
-\texttt{smFire} implementing the state machine $SM(x)$. Further,
-Figure~\ref{fig:fire} declares variables \texttt{smL1} and \texttt{smL2} and
-initialize them to the initial state of the state machine.  Note that we
-represent both states of the machine and names of transitions by integer
-constants. Also note that the pointer argument \texttt{SM} of
-\texttt{smFire} function points to an instrumented state machine, whose
-transition has to be fired.
-
 \begin{figure}[p]
   \centering
   \begin{tabular}{c}
@@ -541,6 +530,17 @@ transition has to be fired.
     identification (\texttt{smGetMachine}).}
   \label{fig:fire}
 \end{figure}
+
+% Although we have already instrumented the program with state machines, there
+% is no code manipulating them.
+Figure~\ref{fig:fire} contains also many constants and a function
+\texttt{smFire} implementing the state machine $SM(x)$. Further,
+Figure~\ref{fig:fire} declares variables \texttt{smL1} and \texttt{smL2} and
+initialize them to the initial state of the state machine.  Note that we
+represent both states of the machine and names of transitions by integer
+constants. Also note that the pointer argument \texttt{SM} of
+\texttt{smFire} function points to an instrumented state machine, whose
+transition has to be fired.
 
 It remains to instrument the recognized code fragments in the original
 program. For each fragment we know its related transition of the state
@@ -647,17 +647,18 @@ program.
 %the function, and which can be modified by the function. Having results from
 %a points-to analysis, a computation of the summaries is straightforward.
 
-The input of the slicing algorithm is a program to be sliced and so-called
+The input of the slicing algorithm is a program to be sliced and a so-called
 \emph{slicing criteria}. A slicing criterion is a pair of a program location
 and a set of program variables. The slicing algorithm removes program
 statements that do not affect any slicing criterion. More precisely, for
 each input data passed to both original and sliced programs, values of the
 variable set of each slicing criterion at the corresponding location are
 always equal in both programs. Our analysis is interested only in states of
-the instrumented automata, especially in location corresponding to errors.
-Hence, we set the slicing criteria to be all pairs of a location before an
-\texttt{assert} statement of \texttt{smFire} function and the set of all
-variables representing current states of the corresponding state machines.
+the instrumented automata, especially in locations corresponding to errors.
+Hence, the slicing criterion is a pair of a location preceding an
+\texttt{assert} statement in \texttt{smFire} function and the set of all
+variables representing current states of the corresponding state machines. The
+slicing criteria then consists of all such pairs.
 
 \begin{figure}[!htb]
     \begin{center}
@@ -696,12 +697,12 @@ and~\ref{fig:copy_instrumented}, we want to preserve variables \texttt{smL1}
 and \texttt{smL2}. We put slicing criteria into the lines of code detecting
 transitions of state machines into error states. In other words, the slicing
 criteria for our running example are pairs
-(27,\{\texttt{smL1},\texttt{smL2}\}), (34,\{\texttt{smL1},\texttt{smL2}\}),
-(40,\{\texttt{smL1},\texttt{smL2}\}), where the number refer to lines in the
+(27,\{\texttt{smL1},\texttt{smL2}\}), (35,\{\texttt{smL1},\texttt{smL2}\}),
+(41,\{\texttt{smL1},\texttt{smL2}\}), where the number refers to lines in the
 code of Figure~\ref{fig:fire}. The result of the slicing procedure is
-presented in Figures~\ref{fig:copy_sliced} and~\ref{fig:fire} (the code in
-the latter figure is not changed by the slicing). Note that the sliced code
-does not contain the \texttt{while}-loop and also the \texttt{lock} and
+presented in Figures~\ref{fig:fire} and~\ref{fig:copy_sliced} (the code in
+the former figure shall not changed by the slicing). Note that the sliced code
+contains neither the \texttt{while}-loop nor the \texttt{lock} and
 \texttt{unlock} commands.
 
 It is important to note that some slicing techniques, including the one
@@ -813,16 +814,16 @@ the assertions in the function \texttt{smFire}.
 To verify applicability of the presented technique, we have developed an
 experimental implementation. Our experimental tool works with programs in C
 and, for the sake of simplicity, it detects only locking errors described by
-a state machine very similar to $SM(x)$ of Figure~\ref{fig:sm}. Moreover,
-the instances of the state machine are associated only to global variables
-that appear as arguments of some \texttt{lock} or \texttt{unlock} function
-call. This may as well be the case for instances of dynamically allocated
-locks that are allocated only once during the run of the symbolic executor.
-The main part of our implementation is written in three modules for the
-\textsc{Llvm} framework~\cite{llvm}, namely \texttt{Prepare}, \texttt{Slicer},
-and \texttt{Kleerer}. The framework provides us with the C compiler
-\textsc{\textsc{clang}}. We also use an existing symbolic executor for
-\textsc{Llvm} called \textsc{Klee}~\cite{klee}.
+a state machine very similar to $SM(x)$ of Figure~\ref{fig:sm}. The instances
+of the state machine are associated with arguments of \texttt{lock} and
+\texttt{unlock} function calls. Note that the technique currently works only
+for the cases where a lock is instantiated only once during the run of the
+symbolic executor. It works on a vast majority of the code we used. However we
+plan to add a support even for the rest. The main part of our implementation
+is written in three modules for the \textsc{Llvm} framework~\cite{llvm},
+namely \texttt{Prepare}, \texttt{Slicer}, and \texttt{Kleerer}. The framework
+provides us with the C compiler \textsc{\textsc{clang}}. We also use an
+existing symbolic executor for \textsc{Llvm} called \textsc{Klee}~\cite{klee}.
 
 Instrumentation of a given program proceeds in two steps. Using a C
 preprocessor, the original program is instrumented with function calls
@@ -1013,7 +1014,7 @@ error mentioned above.
 \section{Related Work} \label{sec:related}
 
 A description of program properties in \textsc{Metal} language and
-meta-level compilation is discussed in~\cite{CEH02,ECC00,metal,pldi02}. The
+meta-level compilation is discussed in~\cite{CEH02,metal,ECC00,pldi02}. The
 technique presented in~\cite{metal} found a thousands of bugs in real system
 code. It provides an easy description of properties to be checked for and a
 fast analysis.  Nevertheless, it suffers from false positives. Since false
@@ -1047,7 +1048,7 @@ one~\cite{PKS05,GLM08:active_props,GLM08:fuzzing,GLE09,SMA05,TdH08}. There
 are also hybrid techniques combining symbolic execution with a complementary
 static analysis~\cite{Beckmanetal08,GNRT10,Gulavanietal06,GMR09,NRTT09}.
 Symbolic execution can be accelerated by a compositional approach based on
-function summaries~\cite{G07,AGT08}. Another approach to effective symbolic
+function summaries~\cite{AGT08,G07}. Another approach to effective symbolic
 execution introduced in~\cite{BCE08,klee,Cadar08} is based on recording of
 already seen behaviour and pruning its repetition. The followng techniques
 focus on reaching a specific program location. Fitnex~\cite{XTHS09}, a
@@ -1093,12 +1094,12 @@ relevant data, we should solve some practical issues like a correct
 detection of starting functions, automatic replacement of assembler,
 treatment of external function calls, etc. We should also implement an
 on-demand memory allocation to \textsc{Klee} as discussed in
-Section~\ref{sec:impl}.
+Section~\ref{sec:impl} or use a different executor.
 
 The second direction is to adopt or design some convenient way for
 specification of arbitrary state machines. It may be a dedicated language
-similar to \textsc{metal}. Then we plan to implement an instrumentation
-treating these state machines. In particular, the instrumantation should
+similar to \textsc{Metal}. Then we plan to implement an instrumentation
+treating these state machines. In particular, the instrumentation should
 correctly handle state machines associated with dynamically allocated
 objects.
 
@@ -1108,8 +1109,8 @@ executor aiming for maximal code coverage. In particular, such an executor
 has to suppress execution paths that differ from explored paths only in
 number of loop iterations. Unfortunately, we do not know about any publicly
 available symbolic executor of this kind. However, it seems that
-\textsc{UcKlee}~\cite{ucklee} (which is not public so far) has been designed
-for a similar purpose.
+\textsc{UcKlee}~\cite{ucklee} (which is not public as of now) has been
+designed for a similar purpose.
 
 %}}}
 %{{{ Conclusion
