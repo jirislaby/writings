@@ -66,15 +66,15 @@ different principles leading to different advantages and disadvantages.
 looking for various kinds of errors specified by state machines. We explain
 the technique with use of the state machine $SM(x)$ of Figure~\ref{fig:sm},
 which describes errors in lock manipulation. Intuitively, the state machine
-represents possible courses of states of a lock $x$ along an execution of a
-program. The state of the lock is changed according to a transition of the
-state machine if the execution performs a program statement syntactically
-subsuming the label of the transition. We would like to decide whether there
-exists any program execution where an instance of state machine $SM(x)$
-assigned to some lock of the analyzed program reaches an error
-state. Unfortunately, this is not feasible due to potentially unbounded
-number of executions and unbounded execution length. Hence, we use static
-analysis to overapproximate the set of reachable states of state machines.
+represents possible courses of states of a lock referenced by $x$ along an
+execution of a program. The state of the lock is changed according to a
+transition of the state machine if the execution performs a program statement
+syntactically subsuming the label of the transition. We would like to decide
+whether there exists any program execution where an instance of state machine
+$SM(x)$ assigned to some lock of the analyzed program reaches an error state.
+Unfortunately, this is not feasible due to potentially unbounded number of
+executions and unbounded execution length. Hence, we use static analysis to
+overapproximate the set of reachable states of state machines.
 
 \begin{figure}[t]
   \centering
@@ -107,13 +107,13 @@ analysis to overapproximate the set of reachable states of state machines.
 Let us assume that we want to check the program of Figure~\ref{fig:copy} for
 errors specified by the state machine $SM(x)$. First, we find all locks in
 the program and to each lock we assign an instance of the state machine. In
-our case, there is only one lock \texttt{L} and thus only one instance
-$SM(\texttt{L})$. For each program location, we compute a set
-overapproximating possible states of $SM(\texttt{L})$ after executions
-leading to the location. Roughly speaking, we initialize the set in the
-initial location to $\{U\}$ and the other sets to $\emptyset$. Then we
-repeatedly update the sets according to the effect of individual program
-statements until the fixed point is reached.
+our case, there is only one lock pointed by \texttt{L} and thus only one
+instance $SM(\texttt{L})$. For each program location, we compute a set
+overapproximating possible states of $SM(\texttt{L})$ after executions leading
+to the location. Roughly speaking, we initialize the set in the initial
+location to $\{U\}$ and the other sets to $\emptyset$. Then we repeatedly
+update the sets according to the effect of individual program statements until
+the fixed point is reached.
 % \item For each nonterminal program location $l$ and each state $s$ of set $S_l$,
 %   if the program statement associated to the location syntactically subsumes
 %   a label\footnote{Note that all occurence of \texttt{x} in the label are
@@ -263,12 +263,12 @@ applied to the Linux kernel.
 \medskip We emphasize the synergy of the three known methods combined in the
 presented technique.
 \begin{itemize}
-\item Specification of errors by state machines (inspired by
-  metacompilation) and instrumentation of a given program with a code
-  emulating the state machines provide us simple slicing criteria: to
-  preserve values of structures representing states of state
-  machines. Hence, the sliced program contains only the code relevant to the
-  considered errors.\note{dlouhy, tezkopadny odstavec}
+\item The errors are specified by state machines (inspired by
+  metacompilation) and a given program instrumented with a code emulating the
+  state machines. This provides us simple slicing criteria: we want to
+  preserve values of data structures representing states of state machines.
+  Hence, the sliced program contains only the code relevant to the considered
+  errors.
 \item Slicing may substantially reduce the size of the code, which in turn may
   remarkably improve performance of the symbolic execution.
 \item Application of symbolic execution brings us another benefit. While in
@@ -767,10 +767,11 @@ and, for the sake of simplicity, it detects only locking errors described by
 a state machine very similar to $SM(x)$ of Figure~\ref{fig:sm}. Moreover,
 the instances of the state machine are associated only to global variables
 that appear as arguments of some \texttt{lock} or \texttt{unlock} function
-call. \todo{Je tohle pravda? Davat to sem?} The main part of our
-implementation is written in three modules for the \textsc{Llvm}
-framework~\cite{llvm}, namely \texttt{Prepare}, \texttt{Slicer}, and
-\texttt{Kleerer}. The framework provides us with the C compiler
+call. This may as well be the case for instances of dynamically allocated
+locks that are allocated only once during the run of the symbolic executor.
+The main part of our implementation is written in three modules for the
+\textsc{Llvm} framework~\cite{llvm}, namely \texttt{Prepare}, \texttt{Slicer},
+and \texttt{Kleerer}. The framework provides us with the C compiler
 \textsc{\textsc{clang}}. We also may use an existing symbolic executor for
 \textsc{Llvm} called \textsc{Klee}~\cite{klee}.
 
@@ -789,20 +790,19 @@ Andersen~\cite{andersen}.
 
 The module \texttt{Kleerer} performs a final processing of the sliced
 bytecode before it is passed to \textsc{Klee}. In particular, the module
-adds to the bytecode a function \texttt{main} calling the \emph{starting
-  function}, i.e.~the function where the analysis should start. The
-\texttt{main} function also allocates a symbolic memory for each parameter
+adds to the bytecode a function \texttt{main} that calls a so-called
+\emph{starting function}. It is the function where the analysis should start.
+The \texttt{main} function also allocates a symbolic memory for each parameter
 of the starting function. Size of the allocated memory is determined by the
-parameter type. Plus, when the parameter is a pointer, the size is
-multiplied by 4000. For example, 4 bytes are allocated for an integer and
-16000 bytes for an integer pointer. Further, for the pointer case, we pass a
-pointer to the middle of the allocated memory (functions might dereference
-memory at negative index). The idea behind is explained
-in~\cite{ucklee}. Finally, the resulting bytecode is symbolically executed
-by~\textsc{Klee}. If a symbolic execution touches a memory out of the
-allocated area, we get a \emph{memory error}. To remedy this inconvenience,
-we plan to implement the same on-demand memory handling
-\textsc{UcKlee}~\cite{ucklee} does.
+parameter type. Plus, when the parameter is a pointer, the size is multiplied
+by 4000. For example, 4 bytes are allocated for an integer and 16000 bytes for
+an integer pointer. Further, for the pointer case, we pass a pointer to the
+middle of the allocated memory (functions might dereference memory at negative
+index). The idea behind is explained in~\cite{ucklee}. Finally, the resulting
+bytecode is symbolically executed by~\textsc{Klee}. If a symbolic execution
+touches a memory out of the allocated area, we get a \emph{memory error}. To
+remedy this inconvenience, we plan to implement the same on-demand memory
+handling \textsc{UcKlee}~\cite{ucklee} does.
 
 %\begin{figure}[htb]
 %\begin{center}
