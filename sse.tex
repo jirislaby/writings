@@ -422,18 +422,18 @@ void foo(char *src, int n) {
 
 The instrumentation starts by recognizing the code fragments in the analysed
 program which manipulate with locks. More precisely, we look for all those
-code fragments matching edge labels of the state machine in
-Figure~\ref{fig:sm}.  The analysed program contains three such fragments,
-all of them in function \texttt{copy} (see Figure~\ref{fig:copy}): the call
-to \texttt{lock} at line~\ref{line:copy_lock}, the call to \texttt{unlock}
-at line~\ref{line:copy_unlock}, and the return statement at
+code fragments matching edge labels of the state machine $SM(x)$ of
+Figure~\ref{fig:sm}. The analysed program contains three such fragments, all
+of them in function \texttt{copy} (see Figure~\ref{fig:copy}): the call to
+\texttt{lock} at line~\ref{line:copy_lock}, the call to \texttt{unlock} at
+line~\ref{line:copy_unlock}, and the return statement at
 line~\ref{line:copy_ret}.
 
 Next we determine a set of all locks with which the program
-manipulates. From recognized code fragments (and according to the structure
-of edge labels of the state machine $SM(x)$ of Figure~\ref{fig:sm}), we find
-out that a pointer variable \texttt{L} in \texttt{copy} is the only program
-variable through which the program manipulates with locks.
+manipulates. From the recognized code fragments % (and according to the structure
+% of edge labels of the state machine $SM(x)$ of Figure~\ref{fig:sm})
+, we find out that a pointer variable \texttt{L} in \texttt{copy} is the
+only program variable through which the program manipulates with locks.
 % (We assume the code represented by dots in \texttt{foo} is not involved in
 % the lock manipulation.)
 Using a points-to analysis, we obtain obtain the set $\{ \texttt{L1},
@@ -447,10 +447,13 @@ the set. More precisely, we define two integer variables \texttt{smL1} and
 and $SM(\texttt{L2})$, respectively. Further, we need to specify a mapping
 from locks to their state machines. The mapping is basically a function
 (preferably with constant complexity) from addresses of program objects
-(i.e.~the locks) to addresses of related state machines. 
-Figure~\ref{fig:fire} shows an implementation of function
+(i.e.~the locks) to addresses of related state machines.
+Figure~\ref{fig:fire} shows an implementation of a function
 \texttt{smGetMachine} that maps addresses of locks \texttt{L1} and
-\texttt{L2} to addresses of related state machines.
+\texttt{L2} to addresses of related state machines. We note that the
+implementation of \texttt{smGetMachine} would be more complicated if state
+machines are associated to dynamically allocated objects.
+
 % Note that lines marked by \texttt{*} represent the code we have
 % instrumented into the original program.
 
@@ -471,14 +474,14 @@ Figure~\ref{fig:fire} shows an implementation of function
 % 	\label{fig:mapping}
 % \end{figure}
 
-Although we have already instrumented the program with state machines, there
-is no code manipulating them. Figure~\ref{fig:fire} contains also a function
-\texttt{smFire} implementing the state machine $SM(x)$.
-
-\texttt{TADY!!}
-
-Note that we represent both states of the machine and names of transitions
-by integer constants. Also note that the pointer argument \texttt{SM} of
+% Although we have already instrumented the program with state machines, there
+% is no code manipulating them.
+Figure~\ref{fig:fire}\todo{Nechat v obrazku cislovani?} contains also many constants and a function
+\texttt{smFire} implementing the state machine $SM(x)$. Further,
+Figure~\ref{fig:fire} declares variables \texttt{smL1} and \texttt{smL2} and
+initialize them to the initial state of the state machine.  Note that we
+represent both states of the machine and names of transitions by integer
+constants. Also note that the pointer argument \texttt{SM} of
 \texttt{smFire} function points to an instrumented state machine, whose
 transition has to be fired.
 
@@ -486,23 +489,23 @@ transition has to be fired.
   \centering
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
- 1: int smL1 = smU, smL2 = smU;
- 2:
- 3: int *smGetMachine(int *p) {
- 4:    if (p == &L1) return &smL1;
- 5:    if (p == &L2) return &smL2;
- 6:    return NULL;         // unreachable 
- 7: }
- 8:
- 9: const int smU  = 0;     // state U 
-10: const int smL  = 1;     // state L 
-11: const int smDU = 2;     // state DU 
-12: const int smDL = 3;     // state DL 
-13: const int smRL = 4;     // state RL 
-14:
-15: const int smLOCK   = 0; // transition lock(x) 
-16: const int smUNLOCK = 1; // transition unlock(x) 
-17: const int smRETURN = 2; // transition return 
+ 1: const int smU  = 0;     // state U 
+ 2: const int smL  = 1;     // state L 
+ 3: const int smDU = 2;     // state DU 
+ 4: const int smDL = 3;     // state DL 
+ 5: const int smRL = 4;     // state RL 
+ 6:
+ 7: const int smLOCK   = 0; // transition lock(x) 
+ 8: const int smUNLOCK = 1; // transition unlock(x) 
+ 9: const int smRETURN = 2; // transition return 
+10:
+11: int smL1 = smU, smL2 = smU;
+12:
+13: int *smGetMachine(int *p) {
+14:    if (p == &L1) return &smL1;
+15:    if (p == &L2) return &smL2;
+16:    return NULL;         // unreachable 
+17: }
 18:
 19: void smFire(int *SM, int transition) {
 20:    switch (*SM) {
@@ -546,15 +549,19 @@ program. For each fragment we know its related transition of the state
 machine and we also know what objects the fragment manipulates with (if
 any). Therefore, we first retrieve an address of state machine related to
 manipulated objects (if any) by using the function \texttt{smGetMachine} and
-then we fire the transition by calling the function \texttt{smFire}. We show
-the instrumented version of \texttt{copy} in
-Figure~\ref{fig:copy_instrumented}. Note that instrumented lines are
-highlighted by \texttt{*} again.
+then we fire the transition by calling the function \texttt{smFire}. The
+instrumented version of the original program consists of the code of
+Figure~\ref{fig:fire} and the instrumented version of the original functions
+\texttt{foo} and \texttt{copy} given in Figure~\ref{fig:copy_instrumented},
+where the instrumented lines are highlighted by~\texttt{*}.
 
 \begin{figure}[!htb]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
+  char *buf1, *buf2;
+  int L1, L2;
+
   char *copy(char *dst, char *src, int n, int *L) {
      int i, len;
      len = 0;
@@ -575,11 +582,16 @@ highlighted by \texttt{*} again.
 *    smFire(smGetMachine(L), smRETURN);
      return dst;
   }
+
+  void foo(char *src, int n) {
+     copy(src, buf1, n, &L1);
+     copy(src, buf2, n, &L2);
+  }
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{\texttt{copy} function instrumented by functions that manipulate
-    with locking automata pointed by \texttt{L}.}
+    \caption{Functions \texttt{foo} and \texttt{copy} instrumented by calls
+      of \texttt{smFire} function.}
     \label{fig:copy_instrumented}
 \end{figure}
 
