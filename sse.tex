@@ -763,21 +763,21 @@ call. \todo{Je tohle pravda? Davat to sem?} The main part of our
 implementation is written in three modules for the \textsc{Llvm}
 framework~\cite{llvm}, namely \texttt{Prepare}, \texttt{Slicer}, and
 \texttt{Kleerer}. The framework provides us with the C compiler
-\textsc{\textsc{clang}} and the symbolic executor \textsc{Klee}~\cite{klee}.
+\textsc{\textsc{clang}}. We also may use an existing symbolic executor for
+\textsc{Llvm} called \textsc{Klee}~\cite{klee}.
 
 Instrumentation of a given program proceeds in two steps. Using a C
 preprocessor, the original program is instrumented with function calls
 \texttt{<sem dat nazev funkce>} located just above statements changing
-states of state machines. The program is then translated by
-\textsc{\textsc{clang}} into \textsc{Llvm}
-bytecode~\cite{llvm}. Optimizations are turned off as required by
-\textsc{Klee}. The rest of the instrumentation is done on the \textsc{Llvm}
-code using the module \texttt{Prepare}.
+states of state machines. The program is then translated by \textsc{clang}
+into \textsc{Llvm} bytecode~\cite{llvm}. Optimizations are turned off as
+required by \textsc{Klee}. The rest of the instrumentation is done on the
+\textsc{Llvm} code using the module \texttt{Prepare}.
 
 The module \texttt{Slicer} implements a variant of the inter-procedural
 slicing algorithm by Weiser~\cite{W81}. To guarantee correctness and to
 improve performance of slicing, the algorithm employs points-to analysis by
-Steensgaard~\cite{Ste96}.
+Andersen~\cite{andersen}.
 
 The module \texttt{Kleerer} performs a final processing of the sliced
 bytecode before it is passed to \textsc{Klee}. In particular, the module
@@ -792,7 +792,7 @@ pointer to the middle of the allocated memory (functions might dereference
 memory at negative index). The idea behind is explained
 in~\cite{ucklee}. Finally, the resulting bytecode is symbolically executed
 by~\textsc{Klee}. If a symbolic execution touches a memory out of the
-allocated area, we get a \emph{memory error}. To remedy the inconvenience,
+allocated area, we get a \emph{memory error}. To remedy this inconvenience,
 we plan to implement the same on-demand memory handling
 \textsc{UcKlee}~\cite{ucklee} does.
 
@@ -811,21 +811,21 @@ we plan to implement the same on-demand memory handling
 \label{ssec:experiments}
 
 We have performed our experiments on several functions of the Linux kernel
-2.6.28., where the static analyser \textsc{Stanse} reported an error. More
+2.6.28, where the static analyzer \textsc{Stanse} reported some error. More
 precisely, \textsc{Stanse} reported an error trace starting in these
 functions. We consulted the errors with kernel developers to sort out which
 are false positives and which are real errors. All the selected functions
-(and transitively all functions called from them) contain no assembler (it
-has been replaced by an equivalent C code) and no external function calls
-after slicing.
+(and all functions transitively called from them) contain no assembler (in
+some cases, it has been replaced by an equivalent C code) and no external
+function calls after slicing.
 
-We run our experimental tool on these functions. All tests were performed on
-a machine with an Intel E6850 dual-core processor at 3\,GHz, 6\,GiB of
-memory, running Linux. We specify \textsc{Klee} parameters to timeout after
-10 seconds spent in an SMT solver and after 300 seconds of an overall
-running time. We tried to double these times several times with no real
-effect. We do not pass optimize option for \textsc{Klee} because it causes
-\textsc{Klee} to crash under some circumstances. 
+We ran our experimental tool on these functions. All tests were performed on
+a machine with an Intel E6850 dual-core processor at 3\,GHz and 6\,GiB of
+memory, running Linux. We specified \textsc{Klee} parameters to time out after
+10 seconds spent in an SMT solver and after 300 seconds of an overall running
+time. Increasing these times brings no real effect in our environment. We do
+not pass optimize option for \textsc{Klee} because it causes \textsc{Klee} to
+crash for most of the input.
 % The optimization might
 % further speed the analysis up. The crashes are yet to be investigated.
 
@@ -837,21 +837,21 @@ effect. We do not pass optimize option for \textsc{Klee} because it causes
 % We consulted the files with upstream developers to sort out which are in each
 % category.
 
-Table~\ref{tab:results} presents results of our tool on selected
-functions. The table shows compilation, instrumentation, slicing, symbolic
-execution, and the overall running time. Further, the table presents the
-ratio of instruction that were sliced out from the instrumented
-\textsc{Llvm} code. The last two columns specify the results of our analysis
-and the real state confirmed by kernel developers. The table clearly shows
-that the bottleneck of our technique is the symbolic execution.  
+Table~\ref{tab:results} presents results of our tool on selected functions.
+The table shows compilation, instrumentation, slicing, symbolic execution, and
+the overall running time. Further, the table presents the ratio of
+instructions that were sliced away from the instrumented \textsc{Llvm} code.
+The last two columns specify the results of our analysis and the real state
+confirmed by kernel developers. The table clearly shows that the bottleneck of
+our technique is the symbolic execution.  
 
-Althought the results has no statistical significance, it is clear that the
-technique can in principle classify error reports produced by other tools
-like \textsc{Stanse}. If our technique reports an error, it is a real
-one. If it finishes the analysis without any error detected, the original
-error report is a false positive. The analysis may also not finish in a
-given time, which is usually to caused by loops in the sliced code. Finally,
-it can report a memory error mentioned above.
+Although the results have no statistical significance, it is clear that the
+technique can in principle classify error reports produced by other tools like
+\textsc{Stanse}. If our technique reports an error, it is a real one. If it
+finishes the analysis without any error detected, the original error report is
+a false positive. The analysis may also not finish in a given time, which is
+usually caused by loops in the sliced code. Finally, it may report a memory
+error mentioned above.
 
 \begin{table}[t]
 \centering
@@ -905,14 +905,15 @@ it can report a memory error mentioned above.
 \end{tabular}
 \medskip~
 \caption{Experimental results. The table presents running time of
-  preprocessing and compilation (\textbf{Comp.}), instrumentation including points-to
-  analysis (\textbf{Instr.}), slicing (\textbf{Slic.}), symbolic execution (\textbf{SE}), and the total
-  running time. The column \textbf{Sliced} presents the ratio of
-  instructions sliced out of the instrumented \textsc{Llvm} code.  
-  The column \textbf{Result} specifies the result of our tool: BUG means that
-  the tool find a real error and FP means that the analysis finished without
-  error found (i.e.~the original error report is a false positive). The
-  last column specifies the factual state of the error report.}
+  preprocessing and compilation (\textbf{Comp.}), instrumentation including
+  points-to analysis (\textbf{Instr.}), slicing (\textbf{Slic.}), symbolic
+  execution (\textbf{SE}), and the total running time. The column
+  \textbf{Sliced} presents the ratio of instructions sliced away from the
+  instrumented \textsc{Llvm} code.  The column \textbf{Result} specifies the
+  result of our tool: BUG means that the tool found a real error and FP means
+  that the analysis finished without error found (i.e.~the original error
+  report is a false positive). The last column specifies the factual state of
+  the error report.}
 \label{tab:results}
 \end{table}
 
