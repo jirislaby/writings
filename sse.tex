@@ -744,20 +744,49 @@ call of \texttt{copy} explores more then $2^{31}$ real paths.
     \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
     \footnotesize
     \begin{tikzpicture}[node distance=0.7cm]
-        \node [loc] (1) {$6$};
+        \node [loc] (0) {$19$};
+        \node [loc] (1) [below of=0] {$6$}
+            edge [pre] node {} (0);
         \node [loc] (2) [below of=1] {$7$}
             edge [pre] node {} (1);
 
         % ->false branch
-        \node [loc] (3) [left of=2,below of=2] {$11$}
+        \node [loc] (3) [left of=2,below of=2,xshift=-0.5cm] {$11$}
             edge [pre] node [label=above:F~~] {} (2);
         \node [loc] (4) [below of=3] {$14$}
             edge [pre] node {} (3);
         \node [loc] (5) [below of=4] {$15$}
             edge [pre] node {} (4);
+        \node [loc] (20) [below of=5] {$20$}
+            edge [pre] node {} (5);
+        \node [loc] (21) [below of=20] {$6$}
+            edge [pre] node {} (20);
+        \node [loc] (22) [below of=21] {$7$}
+            edge [pre] node {} (21);
+        \node [loc] (23) [right of=22,below of=22] {$8$}
+            edge [pre] node [label=above:~~T] {} (22);
+        \node [loc] (24) [below of=23] {$9$}
+            edge [pre] node {} (23);
+        \node [loc] (25) [below of=24] {$11$}
+            edge [pre] node {} (24);
+        \node [loc] (26) [left of=22,below of=22] {$11$}
+            edge [pre] node [label=above:F~~] {} (22);
+        \node [loc] (27) [below of=26] {$14$}
+            edge [pre] node {} (26);
+        \node [loc] (28) [below of=27] {$15$}
+            edge [pre] node {} (27);
+        \node [loc] (29) [left of=25,below of=25] {$14$}
+            edge [pre] node [label=above:F~~] {} (25);
+        \node [] (BUG) [below of=29,yshift=0.2cm] {\emph{bug}};
+        \node [loc] (30) [right of=25,below of=25] {$12$}
+            edge [pre] node [label=above:~~T] {} (25);
+        \node [loc] (31) [below of=30] {$14$}
+            edge [pre] node {} (30);
+        \node [loc] (32) [below of=31] {$15$}
+            edge [pre] node {} (31);
 
         % ->true branch
-        \node [loc] (7) [right of=2,below of=2] {$8$}
+        \node [loc] (7) [right of=2,below of=2,xshift=0.5cm] {$8$}
             edge [pre] node [label=above:~~T] {} (2);
         \node [loc] (8) [below of=7] {$9$}
             edge [pre] node {} (7);
@@ -777,33 +806,55 @@ call of \texttt{copy} explores more then $2^{31}$ real paths.
         \node [loc] (15) [below of=14] {$15$}
             edge [pre] node {} (14);
 
+        \node [loc] (40) [below of=15] {$20$}
+            edge [pre] node {} (15);
+        \node [loc] (41) [below of=40] {$6$}
+            edge [pre] node {} (40);
+        \node [loc] (42) [below of=41] {$7$}
+            edge [pre] node {} (41);
+        \node [loc] (43) [right of=42,below of=42] {$8$}
+            edge [pre] node [label=above:~~T] {} (42);
+        \node [loc] (44) [below of=43] {$9$}
+            edge [pre] node {} (43);
+        \node [loc] (45) [below of=44] {$11$}
+            edge [pre] node {} (44);
+        \node [loc] (46) [right of=45,below of=45] {$12$}
+            edge [pre] node [label=above:~~T] {} (45);
+        \node [loc] (47) [below of=46] {$14$}
+            edge [pre] node {} (46);
+        \node [loc] (48) [below of=47] {$15$}
+            edge [pre] node {} (47);
+        \node [loc] (49) [left of=42,below of=42] {$14$}
+            edge [pre] node [label=above:F~~] {} (42);
+        \node [] (BUG) [below of=49,yshift=0.2cm] {\emph{bug}};
+
 %        \node [] (X1) [above of=1,yshift=2mm] {}
 %            edge [dotted,thick,draw] node {} (1);
     \end{tikzpicture}
-    \caption{Symbolic execution tree of the sliced function \texttt{copy}
-      (see Figure~\ref{fig:copy_sliced})}
+    \caption{Symbolic execution tree of the sliced program of
+      Figure~\ref{fig:copy_sliced}.}
         \label{fig:copy_sliced:SET}
 \end{figure}
 
 By contrast, the sliced program does not contain the loop, which generated
 the huge number of real paths. Therefore, a number of real paths explored by
 the symbolic execution is exactly 6. Figure~\ref{fig:copy_sliced:SET} shows
-a part of a symbolic execution tree of the sliced program, corresponding to
-an execution of function \texttt{copy} of Figure~\ref{fig:copy_sliced}. We
-left out vertices corresponding to lines in called functions
-\texttt{smGetMachine} and \texttt{smFire}. Note that although the parameter
-\texttt{n} has a symbolic value, it can only affect the branching at line
-11. Moreover, the parameter \texttt{L} always has a concrete
-value. Therefore, we do not fork symbolic execution at branchings inside
-functions \texttt{smGetMachine} and \texttt{smFire}. Among the explored
-paths, there is one path going through lines $6,7,8,9,11,14$ in the function
-\texttt{copy}. The path is also marked in Figure~\ref{fig:copy_sliced:SET}
-with the label \emph{bug}. This path reaches the second assertion in
-function \texttt{smFire} (see Figure~\ref{fig:fire}). In other words, the
-path is a witness that we can leave the function \texttt{copy} in a locked
+the symbolic execution tree of the sliced program of
+Figure~\ref{fig:copy_sliced}. We left out vertices corresponding to lines in
+called functions \texttt{smGetMachine} and \texttt{smFire}. Note that
+although the parameter \texttt{n} has a symbolic value, it can only affect
+the branching at line 11. Moreover, the parameter \texttt{L} always has a
+concrete value. Therefore, we do not fork symbolic execution at branchings
+inside functions \texttt{smGetMachine} and \texttt{smFire}. Three of the
+explored paths are marked with the label \emph{bug}. These paths reach the
+second assertion in function \texttt{smFire} (see Figure~\ref{fig:fire})
+called from line 14 of the sliced program. In other words, the paths are
+witnesses that we can leave the function \texttt{copy} in a locked
 state. The remaining explored paths of Figure~\ref{fig:copy_sliced:SET} miss
-the assertions in the function \texttt{smFire}.
-% It means, that the path above represents the only bug-report from our
+the assertions in the function \texttt{smFire}. It means that the original
+program contains only one locking error, namely \emph{return in locked
+  state}.
+
 % analysis.
 
 %}}}
