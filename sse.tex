@@ -171,9 +171,9 @@ the only real locking error in the program.
 
 To sum up, metacompilation is highly flexible, fast, and thus applicable on
 extremely large software projects (e.g.~the Linux kernel). It examines all the
-code and finds many errors. Unfortunately, some of the errors are false
-positives. The main source of false positives is related to the fact that
-the analysis does not work with data values. In particular, the analysis
+code and finds many error reports. Unfortunately, some of the reports are
+false positives. The main source of false positives is related to the fact
+that the analysis does not work with data values. In particular, the analysis
 does not track connections between variable values and states of state
 machines.
 % Therefore, when a branching statement is processed, the analysis cannot
@@ -188,11 +188,10 @@ At this point, we would like to emphasize that metacompilation actually uses
 a more sophisticated algorithm enriched with many techniques for partial
 elimination of false positives (see~\cite{pldi02} for
 details). Metacompilation employs a dedicated language for description of
-state machines called \textsc{Metal} and mentioned in the title of this
-paper. The idea of error specification using state machines appears in
-several tools including the original implementation of metacompilation
-called \textsc{xgcc}~\cite{pldi02}, \textsc{Esp}~\cite{DLS02} or
-\textsc{Stanse}~\cite{stanse}.
+state machines called \textsc{Metal}.  The idea of error specification using
+state machines appears in several tools including the original implementation
+of metacompilation called \textsc{xgcc}~\cite{pldi02},
+\textsc{Esp}~\cite{DLS02} or \textsc{Stanse}~\cite{stanse}.
 
 \medskip In contrast to metacompilation, \emph{symbolic execution}~\cite{se} analyzes each execution path separately. In contrast to
 standard execution, symbolic execution replaces input data by symbols
@@ -389,7 +388,7 @@ presented results.
 \section{Instrumentation} \label{sec:instr}
 
 The purpose of the instrumentation phase of our algorithm is to insert a
-code implementing a state machine into an analysed program. Nevertheless,
+code implementing a state machine into the analysed program. Nevertheless,
 the semantics of the program being instrumented must not be changed.  A
 result of this phase is therefore a new program that still has the original
 functionality and it simultaneously updates instrumented state machines. We
@@ -399,8 +398,8 @@ function \texttt{copy} of Figure~\ref{fig:copy}. The function \texttt{foo}
 calls the function \texttt{copy} twice, first with the lock \texttt{L1} and
 then with the lock \texttt{L2}. The locks guard writes into buffers
 \texttt{buf1} and \texttt{buf2} respectively. The function \texttt{foo} is
-the \emph{starting function} of our analysis.
-
+a so-called \emph{starting function}. It is a function where the symbolic
+execution starts.
 
 \begin{figure}[!htb]
   \centering
@@ -429,8 +428,8 @@ of them in function \texttt{copy} (see Figure~\ref{fig:copy}): the call to
 line~\ref{line:copy_unlock}, and the return statement at
 line~\ref{line:copy_ret}.
 
-Next we determine a set of all locks with which the program
-manipulates. From the recognized code fragments % (and according to the structure
+Next we determine a set of all locks that are manipulated by the program.
+From the recognized code fragments% (and according to the structure
 % of edge labels of the state machine $SM(x)$ of Figure~\ref{fig:sm})
 , we find out that a pointer variable \texttt{L} in \texttt{copy} is the
 only program variable through which the program manipulates with locks.
@@ -522,7 +521,7 @@ transition has to be fired.
 31:       break;
 32:    case smL:
 33:       switch (transition) {
-34:      case smLOCK:
+34:       case smLOCK:
 35:          assert(false); // double lock
 36:          break;
 37:       case smUNLOCK:
@@ -700,11 +699,20 @@ may be a source of false positives in our technique.
 %}}}
 %{{{ Symbolic Execution
 
-\section{Symbolic Execution} \label{sec:symexe} \todo{M}
+\section{Symbolic Execution} \label{sec:symexe}
 
-This is the final phase of our technique. We symbolically execute the sliced program from the entry location of the starting function. Symbolic execution explores real program paths. Therefore, if it reaches some of the assertions inside function \texttt{smFire}, then we have found a bug.
+This is the final phase of our technique. We symbolically execute the sliced
+program from the entry location of the starting function. Symbolic execution
+explores real program paths. Therefore, if it reaches some of the assertions
+inside function \texttt{smFire}, then we have found a bug.
 
-Let us first discuss symbolic execution of the original program. We start at the entry location of the function \texttt{foo}. The execution eventually reaches the function \texttt{copy}. Note that value of the parameter \texttt{n} is symbolic. Therefore, symbolic execution will fork into two execution each time we reach line~9. One of the executions skips the loop at lines~9--12, while the other enters it. If we assume that type of \texttt{n} is a 32 bit integer, then we explore more then $2^{31}$ real paths.
+Let us first discuss symbolic execution of the original program. We start at
+the entry location of the function \texttt{foo}. The execution eventually
+reaches the function \texttt{copy}. Note that value of the parameter
+\texttt{n} is symbolic. Therefore, symbolic execution will fork into two
+executions each time we reach line~9. One of the executions skips the loop at
+lines~9--12, while the other enters it. If we assume that the type of
+\texttt{n} is a 32 bit integer, then we explore more then $2^{31}$ real paths.
 
 \begin{figure}[!htb]
     \centering
@@ -754,7 +762,24 @@ Let us first discuss symbolic execution of the original program. We start at the
         \label{fig:copy_sliced:SET}
 \end{figure}
 
-By contrast, the sliced program does not contain the loop, which generated the huge number of real paths. Therefore, number of real paths explored by symbolic execution is exactly 9. At Figure~\ref{fig:copy_sliced:SET} there we describe a part of symbolic execution tree of the sliced program, corresponding to an execution of function \texttt{copy}. But we do not show vertices corresponding to lines in called functions \texttt{smGetMachine} and \texttt{smFire}. Note that although the parameter \texttt{n} has symbolic value, it can only affect the branching at line 9. Moreover, the parameter \texttt{L} has always concrete value. Therefore, we do not fork symbolic execution at branchings inside functions \texttt{smGetMachine} and \texttt{smFire}. Among the explored paths, there is one going through lines $3,4,5,6,8,11$ in the function \texttt{copy}. The path is also marked at Figure~\ref{fig:copy_sliced:SET}. This path reaches the second assertion in function \texttt{smFire} (see Figure~\ref{fig:fire}). In other words, the path is a witness that we can leave the function \texttt{copy} in locked state. The remaining explored paths miss the assertions in the function \texttt{smFire}. It means, that the path above represents the only bug-report from our analysis.
+By contrast, the sliced program does not contain the loop, which generated the
+huge number of real paths. Therefore, a number of real paths explored by
+the symbolic execution is exactly 9. At Figure~\ref{fig:copy_sliced:SET} there
+we describe a part of a symbolic execution tree of the sliced program,
+corresponding to an execution of function \texttt{copy}. But we do not show
+vertices corresponding to lines in called functions \texttt{smGetMachine} and
+\texttt{smFire}. Note that although the parameter \texttt{n} has a symbolic
+value, it can only affect the branching at line 9. Moreover, the parameter
+\texttt{L} always has a concrete value. Therefore, we do not fork symbolic
+execution at branchings inside functions \texttt{smGetMachine} and
+\texttt{smFire}. Among the explored paths, there is one path going through
+lines $3,4,5,6,8,11$ in the function \texttt{copy}. The path is also marked in
+Figure~\ref{fig:copy_sliced:SET}. This path reaches the second assertion in
+function \texttt{smFire} (see Figure~\ref{fig:fire}). In other words, the path
+is a witness that we can leave the function \texttt{copy} in a locked state.
+The remaining explored paths miss the assertions in the function
+\texttt{smFire}.  It means, that the path above represents the only bug-report
+from our analysis.
 
 %}}}
 %{{{ Implementation
@@ -777,11 +802,11 @@ and \texttt{Kleerer}. The framework provides us with the C compiler
 
 Instrumentation of a given program proceeds in two steps. Using a C
 preprocessor, the original program is instrumented with function calls
-\texttt{<sem dat nazev funkce>} located just above statements changing
-states of state machines. The program is then translated by \textsc{clang}
-into \textsc{Llvm} bytecode~\cite{llvm}. Optimizations are turned off as
-required by \textsc{Klee}. The rest of the instrumentation is done on the
-\textsc{Llvm} code using the module \texttt{Prepare}.
+\texttt{smFire} located just above statements changing states of state
+machines. The program is then translated by \textsc{clang} into \textsc{Llvm}
+bytecode~\cite{llvm}. Optimizations are turned off as required by
+\textsc{Klee}. The rest of the instrumentation is done on the \textsc{Llvm}
+code using the module \texttt{Prepare}.
 
 The module \texttt{Slicer} implements a variant of the inter-procedural
 slicing algorithm by Weiser~\cite{Wei84}. To guarantee correctness and to
@@ -790,19 +815,18 @@ Andersen~\cite{andersen}.
 
 The module \texttt{Kleerer} performs a final processing of the sliced
 bytecode before it is passed to \textsc{Klee}. In particular, the module
-adds to the bytecode a function \texttt{main} that calls a so-called
-\emph{starting function}. It is the function where the analysis should start.
-The \texttt{main} function also allocates a symbolic memory for each parameter
-of the starting function. Size of the allocated memory is determined by the
-parameter type. Plus, when the parameter is a pointer, the size is multiplied
-by 4000. For example, 4 bytes are allocated for an integer and 16000 bytes for
-an integer pointer. Further, for the pointer case, we pass a pointer to the
-middle of the allocated memory (functions might dereference memory at negative
-index). The idea behind is explained in~\cite{ucklee}. Finally, the resulting
-bytecode is symbolically executed by~\textsc{Klee}. If a symbolic execution
-touches a memory out of the allocated area, we get a \emph{memory error}. To
-remedy this inconvenience, we plan to implement the same on-demand memory
-handling \textsc{UcKlee}~\cite{ucklee} does.
+adds to the bytecode a function \texttt{main} that calls a \emph{starting
+function}.  The \texttt{main} function also allocates a symbolic memory for
+each parameter of the starting function. Size of the allocated memory is
+determined by the parameter type. Plus, when the parameter is a pointer, the
+size is multiplied by 4000. For example, 4 bytes are allocated for an integer
+and 16000 bytes for an integer pointer. Further, for the pointer case, we pass
+a pointer to the middle of the allocated memory (functions might dereference
+memory at negative index). The idea behind is explained in~\cite{ucklee}.
+Finally, the resulting bytecode is symbolically executed by~\textsc{Klee}. If
+a symbolic execution touches a memory out of the allocated area, we get a
+\emph{memory error}. To remedy this inconvenience, we plan to implement the
+same on-demand memory handling \textsc{UcKlee}~\cite{ucklee} does.
 
 %\begin{figure}[htb]
 %\begin{center}
