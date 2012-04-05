@@ -22,6 +22,7 @@
 \newcommand{\todol}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
 \newcommand{\rem}[1]{{\scriptsize{{\textcolor{blue}{[#1]}}}}}
 \lstset{basicstyle=\ttfamily\scriptsize,escapeinside={(*@}{@*)}}
+\newcommand{\SM}{{\textit{SM}}}
 
 \newcommand{\ADD}[1]{\Color{blue}{#1}}
 \newcommand{\DEL}[1]{\Color{red}{#1}}
@@ -94,7 +95,6 @@ containing loops or recursion have typically large or even infinite number
 of execution paths and cannot be completely analysed by symbolic execution.
 % Hence, executors are usually able to explore merely a small part of an analysed program.
 
-
 In this paper, we introduce a new fully automatic program analysis
 technique offering flexibility of FSM property specification with zero false
 positive rate of symbolic execution. The technique symbolically executes
@@ -104,8 +104,8 @@ property. The basic idea is very simple:
 \item We get state machines describing some program properties. We
   instrument a given program with a code tracking behaviors of the state
   machines.
-\item The instrumented program is then reduced using the slicing method
-  introduced in~\cite{Wei84}.  The sliced program has to meet the criterion
+\item The instrumented program is then reduced using the method called
+  \emph{slicing}~\cite{Wei84}. The sliced program has to meet the criterion
   to be equivalent to the instrumented program with respect to reachability
   of error states of tracked state machines. Note that slicing may remove
   big portions of the code, including loops and function calls. Hence, an
@@ -114,23 +114,21 @@ property. The basic idea is very simple:
 \item Finally, we execute the sliced program symbolically to find violations
   of the checked property.
 \end{enumerate}
-
-Note the analysis of the program is fully automated once a user provides a
-property specification. Our technique may be used in two ways according to the
-applied symbolic execution tool. If we apply a symbolic executor that prefers
-to explore more parts of the code (for example, it can explore only such
-execution paths where each program loop is unwind at most twice), we may use
-the technique as a general bug-finding technique reporting only real errors.
-Note that this approach may miss errors appearing only on unexplored paths. On
-the contrary, if we use a symbolic executor exploring all execution paths, we
+Our technique may be used in two ways according to the applied symbolic
+execution tool. If we apply a symbolic executor that prefers to explore more
+parts of the code (for example, it can explore only such execution paths
+where each program loop is passed at most twice), we may use the technique as a
+general bug-finding technique reporting only real errors. Note that this
+approach may miss errors appearing only on unexplored paths. On the
+contrary, if we use a symbolic executor exploring all execution paths, we
 may use our technique for basic classification of error reports produced by
 other tools (e.g.~\textsc{xgcc} or \textsc{Stanse}). For each such an error
 report, we may instrument the corresponding code only with the state machine
-describing that reported error. If our technique finds the same error, it is a
-real one. If our technique explores all execution paths of the sliced code
-without detecting the error, it is a false positive. If our technique runs out
-of resources, we cannot decide whether the error is a real one or just a false
-positive.
+describing the reported error. If our technique finds the same error, it is
+a real one. If our technique explores all execution paths of the sliced code
+without detecting the error, it is a false positive. If our technique runs
+out of resources, we cannot decide whether the error is a real one or just a
+false positive.
 
 We have developed an experimental tool implementing our technique. The tool
 instruments a program with a state machine describing locking errors (we use
@@ -143,25 +141,25 @@ applied to the Linux kernel.
 We emphasize the synergy of the three known methods combined in the
 presented technique.
 \begin{itemize}
-\item The errors are specified by state machines (inspired by
-  metacompilation) and a given program instrumented with a code emulating the
-  state machines. This provides us simple slicing criteria: we want to
-  preserve values of memory places representing states of state machines.
-  Hence, the sliced program contains only the code relevant to the considered
-  errors.
+\item Instrumentation of a program with a code emulating state machines
+  provides us simple slicing criteria: we want to preserve values of memory
+  places representing states of state machines. Hence, the sliced program
+  contains only the code relevant to the considered errors specified by
+  state machines.
 \item Slicing may substantially reduce the size of the code, which in turn may
   remarkably improve performance of the symbolic execution.
 \item Application of symbolic execution brings us another benefit. While in
-  metacompilation, the state machines are associated to syntactic objects
-  (e.g.~lock variables appearing in a program), we may associate state
-  machines to actual values of these objects. This leads to a higher precision
-  of error detection, which may potentially result in a detection of real
-  errors missed by metacompilation. 
+  standard static analysis, the state machines are associated to syntactic
+  objects (e.g.~lock variables appearing in a program), we may associate
+  state machines to actual values of these objects. This leads to a higher
+  precision of error detection.
+ % which may potentially result in a detection of real errors missed by static analysis. 
 \end{itemize}
 
-The rest of the paper is organized as follows.
-Sections~\ref{sec:instr},~\ref{sec:slicing}, and~\ref{sec:symexe} deal with
-program instrumentation, slicing, and symbolic execution, respectively.
+The rest of the paper is organized as follows. The following section
+introduces our running example. Sections~\ref{sec:instr},~\ref{sec:slicing},
+and~\ref{sec:symexe} deal with program instrumentation, slicing, and
+symbolic execution, respectively.
 % Section~\ref{sec:BackMapping} discusses extraction of
 % counterexamples.\todo{Chceme to tu nechat?}
 Experimental implementation of our technique and some experimental results
@@ -169,8 +167,6 @@ are discussed in Section~\ref{sec:impl}. Section~\ref{sec:related} is
 devoted to related work while Section~\ref{sec:future} indicates some
 directions driving our future research. Finally, the last section summarizes
 presented results.
-
-%\texttt{Tool by se mohl jmenovat synergyton.}
 
 %{{{ Obrazek nekonecneho stromu symbolicke exekuce na neproslicovanem kodu
 
@@ -265,19 +261,20 @@ presented results.
 %}}}
 %{{{ Property Specification
 
-\section{Property Specification} \label{sec:propspec}
+\section{Property Specification}\label{sec:propspec}
 
-We explain \DEL{the} \ADD{our} technique with use of the state machine $SM(x)$ of Figure~\ref{fig:sm}, which describes errors in lock manipulation.
-Intuitively, the state machine
-represents possible courses of states of a lock referenced by $x$ along an
-execution of a program. The state of the lock is changed according to a
-transition of the state machine if the execution performs a program statement
-syntactically subsuming the label of the transition. We would like to decide
-whether there exists any program execution where an instance of state machine
-$SM(x)$ assigned to some lock of the analyzed program reaches an error state.
-Unfortunately, this is not feasible due to potentially unbounded number of
-executions and unbounded execution length. Hence, we use static analysis to
-overapproximate the set of reachable states of state machines.
+We explain our technique with use of the state machine $\SM(x)$ of
+Figure~\ref{fig:sm}, which describes errors in lock manipulation.
+Intuitively, the state machine represents possible courses of states of a
+lock referenced by $x$ along an execution of a program. The state of the
+lock is changed according to a transition of the state machine if the
+execution performs a program statement syntactically subsuming the label of
+the transition. We would like to decide whether there exists any program
+execution where an instance of state machine $\SM(x)$ assigned to some lock
+of the analyzed program reaches an error state.  Unfortunately, this is not
+feasible due to potentially unbounded number of executions and unbounded
+execution length. Hence, we use static analysis to overapproximate the set
+of reachable states of state machines.
 
 \begin{figure}[tb]
   \centering
@@ -285,9 +282,9 @@ overapproximate the set of reachable states of state machines.
     \tikzstyle{err} = [circle,thick,draw,minimum size=8mm,fill=red!10,draw=red]
     \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
     \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
-    \begin{tikzpicture}[node distance=20mm]
+    \begin{tikzpicture}[node distance=18mm]
         \node [loc] (U) {U};
-        \node (S) [left of=U,xshift=10mm] {}
+        \node (S) [left of=U,xshift=8mm] {}
           edge [post] node {} (U);
         \node [loc] (L) [right of=U,xshift=10mm] {L}
           edge [pre,bend left=20] node [label=below:\texttt{lock($x$)}] {} (U)
@@ -299,7 +296,7 @@ overapproximate the set of reachable states of state machines.
         \node [err] (RL) [below of=L,xshift=13mm] {RL}
           edge [pre,bend right=10,near start] node [label=right:\texttt{return}] {} (L);
     \end{tikzpicture}
-    \caption{State machine $SM(x)$ describing errors in manipulation with
+    \caption{State machine $\SM(x)$ describing errors in manipulation with
       lock $x$. The nodes U and L refer to states \emph{unlocked} and
       \emph{locked}, respectively. The other three nodes refer to error
       states: DU to \emph{double unlock}, DL to \emph{double lock}, and RL
@@ -308,11 +305,11 @@ overapproximate the set of reachable states of state machines.
 \end{figure}
 
 Let us assume that we want to check the program of Figure~\ref{fig:copy} for
-errors specified by the state machine $SM(x)$. First, we find all locks in
+errors specified by the state machine $\SM(x)$. First, we find all locks in
 the program and to each lock we assign an instance of the state machine. In
 our case, there is only one lock pointed by \texttt{L} and thus only one
-instance $SM(\texttt{L})$. For each program location, we compute a set
-overapproximating possible states of $SM(\texttt{L})$ after executions leading
+instance $\SM(\texttt{L})$. For each program location, we compute a set
+overapproximating possible states of $\SM(\texttt{L})$ after executions leading
 to the location. Roughly speaking, we initialize the set in the initial
 location to $\{U\}$ and the other sets to $\emptyset$. Then we repeatedly
 update the sets according to the effect of individual program statements until
@@ -321,7 +318,7 @@ the fixed point is reached.
 %   if the program statement associated to the location syntactically subsumes
 %   a label\footnote{Note that all occurence of \texttt{x} in the label are
 %     replaced by the lock corresponding to the instance of the state
-%     machine.} of some transition of $SM(\texttt{L})$ leading from $s$, then
+%     machine.} of some transition of $\SM(\texttt{L})$ leading from $s$, then
 %   we the target state of the transition has to be in the sets associated to
 %   program locations reachable by the statement. Otherwise, the sets
 %   associated to program locations reachable by the statement have to contain
@@ -385,7 +382,7 @@ machines.
 A drawback of this approach may be illustrated by the \emph{double unlock}
 false positive detected in the program of Figure~\ref{fig:copy} because the
 analysis does not know that the condition at line 13 holds only if the state
-machine $SM(\texttt{L})$ is in state $L$.}
+machine $\SM(\texttt{L})$ is in state $L$.}
 
 
 %}}}
@@ -398,7 +395,7 @@ code implementing a state machine into the analysed program. Nevertheless,
 the semantics of the program being instrumented must not be changed. A
 result of this phase is therefore a new program that still has the original
 functionality and it simultaneously updates instrumented state machines. We
-show the process using the state machine $SM(x)$ of Figure~\ref{fig:sm} and
+show the process using the state machine $\SM(x)$ of Figure~\ref{fig:sm} and
 the program consisting of a function \texttt{foo} of Figure~\ref{fig:foo}
 and the function \texttt{copy} of Figure~\ref{fig:copy}. The function
 \texttt{foo} calls the function \texttt{copy} twice, first with the lock
@@ -427,7 +424,7 @@ void foo(char *src, int n) {
 
 The instrumentation starts by recognizing the code fragments in the analysed
 program which manipulate with locks. More precisely, we look for all those
-code fragments matching edge labels of the state machine $SM(x)$ of
+code fragments matching edge labels of the state machine $\SM(x)$ of
 Figure~\ref{fig:sm}. The analysed program contains three such fragments, all
 of them in function \texttt{copy} (see Figure~\ref{fig:copy}): the call to
 \texttt{lock} at line~\ref{line:copy_lock}, the call to \texttt{unlock} at
@@ -436,7 +433,7 @@ line~\ref{line:copy_ret}.
 
 Next we determine a set of all locks that are manipulated by the program.
 From the recognized code fragments% (and according to the structure
-% of edge labels of the state machine $SM(x)$ of Figure~\ref{fig:sm})
+% of edge labels of the state machine $\SM(x)$ of Figure~\ref{fig:sm})
 , we find out that a pointer variable \texttt{L} in \texttt{copy} is the
 only program variable through which the program manipulates with locks.
 % (We assume the code represented by dots in \texttt{foo} is not involved in
@@ -446,10 +443,10 @@ Using a points-to analysis, we obtain obtain the set $\{ \texttt{L1},
 % Therefore, from \texttt{L}'s points-to set we obtain a set $\{ \texttt{L1},
 % \texttt{L2} \}$ of all possible locks the program manipulates with.
 
-We introduce a unique instance of the state machine $SM(x)$ for each lock in
+We introduce a unique instance of the state machine $\SM(x)$ for each lock in
 the set. More precisely, we define two integer variables \texttt{smL1} and
-\texttt{smL2} for keeping current state of state machines $SM(\texttt{L1})$
-and $SM(\texttt{L2})$, respectively. Further, we need to specify a mapping
+\texttt{smL2} for keeping current state of state machines $\SM(\texttt{L1})$
+and $\SM(\texttt{L2})$, respectively. Further, we need to specify a mapping
 from locks to their state machines. The mapping is basically a function
 (preferably with constant complexity) from addresses of program objects
 (i.e.~the locks) to addresses of related state machines.
@@ -541,7 +538,7 @@ machines are associated to dynamically allocated objects.
 % Although we have already instrumented the program with state machines, there
 % is no code manipulating them.
 Figure~\ref{fig:fire} contains also many constants and a function
-\texttt{smFire} implementing the state machine $SM(x)$. Further,
+\texttt{smFire} implementing the state machine $\SM(x)$. Further,
 Figure~\ref{fig:fire} declares variables \texttt{smL1} and \texttt{smL2} and
 initialize them to the initial state of the state machine.  Note that we
 represent both states of the machine and names of transitions by integer
@@ -876,7 +873,7 @@ program contains only one locking error, namely \emph{return in locked
 To verify applicability of the presented technique, we have developed an
 experimental implementation. Our experimental tool works with programs in C
 and, for the sake of simplicity, it detects only locking errors described by
-a state machine very similar to $SM(x)$ of Figure~\ref{fig:sm}. The instances
+a state machine very similar to $\SM(x)$ of Figure~\ref{fig:sm}. The instances
 of the state machine are associated with arguments of \texttt{lock} and
 \texttt{unlock} function calls. Note that the technique currently works only
 for the cases where a lock is instantiated only once during the run of the
