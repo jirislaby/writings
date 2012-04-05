@@ -81,52 +81,56 @@ applicability of such tools is limited.
 
 On the other hand, test-generation tools based on \emph{symbolic execution}
 do not suffer from false positives, since the checked program is actually
-executed (but on symbolic input instead of concrete one).  Nevertheless, a
-disadvantage of these tools is that they usually detect only low-level
-errors representing violations of programming language semantics,
-i.e.~various types of undefined behavior or crashes. To detect violations of
-other program properties like locking policy, the program has to be modified
-such that the errors can be detected during the execution. This can be
-achieved by introducing a couple of \texttt{assert} statements to specific
-program locations for example. Another and even more important disadvantage
-of the tools is extreme computation cost of symbolic execution. In
-particular, programs containing loops or recursion have typically large or
-even infinite number of execution paths and cannot be analysed completely.
-Hence, executors are usually able to explore merely a small part of an
-analysed program.
+executed (but on symbolic input instead of concrete one). A disadvantage of
+these tools is that they usually detect only low-level errors representing
+violations of programming language semantics, i.e.~various types of
+undefined behavior or crashes. To detect violations of other program
+properties like locking policy, the program has to be modified such that the
+errors can be detected during the execution. This can be achieved, for
+example, by introducing a couple of \texttt{assert} statements to specific
+program locations. Another and even more important disadvantage of the tools
+is extreme computation cost of symbolic execution. In particular, programs
+containing loops or recursion have typically large or even infinite number
+of execution paths and cannot be completely analysed by symbolic execution.
+% Hence, executors are usually able to explore merely a small part of an analysed program.
 
-In this paper, we introduce a new technique offering flexibility of \ADD{FSM
-property specification with} zero false positive rate of symbolic execution.
-\ADD{It is forced to execute only parts of the analysed program having impact
-on the checked property}. The basic idea is very simple: we use the concept of
-state machines to get flexibility in \ADD{property} specification. Then we
-instrument a given program with a code for tracking behaviors of the state
-machines. The instrumented program is then reduced using the slicing method
-introduced in~\cite{Wei84}.  The sliced program has to meet the criterion to
-be equivalent to the instrumented program with respect to reachability of
-error states of tracked state machines. Note that slicing may remove big
-portions of the code, including loops and function calls. Hence, an original
-program with an infinite number of execution paths may be reduced to a program
-with a finite number of execution paths. Finally, we execute the sliced
-program symbolically \ADD{to find violations of the checked property. Note
-that once a user provides a property specification, the analysis of the
-program is then fully automated.}
 
-Our technique may be used in two ways according to the applied symbolic
-execution tool. If we apply a symbolic executor that prefers to explore more
-parts of the code (for example, it can explore only the execution paths
-iterating each program loop at most twice), we may use the technique as a
-general bug-finding technique reporting only real errors. Note that this
-approach may miss errors appearing only on unexplored paths. On the
-contrary, if we use a symbolic executor exploring all execution paths, we
-may use our technique for basic classification of error reports produced by
-other tools (e.g.~\textsc{xgcc} or \textsc{Stanse}). For each such an error
-report, we may instrument the corresponding code only with the state machine
-describing that reported error. If our technique finds the same error, it is
-a real one. If our technique explores all execution paths of the sliced code
-without detecting the error, it is a false positive. If our technique runs
-out of resources, we cannot decide whether the error is a real one or just a
-false positive.
+In this paper, we introduce a new fully automatic program analysis
+technique offering flexibility of FSM property specification with zero false
+positive rate of symbolic execution. The technique symbolically executes
+only parts of the analysed program having impact on the checked
+property. The basic idea is very simple:
+\begin{enumerate}
+\item We get state machines describing some program properties. We
+  instrument a given program with a code tracking behaviors of the state
+  machines.
+\item The instrumented program is then reduced using the slicing method
+  introduced in~\cite{Wei84}.  The sliced program has to meet the criterion
+  to be equivalent to the instrumented program with respect to reachability
+  of error states of tracked state machines. Note that slicing may remove
+  big portions of the code, including loops and function calls. Hence, an
+  original program with an infinite number of execution paths may be reduced
+  to a program with a finite number of execution paths.
+\item Finally, we execute the sliced program symbolically to find violations
+  of the checked property.
+\end{enumerate}
+
+Note that once a user provides a property specification, the analysis of the
+program is then fully automated.  Our technique may be used in two ways
+according to the applied symbolic execution tool. If we apply a symbolic
+executor that prefers to explore more parts of the code (for example, it can
+explore only the execution paths iterating each program loop at most twice),
+we may use the technique as a general bug-finding technique reporting only
+real errors. Note that this approach may miss errors appearing only on
+unexplored paths. On the contrary, if we use a symbolic executor exploring
+all execution paths, we may use our technique for basic classification of
+error reports produced by other tools (e.g.~\textsc{xgcc} or
+\textsc{Stanse}). For each such an error report, we may instrument the
+corresponding code only with the state machine describing that reported
+error. If our technique finds the same error, it is a real one. If our
+technique explores all execution paths of the sliced code without detecting
+the error, it is a false positive. If our technique runs out of resources,
+we cannot decide whether the error is a real one or just a false positive.
 
 We have developed an experimental tool implementing our technique. The tool
 instruments a program with a state machine describing locking errors (we use
