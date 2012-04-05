@@ -51,7 +51,7 @@ Instrumentation, Slicing, and Symbolic Execution}
   precisely, we instrument a given program with a code that tracks runs of
   state machines representing various properties. Next we slice the program
   to reduce its size without affecting runs of state machines. And then we
-  symbolically execute the sliced program to find \emph{real} violations of
+  symbolically execute the sliced program to find real violations of
   the checked properties, i.e.~real bugs. Depending on the kind of symbolic
   execution, the technique can be applied as a stand-alone bug finding
   technique, or to weed out some false positives from an output of another
@@ -74,9 +74,14 @@ null-pointer dereferences, resource allocations, and resource leaking. FSM
 specification is therefore used in many static program analysis tools like
 \textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{slam},
 \textsc{ESP}~\cite{DLS02},~\textsc{Stanse}~\cite{stanse}. All the
-mentioned tools explore an over-approximation of real runs of analyzed systems
-and hence they produce \emph{false positives}, i.e.~they report errors that do
-not correspond to any real error. As manual sorting of error reports
+mentioned tools
+% explore an over-approximation of real runs of analyzed systems and they often
+produce \emph{false positives}, i.e.~they report errors that do
+not correspond to any real error.\footnote{In theory, \textsc{CEGAR}\cite{cegar}
+based tools do not produce false positives. Nevertheless, to achieve an
+appropriate efficiency and scalability for a practical use, the implementation
+of the \textsc{CEGAR} loop is typically not sound in the tools.}
+As manual sorting of error reports
 containing a pile of false positives is tedious work, the practical
 applicability of such tools is limited.
 
@@ -89,7 +94,9 @@ undefined behavior or crashes. To detect violations of other program
 properties like locking policy, the program has to be modified such that the
 errors can be detected during the execution. This can be achieved, for
 example, by introducing a couple of \texttt{assert} statements to specific
-program locations. Another and even more important disadvantage of the tools
+program locations.\footnote{Note that symbolic execution may produce formulae
+of an undecidable theory, so a counterexample of the checked property can be
+missed.} Another and even more important disadvantage of the tools
 is extreme computation cost of symbolic execution. In particular, programs
 containing loops or recursion have typically large or even infinite number
 of execution paths and cannot be completely analysed by symbolic execution.
@@ -118,14 +125,15 @@ Our technique may be used in two ways according to the applied symbolic
 execution tool. If we apply a symbolic executor that prefers to explore more
 parts of the code (for example, it can explore only such execution paths
 where each program loop is passed at most twice), we may use the technique as a
-general bug-finding technique reporting only real errors. Note that this
-approach may miss errors appearing only on unexplored paths. On the
-contrary, if we use a symbolic executor exploring all execution paths, we
+general bug-finding technique reporting only real errors.
+%Note that this approach may miss errors appearing only on unexplored paths.
+On the contrary, if we use a symbolic executor exploring all execution paths, we
 may use our technique for basic classification of error reports produced by
 other tools (e.g.~\textsc{xgcc} or \textsc{Stanse}). For each such an error
 report, we may instrument the corresponding code only with the state machine
 describing the reported error. If our technique finds the same error, it is
-a real one. If our technique explores all execution paths of the sliced code
+a real one.
+If our technique explores all execution paths of the sliced code
 without detecting the error, it is a false positive. If our technique runs
 out of resources, we cannot decide whether the error is a real one or just a
 false positive.
@@ -138,28 +146,28 @@ executor \textsc{Klee}~\cite{klee}. Our experimental results indicate that
 the technique can indeed classify error reports produced by \textsc{Stanse}
 applied to the Linux kernel.
 
-We emphasize the synergy of the three known methods combined in the
-presented technique.
-\begin{itemize}
-\item Instrumentation of a program with a code emulating state machines
-  provides us simple slicing criteria: we want to preserve values of memory
-  places representing states of state machines. Hence, the sliced program
-  contains only the code relevant to the considered errors specified by
-  state machines.
-\item Slicing may substantially reduce the size of the code, which in turn may
-  remarkably improve performance of the symbolic execution.
-\item Application of symbolic execution brings us another benefit. While in
-  standard static analysis, the state machines are associated to syntactic
-  objects (e.g.~lock variables appearing in a program), we may associate
-  state machines to actual values of these objects. This leads to a higher
-  precision of error detection.
- % which may potentially result in a detection of real errors missed by static analysis. 
-\end{itemize}
+%We emphasize the synergy of the three known methods combined in the
+%presented technique.
+%\begin{itemize}
+%\item Instrumentation of a program with a code emulating state machines
+%  provides us simple slicing criteria: we want to preserve values of memory
+%  places representing states of state machines. Hence, the sliced program
+%  contains only the code relevant to the considered errors specified by
+%  state machines.
+%\item Slicing may substantially reduce the size of the code, which in turn may
+%  remarkably improve performance of the symbolic execution.
+%\item Application of symbolic execution brings us another benefit. While in
+%  standard static analysis, the state machines are associated to syntactic
+%  objects (e.g.~lock variables appearing in a program), we may associate
+%  state machines to actual values of these objects. This leads to a higher
+%  precision of error detection.
+% % which may potentially result in a detection of real errors missed by static analysis. 
+%\end{itemize}
 
 The rest of the paper is organized as follows. The following section
-introduces our running example. Sections~\ref{sec:instr},~\ref{sec:slicing},
-and~\ref{sec:symexe} deal with program instrumentation, slicing, and
-symbolic execution, respectively.
+introduces our running example. Sections~\ref{sec:propspec},~\ref{sec:instr},
+\ref{sec:slicing}, and~\ref{sec:symexe} deal with FSM property specification,
+program instrumentation, program slicing, and symbolic execution, respectively.
 % Section~\ref{sec:BackMapping} discusses extraction of
 % counterexamples.\todo{Chceme to tu nechat?}
 Experimental implementation of our technique and some experimental results
@@ -263,8 +271,9 @@ presented results.
 
 \section{Property Specification}\label{sec:propspec}
 
-We explain our technique with use of the state machine $\SM(x)$ of
-Figure~\ref{fig:sm}, which describes errors in lock manipulation.
+%We explain our technique with use of
+Let us consider the state machine $\SM(x)$ of
+Figure~\ref{fig:sm}. It describes errors in lock manipulation.
 Intuitively, the state machine represents possible courses of states of a
 lock referenced by $x$ along an execution of a program. The state of the
 lock is changed according to a transition of the state machine if the
