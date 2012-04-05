@@ -65,18 +65,18 @@ Instrumentation, Slicing, and Symbolic Execution}
 \section{Introduction}
 \label{sec:introduction}
 
-There are several successful formalisms for description of program
-properties. One of the most popular is a \emph{finite state machine
-  (FSM)}. This formalism is simple and still enough flexible to describe
-many often studied program properties including locking policy in concurrent
-programs, null-pointer dereferences, resource allocations, and resource
-leaking. FSM specification is therefore used in many static program analysis
-tools like \textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{BR02},
-\textsc{ESP}~\cite{DLS02},~\textsc{Stanse}~\cite{stanse} etc. All the
-mentioned tools explore an over-approximation of real runs of analyzed
-systems and hence they produce \emph{false positives}, i.e.~they report
-errors that do not correspond to any real error. As manual sorting of error
-reports containing a pile of false positives is tedious work, the practical
+There are several successful formalisms for description of program properties.
+One of the most popular is a \emph{finite state machine (FSM)}.  This
+formalism is simple and still flexible enough to describe many often studied
+program properties including locking policy in concurrent programs,
+null-pointer dereferences, resource allocations, and resource leaking. FSM
+specification is therefore used in many static program analysis tools like
+\textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{slam},
+\textsc{ESP}~\cite{DLS02},~\textsc{Stanse}~\cite{stanse}. All the
+mentioned tools explore an over-approximation of real runs of analyzed systems
+and hence they produce \emph{false positives}, i.e.~they report errors that do
+not correspond to any real error. As manual sorting of error reports
+containing a pile of false positives is tedious work, the practical
 applicability of such tools is limited.
 
 On the other hand, test-generation tools based on \emph{symbolic execution}
@@ -91,71 +91,26 @@ achieved by introducing a couple of \texttt{assert} statements to specific
 program locations for example. Another and even more important disadvantage
 of the tools is extreme computation cost of symbolic execution. In
 particular, programs containing loops or recursion have typically large or
-even infinite number of execution paths and cannot be completely
-analysed. Hence, executors are usually able to explore merely a small part
-of an analysed program.
+even infinite number of execution paths and cannot be analysed completely.
+Hence, executors are usually able to explore merely a small part of an
+analysed program.
 
-\DEL{The title of this paper refers to two popular bug-finding techniques:
-metacompilation and symbolic execution. The two techniques use completely
-different principles leading to different advantages and disadvantages.}
-
-\DEL{\emph{Metacompilation}~\cite{metal,pldi02} is a static analysis technique
-looking for various kinds of errors specified by state machines.}
-
-\DEL{At this point, we would like to emphasize that metacompilation actually uses
-a more sophisticated algorithm enriched with many techniques for partial
-elimination of false positives (see~\cite{pldi02} for
-details). Metacompilation employs a dedicated language for description of
-state machines called \textsc{Metal}.  The idea of error specification using
-state machines appears in several tools including the original implementation
-of metacompilation called \textsc{xgcc}~\cite{pldi02},
-\textsc{Esp}~\cite{DLS02} or \textsc{Stanse}~\cite{stanse}.}
-
-\DEL{In contrast to metacompilation, \emph{symbolic execution}~\cite{se} analyzes each execution path separately. In contrast to
-standard execution, symbolic execution replaces input data by symbols
-representing arbitrary values. Executed statements then manipulate
-expressions over the symbols rather than exact values. For each execution
-path, symbolic execution builds a formula called \emph{path condition},
-which is a necessary and sufficient condition on input data to drive the
-execution along the path. Whenever a path condition becomes unsatifiable,
-the symbolic execution of this path is aborted as the path is unfeasible.
-% Whenever symbolic execution reaches a branching
-% statement, it uses the current path condition to check if any of the
-% branches is unfeasible. If this is the case, the computation proceed to the
-% other branch. Otherwise, the computation is forked and it continues in both
-% branches. Moreover, we add the branching condition to the path condition on
-% the positive branch and its negation to the path condition on the negative
-% branch.
-The main advantage of symbolic execution is that it works only with feasible
-executions (assuming that we can decide satisfiability of a path condition)
-and hence it does not report any false positives. A minor disadvantage is
-that implementations of this technique usually detect only low-level errors
-leading to crash. %(e.g.~segmentation fault).
-To detect a specific kind of error, the program has to be modified to reduce
-the error to a detected one (typically violation of an \texttt{assert}
-statement). The main disadvantage of the technique is its high compuation
-cost. In particular, programs containing loops or recursion have typically
-large or even infinite number of execution paths and cannot be completely
-analyzed by symbolic execution. Hence, symbolic execution usually explores
-only a part of an analyzed program.}
-
-In this paper, we introduce a new technique offering flexibility of
-\DEL{metacompilation and} \ADD{FSM property specification with} zero false
-positive rate of symbolic execution. \ADD{It is forced to execute only parts
-of the analysed program having impact on the checked property}. The basic idea
-is very simple: we use the concept of state machines to get flexibility in
-\ADD{property} \DEL{error} specification. Then we instrument a given program
-with a code for tracking behaviors of the state machines. The instrumented
-program is then reduced using the slicing method introduced in~\cite{Wei84}.
-The sliced program has to meet the criterion to be equivalent to the
-instrumented program with respect to reachability of error states of tracked
-state machines. Note that slicing may remove big portions of the code,
-including loops and function calls. Hence, an original program with an
-infinite number of execution paths may be reduced to a program with a finite
-number of execution paths. Finally, we execute the sliced program symbolically
-\ADD{to find violations of the checked property. Note that once a user
-provides a property specification, the analysis of the program is then fully
-automated.}
+In this paper, we introduce a new technique offering flexibility of \ADD{FSM
+property specification with} zero false positive rate of symbolic execution.
+\ADD{It is forced to execute only parts of the analysed program having impact
+on the checked property}. The basic idea is very simple: we use the concept of
+state machines to get flexibility in \ADD{property} specification. Then we
+instrument a given program with a code for tracking behaviors of the state
+machines. The instrumented program is then reduced using the slicing method
+introduced in~\cite{Wei84}.  The sliced program has to meet the criterion to
+be equivalent to the instrumented program with respect to reachability of
+error states of tracked state machines. Note that slicing may remove big
+portions of the code, including loops and function calls. Hence, an original
+program with an infinite number of execution paths may be reduced to a program
+with a finite number of execution paths. Finally, we execute the sliced
+program symbolically \ADD{to find violations of the checked property. Note
+that once a user provides a property specification, the analysis of the
+program is then fully automated.}
 
 Our technique may be used in two ways according to the applied symbolic
 execution tool. If we apply a symbolic executor that prefers to explore more
