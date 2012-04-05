@@ -72,15 +72,16 @@ formalism is simple and still flexible enough to describe many often studied
 program properties including locking policy in concurrent programs,
 null-pointer dereferences, resource allocations, and resource leaking. FSM
 specification is therefore used in many static program analysis tools like
-\textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{slam},
+\textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{BLR11}, \textsc{SDV}~\cite{BBKL10},
 \textsc{ESP}~\cite{DLS02},~\textsc{Stanse}~\cite{stanse}. All the
 mentioned tools
 % explore an over-approximation of real runs of analyzed systems and they often
 produce \emph{false positives}, i.e.~they report errors that do
-not correspond to any real error.\footnote{In theory, \textsc{CEGAR}\cite{cegar}
-based tools do not produce false positives. Nevertheless, to achieve an
-appropriate efficiency and scalability for a practical use, the implementation
-of the \textsc{CEGAR} loop is typically not sound in the tools.}
+not correspond to any real error.
+%\footnote{In theory, \textsc{CEGAR}\cite{cegar}
+%based tools do not produce false positives. Nevertheless, to achieve an
+%appropriate efficiency and scalability for a practical use, the implementation
+%of the \textsc{CEGAR} loop is typically not sound in the tools.}
 As manual sorting of error reports
 containing a pile of false positives is tedious work, the practical
 applicability of such tools is limited.
@@ -146,23 +147,23 @@ executor \textsc{Klee}~\cite{klee}. Our experimental results indicate that
 the technique can indeed classify error reports produced by \textsc{Stanse}
 applied to the Linux kernel.
 
-%We emphasize the synergy of the three known methods combined in the
-%presented technique.
-%\begin{itemize}
-%\item Instrumentation of a program with a code emulating state machines
-%  provides us simple slicing criteria: we want to preserve values of memory
-%  places representing states of state machines. Hence, the sliced program
-%  contains only the code relevant to the considered errors specified by
-%  state machines.
-%\item Slicing may substantially reduce the size of the code, which in turn may
-%  remarkably improve performance of the symbolic execution.
-%\item Application of symbolic execution brings us another benefit. While in
-%  standard static analysis, the state machines are associated to syntactic
-%  objects (e.g.~lock variables appearing in a program), we may associate
-%  state machines to actual values of these objects. This leads to a higher
-%  precision of error detection.
-% % which may potentially result in a detection of real errors missed by static analysis. 
-%\end{itemize}
+We emphasize the synergy of the three known methods combined in the
+presented technique.
+\begin{itemize}
+\item Instrumentation of a program with a code emulating state machines
+  provides us simple slicing criteria: we want to preserve values of memory
+  places representing states of state machines. Hence, the sliced program
+  contains only the code relevant to the considered errors specified by
+  state machines.
+\item Slicing may substantially reduce the size of the code, which in turn may
+  remarkably improve performance of the symbolic execution.
+\item Application of symbolic execution brings us another benefit. While in
+  standard static analysis, the state machines are associated to syntactic
+  objects (e.g.~lock variables appearing in a program), we may associate
+  state machines to actual values of these objects. This leads to a higher
+  precision of error detection.
+ % which may potentially result in a detection of real errors missed by static analysis. 
+\end{itemize}
 
 The rest of the paper is organized as follows. The following section
 introduces our running example. Sections~\ref{sec:propspec},~\ref{sec:instr},
@@ -1106,10 +1107,16 @@ dataflow algorithm based on~\cite{RHS95} for error detection and an abstract
 simulation pruning algorithm for false positives
 suppression. \textsc{Stanse}~\cite{stanse}, a static analysis tool also uses
 state machines for description of checked program properties. The
-description is based on parametrised abstract syntax trees. Although this
-tool found hundreds of real bugs in the Linux kernel, it suffers from a high
-false positive rate since its false positive suppression algorithms are
-very limited.
+description is based on parametrised abstract syntax trees.
+Finally, \textsc{CEGAR}~\cite{cegar} based tools, like \textsc{SLAM}~\cite{BLR11},
+\textsc{SDV}~\cite{BBKL10} or \textsc{BLAST}~\cite{BHJ07}, do not produce
+false positives, in theory. Nevertheless, to achieve an
+appropriate efficiency and scalability for a practical use, the 
+implementation of the \textsc{CEGAR} loop is typically not sound.
+%Although this
+%tool found hundreds of real bugs in the Linux kernel, it suffers from a high
+%false positive rate since its false positive suppression algorithms are
+%very limited.
 
 Program analysis tools based on symbolic execution~\cite{se} mainly discover
 low-level bugs like division by zero, illegal memory access, assertion
@@ -1118,32 +1125,35 @@ positives, but they have problems with scalability to large programs. There
 has been developed a lot of techniques improving the scalability to programs
 used in practice. Modern techniques are mostly hybrid. They usually combine
 symbolic execution with concrete
-one~\cite{PKS05,GLM08:active_props,GLM08:fuzzing,GLE09,SMA05,TdH08}. There
+one~\cite{PKS05,GLM08:active_props,SMA05}. % GLM08:fuzzing,GLE09,TdH08,
+There
 are also hybrid techniques combining symbolic execution with a complementary
-static analysis~\cite{Beckmanetal08,GNRT10,Gulavanietal06,GMR09,NRTT09}.
+static analysis~\cite{GNRT10,NRTT09}. % Beckmanetal08,GMR09,Gulavanietal06,
 Symbolic execution can be accelerated by a compositional approach based on
 function summaries~\cite{AGT08,G07}. Another approach to effective symbolic
 execution introduced in~\cite{BCE08,klee,Cadar08} is based on recording of
-already seen behaviour and pruning its repetition. The followng techniques
-focus on reaching a specific program location. Fitnex~\cite{XTHS09}, a
-search strategy implemented in \textsc{Pex}~\cite{TdH08}, guides a path
-exploration to a particular target location using fitness function. The
-function measures how close an already discovered feasible path is to the
-target. The LESE~\cite{SPmCS09} approach introduces symbolic variables for
-the number of times each loop was executed. The symbolic variables are
-linked with features of a known grammar generating inputs. Using these
-links, the grammar can control the numbers of loop iterations performed on a
-generated input. A technique presented in~\cite{GL11} analyses loops
-on-the-fly, i.e.~during simultaneous concrete and symbolic executions of a
-program for a concrete input. The loop analysis infers variables that are
-modified by a constant value in each loop iteration. These variables are
-used to build loop summaries expressed in a form of pre and post
-conditions. An algorithm in~\cite{ST11} constructs a nontrivial necessary
-condition on input values to drive the program execution to a given
-location. A technique presented in~\cite{OT11} introduces a pair of counters
-for two different paths around loop for each recurrent variable. Each
-counter keeps an information about the number of iterations around one path
-since the last iteration around the other one. Finally, there is an
+already seen behaviour and pruning its repetition.
+% The followng techniques
+%focus on reaching a specific program location. Fitnex~\cite{XTHS09}, a
+%search strategy implemented in \textsc{Pex}~\cite{TdH08}, guides a path
+%exploration to a particular target location using fitness function. The
+%function measures how close an already discovered feasible path is to the
+%target. The LESE~\cite{SPmCS09} approach introduces symbolic variables for
+%the number of times each loop was executed. The symbolic variables are
+%linked with features of a known grammar generating inputs. Using these
+%links, the grammar can control the numbers of loop iterations performed on a
+%generated input. A technique presented in~\cite{GL11} analyses loops
+%on-the-fly, i.e.~during simultaneous concrete and symbolic executions of a
+%program for a concrete input. The loop analysis infers variables that are
+%modified by a constant value in each loop iteration. These variables are
+%used to build loop summaries expressed in a form of pre and post
+%conditions. An algorithm in~\cite{ST11} constructs a nontrivial necessary
+%condition on input values to drive the program execution to a given
+%location. A technique presented in~\cite{OT11} introduces a pair of counters
+%for two different paths around loop for each recurrent variable. Each
+%counter keeps an information about the number of iterations around one path
+%since the last iteration around the other one. Finally, 
+There is an
 orthogonal line of research which tries to improve the symbolic execution
 for programs with some special types of inputs. Some techniques deal with
 programs manipulating strings~\cite{BTV09,XGM08}, and some other techniques
@@ -1153,9 +1163,6 @@ The interprocedural static slicing was introduced by Weiser~\cite{Wei84}. But
 nowadays, there are many different approaches to program slicing. They are
 surveyed by several authors~\cite{BG,L01,T95}. Applications of slicing include
 program debugging, reverse engineering and regression testing~\cite{GHS92}.
-
-\todo{Zminit rozdil mezi SSE a CEGARem - soucasna analyza vsech
-  potencialnich protiprikladu} 
 
 %}}}
 %{{{ Future Work
