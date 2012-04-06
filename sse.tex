@@ -90,11 +90,11 @@ There are several successful formalisms for description of program
 properties.  One of the most popular is a \emph{finite state machine (FSM)}.
 This formalism is simple and still flexible enough to describe many often
 studied program properties including locking policy in concurrent programs,
-null-pointer dereferences, resource allocations, and resource leaking. FSM
+null-pointer dereferences, resource allocations, and resource leaks. FSM
 specification is therefore used in many static program analysis tools like
 \textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{BLR11},
 \textsc{SDV}~\cite{BBKL10}, \textsc{Blast}~\cite{BHJ07},
-\textsc{ESP}~\cite{DLS02}, \textsc{Stanse}~\cite{stanse}. All the mentioned
+\textsc{ESP}~\cite{DLS02}, or \textsc{Stanse}~\cite{stanse}. All the mentioned
 tools produce \emph{false positives}, i.e.~they report errors that do not
 correspond to any real error. We now roughly explain the basic principle of
 static analysis implemented in \textsc{xgcc}, \textsc{ESP}, and
@@ -103,17 +103,18 @@ static analysis implemented in \textsc{xgcc}, \textsc{ESP}, and
 \subsection{Checking FSM Properties by Static Analysis}\label{ssec:static}
 
 Let us consider the state machine $\SM(x)$ of Figure~\ref{fig:sm}. It
-describes errors in lock manipulation. Intuitively, the state machine
-represents possible courses of states of a lock referenced by $x$ along an
-execution of a program. The state of the lock is changed according to a
-transition of the state machine if the execution performs a program
-statement syntactically subsuming the label of the transition. We would like
-to decide whether there exists any program execution where an instance of
-state machine $\SM(x)$ assigned to some lock of the analyzed program reaches
-an error state. Unfortunately, this is not feasible due to potentially
-unbounded number of executions and unbounded execution length. Hence, static
-analysis tools overapproximate the set of reachable states of state
-machines.
+describes lock manipulation including malign transitions. Intuitively, the
+state machine represents possible courses of states of a lock referenced by
+$x$ along an execution of a program.\note{nevim, ta intuice se mi zda
+zbytecna} The state of the lock is changed
+according to the program behavior. Whenever the program contains a statement
+syntactically subsuming the label of a transition, the transition is fired in
+the state machine. We would like to decide whether there exists any program
+execution where an instance of state machine $\SM(x)$ reaches an error state
+for some lock in the program.  Unfortunately, this is not feasible due to
+potentially unbounded number of executions and unbounded execution length.
+Hence, static analysis tools overapproximate the set of reachable state
+machine states.
 
 \begin{figure}[tb]
   \centering
@@ -209,12 +210,12 @@ of the \texttt{while}-loop, which is the only real execution leading to
 the only real locking error in the program.
 
 To sum up, static analysis tools like \textsc{xgcc}, \textsc{ESP}, and
-\textsc{Stanse} are highly flexible, fast, and thus applicable on extremely
+\textsc{Stanse} are highly flexible, fast and thus applicable to extremely
 large software projects (e.g.~the Linux kernel). It examines all the code
 and finds many error reports. Unfortunately, many of the reports are false
 positives.\footnote{We note that \textsc{xgcc} and \textsc{ESP} actually use
   many techniques for partial elimination of false positives
-  (see~\cite{pldi02,DLS02} for details).}
+  (see~\cite{DLS02,pldi02} for details).}
 % The main source of false positives is related to the fact that the analysis
 % does not work with data values. In particular, the analysis does not track
 % connections between variable values and states of state machines.
@@ -256,13 +257,13 @@ only parts of the analysed program having impact on the checked
 property. The basic idea is very simple:
 \begin{enumerate}
 \item We get state machines describing some program properties. We
-  instrument a given program with a code tracking behaviors of the state
+  instrument a given program with a code tracking behavior of the state
   machines.
-\item The instrumented program is then reduced using the method called
+\item The instrumented program is then reduced using method called
   \emph{slicing}~\cite{Wei84}. The sliced program has to meet the criterion
   to be equivalent to the instrumented program with respect to reachability
   of error states of tracked state machines. Note that slicing may remove
-  big portions of the code, including loops and function calls. Hence, an
+  large portions of the code, including loops and function calls. Hence, an
   original program with an infinite number of execution paths may be reduced
   to a program with a finite number of execution paths.
 \item Finally, we execute the sliced program symbolically to find violations
@@ -270,18 +271,17 @@ property. The basic idea is very simple:
 \end{enumerate}
 Our technique may be used in two ways according to the applied symbolic
 execution tool. If we apply a symbolic executor that prefers to explore more
-parts of the code (for example, it can explore only such execution paths
-where each program loop is passed at most twice), we may use the technique as a
-general bug-finding technique reporting only real errors.  On the contrary, if
-we use a symbolic executor exploring all execution paths, we may use our
-technique for basic classification of error reports produced by other tools
-(e.g.~\textsc{xgcc} or \textsc{Stanse}). For each such an error report, we may
-instrument the corresponding code only with the state machine describing the
-reported error. If our technique finds the same error, it is a real one.  If
-our technique explores all execution paths of the sliced code without
-detecting the error, it is a false positive. If our technique runs out of
-resources, we cannot decide whether the error is a real one or just a false
-positive.
+parts of the code (for example by exploring each program loop at most twice),
+we may use the technique as a general bug-finding technique reporting only
+real errors.  On the contrary, if we use a symbolic executor exploring all
+execution paths, we may use our technique for classification of error reports
+produced by other tools (e.g.~\textsc{xgcc} or \textsc{Stanse}). For each such
+an error report, we may instrument the corresponding code only with the state
+machine describing the reported error. If our technique finds the same error,
+it is a real one.  If our technique explores all execution paths of the sliced
+code without detecting the error, it is a false positive. If our technique
+runs out of resources, we cannot decide whether the error is a real one or
+just a false positive.
 
 We have developed an experimental tool implementing our technique. The tool
 instruments a program with a state machine describing locking errors (we use
@@ -295,10 +295,10 @@ We emphasize the synergy of the three known methods combined in the
 presented technique.
 \begin{itemize}
 \item Instrumentation of a program with a code emulating state machines
-  provides us simple slicing criteria: we want to preserve values of memory
-  places representing states of state machines. Hence, the sliced program
-  contains only the code relevant to the considered errors specified by
-  state machines.
+provides us with simple slicing criteria: we want to preserve values of memory
+places representing states of state machines. Hence, the sliced program
+contains only the code relevant to the considered errors specified by state
+machines.
 \item Slicing may substantially reduce the size of the code, which in turn may
   remarkably improve performance of the symbolic execution.
 \item Application of symbolic execution brings us another benefit. While in
@@ -543,19 +543,19 @@ presented results.
 
 \section{Instrumentation} \label{sec:instr}
 
-The purpose of the instrumentation phase of our algorithm is to insert a
-code implementing a state machine into the analysed program. Nevertheless,
-the semantics of the program being instrumented must not be changed. A
-result of this phase is therefore a new program that still has the original
-functionality and it simultaneously updates instrumented state machines. We
-show the process using the state machine $\SM(x)$ of Figure~\ref{fig:sm} and
-the program consisting of a function \texttt{foo} of Figure~\ref{fig:foo}
-and the function \texttt{copy} of Figure~\ref{fig:copy}. The function
-\texttt{foo} calls the function \texttt{copy} twice, first with the lock
-\texttt{L1} and then with the lock \texttt{L2}. The locks guard writes into
-buffers \texttt{buf1} and \texttt{buf2} respectively. The function
-\texttt{foo} is a so-called \emph{starting function}. It is a function where
-the symbolic execution starts.
+In our algorithm, the purpose of the instrumentation is to insert a code
+implementing a state machine into the analysed program. Nonetheless, the
+semantics of the program being instrumented must not be changed. A result of
+this phase is therefore a new program that still has the original
+functionality but it also simultaneously updates instrumented state machines.
+We show the process using the state machine $\SM(x)$ of Figure~\ref{fig:sm}
+and a program consisting of two functions: \texttt{copy} of
+Figure~\ref{fig:copy} and \texttt{foo} of Figure~\ref{fig:foo}.  The function
+\texttt{foo} calls \texttt{copy} twice, first with the lock \texttt{L1} and
+then with the lock \texttt{L2}. The locks protect writes into buffers
+\texttt{buf1} and \texttt{buf2} respectively. The function \texttt{foo} is a
+so-called \emph{starting function}. It is a function where the symbolic
+execution starts.
 
 \begin{figure}[htb]
   \centering
@@ -575,13 +575,13 @@ void foo(char *src, int n) {
   \label{fig:foo}
 \end{figure}
 
-The instrumentation starts by recognizing the code fragments in the analysed
-program which manipulate with locks. More precisely, we look for all those
-code fragments matching edge labels of the state machine $\SM(x)$ of
+The instrumentation starts by recognizing code fragments which manipulate with
+locks in the analysed program. More precisely, we look for all those code
+fragments matching edge labels of the state machine $\SM(x)$ of
 Figure~\ref{fig:sm}. The analysed program contains three such fragments, all
 of them in function \texttt{copy} (see Figure~\ref{fig:copy}): the call to
 \texttt{lock} at line~\ref{line:copy_lock}, the call to \texttt{unlock} at
-line~\ref{line:copy_unlock}, and the return statement at
+line~\ref{line:copy_unlock}, and the \texttt{return} statement at
 line~\ref{line:copy_ret}.
 
 Next we determine a set of all locks that are manipulated by the program.
@@ -593,14 +593,14 @@ with.
 
 We introduce a unique instance of the state machine $\SM(x)$ for each lock in
 the set. More precisely, we define two integer variables \texttt{smL1} and
-\texttt{smL2} for keeping current state of state machines $\SM(\texttt{L1})$
+\texttt{smL2} to keep the current state of state machines $\SM(\texttt{L1})$
 and $\SM(\texttt{L2})$, respectively. Further, we need to specify a mapping
 from locks to their state machines. The mapping is basically a function
 (preferably with constant complexity) from addresses of program objects
-(i.e.~the locks) to addresses of related state machines.
+(i.e.~the locks) to addresses of corresponding state machines.
 Figure~\ref{fig:fire} shows an implementation of a function
 \texttt{smGetMachine} that maps addresses of locks \texttt{L1} and
-\texttt{L2} to addresses of related state machines. We note that the
+\texttt{L2} to addresses of corresponding state machines. We note that the
 implementation of \texttt{smGetMachine} would be more complicated if state
 machines are associated to dynamically allocated objects.
 
@@ -685,12 +685,12 @@ machines are associated to dynamically allocated objects.
 
 % Although we have already instrumented the program with state machines, there
 % is no code manipulating them.
-Figure~\ref{fig:fire} contains also many constants and a function
-\texttt{smFire} implementing the state machine $\SM(x)$. Further,
-Figure~\ref{fig:fire} declares variables \texttt{smL1} and \texttt{smL2} and
-initialize them to the initial state of the state machine.  Note that we
-represent both states of the machine and names of transitions by integer
-constants. Also note that the pointer argument \texttt{SM} of
+Besides \texttt{smGetMachine}, Figure~\ref{fig:fire} contains also many
+constants and a function \texttt{smFire} implementing the state machine
+$\SM(x)$. Further, Figure~\ref{fig:fire} declares variables \texttt{smL1} and
+\texttt{smL2} and initializes them to the initial state of the state machine.
+Note that we represent both states of the machine and names of transitions by
+integer constants. Also keep in mind that the pointer argument \texttt{SM} of
 \texttt{smFire} function points to an instrumented state machine, whose
 transition has to be fired.
 
@@ -754,12 +754,12 @@ where the instrumented lines are highlighted by~\texttt{*}.
 \section{Slicing} \label{sec:slicing}
 
 Let us have a look at the instrumented program in
-Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main
-part of the function \texttt{copy}, i.e.~the loop copying the characters,
-does not affect states of the instrumented state machines. Symbolic
-execution of such a code is very expensive. Therefore, we use the slicing
-technique~\cite{Wei84} to eliminate such a code from the instrumented
-program.
+Figure~\ref{fig:copy_instrumented}. We can easily observe, that the main part
+of the function \texttt{copy}, the loop copying the characters, does not
+affect states of the instrumented state machines. Symbolic execution of such a
+code is known to be very expensive, moreover in this case it is yet unneeded.
+Therefore, we use the slicing technique from~\cite{Wei84} to eliminate such a
+code from the instrumented program.
 % Slicing may bring a considerable speed-up in the last phase of the
 % algorithm, where we execute the program symbolically.
 
@@ -810,7 +810,7 @@ the instrumented automata, especially in locations corresponding to errors.
 Hence, the slicing criterion is a pair of a location preceding an
 \texttt{assert} statement in \texttt{smFire} function and the set of all
 variables representing current states of the corresponding state machines. The
-slicing criteria then consists of all such pairs.
+slicing criteria then comprises all such pairs.
 
 \begin{figure}[tb]
     \begin{center}
@@ -849,12 +849,12 @@ and~\ref{fig:copy_instrumented}, we want to preserve variables \texttt{smL1}
 and \texttt{smL2}. We put slicing criteria into the lines of code detecting
 transitions of state machines into error states. In other words, the slicing
 criteria for our running example are pairs
-(27,\{\texttt{smL1},\texttt{smL2}\}), (35,\{\texttt{smL1},\texttt{smL2}\}),
+(27,\{\texttt{smL1},\texttt{smL2}\}), (35,\{\texttt{smL1},\texttt{smL2}\}), and
 (41,\{\texttt{smL1},\texttt{smL2}\}), where the numbers refer to lines in the
 code of Figure~\ref{fig:fire}. The result of the slicing procedure is
 presented in Figures~\ref{fig:fire} and~\ref{fig:copy_sliced} (the code in
-the former figure shall not changed by the slicing). Note that the sliced code
-contains neither the \texttt{while}-loop nor the \texttt{lock} and
+the former Figure shall not be changed by the slicing). Note that the sliced
+code contains neither the \texttt{while}-loop nor the \texttt{lock} and
 \texttt{unlock} commands.
 
 It is important to note that some slicing techniques, including the one
@@ -889,7 +889,7 @@ of the original program. It starts at the entry location of the function
 symbolic. Therefore, symbolic execution will fork into two executions each
 time we reach line~9 of Figure~\ref{fig:copy}. One of the executions skips
 the loop at lines~9--12, while the other enters it. If we assume that the
-type of \texttt{n} is a 32 bit integer, then the symbolic execution of one
+type of \texttt{n} is a 32-bit integer, then the symbolic execution of one
 call of \texttt{copy} explores more then $2^{31}$ real paths.
 
 \begin{figure}[!tb]
@@ -1033,7 +1033,7 @@ symbolic executor. It works on a vast majority of the code we used. However we
 plan to add a support even for the rest. The main part of our implementation
 is written in three modules for the \textsc{Llvm} framework~\cite{llvm},
 namely \texttt{Prepare}, \texttt{Slicer}, and \texttt{Kleerer}. The framework
-provides us with the C compiler \textsc{\textsc{clang}}. We also use an
+provides us with a C compiler \textsc{\textsc{clang}}. We also use an
 existing symbolic executor for \textsc{Llvm} called \textsc{Klee}~\cite{klee}.
 
 Instrumentation of a given program proceeds in two steps. Using a C
@@ -1249,14 +1249,12 @@ error mentioned above.
 % meta-level compilation is discussed in~\cite{CEH02,metal,ECC00,pldi02}. 
 
 There are many tools checking properties described by finite state
-machines. They produce both, real error as well as false positives. The
-technique of \textsc{xgcc} presented in~\cite{CEH02,metal,ECC00,pldi02}
-found a thousands of bugs in real system code. It provides a language
-\textsc{Metal} for easy description of properties to be
-checked. %As explained in Subsection~\ref{ssec:static},
-\textsc{xgcc} suffers from false positives %s. Since false positive rate has
-% huge impact on practical usability, an important part of the technique are
-despite usage of false positive suppression algorithms like killing
+machines. They produce both kinds of reports, real error as well as false
+positives. The technique of \textsc{xgcc} presented
+in~\cite{CEH02,metal,ECC00,pldi02} found a thousands of bugs in real system
+code. It provides a language \textsc{Metal} for easy description of properties
+to be checked.  \textsc{xgcc} suffers from false positives despite usage of
+false positive suppression algorithms like killing
 variables and expressions, synonyms, false path pruning, and others. Besides
 the suppression algorithms, bug-reports from the tool are further ranked
 according to their probability of being real errors. There are generic and
@@ -1270,11 +1268,11 @@ simulation pruning algorithm for false positives
 suppression. \textsc{Stanse}~\cite{stanse}, a static analysis tool also uses
 state machines for description of checked program properties. The
 description is based on parametrised abstract syntax trees.  Finally,
-\textsc{CEGAR}~\cite{cegar} based tools, like \textsc{SLAM}~\cite{BLR11},
+\textsc{CEGAR}~\cite{cegar} based tools like \textsc{SLAM}~\cite{BLR11},
 \textsc{SDV}~\cite{BBKL10}, or \textsc{Blast}~\cite{BHJ07}, do not produce
 false positives, in theory. However, to achieve an appropriate efficiency
 and scalability for a practical use, the implementation of the
-\textsc{CEGAR} loop is typically not sound.
+\textsc{CEGAR} loop is typically unsound.
 %Although this
 %tool found hundreds of real bugs in the Linux kernel, it suffers from a high
 %false positive rate since its false positive suppression algorithms are
@@ -1294,7 +1292,7 @@ analysis~\cite{GNRT10,NRTT09}. % Beckmanetal08,GMR09,Gulavanietal06,
 Symbolic execution can be accelerated by a compositional approach based on
 function summaries~\cite{AGT08,G07}. Another approach to effective symbolic
 execution introduced in~\cite{BCE08,klee,Cadar08} is based on recording of
-already seen behaviour and pruning its repetition.
+already seen behavior and pruning its repetition.
 % The followng techniques
 %focus on reaching a specific program location. Fitnex~\cite{XTHS09}, a
 %search strategy implemented in \textsc{Pex}~\cite{TdH08}, guides a path
