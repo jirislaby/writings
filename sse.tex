@@ -93,13 +93,15 @@ studied program properties including locking policy in concurrent programs,
 null-pointer dereferences, resource allocations, and resource leaking. FSM
 specification is therefore used in many static program analysis tools like
 \textsc{xgcc}~\cite{pldi02}, \textsc{SLAM}~\cite{BLR11},
-\textsc{SDV}~\cite{BBKL10}, \textsc{ESP}~\cite{DLS02},
-\textsc{Stanse}~\cite{stanse}. All the mentioned tools produce \emph{false
-  positives}, i.e.~they report errors that do not correspond to any real
-error. We now roughly explain a basic principle of static analysis
-implemented in \textsc{xgcc} and \textsc{Stanse}. \textbf{PATRI SEM I ESP?}
+\textsc{SDV}~\cite{BBKL10}, \textsc{Blast}~\cite{BHJ07},
+\textsc{ESP}~\cite{DLS02}, \textsc{Stanse}~\cite{stanse}. All the mentioned
+tools produce \emph{false positives}, i.e.~they report errors that do not
+correspond to any real error. We now roughly explain the basic principle of
+static analysis implemented in \textsc{xgcc}, \textsc{ESP}, and
+\textsc{Stanse}.
 
-\subsection{Checking FSM Properties by Static Analysis}
+\subsection{Checking FSM Properties by Static Analysis}\label{ssec:static}
+
 Let us consider the state machine $\SM(x)$ of Figure~\ref{fig:sm}. It
 describes errors in lock manipulation. Intuitively, the state machine
 represents possible courses of states of a lock referenced by $x$ along an
@@ -206,13 +208,13 @@ these paths are also infeasible except the one that performs zero iterations
 of the \texttt{while}-loop, which is the only real execution leading to
 the only real locking error in the program.
 
-To sum up, static analysis tools like \textsc{xgcc} and \textsc{Stanse} are
-highly flexible, fast, and thus applicable on extremely large software
-projects (e.g.~the Linux kernel). It examines all the code and finds many
-error reports. Unfortunately, many of the reports are false
-positives.\footnote{We note that \textsc{xgcc} actually uses many techniques
-  for partial elimination of false positives (see~\cite{pldi02} for
-  details).}
+To sum up, static analysis tools like \textsc{xgcc}, \textsc{ESP}, and
+\textsc{Stanse} are highly flexible, fast, and thus applicable on extremely
+large software projects (e.g.~the Linux kernel). It examines all the code
+and finds many error reports. Unfortunately, many of the reports are false
+positives.\footnote{We note that \textsc{xgcc} and \textsc{ESP} actually use
+  many techniques for partial elimination of false positives
+  (see~\cite{pldi02,DLS02} for details).}
 % The main source of false positives is related to the fact that the analysis
 % does not work with data values. In particular, the analysis does not track
 % connections between variable values and states of state machines.
@@ -1243,13 +1245,18 @@ error mentioned above.
 
 \section{Related Work} \label{sec:related}
 
-A description of program properties in \textsc{Metal} language and
-meta-level compilation is discussed in~\cite{CEH02,metal,ECC00,pldi02}. The
-technique presented in~\cite{metal} found a thousands of bugs in real system
-code. It provides an easy description of properties to be checked for and a
-fast analysis.  Nevertheless, it suffers from false positives. Since false
-positive rate has huge impact on practical usability, an important part of
-the technique are false positive suppression algorithms like killing
+% A description of program properties in \textsc{Metal} language and
+% meta-level compilation is discussed in~\cite{CEH02,metal,ECC00,pldi02}. 
+
+There are many tools checking properties described by finite state
+machines. They produce both, real error as well as false positives. The
+technique of \textsc{xgcc} presented in~\cite{CEH02,metal,ECC00,pldi02}
+found a thousands of bugs in real system code. It provides a language
+\textsc{Metal} for easy description of properties to be
+checked. %As explained in Subsection~\ref{ssec:static},
+\textsc{xgcc} suffers from false positives %s. Since false positive rate has
+% huge impact on practical usability, an important part of the technique are
+despite usage of false positive suppression algorithms like killing
 variables and expressions, synonyms, false path pruning, and others. Besides
 the suppression algorithms, bug-reports from the tool are further ranked
 according to their probability of being real errors. There are generic and
@@ -1262,12 +1269,12 @@ dataflow algorithm based on~\cite{RHS95} for error detection and an abstract
 simulation pruning algorithm for false positives
 suppression. \textsc{Stanse}~\cite{stanse}, a static analysis tool also uses
 state machines for description of checked program properties. The
-description is based on parametrised abstract syntax trees.
-Finally, \textsc{CEGAR}~\cite{cegar} based tools, like \textsc{SLAM}~\cite{BLR11},
-\textsc{SDV}~\cite{BBKL10} or \textsc{BLAST}~\cite{BHJ07}, do not produce
-false positives, in theory. Nevertheless, to achieve an
-appropriate efficiency and scalability for a practical use, the 
-implementation of the \textsc{CEGAR} loop is typically not sound.
+description is based on parametrised abstract syntax trees.  Finally,
+\textsc{CEGAR}~\cite{cegar} based tools, like \textsc{SLAM}~\cite{BLR11},
+\textsc{SDV}~\cite{BBKL10}, or \textsc{Blast}~\cite{BHJ07}, do not produce
+false positives, in theory. However, to achieve an appropriate efficiency
+and scalability for a practical use, the implementation of the
+\textsc{CEGAR} loop is typically not sound.
 %Although this
 %tool found hundreds of real bugs in the Linux kernel, it suffers from a high
 %false positive rate since its false positive suppression algorithms are
@@ -1278,12 +1285,12 @@ low-level bugs like division by zero, illegal memory access, assertion
 failure etc. These tools typically do not have problems with false
 positives, but they have problems with scalability to large programs. There
 has been developed a lot of techniques improving the scalability to programs
-used in practice. Modern techniques are mostly hybrid. They usually combine
+used in practice. Modern techniques are mostly hybrid: they usually combine
 symbolic execution with concrete
 one~\cite{PKS05,GLM08:active_props,SMA05}. % GLM08:fuzzing,GLE09,TdH08,
-There
-are also hybrid techniques combining symbolic execution with a complementary
-static analysis~\cite{GNRT10,NRTT09}. % Beckmanetal08,GMR09,Gulavanietal06,
+There are also hybrid techniques combining symbolic execution with a
+complementary static
+analysis~\cite{GNRT10,NRTT09}. % Beckmanetal08,GMR09,Gulavanietal06,
 Symbolic execution can be accelerated by a compositional approach based on
 function summaries~\cite{AGT08,G07}. Another approach to effective symbolic
 execution introduced in~\cite{BCE08,klee,Cadar08} is based on recording of
@@ -1308,11 +1315,11 @@ already seen behaviour and pruning its repetition.
 %for two different paths around loop for each recurrent variable. Each
 %counter keeps an information about the number of iterations around one path
 %since the last iteration around the other one. Finally, 
-There is an
-orthogonal line of research which tries to improve the symbolic execution
-for programs with some special types of inputs. Some techniques deal with
-programs manipulating strings~\cite{BTV09,XGM08}, and some other techniques
-reduce input space using a given input grammar~\cite{GKL08,SPmCS09}.
+There is an orthogonal line of research which tries to improve the symbolic
+execution for programs with some special types of inputs. Some techniques
+deal with programs manipulating strings~\cite{BTV09,XGM08}, and some other
+techniques reduce input space using a given input
+grammar~\cite{GKL08,SPmCS09}.
 
 The interprocedural static slicing was introduced by Weiser~\cite{Wei84}. But
 nowadays, there are many different approaches to program slicing. They are
@@ -1359,20 +1366,18 @@ designed for a similar purpose.
 
 We have presented a novel technique combining three standard methods
 (instrumentation, slicing, and symbolic execution) to check program
-properties given in form of finite state machines. 
-\textbf{JE TO PORAD PRAVDA? We currently do not know
-about any technique combining arbitrary two of the three methods.}
-We have discussed a synergy of the three methods. Moreover, our experimental
-results indicate that the technique can recognize some false positives and
-some real errors in error reports produced by other error-detection tools.
+properties given in form of finite state machines. We have discussed a
+synergy of the three methods. Moreover, our experimental results indicate
+that the technique can recognize some false positives and some real errors
+in error reports produced by other error-detection tools.
 
-% \paragraph{Acknowledgements}
-% \label{sec:acknowledgements}
+\paragraph{Acknowledgements}
+\label{sec:acknowledgements}
 
-% Jan Strej\v{c}ek has been supported by The Czech Science Foundation
-% (GA\v{C}R), grants No.  P202/10/1469 and P202/12/G061. Ji\v{r}\'i Slab\'{y}
-% and Marek Trt\'{\i}k have been supported by The Czech Science Foundation
-% (GA\v{C}R), grant No.~102/09/H042.
+Jan Strej\v{c}ek has been supported by The Czech Science Foundation
+(GA\v{C}R), grants No.~P202/10/1469 and P202/12/G061. Ji\v{r}\'i Slab\'{y}
+and Marek Trt\'{\i}k have been supported by The Czech Science Foundation
+(GA\v{C}R), grant No.~102/09/H042.
 
 %}}}
 
