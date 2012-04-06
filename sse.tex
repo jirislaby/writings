@@ -29,6 +29,26 @@
 %\newcommand{\ADD}[1]{#1}
 \renewcommand{\DEL}[1]{}
 
+% \newcommand{\twolines}[2]{
+%   \begin{minipage}{.1cm}
+%     \vspace*{-2mm}
+%     \begin{center}
+%       \scriptsize
+%       #1\\
+ 
+%       #2
+%     \end{center}
+%   \end{minipage}
+% }
+
+\newcommand{\twolines}[2]{
+  \noindent
+  \begin{tabular}{c}
+     \,\,#2\\[-1mm]
+     \scriptsize #1
+  \end{tabular}
+}
+
 %}}}
 
 \begin{document}
@@ -88,9 +108,11 @@ undefined behavior or crashes. To detect violations of other program
 properties like locking policy, the program has to be modified such that the
 errors can be detected during the execution. This can be achieved, for
 example, by introducing a couple of \texttt{assert} statements to specific
-program locations.\footnote{Note that symbolic execution may produce formulae
-of an undecidable theory, so a counterexample of the checked property can be
-missed.} Another and even more important disadvantage of the tools
+program locations.
+% \footnote{Note that symbolic execution may produce formulae
+% of an undecidable theory, so a counterexample of the checked property can be
+% missed.}
+Another and even more important disadvantage of the tools
 is extreme computation cost of symbolic execution. In particular, programs
 containing loops or recursion have typically large or even infinite number
 of execution paths and cannot be entirely analysed by symbolic execution.
@@ -262,18 +284,18 @@ presented results.
 \section{Property Specification}\label{sec:propspec}
 
 %We explain our technique with use of
-Let us consider the state machine $\SM(x)$ of
-Figure~\ref{fig:sm}. It describes errors in lock manipulation.
-Intuitively, the state machine represents possible courses of states of a
-lock referenced by $x$ along an execution of a program. The state of the
-lock is changed according to a transition of the state machine if the
-execution performs a program statement syntactically subsuming the label of
-the transition. We would like to decide whether there exists any program
-execution where an instance of state machine $\SM(x)$ assigned to some lock
-of the analyzed program reaches an error state.  Unfortunately, this is not
-feasible due to potentially unbounded number of executions and unbounded
-execution length. Hence, we use static analysis to overapproximate the set
-of reachable states of state machines.
+Let us consider the state machine $\SM(x)$ of Figure~\ref{fig:sm}. It
+describes errors in lock manipulation. Intuitively, the state machine
+represents possible courses of states of a lock referenced by $x$ along an
+execution of a program. The state of the lock is changed according to a
+transition of the state machine if the execution performs a program
+statement syntactically subsuming the label of the transition. We would like
+to decide whether there exists any program execution where an instance of
+state machine $\SM(x)$ assigned to some lock of the analyzed program reaches
+an error state. \textbf{TOHLE JE DIVNY: Unfortunately, this is not feasible
+  due to potentially unbounded number of executions and unbounded execution
+  length.} Hence, we use static analysis to overapproximate the set of
+reachable states of state machines.
 
 \begin{figure}[tb]
   \centering
@@ -696,7 +718,7 @@ and \texttt{smL2}. We put slicing criteria into the lines of code detecting
 transitions of state machines into error states. In other words, the slicing
 criteria for our running example are pairs
 (27,\{\texttt{smL1},\texttt{smL2}\}), (35,\{\texttt{smL1},\texttt{smL2}\}),
-(41,\{\texttt{smL1},\texttt{smL2}\}), where the number refers to lines in the
+(41,\{\texttt{smL1},\texttt{smL2}\}), where the numbers refer to lines in the
 code of Figure~\ref{fig:fire}. The result of the slicing procedure is
 presented in Figures~\ref{fig:fire} and~\ref{fig:copy_sliced} (the code in
 the former figure shall not changed by the slicing). Note that the sliced code
@@ -709,9 +731,13 @@ program does not halt.
 % The problem arises when the sliced code contains an error, such that all
 % executions exhibiting the error do not reach the error in the original
 % code as they loop in some code that sliced.
-Therefore, there is no way to guarantee that a sliced
-program will fail to halt whenever the original program fails to halt. This
-is the only principal source of potential false positives in our technique.
+As a result, an input causing an infinite run of the original program can
+induce a finite run in the sliced program. Moreover, the finite run can
+contain locations not visited by the infinite run.
+% Therefore, there is no way to guarantee that a sliced program would fail
+% to halt whenever the original program fails to halt.
+This is the only principal source of potential false positives in our
+technique.
 
 %}}}
 %{{{ Symbolic Execution
@@ -923,58 +949,68 @@ same on-demand memory handling \textsc{UcKlee}~\cite{ucklee} does.
 
 \begin{table}[tb]
 \begin{center}
-%\setlength{\tabcolsep}{2pt}
+\setlength{\tabcolsep}{1.2pt}
 \renewcommand*\arraystretch{1.2}
 %\scriptsize
 \begin{tabular}{|l|c|c|c|c|c|c|c|c|} \hline
   {\textbf{File}}&
-  \multicolumn{5}{|c|}{\textbf{Running Time} (s)} & \textbf{Sliced} &
+  \multicolumn{5}{|c|}{\textbf{Running Time} (s)} & 
+  \multirow{2}{*}{\textbf{Sliced}} &
   \multirow{2}{*}{\textbf{Result}} & \textbf{Factual} \\ \cline{2-6}
   {\textbf{Function}} & \textbf{Comp.} & \textbf{Instr.} &
-   \textbf{Slic.} & \textbf{SE} & \textbf{Total} & (\%) &
+   \textbf{Slic.} & \textbf{SE} & \textbf{Total} & &
  & \textbf{State} \\ \hline \hline
 
   \begin{minipage}{3cm}
     \smallskip\texttt{\scriptsize fs/jfs/super.c}\\[-1pt]
     \texttt{jfs\_quota\_write}\smallskip
   \end{minipage}
-  & 1.25 & 0.18 & 0.15 & 5.09 & 6.67 & 67.8 & BUG & BUG \\ \hline
+  & 1.25 & 0.18 & 0.15 & 5.09 & 6.67 & 
+  \twolines{369/119}{67.8\%} & BUG & BUG \\ \hline
 
   \begin{minipage}{3cm}
     \smallskip\texttt{\scriptsize drivers/net/qlge/qlge\_main.c}\\[-1pt]
     \texttt{qlge\_set\_mac\_address}\smallskip
   \end{minipage}
-  & 2.70 & 0.72 & 26.75 & 13.28 & 43.45 & 66.5 & BUG & BUG \\ \hline
+  & 2.70 & 0.72 & 26.75 & 13.28 & 43.45 &
+  \twolines{1333/447}{66.5\%} & BUG & BUG \\ \hline
 
   \begin{minipage}{3cm}
     \smallskip\texttt{\scriptsize drivers/hid/hidraw.c}\\[-1pt]
     \texttt{hidraw\_read}\smallskip
   \end{minipage}
-  & 1.06 & 0.18 & 0.14 & \multicolumn{2}{|c|}{Timeout} & 67.0 & TO & BUG \\ \hline
+  & 1.06 & 0.18 & 0.14 & \multicolumn{2}{|c|}{Timeout} & 
+  \twolines{666/220}{67.0\%} & TO & BUG \\ \hline
 
   \begin{minipage}{3cm}
     \smallskip\texttt{\scriptsize drivers/net/ns83820.c}\\[-1pt]
     \texttt{queue\_refill}\smallskip
   \end{minipage}
-  & 1.76 & 0.29 & 1.72 & 0.62 & 4.39 & 72.9 & FP & FP \\[-2pt] \hline
+  & 1.76 & 0.29 & 1.72 & 0.62 & 4.39 & 
+  \twolines{1212/329}{72.9\%} & FP & FP \\[-2pt] \hline
 
   \begin{minipage}{3.6cm}
     \smallskip\texttt{\scriptsize drivers/usb/misc/}\\[-3pt]
     \hspace*{2ex}\texttt{\scriptsize sisusbvga/sisusb\_con.c}\\[-1pt]
     \texttt{sisusbcon\_set\_palette}\smallskip
   \end{minipage}
-  & 1.50 & 0.24 & 0.27 & 17.19 & 19.20 & 76.0 & FP & FP \\\hline
+  & 1.50 & 0.24 & 0.27 & 17.19 & 19.20 & 
+  \twolines{2936/705}{76.0\%} & FP & FP \\\hline
 
   \begin{minipage}{3cm}
     \smallskip\texttt{\scriptsize fs/jffs2/nodemgmt.c}\\[-1pt]
     \texttt{jffs2\_reserve\_space}\smallskip
   \end{minipage}
-   & 1.04 & 0.18 & 0.22 & \multicolumn{2}{|c|}{Timeout} & 46.8 & TO & FP \\ \hline
+  & 1.04 & 0.18 & 0.22 & \multicolumn{2}{|c|}{Timeout} & 
+  \twolines{677/360}{46.8\%} & TO & FP \\ \hline
+
   \begin{minipage}{3cm}
     \smallskip\texttt{\scriptsize kernel/kprobes.c}\\[-1pt]
     \texttt{pre\_handler\_kretprobe}\smallskip
   \end{minipage}
-   & 0.32 & 0.09 & 0.51 & 2.43 & 3.35 & 66.3 & ME & FP \\ \hline
+  & 0.32 & 0.09 & 0.51 & 2.43 & 3.35 & 
+  \twolines{202/68}{66.3\%} & ME & FP \\ \hline
+
 \end{tabular}
 \end{center}
 \caption{Experimental results. The table presents running time of
@@ -982,7 +1018,9 @@ same on-demand memory handling \textsc{UcKlee}~\cite{ucklee} does.
   points-to analysis (\textbf{Instr.}), slicing (\textbf{Slic.}), symbolic
   execution (\textbf{SE}), and the total running time. The column
   \textbf{Sliced} presents the ratio of instructions sliced away from the
-  instrumented \textsc{Llvm} code.  The column \textbf{Result} specifies the
+  instrumented \textsc{Llvm} code and the exact number of instructions
+  before/after slicing. \textbf{TY POCTY INSTRUKCI JSOU VCETNE VLOZENEHO
+    KODU, KTERY EMULUJE AUTOMATY?} The column \textbf{Result} specifies the
   result of our tool: BUG means that the tool found a real error, FP means
   that the analysis finished without error found (i.e.~the original error
   report is a false positive), TO that the symbolic execution did not finish in
@@ -1034,15 +1072,16 @@ crash for most of the input.
 % category.
 
 Table~\ref{tab:results} presents results of our tool on selected functions.
-The table shows compilation, instrumentation, slicing, symbolic execution, and
-the overall running time. Further, the table presents the ratio of
+The table shows compilation, instrumentation, slicing, symbolic execution,
+and the overall running time. Further, the table presents the ratio of
 instructions that were sliced away from the instrumented \textsc{Llvm} code.
 The last two columns specify the results of our analysis and the real state
-confirmed by kernel developers. The table clearly shows that the bottleneck of
-our technique is the symbolic execution. However if we did not slice the code,
-the only function executed in time would be \texttt{sisusbcon\_set\_palette},
-computed in 20.64s, i.e. slower by 17 percent. As a demonstration, slicer
-reduces 2936 \textsc{Llvm} instructions to 705 there.
+confirmed by kernel developers. The table clearly shows that the bottleneck
+of our technique is the symbolic execution. However, if we did not slice the
+code, the only function completely executed in time would be
+\texttt{sisusbcon\_set\_palette}, computed in 20.64s.
+% , i.e. slower by 17 per cent. As a demonstration, slicer reduces 2936
+% \textsc{Llvm} instructions to 705 there.
 
 Although the results have no statistical significance, it is clear that the
 technique can in principle classify error reports produced by other tools like
@@ -1169,10 +1208,10 @@ Section~\ref{sec:impl} or use a different executor.
 
 The second direction is to adopt or design some convenient way for
 specification of arbitrary state machines. It may be a dedicated language
-similar to \textsc{Metal}. Then we plan to implement an instrumentation
-treating these state machines. In particular, the instrumentation should
-correctly handle state machines associated with dynamically allocated
-objects.
+similar to \textsc{Metal}~\cite{metal}. Then we plan to implement an
+instrumentation treating these state machines. In particular, the
+instrumentation should correctly handle state machines associated with
+dynamically allocated objects.
 
 Finally, we would also like to examine performance of our technique as a
 stand-alone error-detection tool. To this point, we have to use a symbolic
@@ -1189,13 +1228,14 @@ designed for a similar purpose.
 \section{Conclusion}
 \label{sec:conclusion}
 
-We have presented a novel technique combining three standard methods:
-specification of errors with state machines, slicing, and symbolic execution.
-We currently do not know about any technique combining arbitrary two of the
-three methods. We have discussed a synergy of the three methods. Moreover,
-our experimental results indicate that the technique can recognize some false
-positives and some real errors in error reports produced by other
-error-detection tools.
+We have presented a novel technique combining three standard methods
+(instrumentation, slicing, and symbolic execution) to check program
+properties given in form of finite state machines. 
+\textbf{JE TO PORAD PRAVDA? We currently do not know
+about any technique combining arbitrary two of the three methods.}
+We have discussed a synergy of the three methods. Moreover, our experimental
+results indicate that the technique can recognize some false positives and
+some real errors in error reports produced by other error-detection tools.
 
 % \paragraph{Acknowledgements}
 % \label{sec:acknowledgements}
