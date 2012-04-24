@@ -2,7 +2,7 @@
 
 \documentclass[10pt]{llncs}
 \usepackage{bold-extra}
-\usepackage{color}
+\usepackage{xcolor}
 \usepackage{url}
 \usepackage{graphicx}
 \usepackage{listings}
@@ -16,6 +16,8 @@
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
 \renewcommand\note[1]{\nb{\Color{blue}{#1}}}
 \newcommand\todo[1]{\nb{\Color{red}{#1}}}
+\newcommand\xnote[1]{\Color{green!40!black}{#1}}
+\newcommand\snote[1]{\nb{\Color{green!40!black}{#1}}}
 \lstset{basicstyle=\ttfamily\scriptsize,escapeinside={(*@}{@*)}}
 
 \newcommand\sparse{\textsc{Sparse}}
@@ -28,7 +30,8 @@
 
 %{{{ Title + Author + Abstract
 
-\title{The Bug Database: Comparing Static Analysis Tools Effectively}
+\title{The Bug Database: Comparing Static Analysis Tools Effectively
+\\\xnote{Sorted Bug-reports Database for Tuning Program Analysis Tools}}
 \author{Ji\v{r}\'\i~Slab\'y, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
@@ -52,8 +55,36 @@ BLABLA
 
 %{{{ Intro
 
-\section{Introduction}
+\section{\xnote{Introduction}}
 \label{sec:introduction}
+
+\xnote{
+Nasledujici ctyri body predstavuji vecny obsah teto sekce. Dulezite je i jejich poradi. (nejen v techto bodech pouzivam tyto zkratky: Sorted Bug-reports Database (SBD), Program Analysis Tool (PAT)).
+\\
+(1) Problem pri vyvoji PATu, ktery zde hodlame resit:
+%
+Zamerujeme se na takove PATy, ktere mohou pri sve cinnosti produkovat falesna hlaseni. Uvest priklady takovych PATu (BLAST, SLAM, SDV, COVERITY, KLOCWORK, XGCC, CPPCHECK, PREFIX, PREFAST, ...).
+%
+Jde nam o pozdejsi stadia vyvoje techto PATu, kdy se ma nastroj zacit vyhodnocovat na realnych programech.
+%
+PAT pusteny na realnem programu casto generuje velke mnozstvi bug-reportu, o kterych predem nevime, ktere reporty predstavuji realne chyby, a ktere jsou jen falesna hlaseni. Zduraznit, ze overovani chyby/falesneho hlaseni v realnem, cizim a neznamem kodu je casto casove narocna a nezaziva prace.
+%
+Cilem SBD je tuto casove narocnou a nezazivnou cinnont znacne redukovat.
+\\
+(2) Jak konkretne SBD pomuze pri trideni bug-reportu:
+%
+SBD obsahuje pro analyzovany program velke mnozstvi jiz drive roztridenych bug-reportu. Vyvojari PATu tak staci, aby porovnal vystup z jeho toolu s obsahem SBD.
+%
+Krome vlastniho roztrideni (velke) casti vsech bug-reportu PATu na realne chyby a false positiva, vyvojar dale ziska prehled o znamych realnych chybach, ktere jeho PAT v analyzovane casti programu prehledl.
+\\
+(3) Prirozene zkvalitnovani SBD:
+%
+Muze se stat, ze vyvijeny PAT vyprodukuje na danem programu bug-report, ktery doposud neni v SBD. Vyvojar muze tento bug-report vlozit do SBD a muze k nemu pripojit informaci o tom, jestli jde o realnou chybu nebo o falesne hlaseni. Timto prispivanim do SBD si mohou vsichni vyvojari PATu vzajemne setrit cas.
+%
+SBD je navic navrzena tak, ze se do ni daji vkladat ruzne programy a dokonce i ruzne jejich verze. SBD tak mohou vyuzit i PATy specializovane na urcite typy programu (napr. na knihovny pro praci s retezci, sobory, GUI, apod.).
+\\
+(4) Statisticke udaje o cinnosti PATu na danem programu pomoci SBD: Uzivatel by mel mit moznost si v SBD oznacit moduly z daneho programu (verze), ktere jeho PAT analyzoval. Pak by mel mit moznost oznacit v SBD, ktere bug-reporty jeho PAT vyprodukoval. SBD by mu pak mela poskytnout statistiku, kolik nasel realnych chyb toho ktereho typu, kolik mel falesnych hlaseni toho ktereho typu, procentualni zastoupeni falesnych hlaseni, apod. 
+}
 
 There are several successful tools for finding errors in real code like
 \textsc{Coverity}~\cite{coverity}, or \stanse~\cite{stanse}.
@@ -88,9 +119,32 @@ one tool from a North-American company dealing with static analysis of the
 Linux kernel, we call this \undetI.
 
 %}}}
+
+\section{\xnote{Sorted Bug-reports Database}}
+
+\subsection{\xnote{Usage}}
+
+\xnote{
+V teto subsekci predvedeme, jak se konkretne s SBD pracuje. Jako PAT zvolime STANSE a budeme tridit jeho vystup (bug-reporty) pomoci SBD. Jednotlive ukazky budou zcela konkretni realne priklady pouziti SBD, ktere si kdokoliv muze sam hned odzkouset. Predvedeme nasledujici veci:
+\\
+(1) Trideni bug-reportu z PATu pomoci SBD: (a) Pomoci SQL dotazu: Vezmu nejakou vhodnou hlasku ze STANSE a ukazu SQL dotaz do SBD, ktery vrati, zda se jedna o chybu nebo falesne hlaseni, nebo ze hlaska zatim neni v SBD. Klidne lze udelat 3 priklady pro jednotlive mozne vysledky. Vhodne by mohly byt obrazky vystupu z konzole apod. (b) Pomoci weboveho rozhrani: Provedu totez co v (a), akorat zde zobrazim prislusne nastavena GUI okenka z weboveho rozhrani.
+\\
+(2) Pridani noveho bug-reportu do SBD: (a) Pomoci SQL dotazu: Vezmu nejakou vhodnou hlasku ze STANSE (nejlepe tu z tech 3 hlasek z bodu (1)) a ukazu SQL dotaz do SBD, ktery zajisti vlozeni bug-reportu do SBD. Mely by se odiskutovat jednotlive varianty dotazu (napr. vlozeni rovnou s klasifikaci bug/false alarm; dale typ chyby; pridani dalsich doplnujicich dat k zaznamu). (b) Pomoci weboveho rozhrani: Provedu totez co v (a), akorat zde zobrazim prislusne nastavena GUI okenka z weboveho rozhrani.
+\\
+(3) Pridani noveho programu, ci verze do SBD: (a) Pomoci SQL dotazu: Zvolim nejaky (mensi) open source a program ci knihovnu (pak se domluvime, co by to tak asi mohlo byt) a jeho/jeji nejakou verzi a formuluji SQL dotaz, ktery vlozi ten program do SBD. (b) Pomoci weboveho rozhrani: Provedu totez co v (a), akorat zde zobrazim prislusne nastavena GUI okenka z weboveho rozhrani. Mimochodem, tento bod (3) se da cely take zatim vyresit tak, ze rekneme, ze tato funkcionalita je prozatim ve vyvoji, ale bude zpristupnema v blizke budoucnosti.
+\\
+(4) Statisticke udaje o cinnosti PATu na danem programu pomoci SBD: (a) Pomoci SQL dotazu: Vzal bych vystup STANSE na urcitych par modulech. Pro tento vystup bych formuloval ruzne varianty SQL dotazu do SBD pro ziskani ruznych statistickych udaju o analyze. Mel by se take odiskutovat ten univerzalni format zadavani bug-reportu v dotazu a format seznamu analyzovanych modulu. (b) Pomoci weboveho rozhrani: Provedu totez co v (a), akorat zde zobrazim prislusne nastavena GUI okenka z weboveho rozhrani.
+}
+
 %{{{ Results
 
-\section{Results}
+%\section{Results}
+\subsection{\xnote{Current State}}
+
+\xnote{
+Zde bych dal vsechny zajimave statisticke udaje o aktualnim stavu obsahu SBD. Nezapomenout uvest verzi kernelu, kterou tam mame. Take odiskutovat propojeni s tou databazi nejcastejsich chyb v SW (nemuzu si vzpomenout na tu zkratku) a diskuse zvolenych typu chyb v SBD. Sekci bych uzavrel nasimi plany s SBD do blizke budoucnosti (neco jako kratka Future Work).
+}
+
 118 of the reports are real, 329 false positives. The database contains also
 27 entries which were left unclassified.
 
@@ -98,6 +152,13 @@ Linux kernel, we call this \undetI.
 \undetI failed to report 46\todo{exact count needed}. We
 believe this is because of the default settings of the tool or due to filters
 which are executed on the analysis results.
+
+\subsection{\xnote{Availability}}
+
+\xnote{
+Krome vlastniho URL bych zde zminil moznost stazeni SBD (s licencnimi podminkami, pripadne) pro praci off-line. Pro tuto moznost stazeni SBD je ale nutne dodat na webove stranky instalacni manual. Zde muzeme navic pripadne dat odkaz na tuto stranku. Dale musime zminit, ze subsekce Usage obsahuje konkretni priklady pouziti, ktere je mozne na dane URL primo odzkouset. A ze z te sekce by take melo byt zcela jasne, jak pri zkouseni postupovat (tj. sekci lze tez chapat jako manual pro pouziti tech prikladu).
+}
+\snote{Ackoliv se mohou nektere ze zde pozadovanych veci zdat zbytecne, jedna se o explicitne zminene pozadavky pro tool-papers na ATVA2012}
 
 The database is available at \url{http://arran.fi.muni.cz/bug_database/}.
 
@@ -119,9 +180,16 @@ The database is available at \url{http://arran.fi.muni.cz/bug_database/}.
 
 
 %}}}
+
+\section{\xnote{Related Work}}
+
+\xnote{
+Musime dohledat clanky, ktere resi ruzne benchmarky a kolekce chyb apod. a radne se vuci nim vymezit. Hlavne je potreba zduraznit (oproti ostatnim) ze SBD neslouzi a ani nema slouzit pro porovnavani PATu (jednak vyvojari nemusi nektere vlozene bugy a falesna hlaseni znackovat svym PATem, dale nejsou uvadeny casy pro nalezeni dane chyby, neni zadavan HW na nemz PAT bezel, a take se neuvadi konfigurace, pri ktere ten ktery PAT chybu nasel). Proto statisticke udaje o obsahu SBD jsou prilis hrube na rozumne srovnani vykonu PATu prispivajicich do SBD. Z techto duvodu SBD tyto srovnavaci udaje vubec neposkytuje.
+}
+
 %{{{ Conclusion
 
-\section{Conclusion}
+\section{\xnote{Conclusion}}
 \label{sec:conclusion}
 
 \paragraph{Acknowledgements}
