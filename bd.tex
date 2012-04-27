@@ -24,13 +24,15 @@
 \newcommand\stanse{\textsc{Stanse}}
 \newcommand\undetI{\textsc{Undetermined I}}
 
+\newcommand\cdb{\textsc{ClabureDB}}
+
 %}}}
 
 \begin{document}
 
 %{{{ Title + Author + Abstract
 
-\title{ClabureDB: Classified Bug-Reports Database}
+\title{\cdb: Classified Bug-Reports Database}
 \author{Ji\v{r}\'\i~Slab\'y, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
@@ -44,8 +46,8 @@
   reports produced by several tools applied to the Linux kernel. The reports
   are classified as real errors or false positives. The database has a web 
   frontend and it is also available for download. Using the database,
-  developers of various bug-finding tools can can easily evaluate
-  performance of their tool on a large real-life software project.
+  developers of various bug-finding tools can easily evaluate performance of
+  their tool on a large real-life software project.
 \end{abstract}
 
 %}}}
@@ -59,20 +61,117 @@ databaze klasifikovanych chyb pro ladeni toolu urcenych pro analyzu realneho
 kodu.  availability, related work [M, hlavne odkazy na existujici benchmarky
 a jejich nedostatky], url,
 
-
+The database is available at \url{http://arran.fi.muni.cz/claburedb/}. There
+is also a link to documentation.\todo{todo}
 
 %}}}
 %{{{ Database Structure
 
-\section{Database Structure [J]}
+\section{Database Structure}
+The database is designed to conceive various kind of errors from various
+projects and their version. We decided to cut the database at the project and
+its version level. Hence the user selects project and version and then work
+with a chosen sub-database. Sub-database comprises information about errors,
+tools, error types, users, and relation between them.
 
-Information stored in the database (snapshot?) and considered types of errors
-(including CWE pointers).
+Namely we have several tables for each project and version:
+\begin{itemize}
+\item \textbf{error\_type} -- specifies various kinds of errors (cf.
+Section~\ref{sec:error_type}). It contains name of the type, short description
+and a reference CWE number if exists (see later).
+\item \textbf{error} -- an error specified by the type above (and subtype if
+needed), location (file, line), URL for reference, classification (false
+positive, real error, unknown), confirmation (for real bugs, a commit ID for
+instance), user who inserted the entry, and timestamp of the moment of
+insertion.
+\item \textbf{tool} -- the database contains errors from more tools, here they
+are enumerated. We store name, version, URL and description for each of tools.
+\item \textbf{user} -- each user, who inserts entries to the database, must
+have name, affilitation and login in the database.
+\item \textbf{error\_rel\_tool} -- since there is an m:n relation between
+\texttt{error} and \texttt{tool} tables, we have this relation to provide the
+mapping.
+\end{itemize}
+
+
+%Information stored in the database (snapshot?)
+
+%user(name affilitation login password)
+
+\subsection{Error Types} \label{sec:error_type}
+All the tools produce only a limited kinds of errors. We investigated their
+output and established a set of errors to put in the database. Since there
+already exists a publicly available database of error types, we decided to
+leverage that. It summarizes the error type, provides examples and also points
+to real errors of a particular type. The database is called \emph{Common
+Weakness Enumeration} (CWE)~\cite{cwe}. Some of our errors are still not
+present in CWE though. For those we obviously do not provide a CWE number.
+Here, we list all error types currently available in \cdb.
+
+\noindent \textbf{BUG/WARNING} (CWE 617) \\ \hangindent=2em
+Developers often inject \emph{assert}s to their code to ensure the input to
+the code is as they expected.  Sometimes these assertions are hit and crashes
+are enforced, thus we include them in \cdb.  The location is specified by the
+line where the macro/function appears in the code.
+
+\noindent \textbf{Double Lock} (CWE 764) \\ \hangindent=2em
+Some lock is unintentionally locked twice in a sequence and it leads to an
+inconsistent lock state. The location is specified by the line where the
+second lock happens.
+
+\noindent \textbf{Double Unlock} (CWE 765) \\ \hangindent=2em
+Some lock is unintentionally unlocked twice in a sequence and it leads to an
+inconsistent lock state. The location is specified by the line where the 
+second unlock happens.
+
+\noindent \textbf{Leaving function in locked state} \\ \hangindent=2em
+Some lock is not unlocked on all paths of a function, so it is unintentionally
+leaked. This often results in deadlocks on next invocation of such function.
+The location is specified by the line of \texttt{return} statement or closing
+brace if there is no \texttt{return}.
+
+\noindent \textbf{Use After Free} (CWE 416) \\ \hangindent=2em
+Dereferencing a pointer that points to an already freed memory. Often, the
+code overwrites memory which is no longer owned. The location is specified by
+the line of the use.
+
+\noindent \textbf{Double Free} (CWE 415) \\ \hangindent=2em
+Freeing function is called twice on the same address. Most allocators can
+detect this and usually kill the program. The location is specified by
+the line of the invalid free.
+
+\noindent \textbf{Memory Leak} (CWE 401) \\ \hangindent=2em
+Some code omits to free a memory which was allocated. The location is
+specified by the line of the allocation.
+
+\noindent \textbf{NULL Pointer Dereference} (CWE 476) \\ \hangindent=2em
+A pointer which is NULL is being dereferenced. This typically happens when a
+code allocates memory and dereferences it without prior checking it against
+NULL. The location is specified by the line of the dereference.
+
+\noindent \textbf{Double Resource Put} (CWE 763) \\ \hangindent=2em
+The code requests one copy of a resource from a system, but there is a try to
+return that to the system twice. The location is specified by the line of the
+second put.
+
+\noindent \textbf{Resource Leak} (CWE 404) \\ \hangindent=2em
+The code requests a resource from a system, but omits to return that back to
+the system for reuse. The location is specified by the line of the request.
+
+\noindent \textbf{Calling function from invalid context} \\ \hangindent=2em
+Some function is called at inappropriate place like calling sleep inside
+critical sections or in interrupt handlers. Results are undefined, the system
+may become unresponsive. The location is specified by the line of the function
+call.
 
 %}}}
 %{{{ Current Data and Their Sources
 
 \section{Current Data and Their Sources [J]}
+In the end the database comprises 498 reports in 11 categories.
+118 of the reports are real, 353 false positives. The database contains also
+27 entries which were left unclassified.
+
 
 %}}}
 %{{{ Future Plans
@@ -84,12 +183,7 @@ Information stored in the database (snapshot?) and considered types of errors
 
 \section{Poznamky}
 \begin{itemize}
-\item zridit email claburedb\@fi.muni.cz
 \item nasadit databazi
-\item vystavit ke stazeni, zvolit licenci
-\item dat tam dalsi texty: instrukce ke stazeni a instalaci, priklad pouziti
-  (SQL dotaz), ovladani webove databaze
-\item chyby, podnety k rozsireni, dalsi data, nabidka dalsich toolu na mail 
 \end{itemize}
 
 \bibliographystyle{plain}
@@ -194,8 +288,6 @@ V teto subsekci predvedeme, jak se konkretne s SBD pracuje. Jako PAT zvolime STA
 Zde bych dal vsechny zajimave statisticke udaje o aktualnim stavu obsahu SBD. Nezapomenout uvest verzi kernelu, kterou tam mame. Take odiskutovat propojeni s tou databazi nejcastejsich chyb v SW (nemuzu si vzpomenout na tu zkratku) a diskuse zvolenych typu chyb v SBD. Sekci bych uzavrel nasimi plany s SBD do blizke budoucnosti (neco jako kratka Future Work).
 }
 
-118 of the reports are real, 329 false positives. The database contains also
-27 entries which were left unclassified.
 
 \stanse, by its nature of overapproximating, reported all the reports.
 \undetI failed to report 46\todo{exact count needed}. We
@@ -208,8 +300,6 @@ which are executed on the analysis results.
 Krome vlastniho URL bych zde zminil moznost stazeni SBD (s licencnimi podminkami, pripadne) pro praci off-line. Pro tuto moznost stazeni SBD je ale nutne dodat na webove stranky instalacni manual. Zde muzeme navic pripadne dat odkaz na tuto stranku. Dale musime zminit, ze subsekce Usage obsahuje konkretni priklady pouziti, ktere je mozne na dane URL primo odzkouset. A ze z te sekce by take melo byt zcela jasne, jak pri zkouseni postupovat (tj. sekci lze tez chapat jako manual pro pouziti tech prikladu).
 }
 \snote{Ackoliv se mohou nektere ze zde pozadovanych veci zdat zbytecne, jedna se o explicitne zminene pozadavky pro tool-papers na ATVA2012}
-
-The database is available at \url{http://arran.fi.muni.cz/bug_database/}.
 
 \begin{table}[tb]
 \begin{center}
