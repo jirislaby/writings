@@ -43,12 +43,12 @@
 \begin{abstract}
   We present a database that can serve as a tool for tuning and evaluation
   of various program analysis tools. The database currently contains a heap
-  of bug reports produced by several tools applied to the Linux kernel. The
+  of bug-reports produced by several tools applied to the Linux kernel. The
   reports are classified as either real errors or false positives. The
   database can be downloaded and manipulated by SQL queries, or accessed via
   a web frontend. Using the database, developers of various bug-finding
-  tools can easily evaluate performance of their tool on a large real-life
-  software project.
+  tools can easily evaluate effectiveness and performance of their tool on a
+  large real-life software project.
 \end{abstract}
 
 %}}}
@@ -68,30 +68,30 @@ programs~\cite{CHK11,CHK09,KRA05,NCH05,SRD} and those consisting of
 real-world programs~\cite{CHK09,HW08,LLQ05}. In benchmark
 suites~\cite{CHK11,KRA05,NCH05}, relevant program locations in small
 synthetic programs are explicitly marked as either erroneous or safe. The
-benchmark suite~\cite{CHK09} marks only real errors. The situation is
+benchmark suite~\cite{CHK09} marks only known real errors. The situation is
 different for benchmarks with real-world programs: \cite{LLQ05} contains
-marked test cases triggering errors and non-triggering errors,
+marked test cases triggering/non-triggering errors,
 while~\cite{HW08} provides bug-reports (both real errors and false
-positives) collected from \textsc{Findbugs} and sorted according to priority
+positives) produced by \textsc{Findbugs} and sorted according to priority
 levels assigned to the reports by the tool. The benchmark suites discussed
 so far consider different error types and provide their own error
 taxonomies with exception of suites \cite{CHK11,CHK09}, where errors types
 are linked to \textsc{CWE}~\cite{cwe}.
 
-As far as we know, there is no big real-life project with a significant long
-list of uniformly described bug reports classifed as real errors or false
-positive. Our benchmark suite \cdb fills this gap. The database currently
-contains only a single project, namely the Linux kernel 2.6.28.  We have
-collected over 600 bug reports of 11 error types produced by several
-bug-detection tools. The reports have been manually classified by skilled
-programmers with a help of Linux kernel developers. Either as real errors or
-false positives. % Only a few of them remain unclassified.
+As far as we know, there is no benchmark suite containing big real-life
+projects with a significant list of uniformly described bug-reports
+classified as real errors or false positive. Our benchmark suite \cdb fills
+this gap. The database currently contains only a single project, namely the
+Linux kernel 2.6.28.  We have collected over 600 bug-reports of 11 error types
+produced by several bug-detection tools. The reports have been manually
+classified as either real errors or false positives by skilled programmers with a help of Linux kernel developers.
 
 To evaluate a bug-finding tool, one can analyse a project from our benchmark
-and compare the produced bug reports to those in our database. This way, one
-immediately gets a classification of the reports matched to our database
-entries and also information about missed real errors. This information can be
-further processed according to methodologies of~\cite{HW08,CHK09}.
+suite and compare the produced bug-reports to those in the database. This way,
+one immediately gets a classification (real error/false positive) of the
+reports matched in the database and also information about some missed real
+errors.  This information can be further statistically processed according to
+methodologies of~\cite{HW08,CHK09}.
 
 The database may be downloaded in \textsc{SQLite~3} format for a local use
 under the \emph{Open Database License v1.0}~\cite{ODbL} or accessed via a web
@@ -106,97 +106,92 @@ interface at:
 \section{Database Structure}\label{sec:structure}
 The database is designed to accommodate various kinds of errors from diverse
 projects and their version. We decided to have each project and version in a
-separate database. Hence the user selects project and version and then works
-with a chosen project/version. Such sub-database comprises information about
-errors, tools, error types, users, and relation between them. The main tables
-in the database are two:
-\begin{itemize}
-\item \textbf{error\_type} -- specifies various kinds of errors (cf.
+separate sub-database. A sub-database comprises information about errors,
+tools, error types, users, and relation between them. The main tables in the
+database are two:
+\begin{description}
+\item \textbf{error\_type} This table specifies various kinds of errors (cf.
 Section~\ref{sec:error_type}). It contains a name of the type, short
 description and a reference CWE number if exists (see later).
-\item \textbf{error} -- an error specified by the type above, location (file
-and line), URL for reference (to provide more info), classification (false
-positive, real error, unclassified), confirmation (how the bug was fixed, a
-commit ID for instance), user who inserted the entry, and timestamp of the
-moment of insertion.
-\end{itemize}
+\item \textbf{error} A bug report is specified by the type above, location
+(file and line), URL for reference (to provide more info), classification
+(false positive, real error, unclassified), confirmation (an argument
+supporting the validity of the bug, e.g. a commit ID of the corresponding bug-fix), user who
+inserted the entry, and timestamp of the moment of insertion.
+\end{description}
 
 %Information stored in the database (snapshot?)
 
 %user(name affilitation login password)
 
 \subsection{Error Types} \label{sec:error_type}
-All the tools we have an output from, produce only a limited count of error
-types. We investigated their output and established a set of error types to
-put into the database. Since there already exists a publicly available database
-of error types, we decided to leverage that. It summarizes the error type,
-provides examples and also points to real errors of a particular type. The
-database is called \emph{Common Weakness Enumeration} (CWE)~\cite{cwe}.
-However, two of our types are not present in CWE. We consulted their inclusion
-in CWE, but it was concluded that the are too project-specific and will not be
-added. Here, we list all error types currently available in \cdb. The line of
-each of the reports points to the original source file, even though a macro
-expansion may happen at that place.
+We investigated output of available tools and established a set of error types
+to put into the database. Since there already exists a publicly available
+database CWE~\cite{cwe} of error types, we decided to leverage that.  However,
+two of our types are not present in CWE. We consulted their inclusion in CWE,
+but it was concluded that they are too project-specific and will not be added.
+Here, we list all error types currently available in \cdb.
 
 \noindent \textbf{BUG/WARNING} (CWE 617) \hangindent=2em
-Developers often inject \emph{assert}s to their code to ensure the input to
-the code is as they expected.  Sometimes these assertions are hit and crashes
-are enforced, thus we include them in \cdb.  The location is specified by the
-line where the assertion appears in the code.
+Developers often inject \emph{assert}s to their code, e.g.~to ensure the input
+to the code is as they expected.  Sometimes these assertions are hit and
+crashes are enforced, thus we include them in \cdb. The error location is
+specified by the line where the assertion appears in the code.
 
 \noindent \textbf{Double Lock} (CWE 764) \hangindent=2em
-Some lock is unintentionally locked by a thread twice in a sequence and it
-leads to an inconsistent lock state. The location is specified by the line
-where the second lock happens.
+Some lock is locked by a thread twice in a sequence and it leads to an
+inconsistent lock state. The error location is specified by the line with the
+second locking function call.
 
 \noindent \textbf{Double Unlock} (CWE 765) \hangindent=2em
-Some lock is unintentionally unlocked by a thread twice in a sequence and it
-leads to an inconsistent lock state. The location is specified by the line
-where the second unlock happens.
+Some lock is unlocked by a thread twice in a sequence and it leads to an
+inconsistent lock state. The error location is specified by the line with the
+second unlocking function call.
 
 \noindent \textbf{Use After Free} (CWE 416) \hangindent=2em
-Dereferencing a pointer that points to an already freed memory. The location
-is specified by the line of the use.
+Dereferencing a pointer that points to an already freed memory. The error
+location is specified by the line of the use.
 
 \noindent \textbf{Double Free} (CWE 415) \hangindent=2em
 Freeing function is called twice on the same address. Most allocators can
-detect this and usually kill the program. The location is specified by
+detect this and usually kill the program. The error location is specified by
 the line of the invalid (second) free.
 
 \noindent \textbf{Memory Leak} (CWE 401) \hangindent=2em
-Some code omits to free a memory which was allocated. The location is
-specified by the line of the allocation.
+Some code omits to free a memory which was allocated. The error location is
+specified by the line of the alerror location.
 
 \noindent \textbf{NULL Pointer Dereference} (CWE 476) \hangindent=2em
 A pointer which is NULL is being dereferenced. This typically happens when a
 code allocates memory and dereferences it without prior checking it against
-NULL. The location is specified by the line of the dereference.
+NULL. The error location is specified by the line of the dereference.
 
 \noindent \textbf{Double Resource Put} (CWE 763) \hangindent=2em
-The code requests one copy of a resource from a system such as structures
-holding hardware status, but there is a try to return that to the system
-twice. The location is specified by the line of the second put.
+The code requests one copy of a resource (e.g.~a structure holding hardware
+status) from a system, but there is a try to return that to the system twice.
+The error location is specified by the line of the second put.
 
 \noindent \textbf{Resource Leak} (CWE 404) \hangindent=2em
 The code requests a resource from a system, but omits to return that back to
-the system for reuse. The location is specified by the line of the request.
+the system for reuse. The error location is specified by the line of the
+request.
 
 \noindent \textbf{Calling function from invalid context} \hangindent=2em
 Some function is called at inappropriate place like calling sleep inside
 critical sections or in interrupt handlers. Results are undefined, the system
-may become unresponsive or crash. The location is specified by the line of the
-function call.
+may become unresponsive or crash. The error location is specified by the line
+of the function call.
 
 \noindent \textbf{Leaving function in locked state} \hangindent=2em
 Some lock is not unlocked on all paths of a function, so it is unintentionally
 leaked. This often results in deadlocks on next invocation of such function.
 Sometimes, this is reported by tools which analyze a project per module and
 start the analysis from some chosen function. If the lock is locked while
-leaving from the function, this report is generated.  The location is
+leaving from the function, this report is generated.  The error location is
 specified by the line of \texttt{return} statement or closing brace if there
 is no \texttt{return}.
 
-The last two types may be only Linux kernel specific. As can be seen the
+The last two error types may be only Linux kernel specific. Note that the
 database is not limited to a bounded set of error types. Each project may
 extend this set by its own set.
 
@@ -205,51 +200,40 @@ extend this set by its own set.
 
 \section{Current Data and Their Sources}\label{sec:data}
 
-The benchmark currently contains only bug reports produced for the Linux
+The benchmark currently contains only bug-reports produced for the Linux
 kernel 2.6.28 by the following tools: \clang 3\footnote{We used modified
   \texttt{experimental.unix.PthreadLock} checker, where support for kernel
   locking was added.}, \stanse, and one tool which wanted to stay in
-anonymity. We also included bug reports from kernel and Novell bug tracking
+anonymity. We also included bug-reports from kernel and Novell bug tracking
 systems and mailing lists using our own web crawler.
 
-The database comprises 616 reports of 11 types: 118 real errors, 388 false
-positives, and 110 entries which were left unclassified. Many of the
-unclasified entries were added even recently and are about to be classified
-soon. The following table depicts how each kind of bugs is represented in
-the database.
+The database comprises 616 reports: 118 real errors, 388 false positives, and
+110 entries which are unclassified. Many of the unclassified entries were
+added even recently and are about to be classified soon. The following table
+depicts how each kind of bugs is represented in the database.
 
-%\begin{table}[htb]
 \begin{center}
 \small
 \setlength{\tabcolsep}{2.5pt}
 \begin{tabular}{|l|c|c|c|c|} \hline
 \textbf{Error Type} & \textbf{Real Err.} & \textbf{False Pos.} &
-	\textbf{Unclassified} & \textbf{Total} \\ \hline \hline
+	\textbf{Unclassified} & \textbf{Total} \\ \hline
 
-BUG/WARNING & 8 & 0 & 0 & 8 \\ \hline
-Calling function from invalid context & 16 & 19 & 0 & 35 \\ \hline
-Double Free & 0 & 1 & 0 & 1 \\ \hline
-Double Lock & 16 & 95 & 4 & 115 \\ \hline
-Double Resource Put & 3 & 4 & 0 & 7 \\ \hline
-Double Unlock & 11 & 38 & 82 & 131 \\ \hline
-Leaving function in locked state & 27 & 150 & 0 & 177 \\ \hline
-Memory Leak & 7 & 13 & 0 & 20 \\ \hline
-NULL Pointer Dereference & 17 & 14 & 0 & 31 \\ \hline
-Resource Leak & 13 & 51 & 24 & 88 \\ \hline
-Use After Free & 0 & 3 & 0 & 3 \\ \hline \hline
+BUG/WARNING & 8 & 0 & 0 & 8 \\ 
+Calling function from invalid context & 16 & 19 & 0 & 35 \\ 
+Double Free & 0 & 1 & 0 & 1 \\ 
+Double Lock & 16 & 95 & 4 & 115 \\ 
+Double Resource Put & 3 & 4 & 0 & 7 \\ 
+Double Unlock & 11 & 38 & 82 & 131 \\ 
+Leaving function in locked state & 27 & 150 & 0 & 177 \\ 
+Memory Leak & 7 & 13 & 0 & 20 \\ 
+NULL Pointer Dereference & 17 & 14 & 0 & 31 \\ 
+Resource Leak & 13 & 51 & 24 & 88 \\ 
+Use After Free & 0 & 3 & 0 & 3 \\  \hline
 
 \textbf{Overall Count} & 118 & 388 & 110 & 616 \\ \hline
 \end{tabular}
 \end{center}
-%\caption{Bugs in the database.}
-%\label{tab:results}
-%\end{table}
-
-% The data were collected thanks to the following tools: \clang 3\footnote{We
-% used modified \texttt{experimental.unix.PthreadLock} checker, where support
-% for kernel locking was added.}, \stanse, one tools which wanted to stay
-% in anonymity, and from kernel and Novell bug tracking systems and mailing
-% lists using our own web crawler.
 
 %}}}
 %{{{ Future Plans
@@ -257,18 +241,20 @@ Use After Free & 0 & 3 & 0 & 3 \\ \hline \hline
 \section{Future Plans}
 
 We plan to extend the database in several directions. Namely, we intend to
-collect more bug reports and to support more error types in the current
+collect more bug-reports and to support more error types in the current
 project. Further, we want to add other real-life projects. We also plan to
 extend the web interface to enable other users to maintain and extend the
 database. The future of our database depends also on a feedback of the
 program analysis community. Hence, if you have any suggestions, source of
-bug reports, or another comments, please contact us
+bug-reports, or another comments, please contact us at
 \texttt{claburedb@fi.muni.cz}.
 
 %}}}
 
 \bibliographystyle{plain}
 \bibliography{bd}
+
+\end{document}
 
 \clearpage
 
@@ -290,7 +276,7 @@ Our benchmark suite \cdb differs from the previous approaches, since it provides
 
 \subsection{Notes (they are not meant to appear in the article)}\label{sec:relwork:notes}
 
-\subsubsection{(1) BegBunch -- Benchmarking for C Bug Detection Tools~\cite{CHK09}} This benchmark suite consists of two suites of different purpose. The \emph{Accuracy suite} consists of small benchmarks, called bug-kernels, which were extracted from existing buggy open source applications, like OpenSolaris or MySQL. The bug-kernels was extracted by inspecting bug tracing systems and mailing lists. The bug-kernels contains errors of the following types: buffer overflow, memory/pointer issues, integer overflow, and format string. Each bug in a bug-kernel is annotated with an XML-like markup of the same line that exposes the bug. The second suite \emph{Scalability suite} is composed of a particular versions of several open source applications (like MySQL 5.0.51a, Perl 5.8.4, Sendmail 8.12.3, etc.) of various size from small to large. There is no bug reports considered in this suite. Only size of benchmarks is considered. The purpose of this suite is to measure how well a program analysis tool scales in spite of size of an analysed code.
+\subsubsection{(1) BegBunch -- Benchmarking for C Bug Detection Tools~\cite{CHK09}} This benchmark suite consists of two suites of different purpose. The \emph{Accuracy suite} consists of small benchmarks, called bug-kernels, which were extracted from existing buggy open source applications, like OpenSolaris or MySQL. The bug-kernels was extracted by inspecting bug tracing systems and mailing lists. The bug-kernels contains errors of the following types: buffer overflow, memory/pointer issues, integer overflow, and format string. Each bug in a bug-kernel is annotated with an XML-like markup of the same line that exposes the bug. The second suite \emph{Scalability suite} is composed of a particular versions of several open source applications (like MySQL 5.0.51a, Perl 5.8.4, Sendmail 8.12.3, etc.) of various size from small to large. There is no bug-reports considered in this suite. Only size of benchmarks is considered. The purpose of this suite is to measure how well a program analysis tool scales in spite of size of an analysed code.
 
 \subsubsection{(2) BugBench: Benchmarks for Evaluating Bug Detection Tools~\cite{LLQ05}} Benchmarks are in the form of complete program distributions. It is composed of 17 programs (like gzip-1.2.4, cvs-1.11.4, msql-4.1.1, etc.) including 19 bugs (like stack smash, global buffer overflow, heap buffer overflow, uninitialised read, memory leak, double free, data race,  atomicity, and semantic bug) that were known to exist in these programs. BugBench provides test cases, both triggering and non-triggering bugs known in the programs. They do not mark false positives in the programs.
 
@@ -488,8 +474,6 @@ and Marek Trt\'{\i}k have been supported by The Czech Science Foundation
 
 \bibliographystyle{plain}
 \bibliography{bd}
-
-\end{document}
 
 %%% Local Variables: 
 %%% mode: latex
