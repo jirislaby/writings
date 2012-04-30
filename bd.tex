@@ -99,78 +99,63 @@ available at:
 %{{{ Database Structure
 
 \section{Database Structure}\label{sec:structure}
-The database is designed to conceive various kind of errors from various
-projects and their version. However mixing errors from different projects or
-version makes the work with the database hard. We decided to separate each
-project and version. Hence the user selects project and version and then work
-with a chosen sub-database. Such sub-database comprises information about
-errors, tools, error types, users, and relation between them.
-
-Namely we have several tables for each project and version:
+The database is designed to accommodate various kinds of errors from diverse
+projects and their version. We decided to have each project and version in a
+separate database. Hence the user selects project and version and then works
+with a chosen project/version. Such sub-database comprises information about
+errors, tools, error types, users, and relation between them. The main tables
+in the database are two:
 \begin{itemize}
 \item \textbf{error\_type} -- specifies various kinds of errors (cf.
-Section~\ref{sec:error_type}). It contains name of the type, short description
-and a reference CWE number if exists (see later).
-\item \textbf{error} -- an error specified by the type above (and subtype if
-needed), location (file, line), URL for reference, classification (false
-positive, real error, unknown), confirmation (for real bugs, a commit ID for
-instance), user who inserted the entry, and timestamp of the moment of
-insertion.
-\item \textbf{tool} -- the database contains errors from more tools, here they
-are enumerated. We store name, version, URL and description for each of tools.
-\item \textbf{user} -- each user, who inserts entries to the database, must
-have name, affilitation and login in the database.
-\item \textbf{error\_rel\_tool} -- since there is an m:n relation between
-\texttt{error} and \texttt{tool} tables, we have this relation to provide the
-mapping.
+Section~\ref{sec:error_type}). It contains a name of the type, short
+description and a reference CWE number if exists (see later).
+\item \textbf{error} -- an error specified by the type above, location (file
+and line), URL for reference (to provide more info), classification (false
+positive, real error, unclassified), confirmation (how the bug was fixed, a
+commit ID for instance), user who inserted the entry, and timestamp of the
+moment of insertion.
 \end{itemize}
-
 
 %Information stored in the database (snapshot?)
 
 %user(name affilitation login password)
 
 \subsection{Error Types} \label{sec:error_type}
-All the tools produce only a limited kinds of errors. We investigated their
-output and established a set of errors to put in the database. Since there
-already exists a publicly available database of error types, we decided to
-leverage that. It summarizes the error type, provides examples and also points
-to real errors of a particular type. The database is called \emph{Common
-Weakness Enumeration} (CWE)~\cite{cwe}. Some of our errors are still not
-present in CWE though. For those we obviously do not provide a CWE number.
-Here, we list all error types currently available in \cdb.
+All the tools we have an output from, produce only a limited count of error
+types. We investigated their output and established a set of errors to put in
+the database. Since there already exists a publicly available database of
+error types, we decided to leverage that. It summarizes the error type,
+provides examples and also points to real errors of a particular type. The
+database is called \emph{Common Weakness Enumeration} (CWE)~\cite{cwe}. Some
+of our errors are not present in CWE though. For those we obviously do not
+provide a CWE number. Here, we list all error types currently available in
+\cdb. The line of each of the reports points to the original source file,
+even though a macro expansion may happen at that place.
 
 \noindent \textbf{BUG/WARNING} (CWE 617) \\ \hangindent=2em
 Developers often inject \emph{assert}s to their code to ensure the input to
 the code is as they expected.  Sometimes these assertions are hit and crashes
 are enforced, thus we include them in \cdb.  The location is specified by the
-line where the macro/function appears in the code.
+line where the assertion appears in the code.
 
 \noindent \textbf{Double Lock} (CWE 764) \\ \hangindent=2em
-Some lock is unintentionally locked twice in a sequence and it leads to an
-inconsistent lock state. The location is specified by the line where the
-second lock happens.
+Some lock is unintentionally locked by a thread twice in a sequence and it
+leads to an inconsistent lock state. The location is specified by the line
+where the second lock happens.
 
 \noindent \textbf{Double Unlock} (CWE 765) \\ \hangindent=2em
-Some lock is unintentionally unlocked twice in a sequence and it leads to an
-inconsistent lock state. The location is specified by the line where the 
-second unlock happens.
-
-\noindent \textbf{Leaving function in locked state} \\ \hangindent=2em
-Some lock is not unlocked on all paths of a function, so it is unintentionally
-leaked. This often results in deadlocks on next invocation of such function.
-The location is specified by the line of \texttt{return} statement or closing
-brace if there is no \texttt{return}.
+Some lock is unintentionally unlocked by a thread twice in a sequence and it
+leads to an inconsistent lock state. The location is specified by the line
+where the second unlock happens.
 
 \noindent \textbf{Use After Free} (CWE 416) \\ \hangindent=2em
-Dereferencing a pointer that points to an already freed memory. Often, the
-code overwrites memory which is no longer owned. The location is specified by
-the line of the use.
+Dereferencing a pointer that points to an already freed memory. The location
+is specified by the line of the use.
 
 \noindent \textbf{Double Free} (CWE 415) \\ \hangindent=2em
 Freeing function is called twice on the same address. Most allocators can
 detect this and usually kill the program. The location is specified by
-the line of the invalid free.
+the line of the invalid (second) free.
 
 \noindent \textbf{Memory Leak} (CWE 401) \\ \hangindent=2em
 Some code omits to free a memory which was allocated. The location is
@@ -182,9 +167,9 @@ code allocates memory and dereferences it without prior checking it against
 NULL. The location is specified by the line of the dereference.
 
 \noindent \textbf{Double Resource Put} (CWE 763) \\ \hangindent=2em
-The code requests one copy of a resource from a system, but there is a try to
-return that to the system twice. The location is specified by the line of the
-second put.
+The code requests one copy of a resource from a system such as structures
+holding hardware status, but there is a try to return that to the system
+twice. The location is specified by the line of the second put.
 
 \noindent \textbf{Resource Leak} (CWE 404) \\ \hangindent=2em
 The code requests a resource from a system, but omits to return that back to
@@ -193,18 +178,31 @@ the system for reuse. The location is specified by the line of the request.
 \noindent \textbf{Calling function from invalid context} \\ \hangindent=2em
 Some function is called at inappropriate place like calling sleep inside
 critical sections or in interrupt handlers. Results are undefined, the system
-may become unresponsive. The location is specified by the line of the function
-call.
+may become unresponsive or crash. The location is specified by the line of the
+function call.
+
+\noindent \textbf{Leaving function in locked state} \\ \hangindent=2em
+Some lock is not unlocked on all paths of a function, so it is unintentionally
+leaked. This often results in deadlocks on next invocation of such function.
+Sometimes, this is reported by tools which analyze a project per module and
+start the analysis from some chosen function. If the lock is locked while
+leaving from the function, this report is generated.  The location is
+specified by the line of \texttt{return} statement or closing brace if there
+is no \texttt{return}.
+
+The last two types may be only Linux kernel specific. As can be seen the
+database is not limited to a bounded set of error types. Each project may
+extend this set by its own set.
 
 %}}}
 %{{{ Current Data and Their Sources
 
 \section{Current Data and Their Sources}\label{sec:data}
-Currently, the database comprises 616 reports in 11 categories.  118 of the
-reports are real, 388 false positives. The database contains also 110 entries
-which were left unclassified. Many of those were added even recently and are
-about to be classified soon. Table~\ref{tab:results} depicts how each kind of
-bugs is represented in the database.
+Currently, the database comprises 616 reports of 11 types.  118 of the reports
+are real, 388 false positives. The database contains also 110 entries which
+were left unclassified. Many of those were added even recently and are about
+to be classified soon. Table~\ref{tab:results} depicts how each kind of bugs
+is represented in the database.
 
 \begin{table}[tb]
 \begin{center}
