@@ -143,72 +143,99 @@ to put into the database. Since there already exists a publicly available
 database CWE~\cite{cwe} of error types, we decided to leverage that.  However,
 two of our types are not present in CWE. We consulted their inclusion in CWE,
 but it was concluded that they are too project-specific and will not be added.
-Here, we list all error types currently available in \cdb.
+Here, we list all error types currently available in \cdb. Along with all the
+types we also include a description of the actual error location. It may be
+sometimes unclear what code line is connected to a particular error type.
 
 \noindent \textbf{BUG/WARNING} (CWE 617) \hangindent=2em
 Developers often inject \emph{assert}s to their code, e.g.~to ensure the input
 to the code is as they expected.  Sometimes these assertions are hit and
-crashes are enforced, thus we include them in \cdb. The error location is
-specified by the line where the assertion appears in the code.
+crashes are enforced, thus we include them in \cdb. A typical use case might be
+when we implement a destroy function of an object and we want to ensure the
+object is not alive by a check like \texttt{BUG\_ON(obj->active)}. \\
+The error location is the line where the assertion appears in the code.
+
+\noindent \textbf{Division by Zero} (CWE 369) \hangindent=2em
+The code contains a division instruction but the actual value of the divisor
+is zero. \\
+The error location the line where the division appears in the code.
 
 \noindent \textbf{Double Lock} (CWE 764) \hangindent=2em
-Some lock is locked by a thread twice in a sequence and it leads to an
-inconsistent lock state. The error location is specified by the line with the
-second locking function call.
+Some lock is locked by a thread twice in a row and it leads to an inconsistent
+lock state. \\
+The error location is the line with the second locking function call.
 
 \noindent \textbf{Double Unlock} (CWE 765) \hangindent=2em
-Some lock is unlocked by a thread twice in a sequence and it leads to an
-inconsistent lock state. The error location is specified by the line with the
-second unlocking function call.
-
-\noindent \textbf{Use After Free} (CWE 416) \hangindent=2em
-Dereferencing a pointer that points to an already freed memory. The error
-location is specified by the line of the use.
+Some lock is unlocked by a thread twice in a row and it leads to an
+inconsistent lock state. \\
+The error location is the line with the second unlock function call.
 
 \noindent \textbf{Double Free} (CWE 415) \hangindent=2em
 Freeing function is called twice on the same address. Most allocators can
-detect this and usually kill the program. The error location is specified by
-the line of the invalid (second) free.
+detect this and usually kill the program. \\
+The error location is the line of the invalid (second) free.
 
 \noindent \textbf{Memory Leak} (CWE 401) \hangindent=2em
-Some code omits to free a memory which was allocated. The error location is
-specified by the line where the allocation occurs.
+Some code omits to free a memory which was allocated previously. \\
+The error location is the line where the allocation occurs.
 
-\noindent \textbf{NULL Pointer Dereference} (CWE 476) \hangindent=2em
-A pointer which is NULL is being dereferenced. This typically happens when a
-code allocates memory and dereferences it without prior checking it against
-NULL. The error location is specified by the line of the dereference.
+\noindent \textbf{Invalid Pointer Dereference} (CWE 465) \hangindent=2em
+The code tries to access some memory, but the pointer used is invalid. It may
+become invalid by many ways. Be it using of memory which was freed by other
+part of the system or driver, be it forgotten initialization of some pointer
+(it is NULL or undefined value). Also a source of the problem might be
+accessing an array out-of-bounds. \\
+The error location is specified by the line of the dereference.
 
 \noindent \textbf{Double Resource Put} (CWE 763) \hangindent=2em
 The code requests one copy of a resource (e.g.~a structure holding hardware
-status) from a system, but there is a try to return that to the system twice.
-The error location is specified by the line of the second put.
+status) from a system, but there is more than one attempt to return the
+resource back to the system. Like in this example:
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+struct pci_dev *pdev = pci_get_device(vendor, device, NULL);
+if (pdev) {
+  work_with_pdev(pdev)
+  pci_dev_put(pdev);   // first put
+}
+pci_dev_put(pdev);     // second (illegal) put of the same
+\end{lstlisting}
+\end{tabular}
+\end{center}
+
+\hangindent=2em The error location is the line of the second put.
 
 \noindent \textbf{Resource Leak} (CWE 404) \hangindent=2em
-The code requests a resource from a system, but omits to return that back to
-the system for reuse. The error location is specified by the line of the
-request.
+The code requests a resource from a system, but omits to return that back.  In
+the previous example, both \texttt{pci\_dev\_put} calls would be missing.  \\
+The error location is the line of the request. \\[0.5ex]
 
-\noindent \textbf{Calling function from invalid context} \hangindent=2em
-Some function is called at inappropriate place like calling sleep inside
-critical sections or in interrupt handlers. Results are undefined, the system
-may become unresponsive or crash. The error location is specified by the line
-of the function call.
-
-\noindent \textbf{Leaving function in locked state} \hangindent=2em
-Some lock is not unlocked on all paths of a function, so it is unintentionally
-leaked. This often results in deadlocks on next invocation of such function.
-Sometimes, this is reported by tools which analyze a project per module and
-start the analysis from some chosen function. If the lock is locked while
-leaving from the function, this report is generated.  The error location is
-specified by the line of \texttt{return} statement or closing brace if there
-is no \texttt{return}.
-
-The last two error types may be only Linux kernel specific. Note that the
+The following two error types may be only Linux kernel specific. Note that the
 database is not limited to a bounded set of error types. Each project may
-extend this set by its own set.
+extend this set by arbitrary error types.
 
-\subsection{Errors}
+\noindent \textbf{Calling function from invalid context} (not in CWE)
+\hangindent=2em
+Some function is called at inappropriate place. This includes calling
+functions like sleep or wait inside spin-lock critical sections or in
+interrupt handlers. If that happens, results are undefined, the system may
+become unresponsive or may crash for instance. \\
+The error location is the line of the inappropriate call.
+
+\noindent \textbf{Leaving function in locked state} (not in CWE) \hangindent=2em
+There is a path in a function where some lock is locked but unintentionally
+left locked when returning. This often results in deadlocks on next
+invocation of any function wanting to take the same lock. This error type
+stems from the kernel requirements when returning to userspace that a process
+cannot hold any locks. And yet, this is sometimes reported by tools which
+analyze a project per module and start the analysis from some chosen starting
+functions.  If the lock is locked while leaving these functions, this report
+is generated.  \\
+The error location is the line of \texttt{return} statement or closing brace
+if there is no \texttt{return}.
+
+\subsection{Errors} \todo{update}
 The database comprises 606 reports: 129 real errors, 440 false positives, and
 37 entries which are unclassified. Many of the unclassified entries were
 added even recently and are about to be classified soon. The following table
@@ -221,21 +248,39 @@ depicts how each kind of bugs is represented in the database.
 \textbf{Error Type} & \textbf{Real Err.} & \textbf{False Pos.} &
 	\textbf{Unclassified} & \textbf{Total} \\ \hline
 
-BUG/WARNING & 8 & 0 & 0 & 8 \\ 
-Calling function from invalid context & 16 & 19 & 0 & 35 \\ 
-Double Free & 0 & 1 & 0 & 1 \\ 
-Double Lock & 16 & 95 & 4 & 115 \\ 
-Double Resource Put & 3 & 4 & 0 & 7 \\ 
-Double Unlock & 22 & 90 & 9 & 121 \\ 
-Leaving function in locked state & 27 & 150 & 0 & 177 \\ 
-Memory Leak & 7 & 13 & 0 & 20 \\ 
-NULL Pointer Dereference & 17 & 14 & 0 & 31 \\ 
-Resource Leak & 13 & 51 & 24 & 88 \\ 
-Use After Free & 0 & 3 & 0 & 3 \\  \hline
+BUG/WARNING & 8 & 0 & 0 & 8 \\
+Calling function from invalid context & 16 & 19 & 0 & 35 \\
+Division by Zero & 2 & 0 & 0 & 2 \\
+Double Free & 0 & 1 & 0 & 1 \\
+Double Lock & 16 & 95 & 4 & 115 \\
+Double Resource Put & 3 & 4 & 0 & 7 \\
+Double Unlock & 22 & 90 & 9 & 121 \\
+Leaving function in locked state & 30 & 352 & 37 & 419 \\
+Memory Leak & 7 & 13 & 0 & 20 \\
+Invalid Pointer Dereference & 17 & 17 & 0 & 34 \\
+\hspace{1em}{\scriptsize NULL Pointer Dereference} & 17 & 14 & 0 & 31 \\
+\hspace{1em}{\scriptsize Use After Free} & 0 & 3 & 0 & 3 \\
+Resource Leak & 13 & 51 & 24 & 88 \\ \hline
 
-\textbf{Overall Count} & 129 & 440 & 37 & 606 \\ \hline
+\textbf{Overall Count} & 134 & 642 & 74 & 850 \\ \hline
 \end{tabular}
 \end{center}
+
+\begin{figure}[htb]
+\begin{center}
+\includegraphics{types}
+\end{center}
+\caption{Error types in the web interface}
+\end{figure}
+
+\begin{figure}[htb]
+\begin{center}
+\includegraphics{error}
+\end{center}
+\caption{Error list with one error expanded}
+\end{figure}
+
+\todo{stats (file count, size, avg, med, err per file, err per file type)}
 
 \section{Use Case}
 
@@ -253,6 +298,12 @@ program analysis community. Hence, if you have any suggestions, source of
 bug-reports, or another comments, please contact us at
 \texttt{claburedb@fi.muni.cz}.
 
+\todo{Interface for insertion is under construction.}
+\todo{Emphasize openness.}
+\todo{file+line tuples}
+\todo{emphasize genuineness of errors}
+\todo{novelty is not only the false-positives, but also the contents}
+
 %}}}
 
 \bibliographystyle{plain}
@@ -260,23 +311,31 @@ bug-reports, or another comments, please contact us at
 
 \end{document}
 
-\clearpage
-
-\section{Poznamky}
-\begin{itemize}
-\item nasadit databazi
-\item dat na stranky balik s analyzovanym jadrem
-\item budou k dispozici statictiky pristupu k databazi?
-\end{itemize}
-
 %{{{ MARKOVO
 
 \clearpage
 \section{Related Work}
 
-There are benchmark suites consisting of small synthetic programs~\cite{CHK09,KRA05,CHK11,NCH05,SRD} and those consisting of real-world programs~\cite{CHK09,LLQ05,HW08}. Bug-reports in small synthetic programs are explicitly marker as either real errors or false positives in benchmark suites~\cite{KRA05,CHK11,NCH05}. The benchmark suite~\cite{CHK09} marks only real errors. In case of real-world programs the situation is different. Real errors and false positives are identified in~\cite{LLQ05} by constructed test cases hitting or missing known errors, and in~\cite{HW08} there the bug-reports are collected from \textsc{Findbugs} and sorted according to priority levels assigned to the reports by the tool. The benchmark suites discussed so far considers different error types and provide their own error taxonomies. An exception is~\cite{CHK11}, where errors types are linked to \textsc{CWE}~\cite{cwe}.
+There are benchmark suites consisting of small synthetic
+programs~\cite{CHK09,KRA05,CHK11,NCH05,SRD} and those consisting of real-world
+programs~\cite{CHK09,LLQ05,HW08}. Bug-reports in small synthetic programs are
+explicitly marker as either real errors or false positives in benchmark
+suites~\cite{KRA05,CHK11,NCH05}. The benchmark suite~\cite{CHK09} marks only
+real errors. In case of real-world programs the situation is different. Real
+errors and false positives are identified in~\cite{LLQ05} by constructed test
+cases hitting or missing known errors, and in~\cite{HW08} there the
+bug-reports are collected from \textsc{Findbugs} and sorted according to
+priority levels assigned to the reports by the tool. The benchmark suites
+discussed so far considers different error types and provide their own error
+taxonomies. An exception is~\cite{CHK11}, where errors types are linked to
+\textsc{CWE}~\cite{cwe}.
 
-Our benchmark suite \cdb differs from the previous approaches, since it provides correct and explicit marking of both real errors and false positives in real-world programs. In addition, \cdb provides linking of error types to \textsc{CWE}~\cite{cwe}. Its goal is to provide tuning data for later stages of development of program analysis tools. Therefore, \cdb fills the gap in services provided by benchmark suites of the previous approaches. 
+Our benchmark suite \cdb differs from the previous approaches, since it
+provides correct and explicit marking of both real errors and false positives
+in real-world programs. In addition, \cdb provides linking of error types to
+\textsc{CWE}~\cite{cwe}. Its goal is to provide tuning data for later stages
+of development of program analysis tools. Therefore, \cdb fills the gap in
+services provided by benchmark suites of the previous approaches.
 
 \subsection{Notes (they are not meant to appear in the article)}\label{sec:relwork:notes}
 
@@ -432,39 +491,9 @@ which are executed on the analysis results.
 \xnote{
 Krome vlastniho URL bych zde zminil moznost stazeni SBD (s licencnimi podminkami, pripadne) pro praci off-line. Pro tuto moznost stazeni SBD je ale nutne dodat na webove stranky instalacni manual. Zde muzeme navic pripadne dat odkaz na tuto stranku. Dale musime zminit, ze subsekce Usage obsahuje konkretni priklady pouziti, ktere je mozne na dane URL primo odzkouset. A ze z te sekce by take melo byt zcela jasne, jak pri zkouseni postupovat (tj. sekci lze tez chapat jako manual pro pouziti tech prikladu).
 }
-\snote{Ackoliv se mohou nektere ze zde pozadovanych veci zdat zbytecne, jedna se o explicitne zminene pozadavky pro tool-papers na ATVA2012}
-
-\begin{table}[tb]
-\begin{center}
-\begin{tabular}{|l|c|c|c|c|c|c|c|c|} \hline
-
-\textbf{Tool} & \textbf{Reports} & \textbf{Bugs} & \textbf{FP} &
-	\textbf{Missed} \\ \hline
-\sparse & & & & \\ \hline
-\stanse & & & & \\ \hline
-\undetI & & & & \\ \hline
-
-\end{tabular}
-\end{center}
-\caption{Bugs in the database.}
-\label{tab:results}
-\end{table}
-
-
-%}}}
-%{{{ Related Work
-
-\section{\xnote{Related Work}}
-
-\xnote{
-Musime dohledat clanky, ktere resi ruzne benchmarky a kolekce chyb apod. a radne se vuci nim vymezit. Hlavne je potreba zduraznit (oproti ostatnim) ze SBD neslouzi a ani nema slouzit pro porovnavani PATu (jednak vyvojari nemusi nektere vlozene bugy a falesna hlaseni znackovat svym PATem, dale nejsou uvadeny casy pro nalezeni dane chyby, neni zadavan HW na nemz PAT bezel, a take se neuvadi konfigurace, pri ktere ten ktery PAT chybu nasel). Proto statisticke udaje o obsahu SBD jsou prilis hrube na rozumne srovnani vykonu PATu prispivajicich do SBD. Z techto duvodu SBD tyto srovnavaci udaje vubec neposkytuje.
-}
 
 %}}}
 %{{{ Conclusion
-
-\section{\xnote{Conclusion}}
-\label{sec:conclusion}
 
 \paragraph{Acknowledgements}
 \label{sec:acknowledgements}
