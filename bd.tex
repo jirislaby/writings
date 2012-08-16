@@ -120,17 +120,21 @@ separate sub-database. A sub-database comprises information about errors,
 tools, error types, users, and relation between them. The main tables in the
 database are two:
 \begin{description}
-\item \textbf{error\_type} This table specifies various kinds of errors (cf.
-Section~\ref{sec:error_type}). It contains a name of the type, short
+\item \textbf{error\_type} This table keeps a specification of various kinds
+of errors. We will outline some of possible types later in
+Section~\ref{sec:error_type}. The table contains a name of the type, short
 description and a reference CWE number if exists (see later).
-\item \textbf{error} A bug report is specified by the type above, location
-(file and line), URL for reference (to provide more info), classification
-(false positive, real error, unclassified), confirmation (an argument
-supporting the validity of the bug, e.g. a commit ID of the corresponding bug-fix), user who
-inserted the entry, and timestamp of the moment of insertion.
+\item \textbf{error} A bug report is the basic unit in this table. It is
+specified by the type above, location (usually file and line), URL for
+reference (to provide more info), classification (false positive, real error,
+unclassified), confirmation (an argument supporting the validity of the bug,
+e.g. a commit ID of the corresponding bug-fix), user who inserted the entry,
+and timestamp of the moment of insertion.
 \end{description}
-Except they are in the database and can be accessed in raw, they can be also
-viewed using the web interface as is shown in Fig.~\ref{fig:error}.
+
+Except the data are in the database and can be accessed in raw using SQL, they
+can be also viewed using the web interface as is presented in
+Fig.~\ref{fig:error}.
 
 %user(name affilitation login password)
 
@@ -148,51 +152,64 @@ viewed using the web interface as is shown in Fig.~\ref{fig:error}.
 \end{figure}
 
 The benchmark currently contains only bug-reports produced for the Linux
-kernel 2.6.28 by the following tools: \clang 3\footnote{We used modified
-\texttt{experimental.unix.PthreadLock} checker, where support for kernel
-locking was added.}, \stanse, and one commercial tool which wanted to stay in
-anonymity. We also included bug-reports from kernel and Novell bug tracking
-systems and mailing lists using our own web crawler.
+kernel 2.6.28. The following tools were used to gather the bug-reports in that
+kernel: \clang~3, \stanse, and one commercial tool which wanted to stay in
+anonymity. Note that \clang does not support locking checker for the Linux
+kernel natively. We had to slightly modify
+\texttt{experimental.unix.PthreadLock} checker just to understand kernel
+locking functions. Finally, the database also comprises bug-reports from
+kernel and Novell bug tracking systems and mailing lists. For that purpose we
+implemented our own web crawler.
 
 \subsection{Linux Kernel Error Types} \label{sec:error_type}
+Before we could fill the data in the database, we had to have a set of
+error types to put into the \texttt{error\_type} table.  Since there already
+exists a publicly available database CWE~\cite{cwe} of error types, we decided
+to leverage that. We investigated output of tools we had an output from and
+using the CWE database we established a set of error types. Nevertheless, two
+of our types are not present in CWE. We consulted their inclusion in CWE, but
+it was concluded that they are too project-specific and will not be added.
+Here, we list all error types currently available in \cdb. They also form the
+title-page of our web-interface as can be seen in Fig.~\ref{fig:types}.
 
-We investigated output of available tools and established a set of error types
-to put into the database. Since there already exists a publicly available
-database CWE~\cite{cwe} of error types, we decided to leverage that.  However,
-two of our types are not present in CWE. We consulted their inclusion in CWE,
-but it was concluded that they are too project-specific and will not be added.
-Here, we list all error types currently available in \cdb. This can be also
-seen in Fig.~\ref{fig:types}. Along with all the types we also attach a
-description of the actual error location here. It may be sometimes unclear
-what code line is connected to a particular error type.
+Along with each type below we also attach a remark about the actual error
+location. This is to evade a misinterpretation of the error line among
+diverse tools and error types. For example an error present at the outgoing
+edge of a function may be represented by the opening brace of the function,
+closing brace, or by a given \texttt{return} statement. We standardize this
+and force tools to provide a line according to this manual. This way we can
+compare the reports and remove potential duplicates.
 
 \begin{description}
 \item \textbf{BUG/WARNING} (CWE 617)
 Developers often inject \emph{assert}s to their code, e.g.~to ensure the input
-to the code is as they expected.  Sometimes these assertions are hit and
-crashes are enforced, thus we include them in \cdb. A typical use case might be
-when we implement a destroy function of an object and we want to ensure the
-object is not alive by a check like \texttt{BUG\_ON(obj->active)}. \\
+to their function is as they intended. Sometimes however, these assertions are
+hit and crashes enforced. A typical use case might be when we implement a
+destroy function of an object and we want to enforce the caller (by a crash)
+to make the object dead prior calling our function. In that case a check like
+\texttt{assert(!obj->active)} will do the work. \\
 The error location is the line where the assertion appears in the code.
 
 \item \textbf{Division by Zero} (CWE 369)
 The code contains a division instruction but the actual value of the divisor
 is zero. \\
-The error location the line where the division appears in the code.
+The error location is the line where the division appears in the code.
 
 \item \textbf{Double Lock} (CWE 764)
 Some lock is locked by a thread twice in a row and it leads to an inconsistent
-lock state. \\
-The error location is the line with the second locking function call.
+lock state. Note we exclude intentional double locks of semaphores where this
+may not be an issue.  \\
+The error location is the line with the second call of lock.
 
 \item \textbf{Double Unlock} (CWE 765)
 Some lock is unlocked by a thread twice in a row and it leads to an
 inconsistent lock state. \\
-The error location is the line with the second unlock function call.
+The error location is the line with the second call of unlock.
 
 \item \textbf{Double Free} (CWE 415)
-Freeing function is called twice on the same address. Most allocators can
-detect this and usually kill the program. \\
+A freeing function is called twice on the same address while no reassignment
+to the passed pointer occurred. Most allocators can detect this and usually
+kill the program. \\
 The error location is the line of the invalid (second) free.
 
 \item \textbf{Memory Leak} (CWE 401)
@@ -203,27 +220,22 @@ The error location is the line where the allocation occurs.
 The code tries to access some memory, but the pointer used is invalid. It may
 become invalid by many ways. Be it using of memory which was freed by other
 part of the system or driver, be it forgotten initialization of some pointer
-(it is NULL or undefined value). Also a source of the problem might be
-accessing an array out-of-bounds. \\
+(it is NULL or undefined value). Also the source of the problem might be
+accessing an array out of bounds. \\
 The error location is specified by the line of the dereference.
 
 \item \textbf{Double Resource Put} (CWE 763)
 The code requests one copy of a resource (e.g.~a structure holding hardware
-status) from a system, but there is more than one attempt to return the
-resource back to the system. Like in this example:
-\begin{center}
-\begin{tabular}{c}
+status) from a system, but there is more than one attempt to put that resource
+back to the system. Like in this example:
 \begin{lstlisting}[language=C]
-struct pci_dev *pdev = pci_get_device(vendor, device, NULL);
+struct pci_dev *pdev = pci_get_device(vendor, device, NULL); // get
 if (pdev) {
   work_with_pdev(pdev)
-  pci_dev_put(pdev);   // first put
+  pci_dev_put(pdev);               // first put
 }
-pci_dev_put(pdev);     // second (illegal) put of the same
+pci_dev_put(pdev);                 // second (illegal) put of the same
 \end{lstlisting}
-\end{tabular}
-\end{center}
-
 The error location is the line of the second put.
 
 \begin{table}[tb]
@@ -258,7 +270,7 @@ Resource Leak & 13 & 51 & 24 & 88 \\ \hline
 \item \textbf{Resource Leak} (CWE 404)
 The code requests a resource from a system, but omits to return that back.  In
 the previous example, both \texttt{pci\_dev\_put} calls would be missing.  \\
-The error location is the line of the request.
+The error location is the line of the request/get.
 \end{description}
 
 The following two error types may be only Linux kernel specific. Note that the
@@ -267,21 +279,21 @@ extend this set by arbitrary error types.
 
 \begin{description}
 \item \textbf{Calling function from invalid context} (not in CWE)
-Some function is called at inappropriate place. This includes calling
-functions like sleep or wait inside spin-lock critical sections or in
-interrupt handlers. If that happens, results are undefined, the system may
-become unresponsive or may crash for instance. \\
+Some function is called at inappropriate place or within an invalid context.
+This includes calling functions like sleep or wait inside spin-lock critical
+sections or in interrupt handlers. If that happens, results are undefined, the
+system may become unresponsive or may crash for instance. \\
 The error location is the line of the inappropriate call.
 
 \item \textbf{Leaving function in locked state} (not in CWE)
 There is a path in a function where some lock is locked but unintentionally
-left locked when returning. This often results in deadlocks on next
-invocation of any function wanting to take the same lock. This error type
-stems from the kernel requirements when returning to userspace that a process
-cannot hold any locks. And yet, this is sometimes reported by tools which
-analyze a project per module and start the analysis from some chosen starting
-functions.  If the lock is locked while leaving these functions, this report
-is generated.  \\
+left locked when returning from the function. This often results in deadlocks
+on next invocation of any function wanting to take the same lock. This error
+type originates from the kernel requirements when returning to userspace a
+process cannot hold any locks. And yet, this is sometimes reported by tools
+which analyze a large project per module and start the analysis from some
+chosen starting functions.  If the lock is locked while leaving these initial
+functions, the tools generate this report.  \\
 The error location is the line of \texttt{return} statement or closing brace
 if there is no \texttt{return}.
 \end{description}
@@ -294,8 +306,9 @@ Table~\ref{tab:reports} depicts how each kind of bugs is represented in the
 database.
 
 Further, we used our database for comparing kernel subsystems according to
-error occurrence in Table~\ref{tab:stats}. We can see that the highest ratio
-of errors per file is in the architectural code (x86 in our case).
+error occurrence in Table~\ref{tab:stats}. Based on the findings of the tools
+we used, we can see that the highest ratio of errors per file is in the
+architectural code (x86 in our case).
 
 What is not in the Table, but can be read out of \cdb is that maximum false
 positives per file (19) is found in the very core of a kernel scheduler in
