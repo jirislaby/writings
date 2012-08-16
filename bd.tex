@@ -166,7 +166,8 @@ seen in Fig.~\ref{fig:types}. Along with all the types we also attach a
 description of the actual error location here. It may be sometimes unclear
 what code line is connected to a particular error type.
 
-\noindent \textbf{BUG/WARNING} (CWE 617) \hangindent=2em
+\begin{description}
+\item \textbf{BUG/WARNING} (CWE 617)
 Developers often inject \emph{assert}s to their code, e.g.~to ensure the input
 to the code is as they expected.  Sometimes these assertions are hit and
 crashes are enforced, thus we include them in \cdb. A typical use case might be
@@ -174,31 +175,31 @@ when we implement a destroy function of an object and we want to ensure the
 object is not alive by a check like \texttt{BUG\_ON(obj->active)}. \\
 The error location is the line where the assertion appears in the code.
 
-\noindent \textbf{Division by Zero} (CWE 369) \hangindent=2em
+\item \textbf{Division by Zero} (CWE 369)
 The code contains a division instruction but the actual value of the divisor
 is zero. \\
 The error location the line where the division appears in the code.
 
-\noindent \textbf{Double Lock} (CWE 764) \hangindent=2em
+\item \textbf{Double Lock} (CWE 764)
 Some lock is locked by a thread twice in a row and it leads to an inconsistent
 lock state. \\
 The error location is the line with the second locking function call.
 
-\noindent \textbf{Double Unlock} (CWE 765) \hangindent=2em
+\item \textbf{Double Unlock} (CWE 765)
 Some lock is unlocked by a thread twice in a row and it leads to an
 inconsistent lock state. \\
 The error location is the line with the second unlock function call.
 
-\noindent \textbf{Double Free} (CWE 415) \hangindent=2em
+\item \textbf{Double Free} (CWE 415)
 Freeing function is called twice on the same address. Most allocators can
 detect this and usually kill the program. \\
 The error location is the line of the invalid (second) free.
 
-\noindent \textbf{Memory Leak} (CWE 401) \hangindent=2em
+\item \textbf{Memory Leak} (CWE 401)
 Some code omits to free a memory which was allocated previously. \\
 The error location is the line where the allocation occurs.
 
-\noindent \textbf{Invalid Pointer Dereference} (CWE 465) \hangindent=2em
+\item \textbf{Invalid Pointer Dereference} (CWE 465)
 The code tries to access some memory, but the pointer used is invalid. It may
 become invalid by many ways. Be it using of memory which was freed by other
 part of the system or driver, be it forgotten initialization of some pointer
@@ -206,7 +207,7 @@ part of the system or driver, be it forgotten initialization of some pointer
 accessing an array out-of-bounds. \\
 The error location is specified by the line of the dereference.
 
-\noindent \textbf{Double Resource Put} (CWE 763) \hangindent=2em
+\item \textbf{Double Resource Put} (CWE 763)
 The code requests one copy of a resource (e.g.~a structure holding hardware
 status) from a system, but there is more than one attempt to return the
 resource back to the system. Like in this example:
@@ -222,6 +223,8 @@ pci_dev_put(pdev);     // second (illegal) put of the same
 \end{lstlisting}
 \end{tabular}
 \end{center}
+
+The error location is the line of the second put.
 
 \begin{table}[tb]
 \begin{center}
@@ -252,26 +255,25 @@ Resource Leak & 13 & 51 & 24 & 88 \\ \hline
 \label{tab:reports}
 \end{table}
 
-\hangindent=2em The error location is the line of the second put.
-
-\noindent \textbf{Resource Leak} (CWE 404) \hangindent=2em
+\item \textbf{Resource Leak} (CWE 404)
 The code requests a resource from a system, but omits to return that back.  In
 the previous example, both \texttt{pci\_dev\_put} calls would be missing.  \\
-The error location is the line of the request. \\[0.5ex]
+The error location is the line of the request.
+\end{description}
 
 The following two error types may be only Linux kernel specific. Note that the
 database is not limited to a bounded set of error types. Each project may
 extend this set by arbitrary error types.
 
-\noindent \textbf{Calling function from invalid context} (not in CWE)
-\hangindent=2em
+\begin{description}
+\item \textbf{Calling function from invalid context} (not in CWE)
 Some function is called at inappropriate place. This includes calling
 functions like sleep or wait inside spin-lock critical sections or in
 interrupt handlers. If that happens, results are undefined, the system may
 become unresponsive or may crash for instance. \\
 The error location is the line of the inappropriate call.
 
-\noindent \textbf{Leaving function in locked state} (not in CWE) \hangindent=2em
+\item \textbf{Leaving function in locked state} (not in CWE)
 There is a path in a function where some lock is locked but unintentionally
 left locked when returning. This often results in deadlocks on next
 invocation of any function wanting to take the same lock. This error type
@@ -282,6 +284,7 @@ functions.  If the lock is locked while leaving these functions, this report
 is generated.  \\
 The error location is the line of \texttt{return} statement or closing brace
 if there is no \texttt{return}.
+\end{description}
 
 \subsection{Errors}
 The database comprises 850 reports: 134 real errors, 642 false positives, and
@@ -290,21 +293,39 @@ added even recently and are about to be classified soon.
 Table~\ref{tab:reports} depicts how each kind of bugs is represented in the
 database.
 
+Further, we used our database for comparing kernel subsystems according to
+error occurrence in Table~\ref{tab:stats}. We can see that the highest ratio
+of errors per file is in the architectural code (x86 in our case).
+
+What is not in the Table, but can be read out of \cdb is that maximum false
+positives per file (19) is found in the very core of a kernel scheduler in
+\texttt{kernel/sched.c}. It is followed by the XFS filesystem in
+\texttt{fs/xfs/xfs\_log.c} with 14 hits and directory cache management in
+\texttt{fs/dcache.c} with 12 hits. All of them but two are related to improper
+locking. In most of the cases, the false positives stem from too complex code.
+The tools could not often cope with a conditional call to lock and yet,
+located in a loop.
+
 \begin{table}[tb]
 \begin{center}
 \setlength{\tabcolsep}{2.5pt}
-\begin{tabular}{|l|c|c|c|c|} \hline
-\textbf{Error Type} & \textbf{Real Err.} & \textbf{False Pos.} &
-	\textbf{Unclassified} & \textbf{Total} \\ \hline
+\begin{tabular}{|l|c|c|c|c|c|c|} \hline
+\textbf{Subsystem} & \textbf{Files} & \textbf{KLOC} & \textbf{Real Err.} &
+	\textbf{False Pos.} & \textbf{Errs/file (\%)} & \textbf{FPs/file (\%)} \\ \hline
 
-\textbf{Overall Count} & & & & \\ \hline
+Arch        &  354 & 1082 &  6 &  15 & 4.23 & 4.24 \\
+Core        &  202 &  166 &  5 & 104 & 2.48 & 51.49 \\ % mm+kern
+Drivers     & 4492 & 4029 & 88 & 205 & 1.96 & 4.56 \\
+Filesystems &  899 &  720 & 16 & 164 & 1.78 & 18.24 \\
+Networking  &  834 &  525 &  5 & 127 & 0.60 & 15.22 \\
+Sound       &  529 &  438 & 13 &  10 & 2.46 & 1.89 \\ \hline
+
+\textbf{Summary} & 7310 & 6960 & 133 & 625 & 1.82 & 8.55 \\ \hline
 \end{tabular}
 \end{center}
 \caption{Statistics}
 \label{tab:stats}
 \end{table}
-
-\todo{stats (file count, size, avg, med, err per file, err per file type)}
 
 \section{Use Case}
 
@@ -327,6 +348,7 @@ bug-reports, or another comments, please contact us at
 \todo{file+line tuples}
 \todo{emphasize genuineness of errors}
 \todo{novelty is not only the false-positives, but also the contents}
+\todo{related work?}
 
 %}}}
 
