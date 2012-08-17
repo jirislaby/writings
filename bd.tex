@@ -69,13 +69,11 @@ the tool on some source codes and then analyze the obtained bug-reports,
 i.e.~classify them as false positives or real errors, and found out errors
 in the sources missed by the tool. This work is usually tedious and time
 consuming, especially when one tunes or studies performance of a tool for
-real software projects.
-% , where the number of produced bug-reports can be very high
-% (typically hundreds or thousands).
+real software projects. The tedious work can be avoided if suitable
+benchmarks, i.e.~programs with information about their errors, are
+available.
 
-Clearly, there is a serious demand for suitable benchmarks, i.e.~sets of
-programs with a (preferably complete) list of their errors. There exist
-benchmark suites consisting of small synthetic
+There exist benchmark suites consisting of small synthetic
 programs~\cite{CHK11,CHK09,KRA05,NCH05,SRD} and those consisting of
 real-world programs~\cite{CHK09,HW08,LLQ05}. In benchmark
 suites~\cite{CHK11,KRA05,NCH05}, relevant program locations in small
@@ -94,12 +92,14 @@ where errors types are linked to \emph{Common Weakness Enumeration}
 
 As far as we know, there is no benchmark suite containing big real-life
 projects with a significant list of uniformly described bug-reports
-classified as real errors or false positive. Our benchmark suite \cdb shoudl
-fill this gap. The database currently contains only a single project, namely
-the Linux kernel 2.6.28. We have collected over 850 bug-reports of 11 error
-types produced by several bug-detection tools run on the kernel. The reports
-have been manually classified as either real errors or false positives by
-skilled programmers with a help of Linux kernel developers.
+classified as real errors or false positives. Our benchmark suite \cdb
+shoudl fill this gap. 
+
+\cdb currently contains only a single project, namely the Linux kernel
+2.6.28. We have collected about 850 bug-reports of 11 error types produced by
+several bug-detection tools run on the kernel. The reports have been
+manually classified as either real errors or false positives by skilled
+programmers with a help of Linux kernel developers.
 
 The database is still developing in several directions: we plan to add more
 bug-reports for the Linux kernel, to support another software project, and
@@ -157,10 +157,8 @@ There are two main tables in each sub-database:
 \end{description}
 
 \textbf{
-Poznamky:
 \begin{itemize}
-\item Popsat i dalsi tabulky - nastroje, vztahy nastroj-report, tabulka
-  uzivatelu. Mista mame hodne, limit je ted 20 stran LNCS!
+\item Alespon vyctem zminit i dalsi tabulky.
 \item Obrazek by mel byt citelnejsi (doporucuju docasne zvetsit font v .css)
   a muze byt klidne pres ceou stranku.
 \end{itemize}
@@ -178,44 +176,58 @@ for a local use under the \emph{Open Database License v1.0}~\cite{ODbL}.
 %}}}
 %{{{ Current Data and Their Sources
 
-\section{Current Data and Their Sources}\label{sec:data}
+\section{Current Content of the Database}\label{sec:data}
 
-\begin{figure}[tb]
-\begin{center}
-\includegraphics[width=\textwidth]{types}
-\end{center}
-\caption{Error types in the web interface}
-\label{fig:types}
-\end{figure}
+% \begin{figure}[tb]
+% \begin{center}
+% \includegraphics[width=\textwidth]{types}
+% \end{center}
+% \caption{Error types in the web interface}
+% \label{fig:types}
+% \end{figure}
 
-The benchmark currently contains only bug-reports produced for the Linux
-kernel 2.6.28. The following tools were used to gather the bug-reports in that
-kernel: \clang~3, \stanse, and one commercial tool which wanted to stay in
-anonymity. Note that \clang does not support locking checker for the Linux
-kernel natively. We had to slightly modify
-\texttt{experimental.unix.PthreadLock} checker just to understand kernel
-locking functions. Finally, the database also comprises bug-reports from
-kernel and Novell bug tracking systems and mailing lists. For that purpose we
-implemented our own web crawler.
+% \todo{Zvetsit font ve Fig~\ref{fig:types}, je to necitelny. A budto tu
+%   nechat ten obrazek, nebo tabulku. Oboji ne.}
+
+\cdb currently contains only bug-reports produced for the Linux kernel
+2.6.28. We have chosen Linux kernel for several reasons: it is a big (7310
+files with nearly 7 milions LOC in total), real-life, self-contained, and
+open-source project with several public sources of information about
+errors. Moreover, the kernel contains many distinct parts (core, hardware
+drivers, filesystems, networking etc.) that covers some standard application
+areas of program analysis tools.
+
+\subsection{Sources of Bug-Reports}
+
+We used three program analysis tools to gather bug-reports for the kernel:
+\clang~3 \todo{Pridat nejakej odkaz na CLANG.}, \stanse 1.2~\cite{stanse},
+and one commercial tool which wanted to stay in anonymity. Note that \clang
+does not natively detect locking errors in the Linux kernel. Hence, we
+slightly modified \texttt{experimental.unix.PthreadLock} checker just to
+understand kernel locking functions. The database also comprises bug-reports
+from kernel and Novell bug tracking systems and mailing lists. For that
+purpose we implemented our own web crawler. Finally, there are few
+bug-reports detected manually.
 
 \subsection{Linux Kernel Error Types} \label{sec:error_type}
-Before we could fill the data in the database, we had to have a set of
-error types to put into the \texttt{error\_type} table.  Since there already
-exists a publicly available database CWE~\cite{cwe} of error types, we decided
-to leverage that. We investigated output of tools we had an output from and
-using the CWE database we established a set of error types. Nevertheless, two
-of our types are not present in CWE. We consulted their inclusion in CWE, but
-it was concluded that they are too project-specific and will not be added.
-Here, we list all error types currently available in \cdb. They also form the
-title-page of our web-interface as can be seen in Fig.~\ref{fig:types}.
 
-Along with each type below we also attach a remark about the actual error
-location. This is to evade a misinterpretation of the error line among
-diverse tools and error types. For example an error present at the outgoing
-edge of a function may be represented by the opening brace of the function,
-closing brace, or by a given \texttt{return} statement. We standardize this
-and force tools to provide a line according to this manual. This way we can
-compare the reports and remove potential duplicates.
+We have analyzed output of available tools applicable to Linux kernel and we
+have decided to focus on the following 11 error types. Nine of these error
+types are present in \emph{Common Weakness Enumeration}
+(\textsc{CWE})~\cite{cwe} and we provide their CWE identification
+numbers. The two remaining error types are specific for a Linux kernel (they
+can be seen as a violation of the kernel coding policy) and thus they are
+not covered by CWE.
+
+The list of considered error types follows. For each error type we
+explicitely describe the program location associated with an error of this
+type. This is to evade a misinterpretation as diverse tools can associate
+the same error with different program locations. For example, an error
+present at an outgoing edge of a function may be associated to the opening
+brace of the function, the closing brace, or to the corresponding
+\texttt{return} statement.
+
+\textbf{TADY!}
 
 \begin{description}
 \item \textbf{BUG/WARNING} (CWE 617)
