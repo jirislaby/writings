@@ -33,7 +33,7 @@
 %{{{ Title + Author + Abstract
 
 \title{\cdb: Classified Bug-Reports Database}
-\subtitle{Tool for program analysis tool developers}
+\subtitle{Tool for developers of program analysis tools}
 \author{Jiri~Slaby, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
@@ -49,9 +49,9 @@
   currently contains more than 800 bug-reports detected in the Linux kernel
   2.6.28. Support of other software projects written in various programming
   languages is planned. The database can be downloaded and manipulated by
-  SQL queries, or accessed via a web frontend. Using the database,
-  developers of any bug-finding tool can easily evaluate effectiveness
-  and performance of their tool.
+  SQL queries, or accessed via a web frontend.
+  % Using the database, developers of various bug-finding tools can easily
+  % evaluate effectiveness and performance of their tool.
 \end{abstract}
 
 %}}}
@@ -64,9 +64,18 @@
 Many successful bug-finding tools based on various program analysis methods
 appeared during the last ten years. None of them is perfect. Each tool
 either reports both real errors and false positives, or it discovers only a
-part of real errors. To improve or evaluate such a tool, one needs a
-suitable benchmark, i.e.~a set of programs with a (preferably complete) list
-of their errors. There exist benchmark suites consisting of small synthetic
+part of real errors. To improve or evaluate such a tool, one needs to run
+the tool on some source codes and then analyze the obtained bug-reports,
+i.e.~classify them as false positives or real errors, and found out errors
+in the sources missed by the tool. This work is usually tedious and time
+consuming, especially when one tunes or studies performance of a tool for
+real software projects.
+% , where the number of produced bug-reports can be very high
+% (typically hundreds or thousands).
+
+Clearly, there is a serious demand for suitable benchmarks, i.e.~sets of
+programs with a (preferably complete) list of their errors. There exist
+benchmark suites consisting of small synthetic
 programs~\cite{CHK11,CHK09,KRA05,NCH05,SRD} and those consisting of
 real-world programs~\cite{CHK09,HW08,LLQ05}. In benchmark
 suites~\cite{CHK11,KRA05,NCH05}, relevant program locations in small
@@ -74,41 +83,43 @@ synthetic programs are explicitly marked as either erroneous or safe. The
 benchmark suite~\cite{CHK09} marks only known real errors. The situation is
 different for benchmarks with real-world programs: \cite{LLQ05} contains
 marked test cases triggering/non-triggering errors, while~\cite{HW08}
-provides bug-reports (both real errors and false positives mixed together
-without any differentiation) produced by \textsc{Findbugs} and sorted
+provides bug-reports (both real errors and false positives mixed together)
+% without any differentiation)
+produced by \textsc{Findbugs} and sorted
 according to priority levels assigned to the reports by the tool. The
 benchmark suites discussed so far consider different error types and provide
 their own error taxonomies with exception of suites \cite{CHK11,CHK09},
-where errors types are linked to \textsc{CWE}~\cite{cwe}.
+where errors types are linked to \emph{Common Weakness Enumeration}
+(\textsc{CWE})~\cite{cwe}.
 
 As far as we know, there is no benchmark suite containing big real-life
 projects with a significant list of uniformly described bug-reports
-classified as real errors or false positive. Our benchmark suite \cdb fills
-this gap. The database currently contains only a single project, namely the
-Linux kernel 2.6.28. We have collected over 850 bug-reports of 11 error
+classified as real errors or false positive. Our benchmark suite \cdb shoudl
+fill this gap. The database currently contains only a single project, namely
+the Linux kernel 2.6.28. We have collected over 850 bug-reports of 11 error
 types produced by several bug-detection tools run on the kernel. The reports
 have been manually classified as either real errors or false positives by
-skilled programmers with a help of Linux kernel developers. 
+skilled programmers with a help of Linux kernel developers.
 
-The database can be accessed via a web interface at
+The database is still developing in several directions: we plan to add more
+bug-reports for the Linux kernel, to support another software project, and
+to improve the web interface to allow other users to add and maintain the
+database content.
+
+The database can be downloaded in \textsc{SQLite~3} format for a local use
+under the \emph{Open Database License v1.0}~\cite{ODbL} or accessed via a
+web interface at:
 \begin{center}
   \url{http://claburedb.fi.muni.cz/}
 \end{center}
-or downloaded in an \textsc{SQLite~3} format for a local use under the
-\emph{Open Database License v1.0}~\cite{ODbL}.
-
-The database is still developing in several directions: we plan to add more
-bug-reports for the Linux kernel, to support another software projects, and
-to improve the web interface to allow other users to add and maintain contents
-of the database.
 
 \medskip The paper is organized as follows. The following section introduces
 the basic structure of the database and our web
 interface. Section~\ref{sec:data} describes the current content of the
-database including considered kinds of errors, overview of collected
-bug-reports and their sources. Section~\ref{sec:use} suggests a possible use
+database including considered kinds of errors and an overview of collected
+bug-reports and their sources. Section~\ref{sec:use} suggests possible use
 of the database for evaluation of a program analysis tool. Finally, the last
-section presents our future plans with \cdb. 
+section presents our future plans with \cdb.
 
 %}}}
 %{{{ Database Structure
@@ -119,44 +130,52 @@ section presents our future plans with \cdb.
 \begin{center}
 \includegraphics[width=\textwidth]{error}
 \end{center}
-\caption{Error list with one error expanded}
+\caption{List of seven bug-reports with one record info expanded.}  
 \label{fig:error}
 \end{figure}
 
 The database is designed to accommodate various kinds of errors from diverse
 projects and their version. As projects can be written in arbitrary
-programming languages, can contain very specific kinds of errors, can be
-maintained by different people and are interesting for distinct user groups,
-we decided to have each project and version in a separate sub-database.
-\todo{Opravdu chceme mit i kazdou verzi ve vlastni databazi? A chceme tomu
-  rikat sub-database nebo database? -- Tak jsem se domluvili. Ten hlavni duvod
-  byl, ze vezmes jednu verzi SW, tu projedes a pak vezmes odpovidajici
-  databazi a projedes to oproti ni. Subdatabaze jsem tady zavedli kvuli lepsi
-  pochopitelnosti. Bylo to dost divoke, protoze jsme pred tim pretezovali
-  vyraz databaze.} A sub-database comprises information
-about error types, errors, tools, users, and relation between them. The main
-tables in the database are two:
+programming languages, can contain very specific kinds of errors, and can be
+maintained by and interesting for distinct user groups,
+we decided to have each project % and version 
+in a separate sub-database. A sub-database comprises information
+about considered error types, bug-reports, users, tools, and relations between them. 
+There are two main tables in each sub-database:
 \begin{description}
-\item \textbf{error\_type} This table keeps a specification of various kinds
-of errors. We will outline some of possible types later in
-Section~\ref{sec:error_type}. The table contains a name of the type, short
-description and a reference CWE number if exists (see later).
-\item \textbf{error} A bug report is the basic unit in this table. It is
-specified by the type above, location (usually file and line), URL for
-reference (to provide more info), classification (false positive, real error,
-unclassified), confirmation (an argument supporting the validity of the bug,
-e.g. a commit ID of the corresponding bug-fix), user who inserted the entry,
-and timestamp of the moment of insertion.
+\item \textbf{error\_type} This table keeps a specification of considered
+  kinds of errors. We will outline some of possible types later in
+  Section~\ref{sec:error_type}. The table contains a name of the type, short
+  description and a reference CWE number if exists (see later).
+\item \textbf{error} Each line in this table corresponds to one
+  bug-report. It is specified by the error type, location (usually file and
+  line), URL for reference (to provide more info), classification (false
+  positive, real error, unclassified), confirmation (an argument supporting
+  the validity of the bug-report classification, e.g.~a commit ID of the
+  corresponding bug-fix), user who inserted the entry, and timestamp of the
+  moment of insertion.
 \end{description}
 
-Except the data are in the database and can be accessed in raw using SQL, they
-can be also viewed using the web interface as is presented in
-Fig.~\ref{fig:error}. Here we see a list of seven Double Resource Put reports.
-Four of them are false positives (green), the other three are real errors
-(orange). One of the reports is expanded, so that we can see its details and
+\textbf{
+Poznamky:
+\begin{itemize}
+\item Popsat i dalsi tabulky - nastroje, vztahy nastroj-report, tabulka
+  uzivatelu. Mista mame hodne, limit je ted 20 stran LNCS!
+\item Chce to obrazek s vice chybama, kde budou i nejaky false positive a
+  bude rozbalenej treba druhej zaznam. Obrazek by mel byt citelnejsi
+  (doporucuju docasne zvetsit font v .css) a muze byt klidne pres ceou
+  stranku.
+\end{itemize}
+}
+
+Figure~\ref{fig:error} depicts a list of seven bug-reports of type 
+\emph{Double Resource Put} as presented in \cdb's web interface at 
+\url{http://claburedb.fi.muni.cz/}. Four of these reports are false positives (green),
+the other three are real errors (orange). One of the reports is expanded, so that we can see its details and
 highlighted source code with a marked error line.
 
-%user(name affilitation login password)
+Recall that the database can be also downloaded in \textsc{SQLite~3} format
+for a local use under the \emph{Open Database License v1.0}~\cite{ODbL}.
 
 %}}}
 %{{{ Current Data and Their Sources
