@@ -33,7 +33,7 @@
 %{{{ Title + Author + Abstract
 
 \title{\cdb: Classified Bug-Reports Database}
-\subtitle{\textcolor{red}{TODO subtitle}}
+\subtitle{Tool for program analysis tool developers}
 \author{Jiri~Slaby, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
@@ -43,13 +43,22 @@
 
 \begin{abstract}
   We present a database that can serve as a tool for tuning and evaluation
-  of various program analysis tools. The database currently contains a heap
-  of bug-reports produced by several tools applied to the Linux kernel. The
-  reports are classified as either real errors or false positives. The
-  database can be downloaded and manipulated by SQL queries, or accessed via
-  a web frontend. Using the database, developers of various bug-finding
-  tools can easily evaluate effectiveness and performance of their tool on a
-  large real-life software project.
+  of various program analysis tools. The database contains bug-reports
+  produced by various tools applied to various source codes. The bug-reports
+  are classified as either real errors or false positives. The database
+  currently contains more than 800 bug-reports detected in Linux kernel
+  2.6.28. Support of other software projects written in various programming
+  languages is planned. The database can be downloaded and manipulated by
+  SQL queries, or accessed via a web frontend. Using the database,
+  developers of various bug-finding tools can easily evaluate effectiveness
+  and performance of their tool.
+  % The database currently contains a heap
+  % of bug-reports produced by several tools applied to the Linux kernel. The
+  % reports are classified as either real errors or false positives. The
+  % database can be downloaded and manipulated by SQL queries, or accessed via
+  % a web frontend. Using the database, developers of various bug-finding
+  % tools can easily evaluate effectiveness and performance of their tool on a
+  % large real-life software project.
 \end{abstract}
 
 %}}}
@@ -71,35 +80,42 @@ suites~\cite{CHK11,KRA05,NCH05}, relevant program locations in small
 synthetic programs are explicitly marked as either erroneous or safe. The
 benchmark suite~\cite{CHK09} marks only known real errors. The situation is
 different for benchmarks with real-world programs: \cite{LLQ05} contains
-marked test cases triggering/non-triggering errors,
-while~\cite{HW08} provides bug-reports (both real errors and false
-positives) produced by \textsc{Findbugs} and sorted according to priority
-levels assigned to the reports by the tool. The benchmark suites discussed
-so far consider different error types and provide their own error
-taxonomies with exception of suites \cite{CHK11,CHK09}, where errors types
-are linked to \textsc{CWE}~\cite{cwe}.
+marked test cases triggering/non-triggering errors, while~\cite{HW08}
+provides bug-reports (both real errors and false positives mixed together
+without any differentiation) produced by \textsc{Findbugs} and sorted
+according to priority levels assigned to the reports by the tool. The
+benchmark suites discussed so far consider different error types and provide
+their own error taxonomies with exception of suites \cite{CHK11,CHK09},
+where errors types are linked to \textsc{CWE}~\cite{cwe}.
 
 As far as we know, there is no benchmark suite containing big real-life
 projects with a significant list of uniformly described bug-reports
 classified as real errors or false positive. Our benchmark suite \cdb fills
 this gap. The database currently contains only a single project, namely the
-Linux kernel 2.6.28.  We have collected over 600 bug-reports of 11 error types
-produced by several bug-detection tools. The reports have been manually
-classified as either real errors or false positives by skilled programmers with a help of Linux kernel developers.
+Linux kernel 2.6.28. We have collected over 850 bug-reports of 11 error
+types produced by several bug-detection tools run on the kernel. The reports
+have been manually classified as either real errors or false positives by
+skilled programmers with a help of Linux kernel developers. 
 
-To evaluate a bug-finding tool, one can analyse a project from our benchmark
-suite and compare the produced bug-reports to those in the database. This way,
-one immediately gets a classification (real error/false positive) of the
-reports matched in the database and also information about some missed real
-errors.  This information can be further statistically processed according to
-methodologies of~\cite{CHK09,HW08}.
-
-The database may be downloaded in \textsc{SQLite~3} format for a local use
-under the \emph{Open Database License v1.0}~\cite{ODbL} or accessed via a web
-interface at:
+The database can be accessed via a web interface at
 \begin{center}
   \url{http://claburedb.fi.muni.cz/}
 \end{center}
+or downloaded in \textsc{SQLite~3} format for a local use
+under the \emph{Open Database License v1.0}~\cite{ODbL}.
+
+The database is still developing in several directions: we plan to add more
+bug-reports for the Linux kernel, to support another software project, and
+to improve the web interface to allow other users to add and maintain contain
+of the database.
+
+\medskip The paper is organized as follows. The following section introduces
+the basic structure of the database and our web
+interface. Section~\ref{sec:data} describes the current content of the
+database including considered kinds of errors, overview of collected
+bug-reports and their sources. Section~\ref{sec:use} suggests possible use
+of the database for evaluation of a program analysis tool. Finally, the last
+section presents our future plans with \cdb. 
 
 %}}}
 %{{{ Database Structure
@@ -115,10 +131,14 @@ interface at:
 \end{figure}
 
 The database is designed to accommodate various kinds of errors from diverse
-projects and their version. We decided to have each project and version in a
-separate sub-database. A sub-database comprises information about errors,
-tools, error types, users, and relation between them. The main tables in the
-database are two:
+projects and their version. As projects can be written in various
+programming languages, they can contain very specific kinds of errors, and
+they can be maintained by and interesting for diverse user groups, we
+decided to have each project and version in a separate sub-database.
+\todo{Opravdu chceme mit i kazdou verzi ve vlastni databazi? A chceme tomu
+  rikat sub-database nebo database?}  A sub-database comprises information
+about error types, errors, tools, users, and relation between them. The main
+tables in the database are two:
 \begin{description}
 \item \textbf{error\_type} This table keeps a specification of various kinds
 of errors. We will outline some of possible types later in
@@ -134,7 +154,8 @@ and timestamp of the moment of insertion.
 
 Except the data are in the database and can be accessed in raw using SQL, they
 can be also viewed using the web interface as is presented in
-Fig.~\ref{fig:error}.
+Fig.~\ref{fig:error}.\todo{Chce to obrazek s vice chybama, kde bude i
+  nejakej false positive a nebude rozbalenej prvni ani posledni zaznam}.  
 
 %user(name affilitation login password)
 
@@ -340,7 +361,26 @@ Sound       &  529 &  438 & 13 &  10 & 2.46 & 1.89 \\ \hline
 \label{tab:stats}
 \end{table}
 
-\section{Use Case}
+%}}}
+%{{{ Intended Use of the Database
+
+\section{Intended Use of the Database [TOHLE NENI DODELANY]}\label{sec:use}
+
+To evaluate a bug-finding tool, one can analyse a project from our benchmark
+suite and compare the produced bug-reports to those in the database. This way,
+one immediately gets a classification (real error/false positive) of the
+reports matched in the database and also information about some missed real
+errors. This information can be further statistically processed according to
+methodologies of~\cite{CHK09,HW08}.
+
+\begin{itemize}
+\item run your tool
+\item compare outgoing bug reports against the database, get the information
+  which reports correspond to a real bug and which are false positives
+\item classify the rest of your error reports
+\item update the database and evaluate the tool (also in terms of real
+  errors not find by the tool)
+\end{itemize}
 
 %}}}
 %{{{ Future Plans
