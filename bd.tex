@@ -2,7 +2,7 @@
 
 \documentclass[10pt]{llncs}
 \usepackage{bold-extra}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{url}
 \usepackage{graphicx}
 \usepackage{listings}
@@ -135,13 +135,12 @@ section presents our future plans with \cdb.
 
 The database is designed to accommodate various kinds of errors from diverse
 projects and their version. As projects can be written in arbitrary
-programming languages, can contain very specific kinds of errors, and can be
-maintained by\note{tohle} and interesting for distinct user groups\note{a
-tohle nedava smysl, uz jsem to jednou upravil a je to zpet},
-we decided to have each project % and version 
+programming languages, can contain very specific kinds of errors, can be
+maintained by different teams, and can be interesting for distinct user
+groups, we decided to have each project % and version
 in a separate sub-database. A sub-database comprises information about
-considered error types, bug-reports, users, tools, and relations between them. 
-There are two main tables in each sub-database:
+considered error types, bug-reports, users, tools, and relations between
+them. There are two main tables in each sub-database:
 \begin{description}
 \item \textbf{error\_type} This table keeps a specification of considered
   kinds of errors. We will outline some of possible types later in
@@ -212,13 +211,13 @@ our own web crawler. Finally, there are few bug-reports detected manually.
 
 \subsection{Linux Kernel Error Types} \label{sec:error_type}
 
-We have analyzed output of available tools applicable to the Linux kernel and
-we have decided to focus on the following 11 error types. Nine of these error
-types are present in \emph{Common Weakness Enumeration}
-(\textsc{CWE})~\cite{cwe} and we provide their CWE identification numbers. The
-two remaining error types are specific for the Linux kernel (they can be seen
-as a violation of the kernel coding policy) and thus they are not covered by
-CWE.
+We have analyzed output of available tools applicable to the Linux kernel
+and we have decided to focus on the following 11 error types. Nine of these
+error types are present in \emph{Common Weakness Enumeration}
+(\textsc{CWE})~\cite{cwe} and we provide their CWE identification
+numbers. The two remaining error types are specific for the Linux kernel
+(they can be seen as a violation of the kernel coding policy) and thus they
+are not covered by CWE.
 
 The list of considered error types follows. For each error type we
 explicitly describe the program location associated with an error of this
@@ -228,65 +227,87 @@ present at an outgoing edge of a function may be associated to the opening
 brace of the function, the closing brace, or to the corresponding
 \texttt{return} statement.
 
-\textbf{TADY!}
-
 \begin{description}
-\item \textbf{BUG/WARNING} (CWE 617)
-Developers often inject \emph{assert}s to their code, e.g.~to ensure the input
-to their function is as they intended. Sometimes however, these assertions are
-hit and crashes enforced. A typical use case might be when we implement a
-destroy function of an object and we want to enforce the caller (by a crash)
-to make the object dead prior calling our function. In that case a check like
-\texttt{assert(!obj->active)} will do the work. \\
-The error location is the line where the assertion appears in the code.
-
-\item \textbf{Division by Zero} (CWE 369)
-The code contains a division instruction but the actual value of the divisor
-is zero. \\
-The error location is the line where the division appears in the code.
-
-\item \textbf{Double Lock} (CWE 764)
-Some lock is locked by a thread twice in a row and it leads to an inconsistent
-lock state. Note we exclude intentional double locks of semaphores where this
-may not be an issue.  \\
-The error location is the line with the second call of lock.
-
-\item \textbf{Double Unlock} (CWE 765)
-Some lock is unlocked by a thread twice in a row and it leads to an
-inconsistent lock state. \\
-The error location is the line with the second call of unlock.
-
-\item \textbf{Double Free} (CWE 415)
-A freeing function is called twice on the same address while no reassignment
-to the passed pointer occurred. Most allocators can detect this and usually
-kill the program. \\
-The error location is the line of the invalid (second) free.
-
+\item \textbf{BUG/WARNING} (CWE 617) Developers often inject \emph{assert}s
+  to their code, e.g.~to ensure the their function gets a correct input.
+  For example, a destroy function of an object \texttt{obj} can contain a
+  line \texttt{assert(!obj->active)} to check that the object to be
+  destroyed is inactive. An error occurs if the condition of some
+  \texttt{assert} is violated.\\
+  \emph{Error location:} the line with the violated assertion.
+  % where the assertion appears in the code.
+\item \textbf{Division by Zero} (CWE 369) The code contains a division
+  instruction but the actual value of the divisor
+  is zero. \\
+  \emph{Error location:} the line with the division.
+\item \textbf{Double Lock} (CWE 764) Some lock is locked by a thread twice
+  in a row and it leads to an inconsistent lock state. Note that we ignore
+  double locks of semaphores as this may be their intentional application.\\
+  \emph{Error location:} the line with the second call of lock.
+\item \textbf{Double Unlock} (CWE 765) Some lock is unlocked by a thread
+  twice in a row and it leads to an
+  inconsistent lock state. Again, we ignore double unlocks of semaphores.\\
+  \emph{Error location:} the line with the second call of unlock.
+\item \textbf{Double Free} (CWE 415) A freeing function is called twice on
+  the same address while no reassignment to the passed pointer
+  occurred between the two calls. Most allocators can detect this and usually
+  kill the program. \\
+  \emph{Error location:} the line of the invalid (second) free.
 \item \textbf{Memory Leak} (CWE 401)
-Some code omits to free a memory which was allocated previously. \\
-The error location is the line where the allocation occurs.
-
-\item \textbf{Invalid Pointer Dereference} (CWE 465)
-The code tries to access some memory, but the pointer used is invalid. It may
-become invalid by many ways. Be it using of memory which was freed by other
-part of the system or driver, be it forgotten initialization of some pointer
-(it is NULL or undefined value). Also the source of the problem might be
-accessing an array out of bounds. \\
-The error location is specified by the line of the dereference.
-
-\item \textbf{Double Resource Put} (CWE 763)
-The code requests one copy of a resource (e.g.~a structure holding hardware
-status) from a system, but there is more than one attempt to put that resource
-back to the system. Like in this example:
-\begin{lstlisting}[language=C]
+  Some code omits to free a memory which was allocated previously. \\
+  \emph{Error location:} the line with the allocation command.
+\item \textbf{Invalid Pointer Dereference} (CWE 465) The code tries to
+  access some memory, but the pointer used is invalid. It may become invalid
+  in many ways. For example, the pointer may point to a deallocated memory
+  (known as \emph{dangling pointer} or \emph{use after free}) or it can be
+  set to NULL (known as \emph{NULL pointer dereference}) or
+  uninitialized. Another source of the problem may be
+  accessing an array out of bounds. \\
+  \emph{Error location:} the line of the dereference.
+\item \textbf{Double Resource Put} (CWE 763) The code requests one copy of a
+  resource (e.g.~a structure holding hardware status) from a system, but
+  there is more than one attempt to put that resource back to the
+  system. Like in this example:
+  \begin{lstlisting}[language=C]
 struct pci_dev *pdev = pci_get_device(vendor, device, NULL); // get
 if (pdev) {
   work_with_pdev(pdev)
   pci_dev_put(pdev);               // first put
 }
 pci_dev_put(pdev);                 // second (illegal) put of the same
-\end{lstlisting}
-The error location is the line of the second put.
+  \end{lstlisting}
+  \emph{Error location:} the line of the second put.
+\item \textbf{Resource Leak} (CWE 404) The code requests a resource from a
+  system, but omits to return that back. For example, the error occurs in
+  the previous example if we remove both \texttt{pci\_dev\_put} calls. \\
+  \emph{Error location:} the line of the request/get.
+% \end{description}
+% The following two error types may be only Linux kernel specific. Note that the
+% database is not limited to a bounded set of error types. Each project may
+% extend this set by arbitrary error types.
+% \begin{description}
+\item \textbf{Calling function from invalid context} (not in CWE, Linux
+  kernel specific) Some function is called at inappropriate place or within
+  an invalid context. This includes calling functions like sleep or wait
+  inside spin-lock critical sections or in interrupt handlers. This is
+  considered to be an error because results of such a call are
+  undefined: the system may become unresponsive or may crash for instance. \\
+  \emph{Error location:} the line of the inappropriate call.
+\item \textbf{Leaving function in locked state} (not in CWE, Linux kernel
+  specific) This error type originates from the kernel requirements that a
+  process has to release all locks before returning control to userspace.
+  This error occurs if a function has an execution path where some lock is
+  locked and left locked when leaving the function. It is considered to be
+  an error (violation of kernel coding policy) as such an execution may lead
+  to a deadlock on the next invocation of any function wanting to take the
+  same lock. \\
+  % And yet, this is sometimes reported by tools which analyze a large project
+  % per module and start the analysis from some chosen starting functions.  If
+  % the lock is locked while leaving these initial
+  % functions, the tools generate this report.  \\
+  \emph{Error location:} the line of the corresponding \texttt{return}
+  statement or closing brace if there is no \texttt{return}.
+\end{description}
 
 \begin{table}[tb]
 \begin{center}
@@ -295,21 +316,23 @@ The error location is the line of the second put.
 \begin{tabular}{|l|c|c|c|c|} \hline
 \textbf{Error Type} & \textbf{Real Err.} & \textbf{False Pos.} &
 	\textbf{Unclassified} & \textbf{Total} \\ \hline
-
 BUG/WARNING & 8 & 0 & 0 & 8 \\
-Calling function from invalid context & 16 & 19 & 0 & 35 \\
 Division by Zero & 2 & 0 & 0 & 2 \\
-Double Free & 0 & 1 & 0 & 1 \\
 Double Lock & 16 & 95 & 4 & 115 \\
-Double Resource Put & 3 & 4 & 0 & 7 \\
 Double Unlock & 22 & 90 & 9 & 121 \\
-Leaving function in locked state & 30 & 352 & 37 & 419 \\
+Double Free & 0 & 1 & 0 & 1 \\
 Memory Leak & 7 & 13 & 0 & 20 \\
-Invalid Pointer Dereference & 17 & 17 & 0 & 34 \\
-\hspace{1em}{\scriptsize NULL Pointer Dereference} & 17 & 14 & 0 & 31 \\
-\hspace{1em}{\scriptsize Use After Free} & 0 & 3 & 0 & 3 \\
-Resource Leak & 13 & 51 & 24 & 88 \\ \hline
-
+Invalid Pointer Dereference & 17 & 17 & 0 & 34 \\ 
+\hspace{1em}\cellcolor{black!10}{\scriptsize NULL Pointer Dereference} & 
+\cellcolor{black!10}\scriptsize 17 & \cellcolor{black!10}\scriptsize 14 & 
+\cellcolor{black!10}\scriptsize 0 & \cellcolor{black!10}\scriptsize 31 \\
+\hspace{1em}\cellcolor{black!10}{\scriptsize Use After Free} & 
+\cellcolor{black!10}\scriptsize 0 & \cellcolor{black!10}\scriptsize 3 & 
+\cellcolor{black!10}\scriptsize 0 & \cellcolor{black!10}\scriptsize 3 \\
+Double Resource Put & 3 & 4 & 0 & 7 \\
+Resource Leak & 13 & 51 & 24 & 88 \\
+Calling function from invalid context & 16 & 19 & 0 & 35 \\
+Leaving function in locked state & 30 & 352 & 37 & 419 \\ \hline
 \textbf{Overall Count} & 134 & 642 & 74 & 850 \\ \hline
 \end{tabular}
 \end{center}
@@ -317,85 +340,56 @@ Resource Leak & 13 & 51 & 24 & 88 \\ \hline
 \label{tab:reports}
 \end{table}
 
-\item \textbf{Resource Leak} (CWE 404)
-The code requests a resource from a system, but omits to return that back.  In
-the previous example, both \texttt{pci\_dev\_put} calls would be missing.  \\
-The error location is the line of the request/get.
-\end{description}
+\subsection{Bug-Reports in the Database}
 
-The following two error types may be only Linux kernel specific. Note that the
-database is not limited to a bounded set of error types. Each project may
-extend this set by arbitrary error types.
-
-\begin{description}
-\item \textbf{Calling function from invalid context} (not in CWE)
-Some function is called at inappropriate place or within an invalid context.
-This includes calling functions like sleep or wait inside spin-lock critical
-sections or in interrupt handlers. If that happens, results are undefined, the
-system may become unresponsive or may crash for instance. \\
-The error location is the line of the inappropriate call.
-
-\item \textbf{Leaving function in locked state} (not in CWE)
-There is a path in a function where some lock is locked but unintentionally
-left locked when returning from the function. This often results in deadlocks
-on next invocation of any function wanting to take the same lock. This error
-type originates from the kernel requirements when returning to userspace a
-process cannot hold any locks. And yet, this is sometimes reported by tools
-which analyze a large project per module and start the analysis from some
-chosen starting functions.  If the lock is locked while leaving these initial
-functions, the tools generate this report.  \\
-The error location is the line of \texttt{return} statement or closing brace
-if there is no \texttt{return}.
-\end{description}
-
-\subsection{Errors}
-The database comprises 850 reports: 134 real errors, 642 false positives, and
-74 entries which are unclassified. Many of the unclassified entries were
-added even recently and are about to be classified soon.
+Currently the database comprises 850 reports: 134 real errors, 642 false
+positives, and 74 entries which are unclassified. Many of the unclassified
+entries were added even recently and are about to be classified soon.
 Table~\ref{tab:reports} depicts how each kind of bugs is represented in the
-database.
+database. As seen from the table, most of the bug-reports in the database
+are related to locking errors. 
 
-Further, we used our database for comparing kernel subsystems according to
-error occurrence in Table~\ref{tab:stats}. For the presentation purposes we
-excluded subsystems with less than 10 reports. Those were security,
-virtualization, or inter-process-communication subsystems for example. Based
-on the findings of the tools we used, we can see that the highest ratio of
-errors per file is in the sound subsystem and a core code performing memory
-management and maintaining running system. On the other hand we see that the
-tools were very unsuccessful to find real errors in networking subsystem while
-they found relatively many false positives there. The core is the worst
-written code with respect to the tools in this manner. In average, every
-second file contained a false positive.
+% Further, we used our database for comparing kernel subsystems according to
+% error occurrence in Table~\ref{tab:stats}. For the presentation purposes we
+% excluded subsystems with less than 10 reports. Those were security,
+% virtualization, or inter-process-communication subsystems for example. Based
+% on the findings of the tools we used, we can see that the highest ratio of
+% errors per file is in the sound subsystem and a core code performing memory
+% management and maintaining running system. On the other hand we see that the
+% tools were very unsuccessful to find real errors in networking subsystem while
+% they found relatively many false positives there. The core is the worst
+% written code with respect to the tools in this manner. In average, every
+% second file contained a false positive.
 
-What is not in the Table~\ref{tab:stats}, but can be pulled out of \cdb is that
-maximum false positives per file (19) is found in the very core of the kernel
-scheduler in \texttt{kernel/sched.c}. It is followed by the XFS filesystem in
-\texttt{fs/xfs/xfs\_log.c} with 14 hits and directory cache management in
-\texttt{fs/dcache.c} with 12 hits. All of them but two are related to improper
-locking. In most of the cases, the false positives stem from too complex code.
-The tools could not often cope with a conditional call to lock and yet,
-located in a loop.
+% What is not in the Table~\ref{tab:stats}, but can be pulled out of \cdb is that
+% maximum false positives per file (19) is found in the very core of the kernel
+% scheduler in \texttt{kernel/sched.c}. It is followed by the XFS filesystem in
+% \texttt{fs/xfs/xfs\_log.c} with 14 hits and directory cache management in
+% \texttt{fs/dcache.c} with 12 hits. All of them but two are related to improper
+% locking. In most of the cases, the false positives stem from too complex code.
+% The tools could not often cope with a conditional call to lock and yet,
+% located in a loop.
 
-\begin{table}[tb]
-\begin{center}
-\setlength{\tabcolsep}{2.5pt}
-\begin{tabular}{|l|c|c|c|c|c|c|} \hline
-\textbf{Subsystem} & \textbf{Files} & \textbf{KLOC} & \textbf{Real Err.} &
-	\textbf{False Pos.} & \textbf{Errs/file (\%)} & \textbf{FPs/file (\%)} \\ \hline
+% \begin{table}[tb]
+% \begin{center}
+% \setlength{\tabcolsep}{2.5pt}
+% \begin{tabular}{|l|c|c|c|c|c|c|} \hline
+% \textbf{Subsystem} & \textbf{Files} & \textbf{KLOC} & \textbf{Real Err.} &
+% 	\textbf{False Pos.} & \textbf{Errs/file (\%)} & \textbf{FPs/file (\%)} \\ \hline
 
-Arch        &  354 &  146 &  6 &  15 & 1.69 & 4.24 \\
-Core        &  202 &  166 &  5 & 104 & 2.48 & 51.49 \\ % mm+kern
-Drivers     & 4492 & 4029 & 88 & 205 & 1.96 & 4.56 \\
-Filesystems &  899 &  720 & 16 & 164 & 1.78 & 18.24 \\
-Networking  &  834 &  525 &  5 & 127 & 0.60 & 15.22 \\
-Sound       &  529 &  438 & 13 &  10 & 2.46 & 1.89 \\ \hline
+% Arch        &  354 &  146 &  6 &  15 & 1.69 & 4.24 \\
+% Core        &  202 &  166 &  5 & 104 & 2.48 & 51.49 \\ % mm+kern
+% Drivers     & 4492 & 4029 & 88 & 205 & 1.96 & 4.56 \\
+% Filesystems &  899 &  720 & 16 & 164 & 1.78 & 18.24 \\
+% Networking  &  834 &  525 &  5 & 127 & 0.60 & 15.22 \\
+% Sound       &  529 &  438 & 13 &  10 & 2.46 & 1.89 \\ \hline
 
-\textbf{Summary} & 7310 & 6960 & 133 & 625 & 1.82 & 8.55 \\ \hline
-\end{tabular}
-\end{center}
-\caption{Statistics}
-\label{tab:stats}
-\end{table}
+% \textbf{Summary} & 7310 & 6960 & 133 & 625 & 1.82 & 8.55 \\ \hline
+% \end{tabular}
+% \end{center}
+% \caption{Statistics}
+% \label{tab:stats}
+% \end{table}
 
 %}}}
 %{{{ Intended Use of the Database
