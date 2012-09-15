@@ -4,8 +4,18 @@ PROJ=memics
 all: $(PROJ).dvi
 pdf: $(PROJ).pdf
 ps: $(PROJ).ps
+bib: $(PROJ).bbl
 
 $(PROJ).dvi: $(PROJ).tex FORCE
+
+$(PROJ).tex: $(PROJ).bbl
+
+%.bbl: %.bib
+	latex $(patsubst %.bib,%.tex,$<)
+	bibtex $(subst .bib$,,$<)
+	latex $(patsubst %.bib,%.tex,$<)
+	latex $(patsubst %.bib,%.tex,$<)
+	@rm -f $(PROJ).{pdf,dvi,ps}
 
 %.pdf: %.tex FORCE
 	pdflatex $<
