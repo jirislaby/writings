@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{II.}
-\date{4. 10. 2011}
+\date{27. 9. 2012}
 
 \begin{document}
 
@@ -51,18 +51,19 @@
   \frametitle{Komunikace I.}
   \begin{enumerate}
   \item Voláním funkce: system call (syscall)
+  \pause
   \begin{itemize}
   \item Skok do jádra speciální instrukcí (x86\_64: \texttt{syscall})
     \begin{itemize}
     \item O skok se stará libc (\texttt{fwrite}$\rightarrow$\texttt{write}$\rightarrow$\texttt{syscall}$\rightarrow$instrukce)
     \item Drahá operace (přepnutí kontextu)
     \end{itemize}
-  \item 1. parametr \texttt{syscall}u je číslo operace
+  \item Do registru se uloží číslo operace
     \begin{itemize}
     \item V jádře: tabulka číslo-funkce
     \end{itemize}
   \item \texttt{syscall(\_\_NR\_fork)}
-  \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_fork}
+  \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_fork}; příklady
   \end{itemize}
 
   \pause
@@ -136,19 +137,20 @@
   \item LDD3 3. a 6. kapitola
   \item 2-3 kroky
   \begin{enumerate}
-  \item Registrace rozsahu major+minor (\texttt{module\_init})
+  \item Registrace rozsahu major+minor (v \texttt{module\_init})
     \begin{itemize}
     \item \texttt{alloc\_chrdev\_region}, \texttt{register\_chrdev\_region},
       \texttt{unregister\_chrdev\_region} (\header{linux/fs.h})
     \item Přidání záznamu do \texttt{/proc/devices}
     \end{itemize}
-  \item Registrace jednotlivých minorů (PCI, USB, \ldots \texttt{probe})
+  \pause
+  \item Registrace jednotlivých minorů (při objevení zařízení)
     \begin{itemize}
     \item \texttt{cdev\_add}, \texttt{cdev\_del} (\header{linux/cdev.h})
     \item Po odpovídajícím \texttt{mknod} lze zařízení používat
     \end{itemize}
+  \pause
   \item Podat zprávu \texttt{udev} (vytvoření \texttt{/dev/*}) -- nepovinné
-    (\texttt{probe})
     \begin{itemize}
     \item \texttt{device\_create}, \texttt{device\_destroy}
       (\header{linux/device.h})
@@ -156,23 +158,25 @@
     \end{itemize}
   \end{enumerate}
 
-  \pause
+%  \pause
 
-  \item Implementuje \texttt{open}, \texttt{close}, \texttt{read},
-    \texttt{write}, \texttt{ioctl}, \texttt{mmap}, \ldots
+%  \item Implementuje \texttt{open}, \texttt{close}, \texttt{read},
+%    \texttt{write}, \texttt{ioctl}, \texttt{mmap}, \ldots
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
   \frametitle{Znaková zařízení II.}
+  \heading{Misc vrstva} \\
   Stačí-li 1 zařízení (1 minor), lze použít vrstvu \texttt{misc}
   \begin{itemize}
   \item Dělá všechnu práci z předchozího slidu
   \item Potřebujeme
     \begin{itemize}
-    \item Seznam implementovaných funkcí (opět; viz dále)
     \item Definici misc zařízení (\texttt{struct miscdevice})
+    \item Seznam implementovaných funkcí (např. \texttt{open}, \texttt{read}
+    apod.)
     \end{itemize}
   \item \texttt{misc\_register}, \texttt{misc\_deregister}
   \item Objeví se v \texttt{/proc/misc} a \texttt{/dev}
@@ -182,26 +186,26 @@
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Popis funkcí}
+  \frametitle{Obsluhované funkce}
 
-  \heading{Seznam funkcí, které chceme obsluhovat}
+  \heading{Seznam implementovaných funkcí}
   \begin{itemize}
-  \item \texttt{struct file\_operations} (\header{linux/fs.h})
-  \item Parametr pro \texttt{cdev\_add}, součást \texttt{miscdevice} apod.
-  \end{itemize}
-
-  \pause
-
+  \item Funkce jako:
   \begin{lstlisting}[language=C]
 ssize_t (*write)(struct file *filp, const char __user *buf, size_t count, loff_t *offp)
   \end{lstlisting}
 
+  \item \texttt{struct file\_operations} (\header{linux/fs.h})
+  \item Parametr pro \texttt{cdev\_add}, součást \texttt{miscdevice} apod.
+
   \pause
 
-  \begin{itemize}
   \item \texttt{filp->private\_data} slouží programátorovi (libovolně)
   \item \texttt{offp} slouží programátorovi (k poznamenání průběhu)
   \item \texttt{\_\_user} značí ukazatel od uživatele (tomu nevěříme)
+
+  \pause
+
   \item Návratové hodnoty
   \begin{itemize}
   \item \texttt{int} -- záporné = \texttt{-Echyba}, jinak 0
@@ -239,12 +243,12 @@ struct file_operations my_fops = {
 };
 
 int my_open(struct inode *inode, struct file *filp) {
-  filp->private_data = __something;
+  filp->private_data = 3;
   return 0;
 }
 
 ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t *offp) {
-  /* filp->private_data is __something here */
+  /* filp->private_data is 3 here */
   if (count == 0)
     return -EINVAL;
   return 0;
@@ -261,12 +265,11 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
   \begin{enumerate}
   \item Definice \texttt{struct file\_operations}
-  \item Vytvoření funkcí dle prototypu z \texttt{file\_operations} (nalézt v
-    lxr)
+  \item Vytvoření funkcí dle prototypu z \texttt{file\_operations} (lxr)
   \begin{itemize}
   \item Open a release s nějakým \texttt{printk}
   \item Read a write prozatím prázdná těla
-  \item Open a release vracejí 0 (žádná chyba), read též (EOF), write
+  \item Open a release vracejí 0 (žádná chyba), read též (0 = EOF), write
     \texttt{count} (zapsáno vše)
   \end{itemize}
   \item Definice \texttt{struct miscdevice}
@@ -338,15 +341,16 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   \bigskip
 
   \begin{center}
-  \begin{tabular}{|c|c|c|} \hline
+  \begin{tabular}{|p{2.8cm}|c|p{2.8cm}|} \hline
   Uživatel (32-bit) & & Jádro (64-bit) \\ \hline
-  \texttt{data} ... 4 bajty &
+  \texttt{data} ... 4 bajty na offsetu 4 &
   \begin{lstlisting}[language=C]
 struct my {
+  char x;
   void *data;
 };
   \end{lstlisting} &
-  \texttt{data} ... 8 bajtů \\ \hline
+  \texttt{data} ... 8 bajtů na offsetu 8 \\ \hline
   \end{tabular}
   \end{center}
 
@@ -366,14 +370,14 @@ struct my {
   \begin{center}
   \begin{tabular}{ccc}
   \begin{lstlisting}[language=C]
-struct my {
+struct bad {
   unsigned long flags;
   short index;
   void *data;
 } my;
   \end{lstlisting} & $\Rightarrow$ &
   \begin{lstlisting}[language=C]
-struct my {
+struct good {
   __u64 flags;
   __s16 index;
   union {
