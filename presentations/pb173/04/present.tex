@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{IV.}
-\date{11. 10. 2011}
+\date{10. 10. 2012}
 
 \begin{document}
 
@@ -52,15 +52,29 @@ store(a, addr);
   \end{lstlisting}
   \end{tabular}
 
+  \smallskip
+
+  Uvažujme \texttt{*addr == 0}
+
   \bigskip
   \pause
 
-  \begin{tabular}{c|c}
-  Vlákno A & Vlákno B \\ \hline
+  \begin{tabular}{c|c|c}
+  \texttt{*addr} & Vlákno A & Vlákno B \\ \hline
+  \begin{lstlisting}[language=C]
+0
+0
+0
+  \end{lstlisting} &
   \begin{lstlisting}[language=C]
 int a = load(addr);
 a = a + 1;
 <schedule>
+  \end{lstlisting} &
+  \begin{lstlisting}
+<waiting>         ~
+
+_
   \end{lstlisting} \\
   \end{tabular}
   \end{center}
@@ -68,11 +82,17 @@ a = a + 1;
   \pause
 
   \begin{center}
-  \begin{tabular}{c|c}
-  Vlákno A & Vlákno B \\ \hline
+  \begin{tabular}{c|c|c}
+  \texttt{*addr} & Vlákno A & Vlákno B \\ \hline
+  \begin{lstlisting}[language=C]
+0
+0
+1
+  \end{lstlisting} &
   \begin{lstlisting}[language=C]
 int a = load(addr);
 a = a + 1;
+<waiting>
   \end{lstlisting} &
   \begin{lstlisting}[language=C]
 int a = load(addr);
@@ -85,17 +105,22 @@ store(a, addr);
   \pause
 
   \begin{center}
-  \begin{tabular}{c|c}
-  Vlákno A & Vlákno B \\ \hline
+  \begin{tabular}{c|c|c}
+  \texttt{*addr} & Vlákno A & Vlákno B \\ \hline
+  \begin{lstlisting}[language=C]
+   0
+   0
+/*>1<*/
+  \end{lstlisting} &
   \begin{lstlisting}[language=C]
 int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} &
   \begin{lstlisting}[language=C]
-int a = load(addr);
-a = a + 1;
-store(a, addr);
+<exited>          ~
+
+_
   \end{lstlisting}
   \end{tabular}
   \end{center}
@@ -174,12 +199,12 @@ atomic_inc(&a);
 
 \begin{frame}
   \frametitle{Úkol}
-  
+
   \heading{Práce s atomickými typy}
   \begin{enumerate}
   \item Definice jednoho \texttt{atomic\_t} v \texttt{module\_init}
   \item Nastavit hodnotu na -3 (nejlépe staticky)
-  \item Atomicky: přičíst 1 a přečíst hodnotu
+  \item Atomicky jednou operací ,,přičíst 1 a přečíst hodnotu''
   \item Přečtenou hodnotu vypsat do logu
   \item Přičíst 3
   \item Odečíst 1
@@ -193,7 +218,7 @@ atomic_inc(&a);
   \begin{itemize}
   \item Stačí-li 1 bit namísto \texttt{int}
   \item \header{linux/bitops.h}, \doc{Documentation/atomic\_ops.txt}
-  \item \texttt{unsigned long a = 0}, popř. \texttt{DECLARE\_BITMAP(a, 1000)}
+  \item \texttt{DECLARE\_BITMAP(a, 1000)}
   \item \texttt{set\_bit}, \texttt{clear\_bit}, \texttt{test\_bit}
   \item \texttt{test\_and\_set\_bit}, \texttt{test\_and\_clear\_bit}
   \end{itemize}
@@ -214,18 +239,17 @@ atomic_inc(&a);
 
 \begin{frame}
   \frametitle{Úkol}
-  
+
   \heading{Práce s bitmapami}
   \begin{enumerate}
   \item Definice bitového pole o 100 bitech
   \item Výmaz pole (\texttt{bitmap\_zero})
   \item Nastavení 2., 63. a 76. bitu
-  \item Výpis longu (\texttt{\%lx}) s 63. bitem (\texttt{pole[BIT\_WORD(63)]} z
-    LXR)
-  \item Výpis celého pole (\texttt{bitmap\_scnprintf})
-  \item Výpis longů obsahující 1 bity (\texttt{for\_each\_set\_bit} z
-    LXR)
-  \item Výpis pozice 1. nastaveného bitu (\texttt{find\_first\_bit})
+  \item Výpis \emph{longu} (\texttt{\%lx}) s 63. bitem
+  (\texttt{bitmapa[BIT\_WORD(63)]})
+  \item Výpis celé bitmapy (\texttt{bitmap\_scnprintf})
+  \item Výpis \emph{longů} obsahující ,,1'' bity (\texttt{for\_each\_set\_bit})
+  \item Výpis \emph{pozice} 1. nastaveného bitu (\texttt{find\_first\_bit})
   \end{enumerate}
 \end{frame}
 
@@ -245,15 +269,14 @@ atomic_inc(&a);
   \item Mutexy
   \begin{itemize}
   \item Spící, fronta čekatelů
-  \item Pomalejší než spinlock (viz \texttt{\_\_mutex\_lock\_common})
+  \item Pomalejší než spinlock (viz tělo \texttt{\_\_mutex\_lock\_common})
   \end{itemize}
   \item Semafory
   \begin{itemize}
   \item Podobné mutexům
   \item Počítadlo (jsou rekurzivní)
-  \item Dnes se používají vyjímečně
+  \item Dnes se používají výjimečně
   \end{itemize}
-  \item Monitory (java) \ldots
   \end{itemize}
 
   \begin{center}
@@ -355,11 +378,6 @@ spin_unlock(&addr_lock);
   \item \header{linux/mutex.h}
   \item \texttt{DEFINE\_MUTEX(name)}
   \item \texttt{mutex\_lock}, \texttt{mutex\_unlock}
-  \item Přerušitelné varianty
-  \begin{itemize}
-  \item Signál přeruší čekání
-  \item Tyto funkce vracejí hodnotu ne/mám zámek
-  \end{itemize}
   \item Podobné \texttt{pthread} mutexům
   \end{itemize}
 
@@ -420,11 +438,11 @@ mutex_unlock(&addr_lock);
 
 \begin{frame}
   \frametitle{Úkol}
-  
+
   \heading{Atomické čtení/zápis bufferu o velikosti 128 bytů}
   \begin{itemize}
   \item Globální buffer
-  \item 2 znaková (i misc) zařízení
+  \item 2 znaková (misc) zařízení
   \begin{itemize}
   \item 1 implementuje \texttt{.read}
   \item 1 implementuje \texttt{.write}
@@ -432,7 +450,7 @@ mutex_unlock(&addr_lock);
   \item Zápis
   \begin{itemize}
   \item Umožněn max. po 5 znacích (\texttt{.write} vrací max. 5)
-  \item Spí 10 ms po každém zápisu znaku do bufferu (\texttt{msleep} z
+  \item Spí 20 ms po každém zápisu znaku do bufferu (\texttt{msleep} z
     \header{linux/delay.h})
   \end{itemize}
   \item Čtení
@@ -452,7 +470,7 @@ mutex_unlock(&addr_lock);
 
 \begin{frame}[fragile]
   \frametitle{Deadlock}
-  
+
   \begin{itemize}
   \item 4 podmínky uváznutí
   \item Jádro spoléhá na programátora, že k němu nikdy nedojde
@@ -472,7 +490,7 @@ mutex_unlock(&addr_lock);
 
 \begin{frame}
   \frametitle{Další problémy zámků}
-  
+
   \begin{itemize}
   \item Zpomalují kritický kód
   \begin{itemize}
