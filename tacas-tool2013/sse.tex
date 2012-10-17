@@ -1,0 +1,160 @@
+% vim: tw=78 ai spell spelllang=en
+
+\documentclass[10pt]{llncs}
+\usepackage{color}
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{xspace}
+\pagestyle{plain}
+
+\lstset{basicstyle=\ttfamily\scriptsize,escapeinside={(*@}{@*)}}
+
+%{{{ (La)TeX definitions
+
+\newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
+\renewcommand\note[1]{\nb{\textcolor{blue}{#1}}}
+\newcommand\todo[1]{\nb{\textcolor{red}{#1}}}
+
+%\renewcommand\note[1]{}
+%\renewcommand\todo[1]{}
+
+%}}}
+
+\begin{document}
+
+%{{{ Title + Author + Abstract
+
+\title{Symbiotic: Synergy of Instrumentation, \\
+Slicing, and Symbolic Execution}
+\author{\emph{Jiri~Slaby}, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
+\institute{Faculty of Informatics, Masaryk University\\
+  Botanick\'a 68a, 60200 Brno, Czech Republic\\
+  \email{\{slaby,strejcek,trtik\}@fi.muni.cz}}
+
+\maketitle
+
+\begin{abstract}
+  We present a tool combining three well-known techniques: instrumentation,
+  program slicing, and symbolic execution. More precisely, we instrument a
+  given program with a code that tracks runs of state machines representing
+  various properties. Next we slice the program to reduce its size without
+  affecting runs of state machines. And then we symbolically execute the
+  sliced program to find real violations of the checked properties, i.e.~real
+  bugs.
+\end{abstract}
+
+%}}}
+%{{{ Intro
+
+\section{Verification Approach}
+\label{sec:approach}
+The tool is based on our approach combining three well-known
+techniques~\cite{sse}. It transfers the idea of abstract
+interpretation~\cite{cousot} into the symbolic execution~\cite{king} while
+using static program slicing~\cite{weiser} to achieve that with better
+results.
+
+The source codes are first preprocessed by our instrumentor to contain the
+desired behavior description. This happens on the C level and in the case of
+the competition, this means to put \texttt{assert(0)} function calls wherever
+we encounter an \texttt{ERROR} label in the code. Given the instrumented code,
+we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is in turn
+interprocedurally sliced with respect to slicing criteria, which are the
+instrumented \texttt{assert} calls. In other words we remove all the
+irrelevant code except the one that has an immediate effect on the crash. The
+sliced \textsc{Llvm} bitcode is finally symbolically executed by
+\textsc{Klee}~\cite{klee}. There are several possible reports \textsc{Klee}
+prints on the output. It can either find a bug and report that, or finish the
+computation without any report, or terminate in some errant way (out of time,
+out of memory, or some internal error for example). We map these to the
+demanded answers: \emph{TRUE}, \emph{FALSE}, or \emph{UNKNOWN} respectively.
+This is taken care of in a simple scripted filter.
+
+\section{Software Architecture}
+\paragraph{Libraries/External Tools} For the code translation and for
+operations with the \textsc{Llvm} bitcode we use \textsc{Llvm}/\textsc{Clang}
+3.1~\cite{llvm}. Symbolic executor is \textsc{Klee}. It itself uses
+\textsc{Stp} SAT solver. We obtained both \textsc{Klee} and \textsc{Stp}
+from GIT and use the snapshots.
+
+\paragraph{Software Structure and Architecture} The architecture described in
+Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
+The slicer is written as a plug-in for the optimizer \texttt{opt} from the
+\textsc{Llvm} suite. It is publicly available in a separate repository at
+\url{https://github.com/jirislaby/LLVMSlicer/}. For the ease of use, all the
+parts of the pipeline are one by one run by a single script \texttt{runme}.
+
+\begin{figure}[tb]
+\begin{center}
+\input{pipeline.pspdftex}
+\end{center}
+  \caption{Pipeline of the tool}
+\label{fig:pipeline}
+\end{figure}
+
+\paragraph{Implementation Technology} The instrumentation is performed by a
+\texttt{bash} script using \texttt{sed}. The final filter as well uses
+\texttt{bash} with a help of \texttt{grep}. The rest of the toolchain is
+written in C++ and compiled using \texttt{gcc}.
+
+\section{Discussion of Strengths and Weaknesses of the Approach}
+Abstract interpretation is good at finding bugs. Unfortunately it also
+produces, some times, many false positives. On the contrary, symbolic
+execution is by design resistant to false positives, but it is overweighted by
+the computation time. To circumvent the computation time issue, we utilize
+program slicing. Hence as a result we have a symbolic executor which is
+performing computation similar to abstract interpretation, does not produce
+false positives and is reasonably fast.
+
+Still, sometimes the slicer does not slice the code much because of too
+complex code. For example if the checked property is contained in a loop,
+the slicer has to preserve the loop in place and will not help symbolic
+execution in this particular case at all. Those cases still result in a
+time-out during the execution, the same as no slicer was used at all.
+
+Yet, our implementation apparently still contains bugs, because the answer
+given is invalid in some cases.
+
+\paragraph{Soundness} The only inconsistence introduced by the pipeline is
+from the slicer. For very specific infinite loops that are contained in
+daemons for instance, it can slice the loop away because the computation of
+some property is not dependent on that. In the case of competition this was
+not the case however.
+
+\section{Tool Setup and Configuration}
+\paragraph{Download Instructions} The tool can be obtained at \\
+\begin{center}
+\url{http://www.fi.muni.cz/~xslaby/symbiotic/}
+\end{center}
+
+\paragraph{Installation instructions}
+\begin{itemize}
+\item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
+\item Untar the archive with the tool.
+\item Change directory into \texttt{symbiotic}.
+\item Run \texttt{./runme <file.c>} for each source file in the set.
+\end{itemize}
+
+\paragraph{Configuration Definition} None we are aware of.
+
+\paragraph{Results Reported} The results conform to the rules
+(\texttt{TRUE/FALSE/UNKWNOWN}).
+
+\section{Software Project and Contributors}
+\paragraph{Contact Info} The contact person is Jiri Slaby, slaby@fi.muni.cz.
+Other people involved in the development: Marek Trt\'ik, Ben Liblit (random
+fixes).
+
+\paragraph{General Information} The tool is available under the GNU GPLv2
+License. The tool is only an experimental implementation of the techniques, so
+it has no dedicated web-site. The tool is hosted on the Faculty of Informatics,
+Masaryk University, Brno, Czech Republic. We would like to thank our advisors
+prof. Anton\'in Ku\v{c}era and dr. Jan Strej\v{c}ek. Our work is supported by
+grant no. XXX\todo{NUMBER}.
+
+\bibliographystyle{plain}
+\bibliography{sse}
+
+\end{document}
