@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{V.}
-\date{18. 11. 2011}
+\date{18. 10. 2012}
 
 \begin{document}
 
@@ -27,6 +27,12 @@
   \item Alokace paměti
   \end{itemize}
 
+\end{frame}
+
+\part{Organizace paměti}
+
+\begin{frame}
+\partpage
 \end{frame}
 
 \begin{frame}
@@ -117,7 +123,7 @@
   \item Vypsat signaturu (text, 4B -- \texttt{virt[0]})
   \item Vypsat délku tabulky (4B -- \texttt{virt[1]})
   \item Odmapovat (\texttt{iounmap(virt)})
-  \item Porovnejte délku s výpisem (\texttt{0x00064})
+  \item Porovnejte délku s výpisem (tj. \texttt{0x00064} nahoře)
   \item Můžete si přemapovat a vypsat celou tabulku a porovnat položky se
     specifikací ACPI
   \end{enumerate}
@@ -147,7 +153,7 @@
   \end{itemize}
   \item OS namapuje stránky do VP
   \begin{itemize}
-  \item A může přidat ,,virtuální'' stránky např. na disku (swap)
+  \item A může přidat ,,imaginarní'' stránky např. na disku (swap)
     \begin{itemize}
     \item Programy vidí více ,,paměti''
     \end{itemize}
@@ -216,6 +222,12 @@
   \end{enumerate}
 \end{frame}
 
+\part{Alokace paměti}
+
+\begin{frame}
+\partpage
+\end{frame}
+
 \begin{frame}
   \frametitle{Alokace paměti}
 
@@ -244,11 +256,13 @@
   \frametitle{\texttt{kmalloc}}
 
   \begin{itemize}
+  \item Vnitřně alokuje po stránkách, ale rozděluje stránky na menší kusy
+  \begin{itemize}
+  \item Výhýbání se fragmentaci paměti
+  \end{itemize}
   \item \header{linux/slab.h}
-  \item Až cca. 8M (různí se pro architektury)
-  \item Využívá 2. typ alokátorů, ale rozděluje stránky na menší kusy
-  \item \texttt{kmalloc}, \texttt{kzalloc}, \texttt{kfree}
-  \item Různé implementace: SLAB, \emph{SLUB}, SLOB, SLQB
+  \item \texttt{kmalloc}, \texttt{kzalloc} (= \texttt{kmalloc} +
+  \texttt{memset}), \texttt{kfree}
   \end{itemize}
 
 \end{frame}
@@ -275,7 +289,7 @@
   \end{itemize}
   \item Rychlejší než \texttt{kmalloc}
   \item \texttt{\_\_get\_free\_pages}, \texttt{free\_pages}
-  \item \texttt{\_\_get\_free\_page}, \texttt{free\_page}
+  \item \texttt{\_\_get\_free\_page}, \texttt{free\_page} (order 0)
   \end{itemize}
 
 \end{frame}
@@ -286,7 +300,7 @@
   \begin{itemize}
   \item \header{linux/vmalloc.h}
   \item Podobný \texttt{kmalloc}
-  \item Neatomický (nemá \texttt{GFP\_*})
+  \item Neatomický (předpokládá \texttt{GFP\_KERNEL})
   \item Maximální velikost daná omezením architektury
   \begin{itemize}
   \item x86: 128M (lze zvýšit parametrem, ne o moc)
@@ -294,12 +308,12 @@
   \end{itemize}
   \item Alokuje po stránkách a mapuje je souvisle
   \begin{itemize}
-  \item Tj. používá 2. alokátor
+  \item Tj. (opět) alokuje po stránkach
   \item Fyzické stránky jsou umístěné různě po RAM
   \end{itemize}
   \item Dražší
   \item \texttt{vmalloc}, \texttt{vfree}
-  \item Odlišná práce s adresami
+  \item \emph{Odlišná práce s adresami}
   \begin{itemize}
   \item \texttt{vmalloc\_to\_page}, \texttt{vmalloc\_to\_pfn}
   \end{itemize}
