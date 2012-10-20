@@ -16,6 +16,7 @@
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
 \renewcommand\note[1]{\nb{\textcolor{blue}{#1}}}
 \newcommand\todo[1]{\nb{\textcolor{red}{#1}}}
+\newcommand\tool{\textsc{Symbiotic}}
 
 %\renewcommand\note[1]{}
 %\renewcommand\todo[1]{}
@@ -26,9 +27,9 @@
 
 %{{{ Title + Author + Abstract
 
-\title{Symbiotic: Synergy of Instrumentation, \\
+\title{\tool: Synergy of Instrumentation, \\
 Slicing, and Symbolic Execution}
-\author{\emph{Jiri~Slaby}, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
+\author{Jiri~Slaby\thanks{Corresponding author}, Jan~Strej\v{c}ek, and Marek~Trt\'{\i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
   \email{\{slaby,strejcek,trtik\}@fi.muni.cz}}
@@ -36,55 +37,65 @@ Slicing, and Symbolic Execution}
 \maketitle
 
 \begin{abstract}
-  We present a tool combining three well-known techniques: instrumentation,
-  program slicing, and symbolic execution. More precisely, we instrument a
-  given program with a code that tracks runs of state machines representing
-  various properties. Next we slice the program to reduce its size without
-  affecting runs of state machines. And then we symbolically execute the
-  sliced program to find real violations of the checked properties, i.e.~real
-  bugs.
+  \tool{} is a tool for detection of bugs describes by finite state machines
+  in C programs. The tool combines three well-known techniques:
+  instrumentation, program slicing, and symbolic execution.  This paper
+  briefly describes the approach of \tool{} including its strengths,
+  weaknesses, and modifications for SV-COMP 2013. Architecture and
+  installation of the tool are described as well.
 \end{abstract}
 
 %}}}
-%{{{ Intro
+
+%{{{ Verification approach
 
 \section{Verification Approach}
 \label{sec:approach}
-The tool is based on our approach combining three well-known
-techniques~\cite{sse}. It transfers the idea of abstract
-interpretation~\cite{cousot} into the symbolic execution~\cite{king} while
-using static program slicing~\cite{weiser} to achieve that with better
-results.
 
-The source codes are first preprocessed by our instrumentor to contain the
-desired behavior description. This happens on the C level and in the case of
-the competition, this means to put \texttt{assert(0)} function calls wherever
-we encounter an \texttt{ERROR} label in the code. Given the instrumented code,
-we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is in turn
-interprocedurally sliced with respect to slicing criteria, which are the
-instrumented \texttt{assert} calls. In other words we remove all the
-irrelevant code except the one that has an immediate effect on the crash. The
-sliced \textsc{Llvm} bitcode is finally symbolically executed by
+\tool{} implements our technique~\cite{sse} that combines instrumentation,
+program slicing, and symbolic execution in order to detect bugs described by
+finite state machines. More precisely, we instrument a given program with a
+code that tracks runs of state machines representing various errorneous
+behaviours. If an instrumented state machine enters an error location during
+a program execution, then the original program contains a bug specified by
+the machine. Then we slice~\cite{weiser} the instrumented program to reduce
+its size without affecting runs of state machines. Finally, we symbolically
+execute~\cite{king} the sliced program to find bugs in the program.
+
+As reachability of an \texttt{ERROR} label is the only bug considered in
+SV-COMP, we have modified our instrumentor to put \texttt{assert(0)}
+function calls at \texttt{ERROR} labels in the code. Given the instrumented
+code, we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is
+in turn interprocedurally sliced with respect to slicing criteria, which are
+the instrumented \texttt{assert} calls. In other words we remove all the
+irrelevant code except the one that has an immediate effect on the
+crash. The sliced \textsc{Llvm} bitcode is finally symbolically executed by
 \textsc{Klee}~\cite{klee}. There are several possible reports \textsc{Klee}
-prints on the output. It can either find a bug and report that, or finish the
-computation without any report, or terminate in some errant way (out of time,
-out of memory, or some internal error for example). We map these to the
-demanded answers: \emph{TRUE}, \emph{FALSE}, or \emph{UNKNOWN} respectively.
-This is taken care of in a simple scripted filter.
+prints on the output. It can either find a bug and report that, or finish
+the computation without any report,
+% (which means that the code contains no reachable \texttt{assert(0)} call), 
+or terminate in some errant way (out of time, out of memory, or some
+internal error for example). We map these to the demanded answers:
+\emph{TRUE}, \emph{FALSE}, or \emph{UNKNOWN} respectively. This is taken
+care of in a simple scripted filter.
+
+%}}}
+%{{{ Software architecture
 
 \section{Software Architecture}
 \paragraph{Libraries/External Tools} For the code translation and for
-operations with the \textsc{Llvm} bitcode we use \textsc{Llvm}/\textsc{Clang}
-3.1~\cite{llvm}. Symbolic executor is \textsc{Klee}. It itself uses
-\textsc{Stp} SAT solver. We obtained both \textsc{Klee} and \textsc{Stp}
-from GIT and use the snapshots.
+operations with the \textsc{Llvm} bitcode we use
+\textsc{Llvm}/\textsc{Clang} 3.1~\cite{llvm}. Symbolic executor is
+\textsc{Klee}~\cite{klee}. It itself uses \textsc{Stp} SAT solver. We
+obtained both \textsc{Klee} and \textsc{Stp} from GIT and use the snapshots.
 
-\paragraph{Software Structure and Architecture} The architecture described in
-Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
+\paragraph{Software Structure and Architecture} The architecture described
+in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
 The slicer is written as a plug-in for the optimizer \texttt{opt} from the
 \textsc{Llvm} suite. It is publicly available in a separate repository at
-\url{https://github.com/jirislaby/LLVMSlicer/}. For the ease of use, all the
-parts of the pipeline are one by one run by a single script \texttt{runme}.
+\url{https://github.com/jirislaby/LLVMSlicer/}.  \todo{Zminit points-to
+  analyzu?} For the ease of use, all the parts of the pipeline are one by one
+run by a single script \texttt{runme}.
 
 \begin{figure}[tb]
 \begin{center}
@@ -99,60 +110,92 @@ parts of the pipeline are one by one run by a single script \texttt{runme}.
 \texttt{bash} with a help of \texttt{grep}. The rest of the toolchain is
 written in C++ and compiled using \texttt{gcc}.
 
+%}}}
+%{{{ Discussion
+
 \section{Discussion of Strengths and Weaknesses of the Approach}
-Abstract interpretation is good at finding bugs. Unfortunately it also
-produces, some times, many false positives. On the contrary, symbolic
-execution is by design resistant to false positives, but it is overweighted by
-the computation time. To circumvent the computation time issue, we utilize
-program slicing. Hence as a result we have a symbolic executor which is
-performing computation similar to abstract interpretation, does not produce
-false positives and is reasonably fast.
 
-Still, sometimes the slicer does not slice the code much because of too
-complex code. For example if the checked property is contained in a loop,
-the slicer has to preserve the loop in place and will not help symbolic
-execution in this particular case at all. Those cases still result in a
-time-out during the execution, the same as no slicer was used at all.
+Abstract interpretation is good at finding bugs. Unfortunately, it usually
+produces many false positives. On the contrary, symbolic execution is by
+design resistant to false positives, but it suffers from high computation
+costs. To reduce the computation time issue, we utilize program slicing.
 
-Yet, our implementation apparently still contains bugs, because the answer
-given is invalid in some cases.
+Unfortunately, the slicer cannot always remove loops or recursion, which are
+the most problematic constructions for symbolic execution. For example, if
+the checked property is contained in a loop, the slicer has to preserve the
+loop in place (it only removes irrelevant instructions in the loop). Those
+cases still result in a time-out during the execution, the same as no slicer
+was used at all.
 
-\paragraph{Soundness} The only inconsistence introduced by the pipeline is
-from the slicer. For very specific infinite loops that are contained in
-daemons for instance, it can slice the loop away because the computation of
-some property is not dependent on that. In the case of competition this was
-not the case however.
+To sum up, our tool is faster than a standard symbolic executor, but it
+still produces time-outs in many cases.
+% Comparing to abstract interpreters, or tool produces no false positives. 
+Hence, we present our tool as a bug-finding tool rather than a verification
+tool. Results of \tool{} in SV-COMP 2013 shows that symbolic execution (when
+combined with slicing) is feasible in many real cases. The results can be
+even better if we use some technique navigating symbolic execution to a
+given program location.
+
+\medskip Invalid answers produced by the tool are due to bugs in
+implementation. In theory, the only source of invalid answers introduced by
+the pipeline is in the slicer: it can completely remove an infinite loop in
+some cases and thus an unreachable \texttt{ERROR} label located below the
+loop may become reachable. However, there is no such case in competition
+benchmarks.
+
+% \paragraph{Soundness} The only inconsistence introduced by the pipeline is
+% from the slicer. For very specific infinite loops that are contained in
+% daemons for instance, it can slice the loop away because no observed
+% program property depends on that.
+
+% Yet, our implementation apparently still contains bugs, because the answer
+% given is invalid in some cases.
+
+
+%}}}
+%{{{ Tool setup and configuration
 
 \section{Tool Setup and Configuration}
-\paragraph{Download Instructions} The tool can be obtained at \\
-\begin{center}
-\url{http://www.fi.muni.cz/~xslaby/symbiotic/}
-\end{center}
-
-\paragraph{Installation instructions}
+\paragraph{Download and Installation Instructions}
 \begin{itemize}
 \item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
+\item Download the tool at: \url{http://www.fi.muni.cz/~xslaby/symbiotic/}
 \item Untar the archive with the tool.
 \item Change directory into \texttt{symbiotic}.
 \item Run \texttt{./runme <file.c>} for each source file in the set.
 \end{itemize}
+
+% \paragraph{Installation instructions}
+% \begin{itemize}
+% \item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
+% \item Untar the archive with the tool.
+% \item Change directory into \texttt{symbiotic}.
+% \item Run \texttt{./runme <file.c>} for each source file in the set.
+% \end{itemize}
 
 \paragraph{Configuration Definition} None we are aware of.
 
 \paragraph{Results Reported} The results conform to the rules
 (\texttt{TRUE/FALSE/UNKWNOWN}).
 
+%}}}
+%{{{ Software project and contributors
+
 \section{Software Project and Contributors}
-\paragraph{Contact Info} The contact person is Jiri Slaby, slaby@fi.muni.cz.
-Other people involved in the development: Marek Trt\'ik, Ben Liblit (random
+\paragraph{Contact Info} The concept of the tool has been developed by
+authors of this paper. The tool was implemented by Jiri Slaby (contact
+person, \texttt{slaby@fi.muni.cz}), Marek Trt\'ik, and Ben Liblit (random
 fixes).
 
 \paragraph{General Information} The tool is available under the GNU GPLv2
 License. The tool is only an experimental implementation of the techniques, so
 it has no dedicated web-site. The tool is hosted on the Faculty of Informatics,
-Masaryk University, Brno, Czech Republic. We would like to thank our advisors
-prof. Anton\'in Ku\v{c}era and dr. Jan Strej\v{c}ek. Our work is supported by
-grant no. XXX\todo{NUMBER}.
+Masaryk University, Brno, Czech Republic.
+
+% We would like to thank our advisors prof. Anton\'in Ku\v{c}era and dr. Jan
+% Strej\v{c}ek. Our work is supported by grant no. XXX\todo{NUMBER}.
+
+%}}}
 
 \bibliographystyle{plain}
 \bibliography{sse}
