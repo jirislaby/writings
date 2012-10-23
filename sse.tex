@@ -57,9 +57,10 @@ finite state machines. More precisely, we instrument a given program with a
 code that tracks runs of state machines representing various errorneous
 behaviours. If an instrumented state machine enters an error location during
 a program execution, then the original program contains a bug specified by
-the machine. Then we slice~\cite{weiser} the instrumented program to reduce
-its size without affecting runs of state machines. Finally, we symbolically
-execute~\cite{king} the sliced program to find bugs in the program.
+the machine. After instrumentation, we slice~\cite{weiser} the program to
+reduce its size without affecting runs of state machines. Finally, we
+symbolically execute~\cite{king} the sliced program to find bugs in the
+program.
 
 As reachability of an \texttt{ERROR} label is the only bug considered in the
 SV-COMP, we have modified our instrumentor to put \texttt{assert(0)}
@@ -85,8 +86,9 @@ care of in a simple scripted filter.
 \paragraph{Libraries/External Tools} For the code translation and for
 operations with the \textsc{Llvm} bitcode we use
 \textsc{Llvm}/\textsc{Clang} 3.1~\cite{llvm}. Symbolic executor is
-\textsc{Klee}~\cite{klee}. It itself uses \textsc{Stp} SAT solver. We
-obtained both \textsc{Klee} and \textsc{Stp} from GIT and use the snapshots.
+\textsc{Klee}~\cite{klee}. It itself uses \textsc{Stp} constraint
+solver~\cite{stp}. We obtained both \textsc{Klee} and \textsc{Stp} from GIT
+and use the snapshots.
 
 \paragraph{Software Structure and Architecture} The architecture described
 in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
@@ -113,42 +115,24 @@ written in C++ and compiled using \texttt{gcc}.
 
 \section{Discussion of Strengths and Weaknesses of the Approach}
 
-Abstract interpretation is good at finding bugs. Unfortunately, it usually
-produces many false positives. On the contrary, symbolic execution is by
-design resistant to false positives, but it suffers from high computation
-costs. To reduce the computation time issue, we utilize program slicing.
+The strength of the tool lies in high precision of the answers. In theory,
+the only source of invalid answers is the slicer: it can completely remove
+an infinite loop in some cases and thus an unreachable \texttt{ERROR} label
+located below the loop may become reachable. However, there is no such case
+in competition benchmarks. All invalid answers produced by the tool are due
+to bugs in implementation.
 
-Unfortunately, the slicer cannot always remove loops or recursion, which are
-the most problematic constructions for symbolic execution. For example, if
-the checked property is contained in a loop, the slicer has to preserve the
-loop in place (it only removes irrelevant instructions in the loop). Those
-cases still result in a time-out during the execution, the same as no slicer
-was used at all.
+The main weakness of the tool is a high percentage of \texttt{UNKNOWN}
+results. The main source of these results follows from high computation
+costs of symbolic execution of programs with loops or recursion. This
+problem is relieved by slicing, but there are still many cases where the
+sliced code remains complex and symbolic execution runs out of time or
+memory. Other sources of \texttt{UNKNOWN} results are internal errors of
+\textsc{Klee} and general limitations of SMT solving.
 
-To sum up, our tool is faster than a standard symbolic executor, but it
-still produces time-outs in many cases.
-% Comparing to abstract interpreters, or tool produces no false positives. 
-Hence, we present our tool as a bug-finding tool rather than a verification
-tool. Results of \tool{} in SV-COMP 2013 shows that symbolic execution (when
-combined with slicing) is feasible in many real cases. The results can be
-even better if we use some technique to navigate the symbolic execution to a
-given program location.
-
-\medskip Invalid answers produced by the tool are due to bugs in
-implementation. In theory, the only source of invalid answers introduced by
-the pipeline is in the slicer: it can completely remove an infinite loop in
-some cases and thus an unreachable \texttt{ERROR} label located below the
-loop may become reachable. However, there is no such case in competition
-benchmarks.
-
-% \paragraph{Soundness} The only inconsistence introduced by the pipeline is
-% from the slicer. For very specific infinite loops that are contained in
-% daemons for instance, it can slice the loop away because no observed
-% program property depends on that.
-
-% Yet, our implementation apparently still contains bugs, because the answer
-% given is invalid in some cases.
-
+\textbf{TADY by mel byt komentar k vysledkum Symbioticu na benchmarcich!
+  Napr. v kategorii X jsme malo vyslicovali, proto timeouty, v kategorii Z
+  jsme meli problem s dynamickou pameti apod.}
 
 %}}}
 %{{{ Tool setup and configuration
@@ -164,10 +148,10 @@ benchmarks.
 \item Run \texttt{./runme <file.c>} for each source file in the set.
 \end{itemize}
 
-\paragraph{Configuration Definition} None we are aware of.
+\paragraph{Configuration Definition} None.
 
-\paragraph{Results Reported} The results conform to the rules
-(\texttt{TRUE/FALSE/UNKWNOWN}).
+\paragraph{Results Reported} The results \texttt{TRUE/FALSE/UNKWNOWN} match
+the competition rules.$\!\!$
 
 %}}}
 %{{{ Software project and contributors
@@ -175,8 +159,8 @@ benchmarks.
 \section{Software Project and Contributors}
 \paragraph{Contact Info} The concept of the tool has been developed by
 authors of this paper. The tool was implemented by Jiri Slaby (contact
-person, \texttt{slaby@fi.muni.cz}), Marek Trt\'ik, and Ben Liblit (random
-fixes).
+person, \texttt{slaby@fi.muni.cz}), Marek Trt\'ik, and Ben Liblit (several
+ fixes).
 
 \paragraph{General Information} The tool is available under the GNU GPLv2
 License. The tool is only an experimental implementation of the techniques, so
