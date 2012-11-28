@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{IX.}
-\date{22. 11. 2011}
+\date{29. 11. 2012}
 
 \begin{document}
 
@@ -136,7 +136,8 @@ struct vm_area_struct {
   \heading{API}
   \begin{itemize}
   \item \header{linux/mm.h}, \texttt{struct vm\_area\_struct}
-  \item \texttt{\_\_get\_free\_page*} $\Rightarrow$ \texttt{remap\_pfn\_range}
+  \item \texttt{\_\_get\_free\_page/pages} $\Rightarrow$
+  \texttt{remap\_pfn\_range}
   \item \texttt{vmalloc\_user} $\Rightarrow$ \texttt{remap\_vmalloc\_range}
   \end{itemize}
 
@@ -163,8 +164,8 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
   \heading{Přemapování prostorů}
   \begin{enumerate}
-  \item Alokovat souvislé 2 a 2 stránky (vmalloc a page alokátory)
-  \item Zapsat na každou stránku libovolný, ale různý řetězec
+  \item Alokovat 2stránku (vmalloc) a 2stránku (page alokátory)
+  \item Zapsat na všechny 4 stránky libovolný, ale různý řetězec
   \item Přemapovat stránky v \texttt{mmap}
   \begin{itemize}
   \item První dvojice RO, druhá R/W
@@ -286,16 +287,12 @@ struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *t
   \heading{Mapování roztroušených stránek} (domácí)
   \begin{enumerate}
   \item Předchozí příklad rozšiřte
-  \item Místo alokací dvojstránky alokovat 2 samostatné stránky
-  \begin{itemize}
-  \item \texttt{\_\_get\_free\_pages(1)} $\rightarrow$ 2$\times$
-    \texttt{\_\_get\_free\_page}
-  \end{itemize}
+  \item Místo alokací 2stránek alokovat 4 samostatné stránky
   \item Přemapovat stránky v \texttt{mmap}
   \begin{itemize}
-  \item \texttt{remap\_pfn\_range} $\rightarrow$ \texttt{vma->vm\_ops->nopage}
+  \item Změna \texttt{remap\_pfn\_range} na \texttt{vma->vm\_ops->nopage}
   \end{itemize}
-  \item Userspace program stejný
+  \item Userspace program stejný (funkčnost navenek stejná)
   \end{enumerate}
 
   \medskip
