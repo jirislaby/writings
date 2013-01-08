@@ -29,8 +29,8 @@
 
 \title{\tool: Synergy of Instrumentation,\\ Slicing, and Symbolic
   Execution\thanks{This work has been supported by The Czech Science
-    Foundation (GA\v{C}R), grant No.~P202/12/G061.}}  
-\subtitle{(Competition Contribution)} 
+    Foundation (GA\v{C}R), grant No.~P202/12/G061.}}
+\subtitle{(Competition Contribution)}
 \author{Jiri~Slaby, Jan~Strej\v{c}ek, and Marek~Trt\'{i}k}
 \institute{Faculty of Informatics, Masaryk University\\
   Botanick\'a 68a, 60200 Brno, Czech Republic\\
@@ -71,15 +71,15 @@ function calls at \texttt{ERROR} labels in the code. Given the instrumented
 code, we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is
 in turn interprocedurally sliced with respect to slicing criteria, which are
 the instrumented \texttt{assert} calls. In other words we remove all the
-code except the one that has an effect on the bug. The sliced \textsc{Llvm}
-bitcode is finally symbolically executed by \textsc{Klee}~\cite{klee}. There
-are several possible outputs that \textsc{Klee} may generate. It can either
-find a reachable \texttt{assert} and report that, or finish the computation
-without any report, or terminate in some errant way (out of time, out of
-memory, invalid memory dereference, or some internal error for example). We
-map these to the demanded answers: \emph{UNSAFE}, \emph{SAFE}, or
-\emph{UNKNOWN} respectively. This is taken care of in a simple scripted
-filter.
+code except the one that has an effect on reachability of \texttt{assert}
+calls. The sliced \textsc{Llvm} bitcode is finally symbolically executed by
+\textsc{Klee}~\cite{klee}. There are several possible outputs that
+\textsc{Klee} may generate. It can either find a reachable \texttt{assert} and
+report it, or finish the computation without any report, or terminate in some
+errant way (out of time, out of memory, invalid memory dereference, or some
+internal error for example). We map these to the demanded answers:
+\emph{UNSAFE}, \emph{SAFE}, or \emph{UNKNOWN} respectively. This is taken care
+of in a simple scripted filter.
 
 %}}}
 %{{{ Software architecture
@@ -87,7 +87,7 @@ filter.
 \section{Software Architecture}
 \paragraph{Libraries/External Tools} For the code translation and for
 operations with the \textsc{Llvm} bitcode we use
-\textsc{Llvm}/\textsc{Clang} 3.1~\footnote{\url{http://llvm.org}}. The
+\textsc{Llvm}/\textsc{Clang} 3.1\footnote{\url{http://llvm.org}}. The
 symbolic executor is \textsc{Klee} which itself uses the
 \textsc{Stp} constraint solver~\cite{stp}. We obtained both \textsc{Klee} and
 \textsc{Stp} from the respective GIT repositories and used the snapshots. For
@@ -98,10 +98,8 @@ in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
 The slicer is written as a plug-in for the optimizer \texttt{opt} from the
 \textsc{Llvm} suite. It is publicly available in a separate repository at
 \url{https://github.com/jirislaby/LLVMSlicer/}. The slicer improves the
-symbolic execution considerably. If applied, it allows for computation to be
-finished in 56\% cases. If not, only 6\% of the benchmarks are computed in
-time specified by the competition rules. For ease of use, all parts of the
-tool pipeline are one by one run by a single script \texttt{runme}.
+symbolic execution considerably. For ease of use, all parts of the tool
+pipeline are one by one run by a single script \texttt{runme}.
 
 \begin{figure}[tb]
 \begin{center}
@@ -139,8 +137,7 @@ limitations of constraint solving.
 We tested the tool on two sets: ControlFlowInteger and ProductLines. The tool
 was able to finish the computation and provide a meaningful result for 439
 files of 783, i.e. on a bit more than 56\%. The remaining benchmarks still
-time out during the symbolic execution because the slicer is not able to slice
-enough code due to dependencies present there. 
+time out during the symbolic execution.
 
 %}}}
 %{{{ Tool setup and configuration
@@ -149,18 +146,19 @@ enough code due to dependencies present there.
 \paragraph{Download and Installation Instructions}
 \begin{itemize}
 \item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
-\item Download \tool 1 at: \url{http://www.fi.muni.cz/~xslaby/symbiotic/}.
+\item Download \tool 1 at: \url{https://sf.net/projects/symbiotic/}.
 \item Change the current directory to \texttt{/opt} (this location is
 	needed for \textsc{Klee}).
 \item Untar the archive with the tool.
 \item Change directory into \texttt{/opt/symbiotic}.
-\item Run \texttt{./runme <file.c>} for each source file in the set.
+\item Run \texttt{./runme <benchmark.c>} for each source file in the set.
 \end{itemize}
 
 \paragraph{Results Reported} \texttt{SAFE/UNSAFE/UNKWNOWN} answers match
 the competition rules. The counterexample for an error in some
-\texttt{benchmark.c} is generated for each
-error path in the benchmark to \texttt{benchmark.c-klee-out/}.
+\texttt{<benchmark.c>} is generated for each error path in the benchmark to
+\texttt{<benchmark.c>-klee-out/}. There is also a sliced code referred by all
+the error paths.
 
 %}}}
 %{{{ Software project and contributors
