@@ -74,12 +74,12 @@ the instrumented \texttt{assert} calls. In other words we remove all the
 code except the one that has an effect on reachability of \texttt{assert}
 calls. The sliced \textsc{Llvm} bitcode is finally symbolically executed by
 \textsc{Klee}~\cite{klee}. There are several possible outputs that
-\textsc{Klee} may generate. It can either find a reachable \texttt{assert} and
-report it, or finish the computation without any report, or terminate in some
-errant way (out of time, out of memory, invalid memory dereference, or some
-internal error for example). We map these to the demanded answers:
-\emph{UNSAFE}, \emph{SAFE}, or \emph{UNKNOWN} respectively. This is taken care
-of in a simple scripted filter.
+\textsc{Klee} may generate. It can either find a reachable \texttt{assert}
+and report it, or finish the computation without any report, or terminate in
+some errant way (out of time, out of memory, invalid memory dereference, or
+some internal error for example). We map these to the demanded answers:
+\texttt{UNSAFE}, \texttt{SAFE}, or \texttt{UNKNOWN} respectively. This is
+taken care of in a simple scripted filter.
 
 %}}}
 %{{{ Software architecture
@@ -120,11 +120,11 @@ written in C++ and compiled using \texttt{gcc}.
 \section{Discussion of Strengths and Weaknesses of the Approach}
 
 The strength of the tool lies in its high precision of the answers. In theory,
-the only source of invalid answers is the slicer: it can completely remove
+the only source of incorrect answers is the slicer: it can completely remove
 an infinite loop in some cases and thus an unreachable \texttt{ERROR} label
 located below the loop may become reachable. However, there is no such case
-in the competition benchmarks. All invalid answers produced by the tool are
-due to bugs in \textsc{Clang} (broken \texttt{inline} handling), \textsc{Klee}
+in the competition benchmarks. All incorrect answers produced by the tool are
+due to bugs in \textsc{Clang} 3.1 (broken \texttt{inline} handling), \textsc{Klee}
 (non-correct optimization performed), or our code.
 
 The main weakness of the tool is a high percentage of \texttt{UNKNOWN}
@@ -135,13 +135,15 @@ complex and symbolic execution runs out of time or memory. Other sources of
 \texttt{UNKNOWN} results are internal errors of \textsc{Klee} and general
 limitations of constraint solving.
 
-We decided to opt-in to 4 categories: \emph{ControlFlowInteger-\-MemPrecise},
-\emph{DeviceDrivers64}, \emph{FeatureChecks}, and \emph{SystemC}. There, the
-tool was able to finish the computation and provide a meaningful result for
-329 out of 1465 files. In the category with best results
-(\emph{FeatureChecks}), \tool answered 68\% correctly. The remaining
-benchmarks in the sets still time out during the symbolic execution or cause
-a crash in \textsc{Klee}.
+We decided to opt-in to 4 categories:
+\emph{ControlFlowInteger-\-MemPrecise}, \emph{DeviceDrivers64},
+\emph{FeatureChecks}, and \emph{SystemC}. \tool was able to finish the
+computation and provide a result \texttt{SAFE} or \texttt{UNSAFE} for 666
+out of 1465 files. Out of these 666 answers, 40 are incorrect.
+%  In the category with best results
+% (\emph{FeatureChecks}), \tool answered 68\% correctly.
+% The remaining benchmarks in the four cat still time out during the symbolic
+% execution or cause a crash in \textsc{Klee}.
 
 %}}}
 %{{{ Tool setup and configuration
