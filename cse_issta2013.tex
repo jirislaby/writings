@@ -1,0 +1,1372 @@
+\documentclass{sig-alternate}%[letterpaper]
+\setlength{\pdfpagewidth}{8.5in}
+\setlength{\pdfpageheight}{11in}
+\pdfpagewidth=8.5in
+\pdfpageheight=11in
+\usepackage{times}
+\usepackage{balance}
+\usepackage{amssymb,amsmath}
+\usepackage[ruled,linesnumbered,noline,noend]{algorithm2e}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows}
+
+\clubpenalty = 10000
+\widowpenalty = 10000
+\displaywidowpenalty = 10000
+
+%{{{ Macros
+
+\newtheorem{dfn}{Definition}%[section]
+\newtheorem{thm}{Theorem}%[section]
+\newtheorem{lem}{Lemma}%[section]
+
+\newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
+\newcommand{\todo}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
+\newcommand{\rem}[1]{{\scriptsize{{\textcolor{blue}{[#1]}}}}}
+\newcommand{\note}[1]{\nb{\scriptsize{{\textcolor{blue}{[#1]}}}}}
+\renewcommand{\todo}[1]{}
+\renewcommand{\rem}[1]{}
+\renewcommand{\note}[1]{}
+
+\newcommand{\false}{\ensuremath{\mathit{false}}}
+\newcommand{\true}{\ensuremath{\mathit{true}}}
+\newcommand{\ite}{\ensuremath{\mathbf{ite}}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\dom}{\ensuremath{\mathbf{Dom}}}
+\newcommand{\rng}{\ensuremath{\mathbf{Rng}}}
+\newcommand{\var}[1]{{\tt #1}}
+\newcommand{\sym}[1]{\ensuremath{\underline{#1}}}
+\newcommand{\prm}[1]{\ensuremath{[ #1 ]}}
+\newcommand{\ese}[1]{\ensuremath{\langle #1 \rangle}}
+\newcommand{\bld}[1]{\ensuremath{\boldsymbol{#1}}}
+\newcommand{\asgn}{\texttt{ := }}
+\newcommand{\KwInSep}{ \\ \hspace{1cm} }
+\newcommand{\KwOutSep}{ \\ \hspace{1.3cm} }
+\newcommand{\lmark}[1]{\nlset{#1~~~~}}
+
+\newcommand{\Pex}{\textsc{Pex}\xspace}
+\newcommand{\Sage}{\textsc{Sage}\xspace}
+\newcommand{\Cute}{\textsc{Cute}\xspace}
+\newcommand{\Klee}{\textsc{Klee}\xspace}
+\newcommand{\Exe}{\textsc{Exe}\xspace}
+\newcommand{\APC}{\textsc{Apc}\xspace}
+\newcommand{\DART}{\textsc{Dart}\xspace}
+\newcommand{\Z}{\textsc{Z3}\xspace}
+
+\DontPrintSemicolon
+\newcommand{\aarg}[2]{#1~{\it //~#2}}
+\newcommand{\aargm}[2]{\\ \qquad \aarg{#1}{#2}}
+\newcommand{\aset}{\ensuremath{\longleftarrow}}
+
+%}}}
+
+%\sloppy
+\begin{document}
+
+%\conferenceinfo{ISSTA}{}
+%\CopyrightYear{}
+%\crdata{}
+
+%{{{ Title + Authors + Abstract
+
+\title{
+  Compact Symbolic Execution
+}
+
+\numberofauthors{1} % there are actually two authors, but this is for formatting purpose
+\author{
+\alignauthor
+  Ji\v{r}\'{i} Slab\'{y}~~~~~~~~~~~Jan Strej\v{c}ek~~~~~~~~~~~Marek Trt\'{\i}k\\
+  \affaddr{Faculty of Informatics, Masaryk University}\\
+  \affaddr{Brno, Czech Republic}\\
+  \email{\{slaby,mstrejcek,trtik\}@fi.muni.cz}
+}
+
+\maketitle
+
+\begin{abstract}
+  We present a generalisation of King's symbolic execution technique called
+  \emph{compact symbolic execution}. It is based on a concept of templates:
+  a template is a declarative parametric description of a program part,
+  whose any execution has some regularities in program states along
+  it. Typical sources of such regularities are program loops and recursive
+  calls. Using the templates, we are able to build a symbolic execution tree
+  where a single node represents arbitrarily many iterations of the
+  corresponding program part without loss of any information. This leads to
+  a considerable reduction of size of the symbolic execution tree. There are
+  even programs for which the resulting compact symbolic execution trees are
+  finite while the classic symbolic execution trees are infinite.
+\end{abstract}
+
+\category{D.2.4}{Software Engineering}{Software/Program Verification}
+\category{\\D.2.5}{Software Engineering}{Testing and Debugging}
+\category{\\F.3.1}{Logics and Meanings of Programs}{Specifying and
+Verifying and Reasoning about Programs}
+
+\terms
+Reliability, Verification, Algorithms
+
+\keywords
+Symbolic execution, Path Explosion Problem
+
+%}}}
+%{{{ Introduction
+
+\section{Introduction} \label{sec:Introduction}
+
+Classic symbolic execution as proposed by King in 1976~\cite{Kin76}
+systematically explores all real execution paths in an analysed program.
+% We commonly describe these paths in a tree structure called \emph{symbolic
+% execution tree}. Each path in the tree from its root to any leaf
+% represents one real path in the analysed program.
+There is typically huge (or even infinite) number of execution paths even
+for very small and simple programs. Therefore, exploration of all execution
+paths is a serious problem known as \emph{path explosion problem}.
+
+Compact symbolic execution also explores all real execution paths, but in a
+compact manner. We analyse a given program \emph{before} we start its
+symbolic execution. We look for those parts of the program, which might
+produce execution paths with some regularities in program states along
+them. Typically, program loops and recursion produce such regularities. We
+analyse these program parts independently from the rest of the program. The
+goal of the analysis is to find a \emph{template}, i.e.~a declarative
+parametric description of the complete behaviour of the analysed part.
+Later, whenever the symbolic execution enters a program part for which we
+have a template, we add to the symbolic execution tree just a single node 
+that reflects a cumulative effect of any execution of the program part as
+represented by the template. This node has one successor for each edge
+leaving the program part. Symbolic execution continues from these successors
+in the standard way.
+
+% This node corresponds to an application of the template which specifies
+% changes of the symbolic state and path condition after leaving this
+% program part, i.e.~after leaving the node of the symbolic tree.
+
+% we instantiate the template into the end
+% of the current path by adding a \emph{single} vertex, representing
+% \emph{any} symbolic execution through the part, and then we simply
+% \emph{jump} behind the part, where we continue with the classic symbolic
+% execution again.
+
+The worst case for compact symbolic execution occurs when we fail to
+compute any template for a given program. Compact symbolic execution then
+reduces to the classic one.
+
+\medskip The rest of the paper is organized as follows. The next section
+presents the basic idea of the compact symbolic execution using an
+illustrative example. Section~\ref{sec:technique} provides a formal
+description of the technique.
+% in a simple setting: templates with one parameter that are derived from
+% integer programs without function calls. Section~\ref{sec:extensions}
+% indicates possible extension of the technique.
+Experimental results are presented in Section~\ref{sec:experiments}. The
+last two sections discuss the related work and conclude the paper.
+
+%}}}
+%{{{ Basic idea
+
+\section{Basic Idea}\label{sec:basic}
+
+In this paper, we work with programs in form of flowgraphs. For example, the
+flowgraph of Figure~\ref{fig:linSrch}(a) represents a simple linear search
+program. The program sets \texttt{i} to \texttt{1} if some of the first
+\texttt{n} elements of the array \texttt{A} has the value given by
+\texttt{x}. Otherwise, the program sets \texttt{i} to \texttt{-1}.
+
+\begin{figure}[!htb]
+  \begin{tabular}{ccc}
+    %{{{ CFG
+
+\tikzstyle{start} = [regular polygon,regular polygon sides=3,
+    regular polygon rotate=180,thick,draw,minimum size=9mm,inner sep=0pt]
+\tikzstyle{target} = [regular polygon,regular polygon sides=3,
+    regular polygon rotate=0,thick,draw,minimum size=9mm,inner sep=0pt]
+\tikzstyle{loc} = [circle,thick,draw,minimum size=6mm]
+\tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+\tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+\footnotesize
+\begin{tikzpicture}[node distance=1.0cm]
+    \pgfsetmovetofirstplotpoint
+    % \pgfplothandlerclosedcurve
+    % %\pgfplothandlerlineto
+    % \pgfplotstreamstart
+    %     \pgfplotstreampoint{\pgfpoint{-0.1cm}{-0.5cm}}
+    %     \pgfplotstreampoint{\pgfpoint{-2.4cm}{-3.1cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.15cm}{-3.5cm}}
+    %     \pgfplotstreampoint{\pgfpoint{1.4cm}{-2.0cm}}
+    % \pgfplotstreamend
+    % \pgfsetfillcolor{lightgray!65}
+    % \pgfusepath{fill}
+    % %\pgfusepath{stroke}
+
+    \pgfplothandlerclosedcurve
+    %\pgfplothandlerlineto
+    \pgfplotstreamstart
+        \pgfplotstreampoint{\pgfpoint{0.1cm}{-1.0cm}}
+        \pgfplotstreampoint{\pgfpoint{-1.4cm}{-2.5cm}}
+        \pgfplotstreampoint{\pgfpoint{0.1cm}{-4.0cm}}
+        \pgfplotstreampoint{\pgfpoint{0.55cm}{-2.5cm}}
+    \pgfplotstreamend
+    \pgfsetfillcolor{gray!30}
+    \pgfusepath{fill}
+   \pgfusepath{stroke}
+    
+    \node [start] (a) {$a$};
+    \node [loc] (b) [inner sep=2.5pt,below of=a,yshift=-5mm] {$b$}
+        edge [pre] node [label=right:\texttt{i:=0}] {} (a);
+    \node [loc] (c) [left of=b,yshift=-10mm] {$c$}
+        edge [pre, bend left=20]
+                node [label=above:\texttt{i<n~~~~}] {} (b);
+    \node [loc] (f) [right of=b,inner sep=1.9pt,yshift=-10mm] {$f$}
+        edge [pre, bend right=20]
+                node [label=above:\texttt{~~~~i>=n}] {} (b);
+    \node [loc] (d) [right of=c,yshift=-10mm] {$d$}
+        edge [pre, bend left=20]
+            node [label=left:\texttt{A[i]!=x}] {} (c)
+        edge [post, bend right=20]
+                node [label=left:\texttt{++i}] {} (b);
+    \node [loc] (e) [left of=c,xshift=-5mm,yshift=-10mm] {$e$}
+        edge [pre, bend left=20] node
+            [label=above:\texttt{A[i]=x~~~~~}] {} (c);
+    \node [target] (g) [below of=d,yshift=-5mm] {$g$}
+        edge [pre, bend left=20]
+                node [label=left:\texttt{i:=1~~}] {} (e)
+        edge [pre, bend right=20]
+                node [label=below:\texttt{~~~~~i:=-1}] {} (f);
+    \node [] (blank) [below of=g,yshift=-1.73cm] {};
+\end{tikzpicture} 
+
+    %}}}
+    & 
+    %{{{ standard tree 
+
+\tikzstyle{start} = [regular polygon,regular polygon sides=3,
+    regular polygon rotate=180,thick,draw,inner sep=0.5pt]
+\tikzstyle{target} = [regular polygon,regular polygon sides=3,
+    regular polygon rotate=0,thick,draw,inner sep=0.2pt]
+\tikzstyle{loc} = [circle,thick,draw,inner sep=1.0pt,minimum size=5mm]
+\tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+\tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+\footnotesize
+\begin{tikzpicture}[node distance=0.9cm]
+%     \draw[color=black,thick,dotted] (-1.6,-4.8)--(-1.6,-5.2);
+%     \draw[color=black,thick,dotted] (-0.2,-5)--(-0.2,-5.4);
+%     \draw[color=black,thick,dotted] (0.8,-4.3)--(0.8,-4.7);
+
+    \pgfsetmovetofirstplotpoint
+
+    \pgfplothandlerclosedcurve
+    \pgfplotstreamstart
+      \pgfplotstreampoint{\pgfpoint{0.4cm}{-1cm}}
+      \pgfplotstreampoint{\pgfpoint{0.4cm}{-7cm}}
+      \pgfplotstreampoint{\pgfpoint{-0.4cm}{-7cm}}
+      \pgfplotstreampoint{\pgfpoint{-0.4cm}{-1cm}}
+    \pgfplotstreamend
+    \pgfsetfillcolor{gray!30}
+    \pgfusepath{fill}
+    % \pgfplotstreamstart
+    %     \pgfplotstreampoint{\pgfpoint{0.2cm}{-2.3cm}}
+    %     \pgfplotstreampoint{\pgfpoint{-1.1cm}{-3.1cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.15cm}{-4.8cm}}
+    % \pgfplotstreamend
+    % \pgfsetfillcolor{lightgray!100}
+    % \pgfusepath{fill}
+    % \pgfplothandlercurveto
+    % \pgfplotstreamstart
+    %     \pgfplotstreampoint{\pgfpoint{-1.1cm}{-4.9cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.15cm}{-4.0cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.25cm}{-4.9cm}}
+    % \pgfplotstreamend
+    % \pgfsetfillcolor{lightgray!100}
+    % \pgfusepath{fill}
+
+    % \pgfplothandlerclosedcurve
+    % \pgfsetstrokecolor{black!65}
+    % \pgfplotstreamstart
+    %     \pgfplotstreampoint{\pgfpoint{0.2cm}{-0.5cm}}
+    %     \pgfplotstreampoint{\pgfpoint{-1.1cm}{-1.3cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.15cm}{-3cm}}
+    % \pgfplotstreamend
+    % \pgfusepath{stroke}
+    % \pgfplotstreamstart
+    %     \pgfplotstreampoint{\pgfpoint{0.2cm}{-2.3cm}}
+    %     \pgfplotstreampoint{\pgfpoint{-1.1cm}{-3.1cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.15cm}{-4.8cm}}
+    % \pgfplotstreamend
+    % \pgfusepath{stroke}
+    % \pgfplothandlercurveto
+    % \pgfplotstreamstart
+    %     \pgfplotstreampoint{\pgfpoint{-1.1cm}{-4.9cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.15cm}{-4.0cm}}
+    %     \pgfplotstreampoint{\pgfpoint{0.25cm}{-4.9cm}}
+    % \pgfplotstreamend
+    % \pgfusepath{stroke}
+    % \pgfsetstrokecolor{black!100}
+
+%         \pgfplothandlercurveto
+%         \pgfplotstreamstart
+%             \pgfplotstreampoint{\pgfpoint{-2cm}{-4.8cm}}
+%             \pgfplotstreampoint{\pgfpoint{-2cm}{-1.6cm}}
+%             \pgfplotstreampoint{\pgfpoint{-1.25cm}{-1.6cm}}
+%             \pgfplotstreampoint{\pgfpoint{-1.25cm}{-4.8cm}}
+%         \pgfplotstreamend
+%         \pgfusepath{stroke}
+% 
+%         \pgfplothandlercurveto
+%         \pgfplotstreamstart
+%             \pgfplotstreampoint{\pgfpoint{0.45cm}{-4.3cm}}
+%             \pgfplotstreampoint{\pgfpoint{0.45cm}{-1.2cm}}
+%             \pgfplotstreampoint{\pgfpoint{1.2cm}{-1.2cm}}
+%             \pgfplotstreampoint{\pgfpoint{1.2cm}{-4.3cm}}
+%         \pgfplotstreamend
+%         \pgfusepath{stroke}
+
+    \node [loc,inner sep=1.5pt] (a) {$a$};
+
+    \node [loc] (b) [inner sep=1.3pt,below of=a] {$b$}
+        edge [pre] node {} (a);
+    \node [loc] (c) [below of=b] {$c$}
+        edge [pre] node [label=left:{\scriptsize $0<\sym{n}~$}] {} (b);
+    \node [loc,inner sep=0.5pt] (f) [right of=c,xshift=9mm] {$f$}
+        edge [pre] node [label=above:{\scriptsize $~~0\geq\sym{n}$}] {} (b);
+    \node [loc] (g) [below of=f] {$g$}
+        edge [pre] node {} (f);
+    \node [loc] (d) [below of=c] {$d$}
+        edge [pre] node [label=right:{\scriptsize
+            $~\sym{A}(0)\neq\sym{x}$}] {} (c);
+    \node [loc] (e) [left of=d,xshift=-4mm] {$e$}
+        edge [pre] node [label=above:{\scriptsize
+            $\sym{A}(0)=\sym{x}~~~~~~~~~~$}] {} (c);
+    \node [loc] (h) [below of=e] {$g$}
+        edge [pre] node {} (e);
+
+    \node [loc] (b1) [below of=d] {$b$}
+        edge [pre] node {} (d);
+    \node [loc] (c1) [below of=b1] {$c$}
+        edge [pre] node [label=left:{\scriptsize $1<\sym{n}~$}] {} (b1);
+    \node [loc,inner sep=0.5pt] (f1) [right of=c1,xshift=9mm]{$f$}
+        edge [pre] node [label=above:{\scriptsize $~~1\geq\sym{n}$}] {} (b1);
+    \node [loc] (g1) [below of=f1] {$g$}
+        edge [pre] node {} (f1);
+    \node [loc] (d1) [below of=c1] {$d$}
+        edge [pre] node [label=right:{\scriptsize
+            $~\sym{A}(1)\neq\sym{x}$}] {} (c1);
+    \node [loc] (e1) [left of=d1,xshift=-4mm] {$e$}
+        edge [pre] node [label=above:{\scriptsize
+            $\sym{A}(1)=\sym{x}~~~~~~~~~~$}] {} (c1);
+    \node [loc] (h1) [below of=e1] {$g$}
+        edge [pre] node {} (e1);
+
+    \node [loc] (b2) [below of=d1] {$b$}
+        edge [pre] node {} (d1);
+
+    \node [circle,thick,inner sep=0pt,minimum size=5mm] (b3) [below of=b2] {$\vdots$}
+        edge [pre] node {} (b2);
+\end{tikzpicture} 
+
+    %}}}
+    & 
+    %{{{ compact tree
+
+\tikzstyle{start} = [regular polygon,regular polygon sides=3,
+    regular polygon rotate=180,thick,draw,inner sep=0.5pt]
+\tikzstyle{target} = [regular polygon,regular polygon sides=3,
+    regular polygon rotate=0,thick,draw,inner sep=0.2pt]
+\tikzstyle{loc} = [circle,thick,draw,minimum size=5mm]
+\tikzstyle{cloc} = [rectangle,thick,draw,inner sep=3pt,minimum size=5mm,fill=gray!30]
+\tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+\tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+\footnotesize
+\begin{tikzpicture}[node distance=0.9cm]
+%     \node [loc,inner sep=1.5pt] (1) {$a$};
+%     \node [loc] (2) [below of=1] {$b$}
+%         edge [pre] node {} (1);
+% 
+%      \node [loc,inner sep=1.5pt] (3) [below of=2] {$a$};
+%      \node [cloc] (4) [below of=3] {$b$}
+%          edge [pre] node {} (3);
+%      \node [loc,inner sep=1.5pt] (5) [below of=4, left of=4] {$e$}
+%          edge [pre] node {} (4);
+%      \node [loc,inner sep=0.3pt] (6) [below of=4, right of=4] {$f$}
+%          edge [pre] node {} (4);
+
+     \node [loc,inner sep=1.5pt] (7)
+                %[below of=4]
+                {$a$};
+     \node [cloc] (8) [below of=7] {$b$}
+         edge [pre] node {} (7);
+     \node [loc,inner sep=1.5pt] (9) [below of=8, xshift=-5mm] {$e$}
+         edge [pre] node {} (8); %[label=left:{$\gamma_e$}] {} (8);
+     \node [loc,inner sep=0.3pt] (10) [below of=8, xshift=5mm] {$f$}
+         edge [pre] node {} (8); %[label=right:{$\gamma_f$}] {} (8);
+     \node [loc,inner sep=1.0pt] (11) [below of=9] {$g$}
+         edge [pre] node {} (9);
+     \node [loc,inner sep=1.0pt] (12) [below of=10] {$g$}
+         edge [pre] node {} (10);
+
+     % \node [rectangle] (b) [below of=7,xshift=3.5mm] {$~~b.s$};
+     % \node [rectangle] (e) [above of=11,xshift=4mm] {$~e.s$};
+     % \node [rectangle] (f) [above of=12,xshift=-3.8mm,yshift=-0.4mm] {$f.s~~$};
+     \node (blank) [below of=7,yshift=-6.82cm] {};
+\end{tikzpicture} 
+
+    %}}}
+    \\
+    ~~~~~~~(a) & ~~~(b) & ~~~~~~(c)
+  \end{tabular}
+  \caption{(a) A flowgraph of a linear search program. (b)
+    Classic symbolic execution tree of the program. (c) Compact
+    symbolic execution tree of the program.}
+  \label{fig:linSrch}
+\end{figure}
+
+We first briefly describe the classic symbolic execution as proposed by
+King~\cite{Kin76}. Symbolic execution runs a program over symbols
+representing arbitrary input values. We use symbol $\sym{v}$ to represent
+any input value of variable $\var{v}$.
+% $\sym{n},\sym{x},\sym{i},\sym{A}$ to represent input values of
+% $\var{n},\var{x},\var{i},\var{A}$ respectively.
+Symbolic execution maintains a \emph{symbolic memory} $\theta$ and a
+\emph{path condition} $\varphi$. At each state of the symbolic execution,
+$\theta$ assigns to each program variable its current value given as an
+expression over the symbols. For example, if the first command of a program is
+the assignment \texttt{i:=2*n+x}, then $\theta(\var{i})=2\sym{n}+\sym{x}$
+after the first step. The path condition $\varphi$ is a formula representing
+the necessary and sufficient condition on the symbols (i.e.~on input values)
+to drive the execution along the current program path. $\varphi$ is initially
+$\true$ and it can be updated at branching commands. For example, if we
+execute a command \texttt{if~(x>n+5)} (in a flowgraph, this corresponds to a
+location with two out-edges labelled by \texttt{x>n+5} and \texttt{x<=n+5}),
+we instantiate the condition with use of $\theta$ and we check whether the
+current path condition $\varphi$ implies validity of the instance or its
+negation. In other words, we ask for validity of
+\[
+\varphi\implies(\theta(\var{x})>\theta(\var{n})+5)
+~~~~~~~\textrm{and}~~~~~~~
+\varphi\implies(\theta(\var{x})\le\theta(\var{n})+5).
+\] 
+If the first implication is valid, the symbolic execution continues along
+the true branch. If the second implication is valid, the symbolic execution
+continues along the false branch. If none of them is valid, it means that we
+can follow either of the two branches. Hence, the symbolic execution forks
+in order to execute both branches. In this case, we update the path
+condition on the true branch to
+$\varphi\wedge(\theta(\var{x})>\theta(\var{n})+5)$ and the one on the false
+branch to $\varphi\wedge(\theta(\var{x})\le\theta(\var{n})+5)$. Due to the
+forks\note{forks misto forkings. Forking ma jiny, sexualni vyznam.}, symbolic execution is traditionally represented by a tree called
+\emph{symbolic execution tree}. Nodes of the tree (also called \emph{states}
+of the symbolic execution) are triples $(l,\theta,\varphi)$ consisting of
+the current program location $l$, symbolic memory $\theta$, and path
+condition $\varphi$.
+
+The symbolic execution tree for the program of Figure~\ref{fig:linSrch}(a)
+is depicted in Figure~\ref{fig:linSrch}(b). Note that the figure does not
+provide symbolic memories and path conditions of the nodes. However, the
+figure contains instances of branching conditions on the corresponding
+edges. For each node in the tree, the corresponding path condition $\varphi$
+is a conjunction of the instances along the path from the root to the node.
+
+\medskip Now we intuitively explain the idea of compact symbolic execution.
+If we look at the program of Figure~\ref{fig:linSrch}(a), we immediately see
+that locations $b,c,d$ form a cycle\note{v kontextu program bych pouzil spis
+loop, cycle je to v grafech. anebo bych mozna nepsal nahore program, ale
+flowgraph} (highlighted by the grey region). All
+executions of this program part have a very regular structure: each
+execution consists of $\kappa$ iterations along the cycle ($\kappa\ge0$)
+followed either by the edge $(b,f)$ or by the edges $(b,c)$ and $(c,e)$.
+% In other words, each excution follows a path of the form 
+% $(bcd)^{\kappa}bf$ or $(bcd)^{\kappa}bce$.
+We say that $b$ is an \emph{entry location} and $f,e$ are \emph{exit
+  locations} of this program part.
+
+We want to find a unified description of the effect of all executions of
+this program part. We first study the effect of all iterating parts of these
+executions. The effect of $\kappa$ iterations of the cycle on variable
+values can be described by the following \emph{parametric symbolic memory}
+$\theta_*[\kappa]$:
+\[
+\begin{array}{rclp{2ex}rcl}
+  \theta_*[\kappa](\var{n})&=&\sym{n}&&\theta_*[\kappa](\var{x})&=&\sym{x}\\
+  \theta_*[\kappa](\var{i})&=&\sym{i}+\kappa&&\theta_*[\kappa](\var{A})&=&\sym{A}\\
+\end{array}
+\]
+Note that the symbols $\sym{n},\sym{x},\sym{i},\sym{A}$ now represent the
+values of corresponding variables at the entry location of the program
+part. 
+% This is why $\theta_*[\kappa](\var{i})$ is $\sym{i}+\kappa$ and not just
+% $\kappa$.
+
+We can also formulate a \emph{parametric path condition} $\varphi_*[\kappa]$
+representing all path conditions for executions looping around the cycle.
+The necessary and sufficient condition to make $\kappa$ iterations of the
+cycle is validity of both conditions on the cycle, \texttt{i<n} and
+\texttt{A[i]!=x}, in each of $\kappa$ iterations. Using $\theta_*[\kappa]$,
+one easily derives that instances of these conditions in the
+$(\tau+1)$-st\note{to -st tady vypada divne}
+iteration are $\sym{i}+\tau<\sym{n}$ and $\sym{A}(\sym{i}+\tau)\neq\sym{x}$,
+respectively. Hence, $\varphi_*[\kappa]$ can be defined as
+\[
+  \varphi_*[\kappa]~=~\kappa\ge0~\wedge~
+  \forall\tau(0\le\tau<\kappa\implies
+  (\sym{i}+\tau<\sym{n}\,\wedge\,\sym{A}(\sym{i}+\tau)\neq\sym{x})).
+\]
+
+Finally, we use $\theta_*[\kappa]$ and $\varphi_*[\kappa]$ to define
+symbolic memory $\theta_f[\kappa]$ and path condition $\varphi_f[\kappa]$
+describing the effect of all executions of the considered program part
+leading to exit location $f$ and $\theta_e[\kappa],\varphi_e[\kappa]$ with
+the analogous information for the exit location $e$. As the edges
+$(b,f),(b,c),(c,e)$ do not modify any variable, we can clearly see that
+$\theta_f[\kappa]=\theta_e[\kappa]=\theta_*[\kappa]$. Further,
+$\varphi_f[\kappa]$ and $\varphi_e[\kappa]$ are conjunctions of
+$\varphi_*[\kappa]$ with the instances of the conditions on the edge $(b,f)$
+or on the edges $(b,c),(c,e)$, respectively. Hence, the path conditions
+$\varphi_f[\kappa],\varphi_e[\kappa]$ are defined as follows:
+\[
+\begin{array}{rcl}
+  \varphi_f[\kappa]&~=~&\varphi_*[\kappa]~\wedge~\sym{i}+\kappa\ge\sym{n}\\
+  \varphi_e[\kappa]&=&\varphi_*[\kappa]~\wedge~\sym{i}+\kappa<\sym{n}
+    ~\wedge~\sym{A}(\sym{i}+\kappa)=\sym{x}
+\end{array}
+\]
+
+The overall effect of the considered program part is now fully described by
+a so-called \emph{template} consisting of the entry location $b$ and two
+triples $(f,\theta_f[\kappa],\varphi_f[\kappa])$ and
+$(e,\theta_e[\kappa],\varphi_e[\kappa])$.
+
+The template is applied during \emph{compact symbolic execution} of the
+program. The execution processes the first command \texttt{i:=0} in the
+standard way. Then we reach the node $(b,\theta',\varphi')$ with the entry
+location $b$ for which we have the template.
+%  proceeds in the standard way until we reach the node
+% $(b,\theta,\varphi)$ with entry location $b$. 
+% where $\theta(\var{i})=0$ and it assigns to each other variable he
+% corresponding symbol except for ...
+At this point, we apply the template instead of executing the original
+program. The node $(b,\theta',\varphi')$ gets one successor for each triple
+of the template. The triple $(f,\theta_f[\kappa],\varphi_f[\kappa])$
+generates the successor $(f,\theta'_f[\kappa],\varphi'_f[\kappa])$. Note
+that we cannot use $(f,\theta_f[\kappa],\varphi_f[\kappa])$ directly as
+$\theta_f[\kappa],\varphi_f[\kappa]$ describe executions starting just at
+the entry location $b$, while $\theta'_f[\kappa],\varphi'_f[\kappa]$ have to
+reflect the effect of the executions starting at $a$. We create
+$\theta'_f[\kappa],\varphi'_f[\kappa]$ by composing
+$\theta_f[\kappa],\varphi_f[\kappa]$ with $\theta',\varphi'$. The
+composition is precisely described in the following section. In our simple
+program, $\theta',\varphi'$ reflect only the effect of assignment
+\texttt{i:=0}. Thus, $\theta'_f[\kappa]$ equals to $\theta_f[\kappa]$ where
+$\sym{i}$ is replaced by $0$ and $\varphi'_f[\kappa]$ equals
+$\varphi_f[\kappa]$ where $\sym{i}$ is replaced by $0$. The second triple
+$(e,\theta_e[\kappa],\varphi_e[\kappa])$ of the template generates the
+successor $(e,\theta'_e[\kappa],\varphi'_e[\kappa])$ analogously. The
+symbolic execution then continues from these successor in the standard way.
+The resulting \emph{compact symbolic execution tree} is depicted in
+Figure~\ref{fig:linSrch}(c).
+
+The compact symbolic execution tree is much smaller than the classic
+tree. In particular, the infinite path in the classic tree (highlighted by
+the grey region) corresponds to the single node $d$ in the compact
+tree. However, the two trees keep the same information. For example, the
+left leaf of the compact tree represents the following path condition
+\[
+\varphi[\kappa]~=~\kappa\ge0~\wedge~ \forall\tau(0\le\tau<\kappa\implies
+(\tau<\sym{n}\,\wedge\,\sym{A}(\tau)\neq\sym{x}))~\wedge~\kappa<\sym{n}
+~\wedge~\sym{A}(\kappa)=\sym{x}.
+\]
+Let us mark all leafs on the left-hand side of the classic tree as
+$g_0,g_1,g_2,\ldots$ and let $\varphi_0,\varphi_1,\varphi_2,\ldots$ be the
+corresponding path conditions. One can easily compute each path condition
+$\varphi_i$ as a conjunction of the conditions along the corresponding path
+in the figure of the tree and check that $\varphi_i$ is equivalent to
+$\varphi[i]$ for each $i\ge0$. For example,
+\[
+\begin{array}{rcl}
+\varphi_1&=
+&0<\sym{n}~\wedge~\sym{A}(0)\neq\sym{x}~\wedge~1<\sym{n}~\wedge~\sym{A}(1)=\sym{x}\\[2mm]
+\varphi[1]&\equiv&\forall\tau(0\le\tau<1\implies
+(\tau<\sym{n}\,\wedge\,\sym{A}(\tau)\neq\sym{x}))~\wedge~1<\sym{n}
+~\wedge~\sym{A}(1)=\sym{x}
+\end{array}
+\]
+and hence $\varphi_1\equiv\varphi[1]$. Similarly, each symbolic memory of a
+node $g_i$ is an instance $\theta[i]$ of the parametrized symbolic memory in
+the left leaf of the compact tree. Analogous relations hold for leafs on the
+right-hand sides of the trees.
+
+\rem{V tech poslednich odstavcich by chtelo vic vyzdvihnout ten prinos. Je
+tam, ze ten strom je hodne mensi, ale mozna bych uvedl, co to ma za
+dusledek. (zrychleni vypoctu, mensi spotreba pameti, \ldots). Anebo to mozna
+napsat hned v intru.}
+
+%}}}
+%{{{ Description of the technique
+
+\section{Description of the Technique}\label{sec:technique}
+
+This section describes the compact symbolic execution formally. For
+simplicity, we formulate the algorithm for programs manipulating only
+integer variables and read-only multidimensional integer arrays, and with no
+function calls. Nevertheless, the algorithm can be extended to handle
+variables of other types, function calls, etc.
+
+  %{{{ Preliminaries
+
+\subsection{Preliminaries}
+A flowgraph is a tuple $P=(V,E,l_s,\iota)$, where $(V,E)$ is a finite
+oriented graph, elements of $V$ are called \emph{locations}, $l_s\in V$ is a
+\emph{start} location, and $\iota:E\rightarrow\mathcal{I}$ is a function
+assigning to each edge $e$ an \emph{instruction} $\iota(e)$. A location is
+\emph{branching} if its out-degree is $2$. All other locations have
+out-degree at most $1$. We use two kinds of instruction: an assignment
+instruction $\var{a}\texttt{:=}e$ for some scalar variable $\var{a}$ and
+some expression $e$, and an assumption $\texttt{assume}(\gamma)$ for some
+quantifier-free formula $\gamma$ over program variables. Out-edges of any
+branching location are labelled with assumptions $\texttt{assume}(\gamma)$
+and $\texttt{assume}(\neg\gamma)$ for some $\gamma$. We usually omit the
+keyword $\texttt{assume}$ in our flowgraphs. We consider only instructions
+operating on \emph{scalar variables} $\var{a},\var{b},\ldots$ of type
+\texttt{Int} and multi-dimensional \emph{array variables}
+$\var{A},\var{B},\ldots$ of type
+\texttt{Int}$^k\rightarrow$\texttt{Int}. Flowgraphs are also called
+\emph{programs}.
+
+% For a loop $C$ with an entry node $v$, a \emph{flowgraph induced by the loop},
+% denoted as $P(C,v)$, is the subgraph of the original flowgraph induced by $C$
+% where $v$ is marked as the start node, a fresh node $v'$ is added and marked
+% as the target node, and every edge $(u,v)\in E$ leading to $v$ is replaced
+% by an edge $(u,v')$ labelled with the same instruction as one of the edge $(u, v)$.
+
+\medskip By \emph{symbolic expressions} we mean all expressions build with
+integers, standard integer operations and functions, and
+\begin{itemize}
+\item a \emph{symbol} $\sym{a}$ for each scalar variable $\var{a}$,
+\item a \emph{function symbol} $\sym{A}$ for each array variable $\var{A}$,
+  where arity of $\sym{A}$ corresponds to the dimension of array $\var{A}$,
+\item a countable set $\{\kappa_1,\tau_1,\kappa_2,\tau_2,\ldots\}$ of
+  \emph{parameters}, and
+\item a construct $\ite(\varphi,e_1,e_2)$, of meaning
+  ``\textbf{i}f-\textbf{t}hen-\textbf{e}lse'', where $e_1,e_2$ are symbolic
+  expressions and $\varphi$ is a first order formula over symbols and
+  parameters. The value of $\ite(\varphi,e_1,e_2)$ is $e_1$ if $\varphi$
+  holds and $e_2$ otherwise.
+\end{itemize}
+
+% Let $f,e_1,\ldots,e_n$ be symbolic expressions and $x_1,\ldots,x_n$ be path
+% counters or symbols corresponding to scalar variables. Then
+% $f[x_1/e_1,\ldots,x_n/e_n]$ is a symbolic expression $f$ where all
+% occurrences of all $x_i$ are simultaneously replaced by expressions
+% $e_i$. To shorten the notation, we write $f[\vec{x}/\vec{e}]$ when the
+% meaning is clearly given by a context. We also use the notation
+% $\varphi[\vec{x}/\vec{e}]$ with the analogous meaning for formulae
+% $\varphi$.
+
+A \emph{symbolic memory} is a function $\theta$ assigning to each scalar
+variable $\var{a}$ a symbolic expression and to each array variable
+$\var{A}$ the function symbol $\sym{A}$.
+% Let $\var{a}$ be a scalar variable and $e$ be a symbolic expression. Then
+% $\theta[\var{a}\rightarrow e]$ is a symbolic memory equal to $\theta$
+% except for variable $\var{a}$, where $\theta[\var{a}\rightarrow
+% e](\var{a})=e$.
+The notation $\theta(\cdot)$ is used in a more general way. It always
+denotes the operation of replacing each (scalar or array) variable $\var{a}$
+by $\theta(\var{a})$. $\theta\langle\cdot\rangle$ denotes the operation on
+symbolic expressions or formulae, where all occurrences of all symbols
+$\sym{a}$ are simultaneously replaced by $\theta(\var{a})$. Additionally,
+$\theta_1\langle\theta_2\rangle$ denotes composition of two symbolic
+memories $\theta_1$ and $\theta_2$ satisfying
+$\theta_1\langle\theta_2\rangle(\var{a})=\theta_1\langle\theta_2(\var{a})\rangle$
+for each variable $\var{a}$. Intuitively, the symbolic memory
+$\theta_1\langle\theta_2\rangle$ represents an overall effect of a code with
+effect $\theta_1$ followed by a code with effect $\theta_2$.
+
+% Finally, for vectors $\vec{u}=(u_1,\ldots,u_n)$ and
+% $\vec{v}=(v_1,\ldots,v_n)$ we use $\vec{u}\le\vec{v}$ as an abbreviation
+% for $u_1\le v_1\wedge\ldots\wedge u_n\le v_n$.
+
+\medskip \emph{Symbolic state} (or simply a \emph{state}) is a triple
+$s=(l,\theta,\varphi)$ of a location $l$, symbolic memory $\theta$ and first
+order formula over symbols and parameters $\varphi$ called \emph{path
+  condition}. \emph{Initial state} is the triple $(l_s,\theta_s,\true)$
+where $l_s$ is the start location and $\theta_s$ is the symbolic memory
+assigning to each variable $\var{a}$ the corresponding symbol $\sym{a}$. We
+assume that the reader is familiar with standard symbolic execution (we
+refer to~\cite{Kin76} if the intuition provided in the previous section is
+not sufficient).
+
+  %}}}
+  %{{{ Templates
+
+\subsection{Templates and their computation}
+
+Let us consider a fixed program $(V,E,l_s,\iota)$. A \emph{template (with
+  one parameter)} is a pair $(l,M)$, where $l$ is a location called
+\emph{entry location} and $M$ is a finite set of triples. Each triple in $M$
+has the form $(e,\theta[\kappa],\varphi[\kappa])$, where $e$ is a
+location, $\theta[\kappa]$ is a symbolic memory using a single parameter
+$\kappa$, and $\varphi[\kappa]$ is a satisfiable first order formula over
+symbols and parameters with at most one free parameter $\kappa$.
+
+Moreover, each template has to correctly describe some prefix of each
+possible execution starting in the entry node. Formally, each template
+$(l,M)$ has to satisfy the following two conditions.  Let us consider a
+symbolic execution tree of the program $(V,E,l,\iota)$, i.e.~the original
+program with $l$ as start location.
+\begin{enumerate}
+\item Each path in the tree leading from the root to a leaf contains a state
+  $(e,\theta,\varphi)$ such that there exists a triple
+  $(e,\theta'[\kappa],\varphi'[\kappa])\in M$ and a number $n\ge0$
+  satisfying $\theta=\theta'[n]$ and $\varphi\equiv\varphi'[n]$.
+\item For each triple $(e,\theta'[\kappa],\varphi'[\kappa])\in M$ and each
+  number $n\ge0$ such that $\varphi'[n]$ is satisfiable there exists a
+  state $(e,\theta,\varphi)$ in the tree satisfying $\theta=\theta'[n]$ and
+  $\varphi\equiv\varphi'[n]$.
+\end{enumerate}
+
+% \textbf{Pozor, tohle asi neplati pro ty templaty generovany v sekci 3.2,
+%   protoze tam neni trojice reprezentujici nekonecnou iteraci cyklu.}
+
+The definition of a template is quite general and there are many ways of
+obtaining a template. In the rest of this subsection, we present an
+algorithm that tries to derive templates from cycles in flowgraphs.
+
+Let $c_0,c_1,\ldots,c_{n-1}$ be locations forming a cycle in a program. We
+consider $c_0$ as its entry location. Algorithm~\ref{alg:template} describes
+the computation of a template for this cycle. 
+
+\begin{algorithm}[!tb]
+  \caption{computeTemplate}\label{alg:template}
+  \KwIn{a program cycle $c_0,c_1,\ldots,c_{n-1}$}
+  \KwOut{the corresponding template}
+  \BlankLine
+  \DontPrintSemicolon
+Set $\theta_*[\kappa](\var{a})=\bot$ for each scalar variable $\var{a}$ and
+\mbox{~~~~~$\theta_*[\kappa](\var{A})=\sym{A}$ for each
+  array variable $\var{A}$}\\
+$(\theta,\varphi)\aset\texttt{executePath(}c_0,c_1,\ldots,c_{n-1},c_0\texttt{)}$\;
+\If{$\varphi\equiv\false$}{\Return{template computation failed}}
+\Repeat{$\var{change} = \false$}{ \label{alg:theta:repeat}
+  $\var{change} \aset \false$\;
+  \ForEach{{\rm scalar variable} $\var{a}$}{ \label{alg:theta:foreach}
+    \If{$\theta_*[\kappa](\var{a})=\bot$}{
+      \If{$\theta(\var{a})=\sym{a}+c$ for some constant $c$}{
+        $\theta_*[\kappa](\var{a}) \aset \sym{a}+\kappa\cdot c$\;
+        $\var{change} \aset \true$\;
+      }  
+      \If{$\theta(\var{a})=\sym{a}\cdot c$ for some constant $c$}{
+        $\theta_*[\kappa](\var{a}) \aset \sym{a}\cdot c^\kappa$\;
+        $\var{change} \aset \true$\;
+      }  
+      \If{$\theta(\var{a})=e$ for some symbolic expression $e$ such that
+        \mbox{~~~$\theta_*[\kappa](\var{b})\neq\bot$ for each symbol $\sym{b}$ in $e$}}{
+        $\theta_*[\kappa](\var{a}) \aset
+        \ite(\kappa>0,\theta_*[\kappa-1]\langle e\rangle,\sym{a})$\;
+        $\var{change} \aset \true$\;
+      }  
+    }
+  }
+}
+\If{$\theta_*[\kappa](\var{a})=\bot$ for some variable $\var{a}$}{
+  \Return{template computation failed}
+}
+\Else{
+  $\varphi_*[\kappa]\aset\kappa\ge 0~\wedge~
+  \forall\tau(0\le\tau<\kappa\implies\theta_*[\tau]\langle\varphi\rangle)$\;
+  $M\aset\emptyset$\;
+  \ForEach{program path $\pi=c_0,c_1,\ldots,c_i,v$ such that 
+    \mbox{~~~~~~~~~~~$i<n$ and $v\neq c_{(i+1)\bmod n}$}}{
+    $(\theta,\varphi)\aset\texttt{executePath(}\pi\texttt{)}$\;
+    \If{$\varphi\not\equiv\false$}{
+      $M\aset M\cup\{(v,\theta_*[\kappa]\langle\theta\rangle,\varphi_*[\kappa]\wedge
+      \theta_*[\kappa]\langle\varphi\rangle)\}$\;
+    }
+  }
+  \Return{template $(c_0,M)$}
+}
+\end{algorithm}
+
+Recall that $\theta\langle\cdot\rangle$ denotes the operation where all
+occurences of all symbols $\sym{a}$ are simultaneously replaced by
+$\theta(\var{a})$. The algorithm uses a function $\texttt{executePath}(\pi)$
+that symbolically executes all instructions along a path $\pi$ in a
+flowgraph and returns the resulting symbolic memory and path condition.
+
+The first part of the algorithm (lines 1--18) tries to derive a parametric
+symbolic memory $\theta_*[\kappa]$ uniformly describing symbolic memory
+after $\kappa$ iterations over the cycle for each $\kappa\ge 0$. Initially,
+we set $\theta_*[\kappa]$ to be undefined for all scalar variables. As we
+consider only programs that do not modify arrays, we can directly set
+$\theta_*[\kappa](\var{A})=\sym{A}$ for each array variable. Then we compute
+the effect of one iteration of the cycle and check whether the iteration is
+feasible. If it is not, it does not make sense to compute the template and
+thus the algorithm stops. In the \textbf{repeat}-\textbf{until} cycle (lines
+5--18) we try to derive a parametric description $\theta_*[\kappa]$ of
+symbolic memory after $\kappa$ iteration based on the information about
+symbolic memory $\theta$ after one iteration. We repeatedly try to apply one
+of three simple rules. The first rule (lines 9--11) says that if one
+iteration increases the value of a variable $\var{a}$ by a constant $c$, then
+$\kappa$ iterations increases the value by $\kappa\cdot c$. Note that this
+rule covers also the case when the cycle does not modify $\var{a}$
+(i.e.~$c=0$). The second rule (lines 12--14) is similar. The last rule
+(lines 15--17) observes that if the cycle sets the the value of $\var{a}$ to
+$e$, then the value of $\var{a}$ after $\kappa$ iterations is the same as
+the value of $e$ after $\kappa-1$ iterations. Moreover, if we do not perform
+any iteration, the value of $\var{a}$ is unchanged (i.e.~$\sym{a}$). If this
+process does not lead to a complete description of the symbolic memory after
+$\kappa$ iterations, the algorithm fails to find a template for the cycle.
+
+If we have this description, we can compute the template in two
+steps. First, we derive a parametric description $\varphi_*[\kappa]$ of the
+path condition after $\kappa$ iterations (line 22): using
+$\theta_*[\kappa]$, we construct a parametric description of each instance
+of conditions on the cycle and we say that $\kappa$ is non-negative and each
+of the $\kappa$ instances holds. The template should represent all
+executions iterating the cycle for some time and eventually leaving the
+cycle by the last step. To detect all ways of leaving the cycle, we find all
+acyclic paths $c_0,c_1,\ldots,c_i,v$ starting in the entry location and
+leaving the cycle by their last step. Each such a path corresponds to one
+triple in the template. To construct the triple, we symbolically execute the
+acyclic path to obtain $\theta$ and $\varphi$. We check feasibility of the
+acyclic path. The triple represents all executions iterating the cycle
+$\kappa$-times and then leaving the cycle along the acyclic path
+$c_0,c_1,\ldots,c_i,v$. Hence, each such an execution has the symbolic
+memory $\theta_*[\kappa]\langle\theta\rangle$ and its path condition is a
+conjunction of $\varphi_*[\kappa]$ and $\varphi$ with values of symbols
+defined by $\theta_*[\kappa]$.
+
+We emphasize that one can add other rules to the part of the algorithm
+computing the parametric symbolic memory $\theta_*[\kappa]$. For example, a
+rule handling the case when $\theta(\var{a})=c\cdot\sym{a}+d$ for some
+constants $c,d$.
+
+  %}}}
+  %{{{ Compact symbolic execution
+
+\subsection{Compact symbolic execution}
+
+Now we are ready to explain the compact symbolic execution described by
+Algorithm~\ref{alg:executeSymbolically}. If we ignore the lines marked by
+$\Box$, then we get the original algorithm of classic symbolic
+execution. But, as we focus on compact symbolic execution, we describe the
+algorithm with $\Box$ lines included. The algorithm accepts a program $P$
+and a set $p$ of templates resulting from analyses of some program parts of
+$P$. % We emphasise, that each template in $p$ \emph{must} satisfy
+% Definition~\ref{def:BasicTemplate}.
+At
+lines~\ref{alg:executeSymbolically:InitialState}--\ref{alg:executeSymbolically:InitialQ},
+there we create an initial state and insert it into a queue $Q$. The queue
+$Q$ keeps all the program states waiting for their processing in the
+\textbf{repeat}-\textbf{until} cycle (lines
+\ref{alg:executeSymbolically:LoopBegin}--\ref{alg:executeSymbolically:LoopEnd}). The
+key part of the cycle's body begins at
+line~\ref{alg:executeSymbolically:GetTemplatesAt}, where we select all those
+templates from the set $p$, whose entry locations match an actual program
+location $l$. If the selection is not empty, we choose one template $(l,M)$
+of the selected templates.
+% This single template $t$ is chosen at
+% line~\ref{alg:executeSymbolically:ChooseTemplate}.
+We do not put any constraints to the selection strategy. We may for example
+choose randomly. To prevent parameter collisions with parameters in already
+applied templates, we first get a fresh parameter at
+line~\ref{alg:executeSymbolically:UnrollingFreshKappa} and then we replace a
+parameter used in $M$ by default by the fresh one. In the \textbf{foreach}
+cycle at
+lines~\ref{alg:executeSymbolically:Unrolling}--\ref{alg:executeSymbolically:UnrollingEnd}
+we create a successor state $s'$ for each triple of $M$.
+% (see line~\ref{alg:executeSymbolically:SuccessorInUnrolling}).
+If the selection $p'$ computed at
+line~\ref{alg:executeSymbolically:GetTemplatesAt} is empty, we proceed to
+line~\ref{alg:executeSymbolically:ClassicStep}, where we compute successor
+states of the state $s$ by classic symbolic execution. The computed
+successor states are inserted into the queue $Q$ and into computed compact
+symbolic execution $T$ in the \textbf{foreach} cycle at
+lines~\ref{alg:executeSymbolically:AddSATSuccessors}--\ref{alg:executeSymbolically:CreateVertex}. Note
+that only successor states with satisfiable path conditions are considered.
+
+\begin{algorithm}[!t]
+    \caption{\texttt{executeSymbolically}} \label{alg:executeSymbolically}
+    \KwIn{$P=(V,E,l_s,\iota)$ -- a program to be executed 
+        \KwInSep \hspace{-1.1cm}\lmark{$\Box$}\hspace{1.05cm}
+        $p$ -- a set of templates computed for program parts of $P$
+    }
+    \KwOut{$T$ -- a symbolic execution tree of $P$ (compact tree in $\Box$--version)}
+    \BlankLine
+    \DontPrintSemicolon
+    $s_0 \aset (l_s,\theta_s,\true)$  ~~/* initial state */\;
+        \label{alg:executeSymbolically:InitialState}
+    Let $Q$ be a queue of states initially containing only $s_0$ \;
+        \label{alg:executeSymbolically:InitialQ}
+    Create a tree $T$ with root $s_0$ as the only node\;
+        \label{alg:executeSymbolically:Root}
+    \Repeat{\rm $Q$ becomes empty}{ \label{alg:executeSymbolically:LoopBegin}
+        Extract the first state $s=(l,\theta,\varphi)$ from $Q$ \;
+        % \If{\rm $l$ is not the neither exit from the starting function nor
+        %         an error location}{
+        %         \label{alg:executeSymbolically:FinalState}
+            $S \aset \emptyset$ \;
+            \lmark{$\Box$}
+            $p' \aset \texttt{getTemplatesAt(}l,p\texttt{)}$ \;
+                \label{alg:executeSymbolically:BoxesBegin}
+                \label{alg:executeSymbolically:GetTemplatesAt}
+            \lmark{$\Box$}
+            \If {$p' \neq \emptyset$}{
+                \lmark{$\Box$}
+                $(l,M) \aset \texttt{chooseTemplate(}p'\texttt{)}$ \;
+                    \label{alg:executeSymbolically:ChooseTemplate}
+                \lmark{$\Box$}
+                $\kappa \aset \texttt{getFreshParam()}$ \;
+                    \label{alg:executeSymbolically:UnrollingFreshKappa}
+                \lmark{$\Box$}
+                Replace all occurrences of the former parameter in
+                    $M$ by $\kappa$\;
+                \lmark{$\Box$}
+                \ForEach{$(v,\theta[\kappa],\varphi[\kappa])\in M$}{
+                        \label{alg:executeSymbolically:Unrolling}
+                    \lmark{$\Box$}
+                    $s' \aset (v,\theta\langle\theta[\kappa]\rangle,
+                    \varphi\wedge\theta\langle\varphi[\kappa]\rangle)$\;                 
+                    \label{alg:executeSymbolically:SuccessorInUnrolling}
+                    \lmark{$\Box$}
+                    Insert $s'$ into $S$\;
+                        \label{alg:executeSymbolically:UnrollingEnd}
+                }
+            }
+            \lmark{$\Box$}
+            \Else(~~/* apply classic symbolic execution step */){
+                    \label{alg:executeSymbolically:BoxesEnd}
+                $S \aset \texttt{computeClassicSuccessors(}P,s\texttt{)}$ \;
+                    \label{alg:executeSymbolically:ClassicStep}
+            }
+%            Let $u$ be the leaf of $T$ whose label is $s$ \;
+                    \label{alg:executeSymbolically:GetLeaf}
+            \ForEach{\rm state $s' \in S$ such that
+                            $s'=(l',\theta',\varphi')$ and $\varphi'$ is satisfiable}{
+                    \label{alg:executeSymbolically:AddSATSuccessors}
+                    Insert $s'$ at the end of $Q$ \; 
+                    Insert $s'$ and an edge $(s,s')$ into $T$ \;
+                    \label{alg:executeSymbolically:CreateVertex}
+ %           }
+        }
+    } \label{alg:executeSymbolically:LoopEnd}
+    \Return{$T$} \;
+\end{algorithm}
+
+We finish this section by formulating soundness and completeness theorems
+for compact symbolic execution, which uses templates with one parameter.  We
+assume that $T$ and $T'$ are classic and compact symbolic execution trees of
+the program $P$ computed by Algorithm~\ref{alg:executeSymbolically} without
+and with $\Box$ lines respectively.
+% Because of space limitations we moved
+% proofs of the theorems to Appendix~\ref{sec:Proofs}.
+The proofs are straightforward using the two conditions in the definition of
+a template.
+
+% \textbf{Co s tim? Preformulovat nebo sejmout?}
+
+ \begin{thm}[Soundness]
+For each leaf $(e,\theta,\varphi) \in T$ there is a leaf
+$(e,\theta'\prm{\kappa},$ $\varphi'\prm{\kappa}) \in T'$ and integer $n
+\geq 0$ such that $\theta = \theta'\prm{n}$ and $\varphi \equiv
+\varphi'\prm{n}$.
+ \end{thm}
+
+ \begin{thm}[Completeness]
+   For each leaf $(e,\theta'\prm{\kappa},\varphi'\prm{\kappa})' \in T'$ there is a leaf $(e,\theta,\varphi) \in T$ and and integer $n \geq 0$ such that $e.s \equiv
+2   e'.s\prm{\bld{\nu}}$.
+ \end{thm}
+
+%}}}
+  %{{{ Extensions
+
+\subsection{Extensions of the technique}
+
+For clarity of presentation, the compact symbolic execution has been
+described in a very simple settings of programs working only with integer
+variables, read-only integer arrays, and without function calls. However,
+one can extend the technique to programs with more data types, function
+calls allowing recursion etc. Further, one can improve the presented
+technique for computing templates (e.g.~by addition of new rules) or suggest
+a completely new algorithms for template construction. The definition of
+templates can be also extended. For example, one can also consider templates
+with more than one parameter.
+
+In~\cite{Trt12} we present a version of this technique working with function
+calls. Moreover, we introduce there a notion of paired templates that can
+capture some kinds of (unbounded) recursion.
+
+  %}}}
+
+%}}}
+%{{{ Possible Extensions - zakomentovano
+
+% \section{Possible Extensions}\label{sec:extensions}
+
+% \begin{itemize}
+% \item function calls - je to stejny, kdyz se uvazuji cykly, ktery nemeni
+%   vysku call stacku, ale pribudou lokalni promenny apod. 
+% \item templates with more parameters - for descritpion of program parts with
+%   more loops (more alternative paths through one program loop)
+% \item templates for recursion
+% \item more possibilites: more variable types, etc.
+% \end{itemize}
+
+%}}}
+%{{{ Experimantal results
+
+\section{Experimental Results}\label{sec:experiments}
+
+We have implemented both classic and compact symbolic execution in an
+experimental tool to empirically evaluate their effectiveness in
+exploration of program paths. In particular, we want to measure, for
+each technique, a speed in which they explore program paths. Given the
+same fixed exploration method of program paths
+% (e.g.~in breadth-first manner)
+for both techniques, we may ask how quickly they are able to
+reach a particular location in the analysed program.
+
+Therefore, we fixed the breadth-first search of program paths for both
+techniques and we measured their running time on ten benchmark
+programs with a marked target location, until the location is reached
+or until 15 minutes timeout is exceeded. Note that for compact symbolic
+execution we also have to fix a template-selection strategy to be
+instantiated at a particular program location, since there can
+generally be more than one template related to the same program
+location. We always choose randomly between candidate templates. All
+the benchmarks have a huge number of real program paths, generated by
+loops. The target location is chosen to be difficult to reach. A
+technique must therefore explore a lot of program paths to get to the
+right one. The first seven benchmarks have reachable target location,
+while the last tree do not. For these three benchmark all the
+program paths must be explored to give an answer. The individual
+benchmarks can be described as follows (\texttt{C} listing of majority
+of the benchmarks can be found in the Appendix).
+
+The first three benchmarks Hello, HW, and HWM are similar. The
+benchmark HWM was taken from \cite{AGT08} and it accepts a \texttt{C}
+string as an input and scans the string for the presence of substrings
+\texttt{"Hello"},\texttt{"World"}, \texttt{"At"} and
+\texttt{"Microsoft!"}. It does not matter at which position and in
+which order the words occur in the string. The target location is
+reached when all four substrings are found. Benchmark HW searches an
+input string only for substrings \texttt{Hello} and \texttt{World},
+while benchmark Hello searches only for the first one.
+
+Benchmark MatrIR scans upper triangle of an input matrix. The target
+location is reached if the matrix is bigger than 20 $\times$ 20 and it
+contains a line with more than 15 scanned elements with values between 10 and
+100. We took this benchmark from~\cite{ST12}.
+
+Benchmark DOIF scans an input string and counts number of characters
+\texttt{U} and \texttt{V}. The target location is reached when the counts
+have the exact values $10$ and $15$ respectively.
+
+Benchmark DOIFex extends DOIF by another loop scanning the input
+stream again. Occurrences of characters \texttt{u} and \texttt{v}
+decreases the counts computed in the first loop for the characters
+\texttt{U} and \texttt{V} respectively. The target location is
+reached when the resulting counts are the same as described in DOIF
+benchmark.
+
+Benchmark EQCNT originate from \cite{OT11}. It consists of two nested
+loops with branching, where a variable defined in the outermost scope
+is incremented in the innermost loop. The benchmark accepts two
+strings, \texttt{A} and \texttt{B}. For each character in string
+\texttt{A} we count the number of times this character occurs in
+\texttt{B}. The target is reached when the overall count is exactly
+20.
+
+Benchmark EQCNTex extends the benchmark EQCNT. It contains two additional
+nested loops in row. Nevertheless, the bounds of all loops in the benchmarks
+are set to fixed constants. The huge number of program paths is generated by
+the symbolic arrays \texttt{A} and \texttt{B} described above. The limits of
+the loops makes the target location unreachable.
+
+Benchmarks OneLoop and TwoLoops are also designed such that their target
+locations are not reachable. Both benchmarks contain a loop iterated
+\texttt{n}–times. In each iteration, the variable \texttt{i} (initially set
+to \texttt{0}) is increased by \texttt{4}. The target location is then
+guarded by an assertion \texttt{i==15} in OneLoop and by a loop
+\texttt{while (i != j + 7) j += 2} in TwoLoops (\texttt{j} is initialised to
+\texttt{0} before the loop).
+
+\begin{table*}[!t]
+  \begin{center}
+    \setlength{\tabcolsep}{6pt}
+    \renewcommand\arraystretch{1.2}
+    \begin{tabular}{|c||c|c|c|c||c|c||c|}
+      \hline
+      & \multicolumn{4}{c||}{\textbf{Compact SE}} & \multicolumn{2}{c||}{\textbf{SE}} & \textbf{Pex} \\
+      \cline{2-8}
+      \textbf{Benchmark} & Time & Tpt & States & SATFail & Time & States  & Time \\
+      \hline
+      Hello   &  6.08 & 2 &    8 &   2 &  0.265 &     43   &  3.23 \\
+      HW      & 42.59 & 2 &   66 &   5 &  792.6 &  37577   & 14.89 \\
+      HWM     &   T/O & 2 &  436 & 142 &    T/O &  42653   &   T/O \\
+      MatrIR  &  1.81 & 4 &   29 &   0 &  61.79 &    982   &  95.0 \\
+      DOIF    & 31.11 & 3 &   41 &   6 &    T/O & 168847   &   T/O \\
+      DOIFex  & 387.9 & 6 &  253 &  71 &    T/O & 128950   &   T/O \\
+      EQCNT   & 55.08 & 3 &   47 &  10 &    T/O & 125585   &   103 \\
+      \hline
+      EQCNTex &   T/O & 4 & 1900 &  15 &    T/O &  35180   &   T/O \\
+      OneLoop & 0.015 & 1 &    0 &   0 &    T/O &      2   &   134 \\
+      TwoLoops& 0.016 & 2 &    0 &   0 &    T/O &    407   &    64 \\
+      \hline
+    \end{tabular}
+  \end{center}
+  \caption{Experimental results of compact and classic King's symbolic
+  executions.}
+  \label{tab:Expriments}
+\end{table*}
+
+\medskip
+Our experimental results are depicted in Table~\ref{tab:Expriments}. The
+columns have the following meaning.  \textit{Time} is a duration in seconds
+until a technique reached the target location. The symbol T/O means the
+timeout was exceeded. \textit{Tpt} represents numbers of templates
+constructed for the benchmarks. \textit{States} identifies number of
+normally terminated execution (i.e.~without an error) plus number of
+executions, which were running at the moment the target location was reached
+or the timeout was exceeded. And finally, \textit{SATFail} identifies
+numbers of execution for which Z3 SMT solver failed to determine
+satisfiability of their path conditions. We do not show this column for
+classic symbolic execution, since there were no such failures.
+
+We want to highlight the following important observation related to
+the experimental data. First of all, classic symbolic execution was
+faster only for the benchmark Hello. Second, number of executions of
+compact symbolic execution is often several orders of magnitude lower
+then of classic one, while getting closer to the target location
+sooner. On the other hand, presence of quantifiers in path conditions
+of compact symbolic executions puts very high requirements on skills of
+an SMT solver. This leads to failures, which are not seen in classic
+symbolic execution.
+
+We did all the measurements on a single common desktop computer\footnote{
+  Intel\textsuperscript{\textregistered} Core$^{\mathtt{TM}}$ i7 CPU 920 @
+  2x2.67GHz, 6GB RAM, Windows 7 Professional 64-bit, MS Pex 0.92.50603.1, MS
+  Moles 1.0.0.0, MS Visual Studio 2008, MS .NET Framework v3.5 SP1, MS Z3
+  SMT solver v3.2, and boost v1.42.0.}. To get a better view of
+effectiveness of our implementation, we include in Table~\ref{tab:Expriments}
+run-time of a well known symbolic execution tool \textsc{Pex}~\cite{TdH08}.
+
+
+%}}}
+%{{{ Related work
+
+\section{Related Work}\label{sec:related}
+
+Compact symbolic execution is tightly related to the work of King in
+1976~\cite{Kin76}, where the author introduced the original concept of
+classic symbolic execution. Nevertheless, performance issues related to the
+path explosion problem were not tackled. The original concept was
+generalised in \cite{KPV03} for programs with heap by introducing lazy
+initialisation of dynamically allocated data structures.  The lazy
+initialisation algorithm was further improved and formally defined
+in~\cite{DLR11}. Another generalisation step was done in~\cite{KS05}, where
+the authors attempt to avoid symbolic execution of library code (called from
+an analysed program), since such code can be assumed as well defined and
+properly tested.
+
+In \cite{SPmCS09,GL11} the path explosion problem is tackled by focusing on
+program loops. The information inferred from a loop allows to talk about
+multiple program paths through that loop. But the goal is to explore classic
+symbolic execution tree in some effective manner: more interesting paths
+sooner. Approaches \cite{G07,AGT08} shares the same goal as the previous
+ones. Only, they focus on a computation of function summaries rather than on
+program loops. Our goal is completely different: Instead of guiding
+exploration of paths in classic symbolic execution tree, we collapse paths
+(with regularities in states along them) into single vertices in compact
+symbolic execution tree. Paths in compact symbolic execution tree can thus
+be exponentially shorter than corresponding paths in the classic one.
+% The main disadvantage of the approaches \cite{SPmCS09,GL11,G07,AGT08} over
+% ours is the exploration of paths of \emph{classic} symbolic execution
+% tree. These paths can be exponentially longer then corresponding ones in
+% compact symbolic execution tree. The same negative effect therefore
+% applies to lengths of the corresponding path conditions of these paths.
+
+Further, techniques~\cite{QNR11,SH10} group paths of classic symbolic
+execution tree according to an a priori given constraints to a program
+output, while exploring only one path per group. We do not require any such
+constraints.
+
+Note that the compact symbolic execution has a different objective than
+standard summarization techniques~\cite{G07,AGT08,GL11}. Summarization
+basically ``caches'' results of some finite part of symbolic execution. The
+presented technique wants to generalize the precomputed information and
+replace potentially infinite parts of symbolic executions by a single node.
+
+Finally, the idea of declarative parametric description of the effect of a
+program loop has been already used in our paper~\cite{ST12}. In contrast to
+this paper, the goal of~\cite{ST12} is to find a necessary condition on
+input values to reach a given program location. While compact symbolic
+execution can work with templates generated by various techniques (one of
+them is the presented analysis of program cycles), \cite{ST12} focuses on
+a declarative parametrized description of program loops. However, program
+loops considered in \cite{ST12} can have more paths around the loop
+(generated e.g.~by branching statement in the loop).
+
+%}}}
+%{{{ Conclusion 
+
+\section{Conclusion}\label{sec:conclusion}
+
+We have introduced a generalization of classic symbolic execution. The new
+technique called compact symbolic execution can analyze a program and derive
+templates representing an overall effect of some program parts to executions
+leading through the program part. Using such a template, one can construct
+substantially smaller tree that the classic symbolic execution tree without
+loss of information. In particular, one node of the compact tree can
+represent even infinitely many nodes of the classic tree.
+
+Our experimental results show that construction of compact trees instead of
+classic trees often leads to significantly faster detection of errors in
+programs. 
+
+% Compact symbolic execution is sound and complete generalisation of the
+% classic one. It takes advantage over the classic symbolic execution by
+% accepting information about an executed program in advance. The correctness
+% of the passed information is formulated by the concept of templates. We also
+% showed one possible approach to computation of templates for simple program
+% parts.
+
+% \paragraph{Acknowledgements}
+% The work was supported by Czech Science Foundation (GA\v{C}R), grant
+% No.~201/08/P375.
+
+%}}}
+
+\bibliographystyle{plain}
+\bibliography{cse_issta2013}
+
+\appendix
+2
+\section{Listing of Benchmarks}
+
+In this section we list the benchmarks except for the benchmarks Hello and
+HWM, since they can be easily constructed from the benchmark HW.
+
+\begin{verbatim}
+public static void HW(string A) {
+  string H = "Hello\0"; int h = 0;
+  for (int i=0; A[i]!=0; ++i) {
+    int j=i, k=0;
+    while (H[k]!=0 && A[j]!=0 && A[j]==H[k]) {
+      ++j; ++k;
+    }
+    if (H[k] == 0) { h = 1; break; }
+    if (A[j] == 0) break;
+  }
+  string W = "World\0"; int w = 0;
+  for (int i=0; A[i]!=0; ++i) {
+    int j=i, k=0;
+    while (W[k]!=0 && A[j]!=0 && A[j]==W[k]) {
+      ++j; ++k;
+    }
+    if (W[k] == 0) { w = 1; break; }
+    if (A[j] == 0) break;
+  }
+  if (h == 1 && w == 1)
+    // here is the target location:
+    throw new Exception("HW - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void matrIR(int** A, int m, int n)
+{
+  int w = 0;
+  for (int i = 0; i < m; ++i)
+  {
+    int k = 0;
+    for (int j = i; j < n; ++j)
+    if (A[i][j] > 10 && A[i][j] < 100)
+      ++k;
+    if (k > 15)
+    {
+      w = 1;
+      break;
+    }
+  }
+  if (m > 20 && n > 20 && w == 1)
+    throw new Exception("MatrIR - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void DOIF(string P) {
+  int U = 0, V = 0;
+  for (int ic = 0; P[ic] != 'T'; ++ic) {
+    if (P[ic] == 'U') ++U;
+    if (P[ic] == 'V') ++V;
+  }
+  if (U == 10 && V == 15)
+    // here is the target location:
+    throw new Exception("VMS - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void DOIFex(string P) {
+  int U = 0, V = 0;
+  for (int ic = 0; P[ic] != 'T'; ++ic) {
+    if (P[ic] == 'U') ++U;
+    if (P[ic] == 'V') ++V;
+  }
+  for (int ic = 0; P[ic] != 'T'; ++ic) {
+    if (P[ic] == 'u') --U;
+    if (P[ic] == 'v') --V;
+  }
+  if (U == 10 && V == 15)
+    // here is the target location:
+    throw new Exception("VMS - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void EQCNT(string A, string B) {
+  int nA = 0;
+  for (int i = 0; A[i] != 0; ++i)
+    for (int j = 0; B[j] != 0; ++j)
+      if (A[i] == B[j]) ++nA;
+  if (nA == 20)
+    // here is the target location:
+    throw new Exception("EQCNT - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void EQCNTex(string A, string B) {
+  int nA = 0, nB = 0;
+  for (int i = 0; i < 3; ++i)
+    for (int j = 0; j < 3; ++j)
+      if (A[i] == B[j]) ++nA;
+  for (int j = 0; j < 5; ++j)
+    for (int i = 0; i < 5; ++i)
+      if (A[i] == B[j]) ++nB;
+  if (nA == 10 && nB == 13)
+    // here is the target location:
+    throw new Exception("EQCNTex - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void OneLoop(int n) {
+  int i = 0;
+  while (i < n) i += 4;
+  if (i == 15)
+    // here is the target location:
+    throw new Exception("OneLoop - reached!!");
+}
+\end{verbatim}
+
+\begin{verbatim}
+public static void TwoLoops(int n) {
+  int i = 0, j = 0;
+  while (i < n) i += 4;
+  while (i != j + 7) j += 2;
+  // here is the target location:
+  throw new Exception("TwoLoops - reached!!");
+}
+\end{verbatim}
+
+\end{document}
