@@ -1227,7 +1227,531 @@ $(e,\theta'\prm{\kappa},$ $\varphi'\prm{\kappa}) \in T'$ and integer $n
 
 
 %}}}
-  %{{{ Extensions
+%{{{ Recursion
+\color{blue}
+\subsection{Recursion}
+
+\begin{figure*}[!htb]
+\begin{tabular}{ccc}
+{\input{fig_linSrchRec}} & {\input{fig_linSrchRecSET}} &
+{\input{fig_linSrchRecCSET}}
+\\
+(a) & (b) & (c)
+\end{tabular}
+\caption{(a) A program with a recursive function
+\texttt{linSrch(A,i,n,x)}. (b) Symbolic execution tree of the
+recursive function \texttt{linSrch}. (c) Compact symbolic execution
+tree of the recursive function \texttt{linSrch}.
+%, where $\gamma_f \equiv t.\varphi_f\prm{\kappa_1}$, $\gamma_e \equiv
+%t.\varphi_e\prm{\kappa_1}$, $s_f = (t.\theta_f\prm{\kappa_1},
+%t.\varphi_f\prm{\kappa_1}, [(\bot, \bot, t, \kappa_1)], f)$, $s_e =
+%(t.\theta_e\prm{\kappa_1}, t.\varphi_e\prm{\kappa_2}, [(\bot, \bot, t,
+%\kappa_1)], e)$, $s_g^1 = (s_1.\theta \circ t.\theta\prm{\kappa_1},
+%s_1.\varphi, [], g)$ and $s_g^2 = (s_2.\theta \circ
+%t.\theta\prm{\kappa_1}, s_2.\varphi, [], g)$.
+}
+\label{fig:linSrchRec}
+\end{figure*}
+
+Besides cyclic paths, recursive calls also produce real program paths
+with regularities in program states along them. At
+Figure~\ref{fig:linSrchRec}~(a) there is a recursive function
+\texttt{linSrchRec} which is equivalent to the function
+\texttt{linSrch} discussed before. Symbolic execution tree of the
+function is depicted at Figure~\ref{fig:linSrchRec}~(b). The root of
+the tree is the left-most vertex referencing program location $a$.
+There are two sequences of grey regions. The top sequence represents
+recursive calls, while the bottom sequence represents returning from
+the calls. We see that top sequence goes from left to the right. The
+bottom sequence goes in the opposite direction. We can further see
+there is one to one correspondence between regions of both sequences.
+Below each region in the top sequence, there is a single region of
+bottom sequence. Paths in both sequences of regions are connected in
+the tree. But this is not shown in the figure. The connection happens,
+when all the recursive calls are done and some basic case is executed
+in the recursive function. Then we get to the path of the bottom
+regions.
+
+Let us first focus on the path at the top sequence of regions.
+Vertices in each region are related to the same sequence of program
+locations: $a,b,c,a$. Moreover, we enter the path in a vertex
+referencing location $a$ and we can leave the path either by stepping
+into a vertex referencing location $f$ or into a vertex referencing
+location $e$. If we look at the program (at
+Figure~\ref{fig:linSrchRec}~(a)), the sequence $a,b,c,a$ forms a
+cyclic path in it. Of course, the edge $(c,a)$ is not explicit in the
+program. But we consider it as a meta-edge labelled by an action
+simulating the effect of the function call, as defined by action of
+edge $(c,d)$. We now define a program part, say $P_1$, consisting of
+the cyclic path, the entry location $a$ and two exit locations $f$ and
+$e$. The part represent the phase of recursive calls of the function
+\texttt{linSrch}.
+
+Now we similarly analyse the path in bottom sequence of regions. Each
+region repeats the same sequence of program locations $g,d,g$. The
+path is entered in vertex referencing location $g$, but there is no
+exit from the path. The sequence $g,d,g$ of locations forms a cyclic
+path in the program (at Figure~\ref{fig:linSrchRec}~(a)). Note, that
+we assume there is an artificial edge $(g,d)$ enclosing the cycle.
+Action of this edge is supposed to simulate the effect of return from
+the function call, as defined by action of edge $(c,d)$. We want to
+define a program part $P_2$ representing the phase of returning from
+recursive calls. We have the cyclic path and we have the entry
+location $g$ to the part. But there is no exit from the part.
+Obviously, the recursive calls ends in location $g$, where we leave
+the function. Therefore, our exit location is $g$ and we have the
+program part $P_2$. Note that if we want to formally match the exit
+location detection algorithm introduced for previous examples, we may
+imagine there is an edge from $g$ back to $g$ and labelled by
+\texttt{skip} action.
+
+For the program parts $P_1$ and $P_2$ we compute the following
+templates $t_1$ and $t_1$ as described in the previous examples.
+\begin{align*}
+t_1 &= (a, 2, \{ (\theta_f, \varphi_f, [], f)\prm{\kappa}, (\theta_e,
+\varphi_e, [], e)\prm{\kappa} \})
+\\
+t_2 &= (g, 1, \{ (\theta_g\prm{\kappa}, \true, [], g) \}).
+\end{align*}
+Note that the path condition of $t_2$ is simply $\true$, since we
+cannot escape from the path. In other words, as there is no branching
+along the path, the path condition cannot be updated from its initial
+value $\true$. It is important to note, that both templates use
+exactly the same parameter. The use of the same parameter creates a
+link between the number of recursive calls and number of returns from
+them. Having the templates we are able to formulate the template $t$
+for the recursive function \texttt{linSrchRec}. \[ t = (a, 2, \{
+(\theta_f, \varphi_f, [], f)\prm{\kappa}, (\theta_e, \varphi_e, [],
+e)\prm{\kappa} \}, \theta_g\prm{\kappa}, g) \] The template $t$
+contains whole the template $t_1$, but it took only symbolic memory
+$\theta_g$ and the exit location $g$ from the template $t_2$.
+
+We are ready to start compact symbolic execution with the template
+$t$. Symbolic execution tree for the program is depicted at
+Figure~\ref{fig:linSrchRec}~(c). First we step into the program
+location $a$. The tree contains only the root vertex referencing
+location $a$. The location $a$ is the entry location of $t$. Hence, we
+instantiate the first part of $t$ (related to phase of recursive
+calls, i.e.~related to $t_1$) into the tree. The number $2$ in $t$
+identifies, that the root will have two successor vertices referencing
+locations $f$ and $e$ and they will be labelled by program states $s_f
+= (\theta_f, \varphi_f, [(t, \kappa)] \circ [], f)\prm{\kappa}$ and
+$s_e = (\theta_e, \varphi_e, [(t, \kappa)] \circ [], e)\prm{\kappa}$
+respectively. Note that we omitted composition of these states with
+the initial program state labelling the root. We could do that, since
+composition of initial program state with any other state produces the
+other state again. Also note that call stacks of both states
+(i.e.~$[]$) are composed with a call stack containing a single special
+record of the form $(t, \kappa)$. This type of call stack record is
+introduced only for templates of recursive functions. First of all,
+this single record represents any number of subsequent recursive calls
+done by classic symbolic execution. And the record also saves
+reference to the template $t$ and the parameter $\kappa$ used in the
+instantiation. We note that edges from the root to its successors are
+labelled by expressions $\gamma_f \equiv t.\varphi_f\prm{\kappa}$ and
+$\gamma_e \equiv t.\varphi_e\prm{\kappa}$. Having computed successors
+of the root, we continue by classic symbolic execution independently
+from both of these vertices, until we reach the location $g$. For both
+the executions we do the same think at the location $g$. Let us
+consider execution continuing from the successor referencing location
+$f$. We need to instantiate the second part of the template
+representing returns from the recursive calls. So, we remove the
+record $(t, \kappa)$ from the top of the call stack, but we take the
+template $t$ and the parameter $\kappa$ stored in the record $(t,
+\kappa)$. In general, between both instantiation parts of a given
+template, there might be executed any code, there can be instantiated
+many other templates and there can even be instantiated the same
+template several times always with different (fresh) parameters. That
+is why we save the template and the parameter in the stack record. Let
+$s_1$ be a program state of the current leaf vertex of the tree. We
+create its only successor vertex labelled with program state $s_g^1 =
+(s_1.\theta \circ t.\theta\prm{\kappa_1}, s_1.\varphi, [], g)$. We see
+that there are two differences between states $s_1$ and $s_g^1$. First
+of all call stack of $s_g^1$ does not contain the special record $(t,
+\kappa)$ as we have popped it from the stack. And second, the symbolic
+memory of $s_g^1$ is the composition $s_1.\theta \circ
+t.\theta\prm{\kappa_1}$. Further classic symbolic execution form the
+vertex terminates, since we are leaving exit location of the starting
+function. We proceed similarly for the other run of symbolic execution
+(from the second successor of the root), where we get the final
+program state $s_g^2 = (s_2.\theta \circ t.\theta\prm{\kappa},
+s_2.\varphi, [], g)$.
+
+When returning from a function call, values of local variables are
+discarded. Therefore, if we have two program states at the same exit
+location of a function, we may restrict equivalence between symbolic
+memories of these states only to global variables. Therefore we define
+also the following equivalence between program states.
+
+\begin{dfn}[Equivalence on Global Variables]
+Let $s$ and $s'$ be program states. Then $s$ is equivalent on global
+variables with $s'$, written by $s \overset{g}{\equiv} s'$, if they
+have equal or equivalent components except one with symbolic memories,
+where for each global variable \var{a} we require $s.\theta(\var{a})
+\equiv s'.\theta(\var{a})$.
+\end{dfn}
+
+\begin{dfn}[Recursion template] \label{def:RecursionTemplate}
+Let $T$ be symbolic execution tree of $P$ computed by $*$-version of
+Algorithm~\ref{alg:executeSymbolically}, $n>0$ be an integer, $l, l',
+l_1, \ldots, l_n$ be locations in $P$, $\kappa$ be a parameter,
+$\theta\prm{\kappa}, \theta_1\prm{\kappa}, \ldots,$
+$\theta_n\prm{\kappa}$ be symbolic memories $\varphi_1\prm{\kappa},
+\ldots, \varphi_n\prm{\kappa}$ be satisfiable boolean symbolic
+expressions such that for each $i,j \in \{ 1, \ldots, n \}, i \neq j$
+we have $(\varphi_i \wedge \varphi_j) \equiv \false$ and let
+$\Xi_1\prm{\kappa}, \ldots, \Xi_n\prm{\kappa}$ be call stacks.
+
+A tuple $t = (l, n, \{ (\theta_1, \varphi_1, \Xi_1, l_1), \ldots,
+(\theta_n,\varphi_n, \Xi_n, l_n) \})$ is a \emph{template with one
+parameter $\kappa$} in $P$, if
+\begin{itemize}
+\item[(L1)] All the locations $l, l_1, \ldots, l_n$ in $t$ are neither
+entry nor exit ones.
+
+\item[(L2)] For each path $\pi = u \omega$ in $T$ from any vertex $u$
+satisfying $u.l = t.l$ to a leaf, there is a vertex $w \in \omega$, an
+index $i \in \{ 1, \ldots, n \}$ and an integer $\nu \geq 0$, such
+that $w.s \equiv u.s \circ
+(t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\nu}$.
+
+\item[(L3)] For each vertex $u$ of $T$, an index $i \in \{ 1, \ldots,
+n \}$  and non-negative integer $\nu$ such that $u.l = t.l$ and
+$(u.\varphi \wedge u.\theta\ese{t.\varphi_i\prm{\nu}})$ is
+satisfiable, there is a successor $w$ of $u$ in $T$ such that $w.s
+\equiv u.s \circ (t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\nu}$.
+\end{itemize}
+
+A tuple $t = (l, n, \{ (\theta_1, \varphi_1, \Xi_1, l_1), \ldots,
+(\theta_n,\varphi_n, \Xi_n, l_n) \}, \theta, l')$ is a 
+\emph{recursion template with one parameter $\kappa$} in $P$, if
+\begin{itemize}
+\item[(R1)] $t.l$ and $t.l'$ are entry and exit locations of the same
+function respectively and $t.l'$ is the target vertex of an edge with
+a call action of that function. All the locations $l_1, \ldots, l_n$
+in $t$ are neither entry nor exit ones.
+
+\item[(R2)] For each path $\pi = u \omega$ in $T$ from any vertex $u$
+satisfying $u.l = t.l$ to a leaf, there is a non-leaf vertex $w \in
+\omega$, an index $i \in \{ 1, \ldots, n \}$ and an integer $\nu \geq
+0$, such that $w.s \equiv u.s \circ
+(t.\theta_i,~t.\varphi_i,~[(t,\kappa)] \circ
+t.\Xi_i,~t.l_i)\prm{\nu}$.
+
+Further, if there is the first successor $\bar{w}$ of $w$ in $\pi$
+such that $\bar{w}.l = t.l'$ and $\bar{w}.\Xi = w.\Xi$, then there is
+a non-leaf vertex $\bar{u}$ in a suffix of $\pi$ starting with
+$\bar{w}$ such that $\bar{u}.s \overset{g}{\equiv} (\bar{w}.\theta
+\circ t.\theta\prm{\nu}, \bar{w}.\varphi, u.\Xi, t.l')$.
+
+\item[(R3)] For each vertex $u$ of $T$, an index $i \in \{ 1, \ldots,
+n \}$  and non-negative integer $\nu$ such that $u.l = t.l$ and
+$(u.\varphi \wedge u.\theta\ese{t.\varphi_i\prm{\nu}})$ is
+satisfiable, there is a successor $w$ of $u$ in $T$ such that $w.s
+\equiv u.s \circ (t.\theta_i,~t.\varphi_i,~[(t,\kappa)] \circ
+t.\Xi_i,~t.l_i)\prm{\nu}$.
+\end{itemize}
+\end{dfn}
+
+Note that requirements (L2) and (R2) guarantees that no path in $T$
+with vertices $u$ and $v$ such that $u.l = l$ and $v.l = l_i$ is
+suppressed by the state
+$(t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\kappa}$. And
+requirement (L3) and (R3) guarantees that program state
+$(t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\kappa}$ does not
+produce unreal paths. Also note that in requirement (R2) there we use
+restriction of equivalence to global variables for the phase of
+returning from recursive calls. Since values of local variables are
+not important when returning from a function call, the restriction may
+help to simplify detection of a recursion template.
+
+\begin{algorithm}[!h]
+    \caption{\texttt{executeSymbolically}} \label{alg:executeSymbolicallyRec}
+    \KwIn{$P$ - program to be executed \KwInSep
+          $d$ - set of template detectors (only in $\Box$-version)}
+    \KwOut{$E$ - set of final program states \KwOutSep
+           $T$ - symbolic execution tree of $P$ (only in $*$-version)}
+    \BlankLine
+    \DontPrintSemicolon
+    \lmark{$\Box$}
+    Let $p$ be a set of all templates detected in $P$ by detectors $d$ \;
+        \label{alg:executeSymbolically:DetectTemplates}
+    $s_0 \asgn (\Theta, \true, [], $ entry location of the starting function$)$ \;
+        \label{alg:executeSymbolically:InitialStateRec}
+    Le $Q$ be a queue of program states initially containing only $s_0$ \;
+    \lmark{$*$}
+    Create a root vertex of $T$ labelled with $s_0$ \;
+        \label{alg:executeSymbolically:RootRec}
+    \Repeat{\rm $Q$ becomes empty}{ \label{alg:executeSymbolically:LoopBeginRec}
+        Extract the first program state $s$ from $Q$ \;
+        \If{\rm $s.l$ is the exit location of the starting function or
+                an error location}{
+                \label{alg:executeSymbolically:FinalState}
+            Insert $s$ into $E$ \;
+        }
+        \Else{
+            $S \asgn \emptyset$ \;
+            \lmark{$\Box$}
+            \If(/* returning from recursion */)
+            {\rm \texttt{top(}$s.\Xi$\texttt{)} $ = (t, \kappa)
+                    \wedge s.l = s.\Xi.t.l'$}{
+                    \label{alg:executeSymbolically:BoxesBeginRec}
+                \lmark{$\Box$}
+                $t \asgn s.\Xi.t$ \;
+                    \label{alg:executeSymbolically:Unwinding}
+                \lmark{$\Box$}
+                $\kappa \asgn s.\Xi.\kappa$ \;
+                    \label{alg:executeSymbolically:UnwindingGetKappa}
+                \lmark{$\Box$}
+                Replace all occurrences of the former parameter in
+                    $t$ by $\kappa$\;
+                \lmark{$\Box$}
+                $s' \asgn (s.\theta \circ t.\theta\prm{\kappa}, s.\varphi,
+                    \texttt{pop(}s.\Xi\texttt{)}, t.l')$ \;
+                    \label{alg:executeSymbolically:SuccessorInUnwinding}
+                    \label{alg:executeSymbolically:Pop}
+                \lmark{$\Box$}
+                Insert $s'$ into $S$\;
+            }
+            \lmark{$\Box$}
+            \Else{
+                \lmark{$\Box$}
+                $p' \asgn \texttt{getTemplatesAt(}s.l, p\texttt{)}$ \;
+                    \label{alg:executeSymbolically:GetTemplatesAtRec}
+                \lmark{$\Box$}
+                \If {$p' \neq \emptyset$}{
+                    \lmark{$\Box$}
+                    $t \asgn \texttt{chooseTemplate(}p'\texttt{)}$ \;
+                        \label{alg:executeSymbolically:ChooseTemplateRec}
+                    \lmark{$\Box$}
+                    $\kappa \asgn \texttt{getFreshParam()}$ \;
+                        \label{alg:executeSymbolically:FreshKappa}
+                    \lmark{$\Box$}
+                    Replace all occurrences of the former parameter in
+                        $t$ by $\kappa$\;
+                    \lmark{$\Box$}
+                    \If(/* recursive calling */)
+                    {\rm $t$ is a recursion template}{
+                        \lmark{$\Box$}
+                        \ForEach{$i = 1, \ldots, t.n$}{
+                                \label{alg:executeSymbolically:Calling}
+                            \lmark{$\Box$}
+                            $s' \asgn s \circ (t.\theta_i, t.\varphi_i,
+                                    [(t,\kappa)] \circ t.\Xi_i,
+                                    t.l_i)\prm{\kappa}$\;
+                              \label{alg:executeSymbolically:SuccessorInCalling}
+                              \label{alg:executeSymbolically:Push}
+                            \lmark{$\Box$}
+                            Insert $s'$ into $S$\;
+                        }
+                    }
+                    \lmark{$\Box$}
+                    \Else(/* $t$ is a general template with one parameter */){
+                        \lmark{$\Box$}
+                        \ForEach{$i = 1, \ldots, t.n$}{
+                                \label{alg:executeSymbolically:UnrollingRec}
+                            \lmark{$\Box$}
+                            $s' \asgn s \circ (t.\theta_i, t.\varphi_i,
+                                               t.\Xi_i, t.l_i)\prm{\kappa}$\;
+                            \label{alg:executeSymbolically:SuccessorInUnrollingRec}
+                            \lmark{$\Box$}
+                            Insert $s'$ into $S$\;
+                        }
+                    }
+                }
+                \lmark{$\Box$}
+                \Else(/* applying classic symbolic execution step */){
+                        \label{alg:executeSymbolically:BoxesEndRec}
+                    $S \asgn \texttt{computeClassicSuccessors(}P,s\texttt{)}$ \;
+                        \label{alg:executeSymbolically:ClassicStepRec}
+                }
+            }
+            \lmark{$*$}
+            Let $u$ be a leaf of $T$ whose label is $s$ \;
+                    \label{alg:executeSymbolically:GetLeafRec}
+%             \lmark{$*$}
+%             /* Destroy label $s$ of vertex $u$ and leave $u$ unlabelled */ \;
+            \ForEach{\rm program state $s' \in S$ such that
+                            $s'.\varphi$ is satisfiable}{
+                    \label{alg:executeSymbolically:AddSATSuccessorsRec}
+                Insert $s'$ at the end of $Q$ \;
+                \lmark{$*$}
+                Insert a new vertex $v$ labeled with $s'$ into $T$ \;
+                    \label{alg:executeSymbolically:CreateVertexRec}
+                \lmark{$*$}
+                Insert an edge $(u,v)$ into $T$ \;
+                    \label{alg:executeSymbolically:InsertEdge}
+            }
+        }
+    } \label{alg:executeSymbolically:LoopEndRec}
+    \Return{$E$ \\ \lmark{$*$} \hspace{1.05cm} $T$} \;
+\end{algorithm}
+
+We are ready to describe $\Box$-version at
+Algorithm~\ref{alg:executeSymbolically}.
+%
+%At line~\ref{alg:executeSymbolically:DetectTemplates} there we detect
+%templates with one parameter in the passed program $P$. That is a task
+%for so called \emph{template detectors}. We discuss a possible
+%construction of such a detector in Section~\ref{sec:Detection}. The
+%only purpose of 
+%lines~\ref{alg:executeSymbolically:BoxesBegin}--\ref{alg:executeSymbolically:BoxesEnd}
+%is to compute successor states of a currently processed program state
+%$s$. At line~\ref{alg:executeSymbolically:GetTemplatesAt} there we
+%call a system function \texttt{getTemplatesAt}, which selects those
+%templates, whose entry locations matches the actual program location
+%$s.l$. If the selection is not empty we may instantiate one of the
+%selected templates. A system function \texttt{chooseTemplate} is
+%supposed to choose exactly one template $t$ to be instantiated. We may
+%for example choose randomly. We do not put any constraints to the
+%selection strategy. To prevent parameter collisions with already
+%instantiated templates, we first get a fresh parameter at
+%line~\ref{alg:executeSymbolically:FreshKappa} and then we replace the
+%parameter used in $t$ by default by the fresh one. Then we get to a
+%loop at line~\ref{alg:executeSymbolically:Unrolling}. For each program
+%state in the template we create one its successor program state (see
+%line~\ref{alg:executeSymbolically:SuccessorInUnrolling}).
+%
+At line~\ref{alg:executeSymbolically:DetectTemplates} there we detect
+templates with one parameter in the passed program $P$. That is a task
+for so called \emph{template detectors}. We discuss a possible
+construction of such a detector in Section~\ref{sec:Detection}. The
+only purpose of 
+lines~\ref{alg:executeSymbolically:BoxesBegin}--\ref{alg:executeSymbolically:BoxesEnd}
+is to compute successor states of a currently processed program state
+$s$. Let us first assume the test at
+line~\ref{alg:executeSymbolically:BoxesBeginRecRec} is $\false$. So, we get
+to line~\ref{alg:executeSymbolically:GetTemplatesAtRec}. There we call a
+system function \texttt{getTemplatesAt}, which selects those
+templates, whose entry locations matches the actual program location
+$s.l$. If the selection is not empty we may instantiate one of the
+selected templates. A system function \texttt{chooseTemplate} is
+supposed to choose exactly one template $t$ to be instantiated. We may
+for example choose randomly. We do not put any constraints to the
+selection strategy. To prevent parameter collisions we first get a
+fresh one at line~\ref{alg:executeSymbolically:FreshKappaRec} and then we
+replace the parameter used in $t$ by default by the fresh one. Now we
+have two possibilities. Either $t$ is a recursion template or not. In
+the first case we get to a loop at
+line~\ref{alg:executeSymbolically:CallingRec}. There we create $t.n$
+successors of the program state $s$ (see
+line~\ref{alg:executeSymbolically:SuccessorInCallingRec}). Note that call
+stack of $i$-th successor state is of the form $s.\Xi \circ [(t,
+\kappa)] \circ t.\Xi_i$. It means that the special record is at the
+position in the stack, when we entered the recursive function. The
+only special record $(t, \kappa)$ in the call stack represents
+\emph{any} possible number of subsequent recursive calls in classic
+symbolic execution. The record also saves reference to the template
+$t$ and the parameter $\kappa$ for the later phase of returning from
+the recursive calls. If $t$ is not a recursion template, then it must
+be our general purpose template with one parameter (since we do not
+consider any other kinds of templates in this paper). So we get to
+line~\ref{alg:executeSymbolically:UnrollingRec} in the algorithm. There
+we also create successors of the program state $s$ (see
+line~\ref{alg:executeSymbolically:SuccessorInUnrollingRec}). It remains
+to discuss the computation of successors, when the condition at
+line~\ref{alg:executeSymbolically:BoxesBeginRec} is $\true$. The
+condition says that the location $s.l$ references exit location of a
+function and that there is the special record $(t, \kappa)$ at the top
+of the call stack $s.\Xi$. In other words, we reached the moment, when
+we have to return from recursive calls. We first retrieve the
+recursive template and the parameter used in the instantiation of $t$
+(see lines~\ref{alg:executeSymbolically:UnwindingRec} and
+\ref{alg:executeSymbolically:UnwindingGetKappaRec}). After substitution
+of the default parameter by the retrieved one, we finish the
+instantiation of $t$ by computing the only successor of the actual
+state. The successor state represents the effect of all the returns
+from recursive calls done previously. This is ensured by using of the
+same parameter form both phases of the instantiation of the template
+$t$. A number of recursive calls therefore matches the number of
+returns form them. Also note that call stack of the successor does not
+contain the special record. We finish the description of the algorithm
+by the following observation. The expressions computing successor
+states at lines~\ref{alg:executeSymbolically:SuccessorInUnwindingRec},
+\ref{alg:executeSymbolically:SuccessorInCallingRec} and
+\ref{alg:executeSymbolically:SuccessorInUnrollingRec} precisely match
+corresponding expressions in Definition~\ref{def:TemplatesRec}. Note that
+at line~\ref{alg:executeSymbolically:SuccessorInUnwindingRec} there the
+call stack \texttt{pop(}$s.\Xi$\texttt{)} must be equal to one of a
+program state, for which we previously get to
+line~\ref{alg:executeSymbolically:SuccessorInCallingRec}. And this
+program state had to be related to the entry location of a function
+causing the recursive calls.
+
+
+\subsubsection{Recursion Templates Computation}
+
+Let $P$ be a program, $f$ be a recursive function of $P$, $e$ and $x$
+be entry and exit locations of $f$ respectively and let $h = (u,v)$ be
+an edge of $f$ with an action representing recursive call of $f$. We
+transform computation of recursion template for recursive calling of
+$f$ into analysis of two program parts $P_1$ and $P_2$ with cyclic
+paths. The cycle of $P_1$ starts at location $e$ and leads to $u$. We
+then enclose the cycle by an artificial edge whose action simulate an
+effect of any call of $f$. Let $e$ be entry location of $P_1$ and let
+$x_1, \ldots, x_n$ be its exit locations. We compute a template $t_1 =
+(e, n, \{ (\theta_1, \varphi_1, \Xi_1, x_1)\prm{\kappa}, \ldots,
+(\theta_n, \varphi_n, \Xi_n, x_n)\prm{\kappa} \})$ for $P_1$ according
+to algorithm from Section~\ref{sec:Detection:Cycles}. Having $t_1$ we
+can express the resulting recursive template $t$ as follows. \[ t =
+(e, n, \{ (\theta_1, \varphi_1, \Xi_1, x_1)\prm{\kappa}, \ldots,
+(\theta_n, \varphi_n, \Xi_n, x_n)\prm{\kappa} \}, \theta\prm{\kappa},
+x), \] where $\theta\prm{\kappa}$ is the only unknown component in
+$t$. We compute the symbolic memory $\theta$ from analysis of the
+second program part $P_2$. The cycle of $P_2$ starts at $x$. There we
+add an artificial edge, whose action simulate an effect of return from
+any call of $f$. The artificial edge gets us to location $v$. Then we
+enclose the cycle by following a path from $v$ to $x$. We set $x$ to
+be the entry location of $P_2$ and we further set $x$ to also be the
+only exit location from $P_2$. As you can see, here we have introduced
+an assumption that there is no branching along the path from $v$ to
+$x$, i.e.~we cannot escape from the path. We discuss the case, when
+there is some branching (escape edges) along the path later. Since we
+have defined the program part $P_2$, we compute its template $t_2 =
+(x, 1, \{ (\theta\prm{\kappa}, \true, [], x) \})$ according to
+algorithm from Section~\ref{sec:Detection:Cycles}. Then we take the
+symbolic memory $\theta\prm{\kappa}$ and we complete the recursion
+template $t$.
+
+\begin{figure*}[!htb]
+\begin{tabular}{cc}
+{\input{fig_countIfRec}} & {\input{fig_countIfRec2}}
+\\
+(a) & (b)
+\end{tabular}
+\caption{Two equivalent recursive implementations of the function
+\texttt{countIf(A,i,n,x)}.}
+\label{fig:countIfRec}
+\end{figure*}
+
+Note that we can simplify computation of $\theta\prm{\kappa}$ of the
+template $t_2$ such that we only express a return value of $f$. We do
+not need to express local variables of $f$, since requirement (R2) of
+Definition~\ref{def:Templates} uses the equivalence
+$\overset{g}{\equiv}$. We further note, that the algorithm above also
+works for indirect recursion. It immediately follows from the
+algorithm in Section~\ref{sec:Detection:Cycles}, where cyclic path of
+an analysed program part may traverse several functions.
+
+We finish the section by discussion of the assumption we gave to the
+cyclic path of $P_2$. We assumed there is no branching along the path
+from $v$ to $x$. The algorithm presented above can compute templates
+for tail recursions and for many non-tail ones, while keeping the
+computation simple (we only need $\theta\prm{\kappa}$ expressed just
+for return value). Therefore, we believe the assumption has only small
+impact to applicability of the algorithm. Besides, it is always
+possible to move edges with recursive calls below branchings not
+depending on return values form the calls. We demonstrate this process
+at Figures~\ref{fig:countIfRec}~(a) and (b), where we depict two
+equivalent recursive implementations of the function \texttt{countIf}.
+We can easily check that in program at
+Figures~\ref{fig:countIfRec}~(b) there are two program parts (one per
+recursive call), for which we can compute templates according to the
+algorithm described above.
+
+\color{black}
+%}}}
+%{{{ Extensions
 
 \subsection{Extensions of the technique}
 
@@ -1492,6 +2016,7 @@ programs.
 %\appendix
 \begin{appendix}
 
+\color{blue}
 \section{Proofs of Theorems}\label{sec:Proofs}
 
 In this section we prove soundness and completeness theorems presented
@@ -1749,6 +2274,137 @@ if there is $(\kappa, \nu) \in \bld{\nu}$ and $(\kappa, \nu') \in
 \bld{\nu}'$, then $\nu = \nu'$ must be valid.
 \qed
 \end{proof}
+
+Now we focus on case when we have a recursion templates.
+
+\begin{lem} \label{lem:NonAdjacentPushes}Call stack records pushed at
+line~\ref{alg:executeSymbolically:Push} of
+Algorithm~\ref{alg:executeSymbolically} cannot be adjacent in call
+stacks of vertices of $T'$.
+\end{lem}
+\begin{proof}
+Follows immediately from requirement for locations of templates in
+Definition~\ref{def:Templates} and from the fact, that reaching
+line~\ref{alg:executeSymbolically:Push} requires a processed state
+must reference a function entry location.
+\end{proof}
+
+\begin{lem} \label{lem:GEquivToEquiv}
+Let $u \in T$, $u' \in T'$, $u'.\Xi \neq []$, {\tt top(}$u'.\Xi${\tt
+)} $ = (t, \kappa)$, $u'.l$ is an exit location and $u.s
+\overset{g}{\equiv} u'.s\prm{\bld{\nu}}$ for some valuation
+$\bld{\nu}$. Then there are the only direct successors $w \in T$ and
+$w' \in T'$ of $u$ and $u'$ respectively and they satisfy $w.s \equiv
+w'.s\prm{\bld{\nu}}$.
+\end{lem}
+\begin{proof}
+Follows directly from Lemma~\ref{lem:NonAdjacentPushes} and from the
+fact that successors of $u'$ are computed at
+line~\ref{alg:executeSymbolically:ClassicStep} of
+Algorithm~\ref{alg:executeSymbolically}.
+\end{proof}
+
+\begin{thm}[Soundness]
+    For each leaf vertex $e \in T$ there is a leaf vertex $e' \in T'$ and a valuation  $\bld{\nu}$ of all parameters in $e'.s$ such that $e.s \equiv e'.s\prm{\bld{\nu}}$.
+\end{thm}
+\begin{proof}
+    Let $\pi$ be the path in $T$ from the root to the leaf vertex $e$. We prove the theorem by the following induction:
+
+    \emph{Basic case}: The root vertices $r$ and $r'$ of $T$ and $T'$ respectively are labelled by the same program state $s_0$ (see lines \ref{alg:executeSymbolically:InitialState} and \ref{alg:executeSymbolically:Root}). So, $r.s \equiv r'.s\prm{\bld{\nu}}$, for $\bld{\nu} = \emptyset$.
+
+    \emph{Inductive step}: Let $u \in \pi$, $u \neq e$, $u'$ be a vertex of $T'$ and $\bld{\nu}$ be a valuation such that $u.s \equiv u'.s\prm{\bld{\nu}}$. We show, there is a successor $w$ of $u$ in $\pi$, a successor vertex $w'$ of $u'$ in $T'$ and a valuation $\bld{\nu}'$ such that $w.s \equiv w'.s\prm{\bld{\nu}'}$. And we further show there is no vertex $v'$ in the path between $u'$ and $w'$ in $T'$ such that successors of $v'.s$ are computed at line~\ref{alg:executeSymbolically:SuccessorInCalling}. There are four possible cases in Algorithm~\ref{alg:executeSymbolically} for $u'.s$:
+
+    (1) We reach line~\ref{alg:executeSymbolically:Unrolling}: According to Definition~\ref{def:Templates}~(L2), there is a successor vertex $w$ of $u$ in $\pi$, an index $i$ and a non-negative integer $\nu$ for $\kappa$ such that
+    \begin{align*}
+        w.s &\equiv u.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv u'.s\prm{\bld{\nu}} \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv (u'.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, t.\Xi_i\prm{\kappa}, t.l_i))\prm{\bld{\nu} \cup \{(\kappa,\nu)\} }
+        \\
+        &\equiv s'\prm{\bld{\nu}'},
+    \end{align*}
+    where $s'$ is the $i$-th direct successor of $u'.s$ computed at line~\ref{alg:executeSymbolically:SuccessorInUnrolling}. And since $w \in T$, we have $w'.\varphi$ is satisfiable. Therefore, there is be a direct successor $w'$ of $u'$ in $T'$ with $w.s = s'$.
+
+    (2) We reach line~\ref{alg:executeSymbolically:Calling}: According to Definition~\ref{def:Templates}~(R2), there is a successor vertex $w$ of $u$ in $\pi$, an index $i$ and a non-negative integer $\nu$ for $\kappa$ such that
+    \begin{align*}
+        w.s &\equiv u.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, [(t,\kappa)] \circ t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv u'.s\prm{\bld{\nu}} \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, [(t,\kappa)] \circ t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv (u'.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, [(t,\kappa)] \circ t.\Xi_i\prm{\kappa}, t.l_i))\prm{\bld{\nu} \cup \{(\kappa,\nu)\} },
+        \\
+        &\equiv s'\prm{\bld{\nu}'},
+    \end{align*}
+    where $s'$ is the $i$-th direct successor of $u'.s$ computed at line~\ref{alg:executeSymbolically:SuccessorInCalling}. And since $w \in T$, we have $w'.\varphi$ is satisfiable. Therefore, there is a direct successor $w'$ of $u'$ in $T'$ with $w.s = s'$.
+
+    (3) We reach line~\ref{alg:executeSymbolically:Unwinding}: 
+    Let $\pi'$ be a path in $T'$ from the root to the vertex $u'$. According to connections between vertices $u'$ constructed for vertices $u$ along $\pi$, there is a predecessor $x'$ of $u'$ in $\pi'$, which pushed (at line~\ref{alg:executeSymbolically:Push}) the record being at the top of $u'.\Xi$. Obviously, successors of $x'.s$ are computed at line~\ref{alg:executeSymbolically:SuccessorInCalling}. Therefore, there is $x \in \pi$ such that $x.s \equiv x'.s\prm{\bld{\nu}}$. According to case (2) there is a successor $y$ of $x$ in $\pi$ and a direct successor $y'$ of $x'$ in $\pi'$ such that $y.s \equiv y'.s\prm{\bld{\nu}}$. Note that $y'.s$ uses the parameter $\kappa$ retrieved from stack $u'.\Xi$ at line~\ref{alg:executeSymbolically:UnwindingGetKappa}. Therefore, valuation $\bld{\nu}$ defines an integer $\nu = \bld{\nu}(\kappa)$. Also note that $u$ is the first successor of $y$ in $\pi$ with $u.l$ being an exit location and $u.\Xi = y.\Xi$. Otherwise we would apply this case (3) for some other vertex lying between $y'$ and $u'$ in $\pi'$. Therefore, from Definition~\ref{def:Templates}~(R2) there is a non-leaf vertex $v$ in a suffix of $\pi$ starting with $u$ such that
+    \begin{align*}
+        v.s &\overset{g}{\equiv} (u.\theta \circ t.\theta\prm{\kappa}, u.\varphi, x.\Xi, t.l')\prm{\{(\kappa,\nu)\}}
+        \\
+        &\overset{g}{\equiv} (u'.\theta\prm{\bld{\nu}} \circ t.\theta\prm{\kappa}, u'.\varphi\prm{\bld{\nu}}, \texttt{pop(}u'.\Xi\texttt{)}\prm{\bld{\nu}}, t.l')\prm{\{(\kappa,\nu)\}}
+        \\
+        &\overset{g}{\equiv} (u'.\theta \circ t.\theta\prm{\kappa}, u'.\varphi, \texttt{pop(}u'.\Xi\texttt{)}, t.l')\prm{\bld{\nu}}
+        \\
+        &\overset{g}{\equiv} s'\prm{\bld{\nu}},
+    \end{align*}
+    where $s'$ is the only successor state of $u'.s$ computed at line~\ref{alg:executeSymbolically:SuccessorInUnwinding}. Since $v \in T$, then $s'.\varphi$ is satisfiable and there is a direct successor $v'$ of $u'$ in $T'$ with $v'.s = s'$. And finally Lemma~\ref{lem:GEquivToEquiv} ensures there are the only direct successors $w$ and $w'$ of $v$ and $v'$ respectively, such that $w.s \equiv w'.s\prm{\bld{\nu}}$.
+
+    (4) Otherwise, we reach line~\ref{alg:executeSymbolically:ClassicStep}: Since $u.s \equiv u'.s\prm{\bld{\nu}}$ and we apply classic symbolic execution step for $u'.s$, there must be a direct successor $w$ of $u$ and a direct successor $w'$ of $u'$ such that $w.s \equiv w'.s\prm{\bld{\nu}}$.
+\end{proof}
+
+\begin{thm}[Completeness]
+    For each leaf vertex $e' \in T'$ there is a leaf vertex $e \in T$ and a valuation $\bld{\nu}$ of all parameters in $e'.s$ such that $e.s = e'.s\prm{\bld{\nu}}$.
+\end{thm}
+\begin{proof}
+    Let $\pi'$ be the path in $T'$ from the root to the leaf vertex $e'$. We prove the theorem by the following induction:
+
+    \emph{Basic case}: The root vertices $r$ and $r'$ of $T$ and $T'$ respectively are labelled by the same program state $s_0$ (see lines \ref{alg:executeSymbolically:InitialState} and \ref{alg:executeSymbolically:Root}). Let us construct a non-empty set $U$ of vertices of $T$ such that for each valuation $\bld{\nu}$ of all parameters in $r'.s$ such that $r'.\varphi\prm{\bld{\nu}}$ is satisfiable, there is $u \in U$ such that $u.s \equiv r'.s\prm{\bld{\nu}}$. Obviously $U = \{ r \}$, because $r'.\varphi$ contains no parameter (so $r.s \equiv r'.s\prm{\bld{\nu}}$, for each $\bld{\nu})$.
+
+    \emph{Inductive step}:  Let $u' \in \pi'$, $u' \neq e'$ and $U$ be a non-empty set of vertices of $T$ such that for each valuation $\bld{\nu}$ of all parameters in $u'.s$ such that $u'.\varphi\prm{\bld{\nu}}$ is satisfiable, there is $u \in U$ such that $u.s \equiv u'.s\prm{\bld{\nu}}$. We show, there is a successor $w'$ of $u'$ in $\pi'$ and a non-empty set $W$ of vertices of $T$ such that for each valuation $\bld{\nu}'$ of all parameters in $w'.s$ such that $w'.\varphi\prm{\bld{\nu}'}$ is satisfiable, there is $w \in W$ such that $w.s \equiv w'.s\prm{\bld{\nu}'}$. And we further show that each $w \in W$ is a successor of some $u \in U$ and there is no vertex $v'$ between $u'$ and $w'$ in $\pi'$ such that successors of $v'.s$ are computed at line~\ref{alg:executeSymbolically:SuccessorInCalling}. There are four possible cases in Algorithm~\ref{alg:executeSymbolically} for $u'.s$:
+
+    (1) We reach line~\ref{alg:executeSymbolically:Unrolling}: Let $w'$ be a direct successor of $u'$ in $\pi'$. Obviously, $w'.s$ is one of the states $s'$ computed at line~\ref{alg:executeSymbolically:SuccessorInUnrolling}. Let $i$ be the index, for which $w'.s = s'$. The formula $w'.\varphi$ is satisfiable, since $w'$ is in $T'$ (see condition at line~\ref{alg:executeSymbolically:AddSATSuccessors}). Let $\bld{\nu}$ be a valuation for which $w'.\varphi$ is satisfiable. And let $\bld{\nu}' = \bld{\nu} \smallsetminus \{ (\kappa,\nu) \}$, where $\nu$ is an integer assigned in $\bld{\nu}$ to the fresh parameter $\kappa$ introduced at line~\ref{alg:executeSymbolically:FreshKappa}. From line~\ref{alg:executeSymbolically:SuccessorInUnrolling} we see that $u'.\varphi\prm{\bld{\nu}'}$ is satisfiable. Therefore, there is a vertex $u \in U$ such that $u.s \equiv u'.s\prm{\bld{\nu}'}$. According to Definition~\ref{def:Templates}~(L3) there is a successor $w$ of $u$ in $T$ such that
+    \begin{align*}
+        w.s &\equiv u.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv u'.s\prm{\bld{\nu}'} \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv (u'.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, t.\Xi_i\prm{\kappa}, t.l_i))\prm{\bld{\nu}}
+        \\
+        &\equiv w'.s\prm{\bld{\nu}}.
+    \end{align*}
+    Therefore, $w \in W$.
+
+    (2) We reach line~\ref{alg:executeSymbolically:Calling}: Let $w'$ be a direct successor of $u'$ in $\pi'$. Obviously, $w'.s$ is one of the states $s'$ computed at line~\ref{alg:executeSymbolically:SuccessorInCalling}. Let $i$ be the index, for which $w'.s = s'$. The formula $w'.\varphi$ is satisfiable, since $w'$ is in $T'$ (see condition at line~\ref{alg:executeSymbolically:AddSATSuccessors}). Let $\bld{\nu}$ be a valuation for which $w'.\varphi$ is satisfiable. And let $\bld{\nu}' = \bld{\nu} \smallsetminus \{ (\kappa,\nu) \}$, where $\nu$ is an integer assigned in $\bld{\nu}$ to the fresh parameter $\kappa$ introduced at line~\ref{alg:executeSymbolically:FreshKappa}. From line~\ref{alg:executeSymbolically:SuccessorInCalling} we see that $u'.\varphi\prm{\bld{\nu}'}$ is satisfiable. Therefore, there is a vertex $u \in U$ such that $u.s \equiv u'.s\prm{\bld{\nu}'}$. According to Definition~\ref{def:Templates}~(R3) there is a successor $w$ of $u$ in $T$ such that
+    \begin{align*}
+        w.s &\equiv u.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, [(t,\kappa)] \circ t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv u'.s\prm{\bld{\nu}'} \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, [(t,\kappa)] \circ t.\Xi_i\prm{\kappa}, t.l_i)\prm{\{(\kappa,\nu)\}}
+        \\
+        &\equiv (u'.s \circ (t.\theta_i\prm{\kappa}, t.\varphi_i\prm{\kappa}, [(t,\kappa)] \circ t.\Xi_i\prm{\kappa}, t.l_i))\prm{\bld{\nu}}
+        \\
+        &\equiv w'.s\prm{\bld{\nu}}.
+    \end{align*}
+    Therefore, $w \in W$.
+
+    (3) We reach line~\ref{alg:executeSymbolically:Unwinding}: Let $x'$ be a predecessor of $u'$ in $\pi'$, which pushed (at line~\ref{alg:executeSymbolically:Push}) the record being at the top of $u'.\Xi$. Obviously, successors of $x'.s$ are computed at line~\ref{alg:executeSymbolically:SuccessorInCalling}. Further, let $y'$ and $v'$ be direct successors of $x'$ and $u'$ in $\pi'$ respectively. The formula $v'.\varphi$ is satisfiable, since $v'$ is in $T'$ (see condition at line~\ref{alg:executeSymbolically:AddSATSuccessors}). Note that $v'$ is the only successor of $u'$ in $T'$. Let $\bld{\nu}$ be a valuation for which $v'.\varphi$ is satisfiable. Note that $\bld{\nu}$ defines an integer $\nu = \bld{\nu}(\kappa)$ for the parameter $\kappa$ retrieved from stack $u'.\Xi$ at line~\ref{alg:executeSymbolically:UnwindingGetKappa}, since $y'.s$ must have already used it. From line~\ref{alg:executeSymbolically:SuccessorInUnwinding} we see that $u'.\varphi\prm{\bld{\nu}}$ is satisfiable. Therefore, there is a vertex $u \in U$ such that $u.s \equiv u'.s\prm{\bld{\nu}}$. Let $\pi$ be a path in $T$ from the root to a leaf vertex and going through $u$. According to connections between vertices of sets $U$ constructed for vertices $u'$ along $\pi'$, there is a predecessor $x$ of $u$ in $\pi$, such that $x.s \equiv x'.s\prm{\bld{\nu}}$. Since $y'$ is the direct successor of $x$ in $\pi$ (i.e.~there was computed a set $W$ for $y'$), there must also exist a vertex $y \in \pi$ lying between $x$ and $u$ and $y.s \equiv y'.s\prm{\bld{\nu}}$. Note that $u$ is the first successor of $y$ in $\pi$ with $u.l$ being an exit location and $u.\Xi = y.\Xi$. Otherwise we would apply this case (3) for some other vertex lying between $y'$ and $u'$ in $\pi'$. Therefore, from Definition~\ref{def:Templates}~(R2) there is a non-leaf vertex $v$ in a suffix of $\pi$ starting with $u$ such that
+    \begin{align*}
+        v.s &\overset{g}{\equiv} (u.\theta \circ t.\theta\prm{\kappa}, u.\varphi, x.\Xi, t.l')\prm{\{(\kappa,\nu)\}}
+        \\
+        &\overset{g}{\equiv} (u'.\theta\prm{\bld{\nu}} \circ t.\theta\prm{\kappa}, u'.\varphi\prm{\bld{\nu}}, \texttt{pop(}u'.\Xi\texttt{)}\prm{\bld{\nu}}, t.l')\prm{\{(\kappa,\nu)\}}
+        \\
+        &\overset{g}{\equiv} (u'.\theta \circ t.\theta\prm{\kappa}, u'.\varphi, \texttt{pop(}u'.\Xi\texttt{)}, t.l')\prm{\bld{\nu}}
+        \\
+        &\overset{g}{\equiv} v'.s\prm{\bld{\nu}}.
+    \end{align*}
+    And finally Lemma~\ref{lem:GEquivToEquiv} ensures there are the only direct successors $w$ and $w'$ of $v$ and $v'$ respectively, such that $w.s \equiv w'.s\prm{\bld{\nu}}$. Therefore, $w \in W$.
+
+    (4) Otherwise, we reach line~\ref{alg:executeSymbolically:ClassicStep}: Let $u$ be any vertex in $U$. Since $u.s \equiv u'.s\prm{\bld{\nu}}$ for some valuation $\bld{\nu}$ for which $u'.\varphi\prm{\bld{\nu}}$ is satisfiable and since all direct successors of both $u$ and $u'$ are computed by classic symbolic execution step, there must be a direct successor $w$ of $u$ in $T$ and a direct successor $w'$ of $u'$ in $T'$ such that $w.s \equiv w'.s\prm{\bld{\nu}}$. Note that both $u'.s$ and $w'.s$ have exactly the same parameters. Therefore, $w \in W$.
+\end{proof}
+
+
+\color{black}
 
 \section{Listing of Benchmarks}
 
