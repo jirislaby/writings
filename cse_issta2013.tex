@@ -863,6 +863,15 @@ if there is $(\kappa, \nu) \in \bld{\nu}$ and $(\kappa, \nu') \in
 \end{lem}
 \color{black}
 
+We have seen in Section \ref{sec:basic} that checking satisfiability
+of path condition is essential for the classic symbolic execution (see
+also \cite{Kin76}). And we will see, that such checks are also
+essential for the compact one. Unfortunately, programs commonly
+operates in undecidable theories (like Peano arithmetic). We therefore
+assume in this paper that each satisfiability query always terminates
+with a result either SAT, UNSAT, or FAILURE, with the obvious
+meanings.
+
 % For a loop $C$ with an entry node $v$, a \emph{flowgraph induced by the loop},
 % denoted as $P(C,v)$, is the subgraph of the original flowgraph induced by $C$
 % where $v$ is marked as the start node, a fresh node $v'$ is added and marked
@@ -953,8 +962,6 @@ We start with formal definitions of the terms \emph{cycle} and
 \emph{template}, since they are essential for this section. We assume
 $P$ is a program throughout the section.
 
-\todo{Pozor, nemuze cyklus zacinat i v inicialnim uzlu programu?}
-
 \begin{dfn}[Cycle]\label{def:Part}
 Let $(u,e)$ be an edge of a flowgraph $f$ of $P$, $\pi = e \omega e$
 be a cyclic path in $P$ such that $\omega$ does not contain neither
@@ -1003,11 +1010,12 @@ satisfiable, there is a successor $w$ of $u$ in $T$ such that $w.s
   \DontPrintSemicolon
 $(\theta,\varphi,[],e)\aset\texttt{executePath(}P,\pi\texttt{)}$\;
 \label{alg:template:begin}
-\If{$\varphi\equiv\false$}{
+\If{$\varphi$ is not satisfiable or we fail to decide}{
   \label{alg:template:satCheck1}
   \Return{\bf null}
 }
 Set $\theta_*\prm{\kappa}(\var{a})=\bot$ for each variable $\var{a}$\;
+\label{alg:template:memoryBegin}
 % and \mbox{~~~~~~$\theta_*\prm{\kappa}(\var{A})=\sym{A}$ for each
 %  array variable $\var{A}$}\\
 \Repeat{$\var{change} = \false$}{ \label{alg:template:repeatBegin}
@@ -1160,7 +1168,7 @@ Our goal is to show that all tuples inserted into $M$ at line
 Definition~\ref{def:LoopTemplate}. Formulae $\varphi_*\prm{\kappa}
 \wedge \theta_*\prm{\kappa} \langle\varphi\rangle$ constructed at line
 \ref{alg:template:extendM} are trivially satisfiable for $\kappa = 0$,
-since $\theta_*\prm{0}(\var{a}) = \sym{a}$ and satisfiability of
+since $\theta_*\prm{0}(\var{a}) = \Theta(\var{a})$ and satisfiability of
 $\varphi$ is ensured at line \ref{alg:template:satCheck2}. Further,
 for any two different  elements of $X$ the function
 \texttt{executePath} returns two formulae $\varphi$ and $\varphi'$
@@ -1334,20 +1342,13 @@ The algorithm calls the function \texttt{executePath} at lines
 \ref{alg:template:begin} and \ref{alg:template:exitState}. The
 function always accepts a finite path and it therefore always
 symbolically evaluates only a finite number of actions labelling edges
-along the path. Nevertheless, each update of the path condition during
-the execution is automatically followed by a query, whether the
-updated path condition is still satisfiable. As symbolic execution the
-function applies is classic one, the constructed and even final path
-condition is always a quantifier free formula (see~\cite{Kin76}).
-Since quantifier free fragments of theories we consider in this paper
-(i.e. integers, rationals, reals, and arrays) are all decidable, the
-function \texttt{executePath} must always terminate.
+along the path. And according to our assumption about termination of
+satisfiability queries the function \texttt{executePath} must always
+terminate.
 
 Similarly, satisfiability queries at lines
 \ref{alg:template:satCheck1} and \ref{alg:template:satCheck2} must
-always terminate, since the formula $\varphi$ whose decidability is
-checked is always a result from a call to the function
-\texttt{executePath}.
+also always terminate, again according to our assumption.
 
 Since evaluation of all the remaining expressions in the algorithm is
 finite, we may focus on termination of loops. Obviously, both
@@ -1371,40 +1372,59 @@ symbolic expression.
 
 The compact symbolic execution is formally defined in
 Algorithm~\ref{alg:executeSymbolically}. If we ignore the lines marked
-by $\Box$, then we get the original algorithm of classic symbolic
-execution. But, as we focus on compact symbolic execution, we describe
-the algorithm with $\Box$ lines included. The algorithm accepts a
-program $P$ and a finite set $p$ of templates resulting from analyses
-of some cycles of $P$. At
+by $\Box$, then we get classic symbolic execution. But, as we focus on
+compact symbolic execution, we describe the algorithm with $\Box$
+lines included. The algorithm accepts a program $P$ and a finite set
+$p$ of templates resulting from analyses of some cycles in $P$. At
 lines~\ref{alg:executeSymbolically:InitialState}--\ref{alg:executeSymbolically:InitialQ},
 there we create an initial state and insert it into a queue $Q$. The queue
 $Q$ keeps all the program states waiting for their processing in the
-\textbf{repeat}-\textbf{until} cycle (lines
+\textbf{repeat}-\textbf{until} loop (lines
 \ref{alg:executeSymbolically:LoopBegin}--\ref{alg:executeSymbolically:LoopEnd}). The
-key part of the cycle's body begins at
-line~\ref{alg:executeSymbolically:GetTemplatesAt}, where we select all those
-templates from the set $p$, whose entry locations match an actual program
-location $l$. If the selection is not empty, we choose one template $(l,M)$
-of the selected templates.
+key part of the loop's body begins at
+line~\ref{alg:executeSymbolically:GetTemplatesAt}, where we select at
+most one of templates in $p$, whose entry locations match the actual
+program location $s.l$. Note that there can be more then one template
+available at $s.l$. We do not put any constraints to the selection
+strategy. We may for example choose randomly. Also note that we may
+choose none of the templates (i.e. we select \textbf{null}), even if
+there are available templates at $s.l$.
+% all those
+%templates from the set $p$, whose entry locations match an actual program
+%location $l$. If the selection is not empty, we choose one template $(l,M)$
+%of the selected templates.
 % This single template $t$ is chosen at
 % line~\ref{alg:executeSymbolically:ChooseTemplate}.
-We do not put any constraints to the selection strategy. We may for example
-choose randomly. To prevent parameter collisions with parameters in already
-applied templates, we first get a fresh parameter at
-line~\ref{alg:executeSymbolically:UnrollingFreshKappa} and then we replace a
-parameter used in $M$ by default by the fresh one. In the \textbf{foreach}
-cycle at
+%We do not put any constraints to the selection strategy. We may for example
+%choose randomly.
+If the selection is a template $t$, then we first get a fresh
+parameter at line~\ref{alg:executeSymbolically:UnrollingFreshKappa}
+and then we replace an original parameter in all tuples of $t.M$ by
+the fresh one. This replacement is supposed to prevent parameter
+collisions with those in already applied templates. In the
+\textbf{foreach} loop at
 lines~\ref{alg:executeSymbolically:Unrolling}--\ref{alg:executeSymbolically:UnrollingEnd}
-we create a successor state $s'$ for each triple of $M$.
+we create a successor state $s'$ for each tuple of $t.M$.
 % (see line~\ref{alg:executeSymbolically:SuccessorInUnrolling}).
-If the selection $p'$ computed at
-line~\ref{alg:executeSymbolically:GetTemplatesAt} is empty, we proceed to
-line~\ref{alg:executeSymbolically:ClassicStep}, where we compute successor
-states of the state $s$ by classic symbolic execution. The computed
-successor states are inserted into the queue $Q$ and into computed compact
-symbolic execution $T$ in the \textbf{foreach} cycle at
-lines~\ref{alg:executeSymbolically:AddSATSuccessors}--\ref{alg:executeSymbolically:CreateVertex}. Note
-that only successor states with satisfiable path conditions are considered.
+If the selection computed at
+line~\ref{alg:executeSymbolically:GetTemplatesAt} is \texttt{null}, we
+proceed to line~\ref{alg:executeSymbolically:ClassicStep}, where we
+compute successor states of the state $s$ by classic symbolic
+execution. The computed successor states are inserted into the queue
+$Q$ and into computed compact symbolic execution $T$ in the
+\textbf{foreach} loop at
+lines~\ref{alg:executeSymbolically:AddSATSuccessors}--\ref{alg:executeSymbolically:CreateVertex}.
+Note that only successor states with satisfiable path conditions are
+considered. And finally, the \textbf{foreach} loop at lines
+\ref{alg:executeSymbolically:LailedLeafBegin}--\ref{alg:executeSymbolically:LailedLeafEnd}
+is supposed to collect those successors $s'$ of the state $s$ for
+which we are unable to decide satisfiability of the path condition
+$s'.\varphi$. We insert these states into the resulting tree as so
+called \emph{failed leaves}. A presence of a failed leaf in the
+resulting tree indicates that applied symbolic execution has
+failed to explore whole path-space of the executed program.
+
+
 
 \begin{algorithm}[!t]
     \caption{\texttt{executeSymbolically}} \label{alg:executeSymbolically}
@@ -1460,13 +1480,18 @@ that only successor states with satisfiable path conditions are considered.
             }
             Let $u$ be the leaf of $T$ whose label is $s$ \;
                     \label{alg:executeSymbolically:GetLeaf}
-            \ForEach{\rm state $s' \in S$ such that $s'.\varphi$ is satisfiable}{
+            \ForEach{\rm state $s' \in S$ s.t. $s'.\varphi$ is satisfiable}{
                     \label{alg:executeSymbolically:AddSATSuccessors}
                     Insert $s'$ at the end of $Q$ \; 
                     Insert a new vertex $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
                     \label{alg:executeSymbolically:CreateVertex}
- %           }
-        }
+            }
+            \ForEach{\rm state $s' \in S$ s.t. satisfiability query of $s'.\varphi$ results in FAILURE}{
+                    \label{alg:executeSymbolically:LailedLeafBegin}
+                    Insert a new vertex $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
+                    Mark the vertex $v$ in $T$ as failed leaf.
+                    \label{alg:executeSymbolically:LailedLeafEnd}
+            }
     } \label{alg:executeSymbolically:LoopEnd}
     \Return{$T$} \;
 \end{algorithm}
@@ -1475,7 +1500,8 @@ We finish this section by formulating and proving soundness and
 completeness theorems for compact symbolic execution. We assume that
 $T$ and $T'$ are classic and compact symbolic execution trees of the
 program $P$ computed by Algorithm~\ref{alg:executeSymbolically}
-without and with $\Box$ lines respectively.
+without and with $\Box$-lines respectively. We further assume that
+neither $T$ nor $T'$ contain failed leaves.
 
 \begin{thm}[Soundness]
 For each leaf vertex $e \in T$ there is a leaf vertex $e' \in T'$ and
@@ -1611,7 +1637,12 @@ Therefore, $w \in W$.
 \end{proof}
 \end{thm}
 
-\todo{zminit, ze se pouze dokazala soundness a completenes mezi konecnymi cestami ve stromech. Mohou ale existovat nekonecne cesty, mezi kteryma to dokazano neni.}
+Note that in both theorems there we consider only all \emph{finite}
+execution paths in the trees $T$ and $T'$.
+%Therefore, existence of mappings between infinite paths in both trees
+%was not discussed.
+After all, it was our intention to eliminate infinite paths like the
+one at Figure~\ref{fig:linSrch}(b).
 
 %}}}
 %{{{ Extensions
@@ -1678,8 +1709,8 @@ with more than one parameter.
       \hline
     \end{tabular}
   \end{center}
-  \caption{Experimental results of compact and classic King's symbolic
-  executions.}
+  \caption{Experimental results of compact and classic symbolic  
+executions.}
   \label{tab:Expriments}
 \end{table*}
 
@@ -1691,85 +1722,107 @@ same fixed exploration method of program paths
 % (e.g.~in breadth-first manner)
 for both techniques, we may ask how quickly they are able to
 reach a particular location in the analysed program.
-
+%
 Therefore, we fixed the breadth-first search of program paths for both
 techniques and we measured their running time on ten benchmark
-programs with a marked target location, until the location is reached
-or until 15 minutes timeout is exceeded. Note that for compact symbolic
-execution we also have to fix a template-selection strategy to be
-instantiated at a particular program location, since there can
-generally be more than one template related to the same program
-location. We always choose randomly between candidate templates. All
-the benchmarks have a huge number of real program paths, generated by
-loops. The target location is chosen to be difficult to reach. A
-technique must therefore explore a lot of program paths to get to the
-right one. The first seven benchmarks have reachable target location,
-while the last tree do not. For these three benchmark all the
-program paths must be explored to give an answer. The individual
-benchmarks can be described as follows.
+programs with a marked target location, until the location is reached,
+all the execution paths are explored, or until 15 minutes timeout is
+exceeded. Note that for compact symbolic execution we also have to fix
+a template-selection strategy to be instantiated at a particular
+program location, since there can generally be more than one template
+related to the same program location. We always choose randomly
+between candidate templates or we may also decide to choose none of
+them.
+%All the benchmarks have a huge number of real program paths,
+%generated by loops. The target location is chosen to be difficult to
+%reach. A technique must therefore explore a lot of program paths to
+%get to the right one. The first seven benchmarks have reachable target
+%location, while the last tree do not. For these three benchmark all
+%the program paths must be explored to give an answer.
+%The individual benchmarks can be described as follows.
 
-The first three benchmarks Hello, HW, and HWM are similar. The
-benchmark HWM was taken from \cite{AGT08} and it accepts a \texttt{C}
-string as an input and scans the string for the presence of substrings
-\texttt{"Hello"},\texttt{"World"}, \texttt{"At"} and
-\texttt{"Microsoft!"}. It does not matter at which position and in
-which order the words occur in the string. The target location is
-reached when all four substrings are found. Benchmark HW searches an
-input string only for substrings \texttt{Hello} and \texttt{World},
-while benchmark Hello searches only for the first one.
+The benchmarks are very small programs consisting of 14 to 84 actions
+distributed in at most three flowgraphs. But they contain sequences of
+loops, nested loops and loops with internal branching. They are
+designed to produce a huge number of executions paths. So, they are
+challenging for symbolic execution. The target location is chosen to
+be difficult to reach. A technique must thus explore a lot of paths to
+get to the right one. The first seven benchmarks have reachable target
+location, while the last tree do not. For these three benchmark all
+the execution paths must be explored to give an answer.
 
-Benchmark MatrIR scans upper triangle of an input matrix. The target
-location is reached if the matrix is bigger than 20 $\times$ 20 and it
-contains a line with more than 15 scanned elements with values between 10 and
-100. We took this benchmark from~\cite{ST12}.
+Source code of our experimental tool and the benchmarks are freely
+available at \textsc{SourceForge} through \textsc{Git} repository
+\begin{center}
+\texttt{git.code.sf.net/p/bugst/src}
+\end{center}
+Once you clone the repository, build a project \textsc{Rudla}, since
+that is our experimental tool. Then you can use command line options
+to print the benchmarks or to start any further experimentation with
+the tool.
 
-Benchmark DOIF scans an input string and counts number of characters
-\texttt{U} and \texttt{V}. The target location is reached when the counts
-have the exact values $10$ and $15$ respectively.
+%The first three benchmarks Hello, HW, and HWM are similar. The
+%benchmark HWM was taken from \cite{AGT08} and it accepts a \texttt{C}
+%string as an input and scans the string for the presence of substrings
+%\texttt{"Hello"}, \texttt{"World"}, \texttt{"At"} and
+%\texttt{"Microsoft!"}. It does not matter at which position and in
+%which order the words occur in the string. The target location is
+%reached when all four substrings are found. Benchmark HW searches an
+%input string only for substrings \texttt{Hello} and \texttt{World},
+%while benchmark Hello searches only for the first one.
+%
+%Benchmark MatrIR scans upper triangle of an input matrix. The target
+%location is reached if the matrix is bigger than 20 $\times$ 20 and it
+%contains a line with more than 15 scanned elements with values between 10 and
+%100. We took this benchmark from~\cite{ST12}.
+%
+%Benchmark DOIF scans an input string and counts number of characters
+%\texttt{U} and \texttt{V}. The target location is reached when the counts
+%have the exact values $10$ and $15$ respectively.
+%
+%Benchmark DOIFex extends DOIF by another loop scanning the input
+%stream again. Occurrences of characters \texttt{u} and \texttt{v}
+%decreases the counts computed in the first loop for the characters
+%\texttt{U} and \texttt{V} respectively. The target location is
+%reached when the resulting counts are the same as described in DOIF
+%benchmark.
+%
+%Benchmark EQCNT originate from \cite{OT11}. It consists of two nested
+%loops with branching, where a variable defined in the outermost scope
+%is incremented in the innermost loop. The benchmark accepts two
+%strings, \texttt{A} and \texttt{B}. For each character in string
+%\texttt{A} we count the number of times this character occurs in
+%\texttt{B}. The target is reached when the overall count is exactly
+%20.
+%
+%Benchmark EQCNTex extends the benchmark EQCNT. It contains two additional
+%nested loops in row. Nevertheless, the bounds of all loops in the benchmarks
+%are set to fixed constants. The huge number of program paths is generated by
+%the symbolic arrays \texttt{A} and \texttt{B} described above. The limits of
+%the loops makes the target location unreachable.
+%
+%Benchmarks OneLoop and TwoLoops are also designed such that their target
+%locations are not reachable. Both benchmarks contain a loop iterated
+%\texttt{n}-times. In each iteration, the variable \texttt{i} (initially set
+%to \texttt{0}) is increased by \texttt{4}. The target location is then
+%guarded by an assertion \texttt{i==15} in OneLoop and by a loop
+%\texttt{while (i != j + 7) j += 2} in TwoLoops (\texttt{j} is initialised to
+%\texttt{0} before the loop).
 
-Benchmark DOIFex extends DOIF by another loop scanning the input
-stream again. Occurrences of characters \texttt{u} and \texttt{v}
-decreases the counts computed in the first loop for the characters
-\texttt{U} and \texttt{V} respectively. The target location is
-reached when the resulting counts are the same as described in DOIF
-benchmark.
-
-Benchmark EQCNT originate from \cite{OT11}. It consists of two nested
-loops with branching, where a variable defined in the outermost scope
-is incremented in the innermost loop. The benchmark accepts two
-strings, \texttt{A} and \texttt{B}. For each character in string
-\texttt{A} we count the number of times this character occurs in
-\texttt{B}. The target is reached when the overall count is exactly
-20.
-
-Benchmark EQCNTex extends the benchmark EQCNT. It contains two additional
-nested loops in row. Nevertheless, the bounds of all loops in the benchmarks
-are set to fixed constants. The huge number of program paths is generated by
-the symbolic arrays \texttt{A} and \texttt{B} described above. The limits of
-the loops makes the target location unreachable.
-
-Benchmarks OneLoop and TwoLoops are also designed such that their target
-locations are not reachable. Both benchmarks contain a loop iterated
-\texttt{n}–times. In each iteration, the variable \texttt{i} (initially set
-to \texttt{0}) is increased by \texttt{4}. The target location is then
-guarded by an assertion \texttt{i==15} in OneLoop and by a loop
-\texttt{while (i != j + 7) j += 2} in TwoLoops (\texttt{j} is initialised to
-\texttt{0} before the loop).
-
-\todo{Pridat odkaz na bugst (source-forge) a zminit se, ze tam lze
-nalezt nejen tu experimentalni implementaci ale i ty benchmarky.}
-
-Our experimental results are depicted in Table~\ref{tab:Expriments}. The
-columns have the following meaning.  \textit{Time} is a duration in seconds
-until a technique reached the target location. The symbol T/O means the
-timeout was exceeded. \textit{Tpt} represents numbers of templates
-constructed for the benchmarks. \textit{States} identifies number of
-normally terminated execution (i.e.~without an error) plus number of
-executions, which were running at the moment the target location was reached
-or the timeout was exceeded. And finally, \textit{SATFail} identifies
-numbers of execution for which Z3 SMT solver failed to determine
-satisfiability of their path conditions. We do not show this column for
-classic symbolic execution, since there were no such failures.
+Experimental results of both compact and classic symbolic executions
+on the benchmarks are depicted in Table~\ref{tab:Expriments}. The
+columns have the following meaning.  \textit{Time} is a duration in
+seconds until a technique reached the target location, or all the
+execution paths were explored. The symbol T/O means the timeout was
+exceeded. \textit{Tpt} represents numbers of templates constructed for
+the benchmarks. \textit{States} identifies number of normally
+terminated execution (i.e.~without an error) plus number of
+executions, which were running at the moment the target location was
+reached or the timeout was exceeded. And finally, \textit{SATFail}
+identifies numbers of execution for which Z3 SMT solver failed to
+determine satisfiability of their path conditions. We do not show this
+column for classic symbolic execution, since there were no such
+failures.
 
 We want to highlight the following important observation related to
 the experimental data. First of all, classic symbolic execution was
@@ -1778,16 +1831,47 @@ compact symbolic execution is often several orders of magnitude lower
 then of classic one, while getting closer to the target location
 sooner. On the other hand, presence of quantifiers in path conditions
 of compact symbolic executions puts very high requirements on skills of
-an SMT solver. This leads to failures, which are not seen in classic
+the SMT solver. This leads to failures, which are not seen in classic
 symbolic execution.
+%
+Fortunately, Algorithm~\ref{alg:executeSymbolically} saves SAT
+failures in the form of failed leaves in the resulting compact
+symbolic execution tree. Therefore, we may think about subsequent
+analyses for these leaves. For example, in a failed leaf we may
+instantiate parameters $\kappa$ by concrete numbers. The resulting
+formula will become quantifier free and therefore potentially easier
+for an SMT solver. This way we might be able to explore paths below
+the failed leaves. But basically, analyses of failed leaves is the
+topic for our further research. Moreover, as SMT solvers are improving
+quickly, we may expect that counts of the failures will decrease in
+time.
 
-We did all the measurements on a single common desktop computer\footnote{
-  Intel\textsuperscript{\textregistered} Core$^{\mathtt{TM}}$ i7 CPU 920 @
-  2x2.67GHz, 6GB RAM, Windows 7 Professional 64-bit, MS Pex 0.92.50603.1, MS
-  Moles 1.0.0.0, MS Visual Studio 2008, MS .NET Framework v3.5 SP1, MS Z3
-  SMT solver v3.2, and boost v1.42.0.}. To get a better view of
-effectiveness of our implementation, we include in Table~\ref{tab:Expriments}
-run-time of a well known symbolic execution tool \textsc{Pex}~\cite{TdH08}.
+
+Note that we included into Table~\ref{tab:Expriments} also run-times
+of the well known symbolic execution tool \textsc{Pex}~\cite{TdH08} on
+our benchmarks. We measured time, till the target location was covered
+by a test or till the tool completed its search. Of course, the
+comparison with \Pex is not accurate, since it does not explore
+execution paths in breath-first manner, like the other techniques.
+
+And finally we note that we did all the measurements on a single
+common desktop
+computer\footnote{Intel\textsuperscript{\textregistered}
+Core$^{\mathtt{TM}}$ i7 CPU 920 @ 2x2.67GHz, 6GB RAM, Windows 7
+Professional 64-bit, MS Pex 0.92.50603.1, MS Moles 1.0.0.0, MS Visual
+Studio 2008, MS .NET Framework v3.5 SP1, MS Z3 SMT solver v3.2, and
+boost v1.42.0.}.
+
+
+
+%To get a different but rather marginal view of effectiveness of
+%compact symbolic execution, we also include in
+%Table~\ref{tab:Expriments} run-times of the well known symbolic
+%execution tool \textsc{Pex}~\cite{TdH08} on our benchmarks. We
+%measured time, till the target location was covered by a test or till
+%the tool completed its search. Of course, the comparison with \Pex is
+%not accurate, since it does not explore execution paths in
+%breath-first manner.
 
 %}}}
 %{{{ Related work
@@ -1815,53 +1899,98 @@ ones. Only, they focus on a computation of function summaries rather than on
 program loops. Our goal is completely different: Instead of guiding
 exploration of paths in classic symbolic execution tree, we collapse paths
 (with regularities in states along them) into single vertices in compact
-symbolic execution tree. Paths in compact symbolic execution tree can thus
-be exponentially shorter than corresponding paths in the classic one.
+symbolic execution tree.
+%Paths in compact symbolic execution tree can thus be exponentially
+%shorter than corresponding paths in the classic one.
 % The main disadvantage of the approaches \cite{SPmCS09,GL11,G07,AGT08} over
 % ours is the exploration of paths of \emph{classic} symbolic execution
 % tree. These paths can be exponentially longer then corresponding ones in
 % compact symbolic execution tree. The same negative effect therefore
 % applies to lengths of the corresponding path conditions of these paths.
 
-Further, techniques~\cite{QNR11,SH10} group paths of classic symbolic
+Note that templates of compact symbolic execution has a different
+objective than summarization used in~\cite{G07,AGT08,GL11}. As
+summarization basically caches results of some finite part of symbolic
+execution for later fast reuse, our templates are supposed to
+\emph{replace} potentially infinite parts of symbolic executions by a
+single node.
+
+Techniques~\cite{QNR11,SH10} group paths of classic symbolic
 execution tree according to an a priori given constraints to a program
 output, while exploring only one path per group. We do not require any such
 constraints.
 
-Note that the compact symbolic execution has a different objective than
-standard summarization techniques~\cite{G07,AGT08,GL11}. Summarization
-basically ``caches'' results of some finite part of symbolic execution. The
-presented technique wants to generalize the precomputed information and
-replace potentially infinite parts of symbolic executions by a single node.
+Finally, in our previous work~\cite{ST12} there we compute, for a
+given program and a target location in it, a non-trivial necessary
+condition for reaching the target location. In other words, the result
+of the analysis is a first order logic formula. In this work, instead,
+we show how to explore all execution paths of an analysed program in a
+very compact manner. The result is therefore a compact symbolic
+execution tree. Moreover, we do not require any target location, since
+we do not focus on program location reachability here. Nevertheless,
+to achieve our goal here, we adopted a part of a technical stuff
+introduced in~\cite{ST12}. Namely, lines
+\ref{alg:template:memoryBegin}--\ref{alg:template:repeatEnd} of
+Algorithm~\ref{alg:template} are basically a simplified version of a
+computation of a so called iterated memory, which is in~\cite{ST12} an
+over-approximation of memory content after several iterations in a
+program loop. But in this technique, the memory content must always be
+absolutely precise and we may, in addition, analyse only parts of
+program loops.
 
-\todo{Mnohem lepe se vymezit vuci nasi predchozi praci. Nasledujici
-stavajici text nestaci! Udelat lepe! Je to dulezite!}Finally, the idea
-of declarative parametric description of the effect of a
-program loop has been already used in our paper~\cite{ST12}. In contrast to
-this paper, the goal of~\cite{ST12} is to find a necessary condition on
-input values to reach a given program location. While compact symbolic
-execution can work with templates generated by various techniques (one of
-them is the presented analysis of program cycles), \cite{ST12} focuses on
-a declarative parametrized description of program loops. However, program
-loops considered in \cite{ST12} can have more paths around the loop
-(generated e.g.~by branching statement in the loop).
+% In this work we do not require any target location, as we do not
+%focus on program reachability. Instead, we focus on exploration on all
+%finite program paths in a \emph{very} compact manner. To achieve this
+%goal, nevertheless, we adopted a part of a technical stuff introduced
+%in~\cite{ST12}. Namely, lines
+%\ref{alg:template:memoryBegin}--\ref{alg:template:repeatEnd} of
+%Algorithm~\ref{alg:template} are simplified version of a computation
+%of so called iterated memory, which is in~\cite{ST12} an
+%over-approximation of memory content after several iterations in a
+%program loop. In this technique the computed memory must be absolutely
+%precise and we may also analyse only parts of program loops.
+%
+%Finally, the idea of declarative parametric description of the effect
+%of a program loop has been already used in our paper~\cite{ST12}. In
+%contrast to this paper, the goal of~\cite{ST12} is to find a necessary
+%condition on input values to reach a given program location. While
+%compact symbolic execution can work with templates generated by
+%various techniques (one of them is the presented analysis of program
+%cycles), \cite{ST12} focuses on a declarative parametrized description
+%of program loops. However, program loops considered in \cite{ST12} can
+%have more paths around the loop (generated e.g.~by branching statement
+%in the loop).
 
 %}}}
 %{{{ Conclusion 
 
 \section{Conclusion}\label{sec:conclusion}
 
-We have introduced a generalization of classic symbolic execution. The new
-technique called compact symbolic execution can analyze a program and derive
-templates representing an overall effect of some program parts to executions
-leading through the program part. Using such a template, one can construct
-substantially smaller tree that the classic symbolic execution tree without
-loss of information. In particular, one node of the compact tree can
-represent even infinitely many nodes of the classic tree.
+Compact symbolic execution is a generalisation of the classic one. It
+takes advantage over the classic symbolic execution by accepting
+information about an executed program in advance, in form of
+templates.
+% We have also presented the algorithm for templates
+%computation for a given program.
+Using the templates, one can construct substantially smaller tree that
+the classic symbolic execution tree without loss of information. In
+particular, one finite path of the compact tree can represent even
+infinitely many finite paths of the classic tree. Our experimental
+results further show that compact symbolic execution explores
+execution paths faster then the classic one. On the other hand,
+compact symbolic execution is more vulnerable to SAT failures.
 
-Our experimental results show that construction of compact trees instead of
-classic trees often leads to significantly faster detection of errors in
-programs. 
+%We have introduced a generalization of classic symbolic execution. The new
+%technique called compact symbolic execution can analyze a program and derive
+%templates representing an overall effect of some program parts to executions
+%leading through the program part. Using such a template, one can construct
+%substantially smaller tree that the classic symbolic execution tree without
+%loss of information. In particular, one node of the compact tree can
+%represent even infinitely many nodes of the classic tree.
+%
+%Our experimental results show that construction of compact trees instead of
+%classic trees often leads to significantly faster detection of errors in
+%programs. 
 
 % Compact symbolic execution is sound and complete generalisation of the
 % classic one. It takes advantage over the classic symbolic execution by
@@ -1878,15 +2007,6 @@ programs.
 
 \bibliographystyle{plain}
 \bibliography{cse_issta2013}
-
-
-
-
-
-
-
-
-
 
 %\appendix
 %\begin{appendix}
