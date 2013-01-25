@@ -38,6 +38,7 @@
 \newcommand{\dom}{\ensuremath{\mathbf{Dom}}}
 \newcommand{\rng}{\ensuremath{\mathbf{Rng}}}
 \newcommand{\var}[1]{{\tt #1}}
+%\renewcommand{\texttt}[1]{{\tt #1}}
 \newcommand{\sym}[1]{\ensuremath{\underline{#1}}}
 \newcommand{\prm}[1]{\ensuremath{\llbracket #1 \rrbracket}}
 \newcommand{\ese}[1]{\ensuremath{\langle #1 \rangle}}
@@ -64,7 +65,7 @@
 
 %}}}
 
-%\sloppy
+\sloppy
 \begin{document}
 
 %\conferenceinfo{ISSTA}{}
@@ -136,11 +137,11 @@ analyse these program parts independently from the rest of the program. The
 goal of the analysis is to find a \emph{template}, i.e.~a declarative
 parametric description of the complete behaviour of the analysed part.
 Later, whenever the symbolic execution enters a program part for which we
-have a template, we add to the symbolic execution tree just a single node 
-that reflects a cumulative effect of any execution of the program part as
-represented by the template. This node has one successor for each edge
-leaving the program part. Symbolic execution continues from these successors
-in the standard way.
+have a template, we either proceed in the standard way or add to the
+symbolic execution tree just a single node that reflects a cumulative effect
+of any execution of the program part as represented by the template. This
+node has one successor for each edge leaving the program part. Symbolic
+execution continues from these successors in the standard way.
 
 % This node corresponds to an application of the template which specifies
 % changes of the symbolic state and path condition after leaving this
@@ -154,11 +155,12 @@ in the standard way.
 
 The worst case for compact symbolic execution occurs when we fail to
 compute any template for a given program. Compact symbolic execution then
-reduces to the classic one.
+reduces to the classic one. \todo{Tohle neni uplne pravda diky
+  SAT-failum. Budem to tu resit?}
 
 \medskip The rest of the paper is organized as follows. The next section
-presents the basic idea of the compact symbolic execution using an
-illustrative example. Section~\ref{sec:technique} provides a formal
+presents the basic idea of the compact symbolic execution using two
+illustrative examples. Section~\ref{sec:technique} provides a formal
 description of the technique.
 % in a simple setting: templates with one parameter that are derived from
 % integer programs without function calls. Section~\ref{sec:extensions}
@@ -178,32 +180,47 @@ programs in form of flowgraphs.
 % In this paper, we work with programs in form of flowgraphs.
 For example, the flowgraph of Figure~\ref{fig:linSrch}(a) implements
 standard linear search function.
-The function returns the least index \texttt{i} into the array
-\texttt{A} such that \texttt{A[i]=x}. If \texttt{x} is not in
-\texttt{A} at all, then it returns \texttt{-1}.
+The function returns the least index \texttt{i} 
+%into the array \texttt{A} 
+such that \texttt{A[i]=x}. If \texttt{x} is not in \texttt{A} at all, then
+it returns \texttt{-1}.
 %The program sets \texttt{i} to \texttt{1} if some of the first
 %\texttt{n} elements of the array \texttt{A} has the value given by
 %\texttt{x}. Otherwise, the program sets \texttt{i} to \texttt{-1}.
 
-\begin{figure}[!htb]
-    \begin{tabular}{cc}
-        \multicolumn{2}{c}{\input{fig_linSrch}} \\
-        \multicolumn{2}{c}{\qquad\quad\qquad(a)} \\
-        {\input{fig_linSrchSET}} & {\input{fig_linSrchCSET}}
-        \\
-        (b) & (c)
+% \begin{figure}[!htb]
+%     \begin{tabular}{cc}
+%         \multicolumn{2}{c}{\input{fig_linSrch}} \\
+%         \multicolumn{2}{c}{\qquad\quad\qquad(a)} \\
+%         {\input{fig_linSrchSET}} & {\input{fig_linSrchCSET}}
+%         \\
+%         (b) & (c)
+%     \end{tabular}
+% \caption{(a) A flowgraph of a function \texttt{linSrch(A,n,x)}.
+% (b) Classic symbolic execution tree of \texttt{linSrch}. (c) Compact
+% symbolic execution tree of \texttt{linSrch}.\todo{Obrazek (c) je moc
+%   nizko. Co takhle dat to vsechno vedle sebe?}}
+% \label{fig:linSrch}
+% \end{figure}
+
+\begin{figure*}[!htb]
+  \begin{center}
+    \begin{tabular}{cp{5ex}cp{5ex}c}
+      \input{fig_linSrch} &&
+      \input{fig_linSrchSET} &&
+      {\input{fig_linSrchCSET}}
     \end{tabular}
+  \end{center}
 \caption{(a) A flowgraph of a function \texttt{linSrch(A,n,x)}.
 (b) Classic symbolic execution tree of \texttt{linSrch}. (c) Compact
 symbolic execution tree of \texttt{linSrch}.}
 \label{fig:linSrch}
-\end{figure}
-
+\end{figure*}
 
 We first briefly describe the classic symbolic execution as proposed by
 King~\cite{Kin76}. Symbolic execution runs a program over symbols
-representing arbitrary input values. We use symbol $\sym{v}$ to represent
-any input value of variable $\var{v}$.
+representing arbitrary input values. For each variable $\var{v}$, we use
+symbol $\sym{v}$ to represent its input value.
 % $\sym{n},\sym{x},\sym{i},\sym{A}$ to represent input values of
 % $\var{n},\var{x},\var{i},\var{A}$ respectively.
 Symbolic execution maintains a \emph{symbolic memory} $\theta$ and a
@@ -213,7 +230,7 @@ expression over the symbols. For example, if the first command of a program is
 the assignment \texttt{i:=2*n+x}, then $\theta(\var{i})=2\sym{n}+\sym{x}$
 after the first step. The path condition $\varphi$ is a formula representing
 the necessary and sufficient condition on the symbols (i.e.~on input values)
-to drive the execution along the current program path. $\varphi$ is initially
+to drive the execution along the current execution path. $\varphi$ is initially
 $\true$ and it can be updated at branching commands. For example, if we
 execute a command \texttt{if~(x>n+5)} (in a flowgraph, this corresponds to a
 location with two out-edges labelled by \texttt{x>n+5} and \texttt{x<=n+5}),
@@ -246,136 +263,145 @@ figure contains instances of branching conditions on the corresponding
 edges. For each node in the tree, the corresponding path condition $\varphi$
 is a conjunction of the instances along the path from the root to the node.
 
-Now we intuitively explain the idea of compact symbolic execution.
-If we look at the program of Figure~\ref{fig:linSrch}(a), we immediately see
-that locations $b,c,d$ form a cycle\note{v kontextu program bych pouzil spis
-loop, cycle je to v grafech. anebo bych mozna nepsal nahore program, ale
-flowgraph} (highlighted by the grey region). All
-executions of this program part have a very regular structure: each
-execution consists of $\kappa$ iterations along the cycle ($\kappa\ge0$)
-followed either by the edge $(b,f)$ or by the edges $(b,c)$ and $(c,e)$.
+\smallskip Now we intuitively explain the idea of compact symbolic
+execution. If we look at the flowgraph of Figure~\ref{fig:linSrch}(a), we
+immediately see that locations $b,c,d$ and edges between them form a cycle
+(highlighted by the grey region). All executions entering the cycle (at
+location $b$) proceed in the same way: each execution performs $\kappa$
+iterations along the cycle (for some $\kappa\ge0$) and continues either
+along the edge $(b,f)$ or along the edges $(b,c)$ and $(c,e)$ to leave the
+cycle. The desribed parts of executions are called \emph{cycle executions}.
 % In other words, each excution follows a path of the form 
 % $(bcd)^{\kappa}bf$ or $(bcd)^{\kappa}bce$.
 We say that $b$ is an \emph{entry location} and $f,e$ are \emph{exit
-locations} of this program part.
+  locations} of this cycle. The edges $(b,f)$ and $(c,e)$ are \emph{exit
+  edges} of the cycle.
+%
+% \color{blue}
+% % We first specify and then analyse a \emph{program part} consisting of
+% % the locations $b,c,d,e,f$ and of all the edges between them. The part
+% % is highlighted by a light grey region at Figure~\ref{fig:linSrch}~(a).
+% % We can see, the locations' sequence $b,c,d,b$ forms a cyclic path in
+% % the part.
+% The sequence is the only source of the path in the grey
+% regions at Figure~\ref{fig:linSrch}~(b).
+% % In general, a part may contain several cyclic paths, but we are only
+% % interested in those, which are responsible for a production of those paths
+% % in classic symbolic execution tree, we want to eliminate. Therefore, we
+% % call a set of all such ``responsible" cyclic paths as a \emph{core} of the
+% % part. In our example, the cyclic path $b,c,d,b$ is the core of the
+% % part. It is highlighted by a grey region at
+% % Figure~\ref{fig:linSrch}~(a). Next, we mark the location $b$ of the part
+% % as an \emph{entry} location into the part, since we enter the part by
+% % stepping into the location $b$. In general, there can be several entries
+% % into the part. But we are always interested only in that one, which is
+% % related to the entry vertex of that path in a classic symbolic execution
+% % tree, we want to eliminate. The entry location $b$ is highlighted by green
+% % colour in the figure.
+% To complete the part, we further need to specify \emph{exits} from the part.
+% Intuitively, an exit form a part is a location, into which we can escape
+% from an cyclic path of a core. There are two such exit locations $e$ and $f$
+% in our example. They are highlighted by red colour at the figure. Note that
+% we call edges $(c,e)$ and $(b,f)$ as \emph{exit edges} from the part.
+% \color{black}
+%
+Compact symbolic execution aims to effectively exploit the uniformity of all
+cycle executions. To do it, we need to find a unified declarative
+description of the \emph{effect} of all cycle executions on a symbolic
+memory and a path condition. Hence, we analyze the cycle separately from the
+rest of the flowgraph. In the following, the symbols
+$\sym{n},\sym{x},\sym{i},\sym{A}$ represent the values of the corresponding
+variables at the entry location $b$ before the first iteration.
 
-\color{blue}
-We first specify and then analyse a \emph{program part} consisting of
-the locations $b,c,d,e,f$ and of all the edges between them. The part
-is highlighted by a light grey region at Figure~\ref{fig:linSrch}~(a).
-We can see, the locations' sequence $b,c,d,b$ forms a cyclic path in
-the part. The sequence is the only source of the path in the grey
-regions at Figure~\ref{fig:linSrch}~(b). In general, a part may
-contain several cyclic paths, but we are only interested in those,
-which are responsible for a production of those paths in classic
-symbolic execution tree, we want to eliminate. Therefore, we call a
-set of all such ``responsible" cyclic paths as a \emph{core} of the
-part. In our example, the cyclic path $b,c,d,b$ is the core of the
-part. It is highlighted by a grey region at
-Figure~\ref{fig:linSrch}~(a). Next, we mark the location $b$ of the
-part as an \emph{entry} location into the part, since we enter the
-part by stepping into the location $b$. In general, there can be
-several entries into the part. But we are always interested only in
-that one, which is related to the entry vertex of that path in a
-classic symbolic execution tree, we want to eliminate. The entry
-location $b$ is highlighted by green colour in the figure. To complete
-the part, we further need to specify \emph{exits} from the part.
-Intuitively, an exit form a part is a location, into which we can
-escape from an cyclic path of a core. There are two such exit
-locations $e$ and $f$ in our example. They are highlighted by red
-colour at the figure. Note that we call edges $(c,e)$ and $(b,f)$ as
-\emph{exit edges} from the part.
-\color{black}
-
-We want to find a unified description of the effect of all executions of
-this program part. We first study the effect of all iterating parts of these
-executions. The effect of $\kappa$ iterations of the cycle on variable
-values can be described by the following \emph{parametric symbolic memory}
+We first study the effect of all iterating parts of the cycle
+executions. One can see that each iteration increases the value of $\var{i}$
+by one while values of the other variables keep unchanged. Hence, after
+$\kappa$ iterations, the value of $\var{i}$ is $\sym{i}+\kappa$. Formally,
+the effect of $\kappa$ iterations of the cycle on values of all variables is
+described by the following \emph{parametric symbolic memory}
 $\theta_*\prm{\kappa}$:
 \[
-\begin{array}{rclp{2ex}rcl}
-  \theta_*\prm{\kappa}(\var{n})&=&\sym{n}&&\theta_*\prm{\kappa}(\var{x})&=&\sym{x}\\
-  \theta_*\prm{\kappa}(\var{i})&=&\sym{i}+\kappa&&\theta_*\prm{\kappa}(\var{A})&=&\sym{A}\\
+\setlength{\arraycolsep}{2pt}
+\begin{array}{rclp{3ex}rcl}
+  \theta_*\prm{\kappa}(\var{n})&=&\sym{n}&&
+  \theta_*\prm{\kappa}(\var{x})&=&\sym{x}\\
+  \theta_*\prm{\kappa}(\var{i})&=&\sym{i}+\kappa&&
+  \theta_*\prm{\kappa}(\var{A})&=&\sym{A}\\
 \end{array}
 \]
-Note that the symbols $\sym{n},\sym{x},\sym{i},\sym{A}$ now represent the
-values of corresponding variables at the entry location of the program
-part. 
 % This is why $\theta_*[\kappa](\var{i})$ is $\sym{i}+\kappa$ and not just
 % $\kappa$.
 
-We can also formulate a \emph{parametric path condition}
-$\varphi_*\prm{\kappa}$ representing, for a given value of $\kappa$, the
-path condition for that execution looping around the cycle exactly
-$\kappa$ times. The necessary and sufficient condition to make
-$\kappa$ iterations of the cycle is validity of both conditions on the
-cycle, \texttt{i<n} and \texttt{A[i]!=x}, in each of $\kappa$
-iterations.
-\color{blue}
-Therefore, we get the following conjunction
+Further, we formulate a \emph{parametric path condition}
+$\varphi_*\prm{\kappa}$ representing the path condition after $\kappa$
+iterations along the cycle. The necessary and sufficient condition to make
+these $\kappa$ iterations is validity of both conditions on the cycle,
+\texttt{i<n} and \texttt{A[i]!=x}, in each of $\kappa$ iterations. % As the
+% conditions are at the beginning of the cycle (i.e.~not preceded by any
+% assignment), the variables $\var{i},\var{n},var{A},var{x}$ in these
+% conditions during $\tau$-th iteration (where $1\le\tau\le\kappa$) have the
+% same values as they have after $\tau-1$ iterations, which is given by the
+% parametric symbolic memory $\theta_*\prm{\tau-1}$.
+Therefore, the path condition after $\kappa$ iterations has the form
 \begin{align*}
-\sym{i}<\sym{n} &\wedge \sym{A}(\sym{i}) \not= \sym{x}~\wedge\\
-\sym{i}+1<\sym{n} &\wedge \sym{A}(\sym{i}+1) \not= \sym{x}~\wedge\\
-\cdots\cdots\cdots\cdots&\cdots\cdots\cdots\cdots\cdots\cdots\\
-\sym{i}+(\kappa-1)<\sym{n} &\wedge \sym{A}(\sym{i}+(\kappa-1)) \not= \sym{x},
+  \sym{i}<\sym{n}&~~\wedge~~\sym{A}(\sym{i})\not=\sym{x}~~\wedge\\
+  \wedge~~\sym{i}+1<\sym{n}&~~\wedge~~\sym{A}(\sym{i}+1)\not=\sym{x}~~\wedge\\
+  &~~~~\vdots\\
+  \wedge~~\sym{i}+(\kappa-1)<\sym{n}&~~\wedge~~\sym{A}(\sym{i}+(\kappa-1))\not=\sym{x}
+%  \textrm{,}
 \end{align*}
-where $\tau$-th line, $\tau \in \{ 0, 1, \ldots, \kappa-1 \}$,
-consists of two predicates resulting from evaluation of the conditions
-\texttt{i<n} and \texttt{A[i]!=x} respectively after $\tau$ iterations
-already taken around the cycle, i.e. during the $(\tau+1)$-st
-iteration. Unfortunately, the conjunction above is not a first order
-logic formula as its length depends on the parameter $\kappa$, whose
-value can be arbitrary. But we can \emph{equivalently} express the
-conjunction by using quantifiers as follows
+where $\tau$-th line, $\tau\in\{0,1,\ldots,\kappa-1\}$, consists of two
+predicates resulting from evaluation of the conditions \texttt{i<n} and
+\texttt{A[i]!=x} respectively after $\tau$ iterations of the cycle,
+i.e.~during the $(\tau+1)$-st iteration. To uniformly describe all such path
+conditions for all values of parameter $\kappa$, we have to use an
+equivalent formula with a quantifier:
 \[
   \forall\tau(0\le\tau<\kappa\implies
-  (\sym{i}+\tau<\sym{n}\,\wedge\,\sym{A}(\sym{i}+\tau)\neq\sym{x})).
+  (\sym{i}+\tau<\sym{n}\,\wedge\,\sym{A}(\sym{i}+\tau)\neq\sym{x}))
 \]
 If we now add to the formula above the obvious fact, that we cannot
-iterate the cycle negative number of times (i.e. $\kappa \geq 0$), we
-get the resulting the parametric path condition
+iterate the cycle negative number of times (i.e.~$\kappa \geq 0$), we
+get the resulting the parametric path condition $\varphi_*\prm{\kappa}$ as
 \begin{align*}
-  \varphi_*\prm{\kappa}~=~&\kappa\ge0~\wedge\\
-  &\forall\tau(0\le\tau<\kappa\implies
-  (\sym{i}+\tau<\sym{n}\,\wedge\,\sym{A}(\sym{i}+\tau)\neq\sym{x})).
+  \varphi_*\prm{\kappa}~=~&\kappa\ge0~~\wedge\\
+  \wedge~&~\forall\tau(0\le\tau<\kappa\implies
+  (\sym{i}+\tau<\sym{n}~\wedge~\sym{A}(\sym{i}+\tau)\neq\sym{x})).
 \end{align*}
-\color{black}
-
-
- Using $\theta_*\prm{\kappa}$, one easily derives that
-instances of these conditions in the $(\tau+1)$-st\note{to -st tady
-vypada divne} iteration are $\sym{i}+\tau<\sym{n}$ and
-$\sym{A}(\sym{i}+\tau)\neq\sym{x}$, respectively. Hence,
-$\varphi_*\prm{\kappa}$ can be defined as
-\[
-  \varphi_*\prm{\kappa}~=~\kappa\ge0~\wedge~
-  \forall\tau(0\le\tau<\kappa\implies
-  (\sym{i}+\tau<\sym{n}\,\wedge\,\sym{A}(\sym{i}+\tau)\neq\sym{x})).
-\]
 
 Finally, we use $\theta_*\prm{\kappa}$ and $\varphi_*\prm{\kappa}$ to define
-symbolic memory $\theta_f\prm{\kappa}$ and path condition $\varphi_f\prm{\kappa}$
-describing the effect of all executions of the considered program part
-leading to exit location $f$ and $\theta_e\prm{\kappa},\varphi_e\prm{\kappa}$ with
-the analogous information for the exit location $e$. As the edges
-$(b,f),(b,c),(c,e)$ do not modify any variable, we can clearly see that
-$\theta_f\prm{\kappa}=\theta_e\prm{\kappa}=\theta_*\prm{\kappa}$. Further,
-$\varphi_f\prm{\kappa}$ and $\varphi_e\prm{\kappa}$ are conjunctions of
-$\varphi_*\prm{\kappa}$ with the instances of the conditions on the edge $(b,f)$
-or on the edges $(b,c),(c,e)$, respectively. Hence, the path conditions
-$\varphi_f\prm{\kappa},\varphi_e\prm{\kappa}$ are defined as follows:
+symbolic memory $\theta_{b\!f}\prm{\kappa}$ and path condition
+$\varphi_{b\!f}f\prm{\kappa}$ describing the effect of all cycle executions
+leaving of the cycle by exit edge $(b,f)$ and
+$\theta_{ce}\prm{\kappa},\varphi_{ce}\prm{\kappa}$ with the analogous information
+for the exit edge $(c,e)$. As the edges $(b,f),(b,c),(c,e)$ do not modify
+any variable, we can clearly see that
+$\theta_{b\!f}\prm{\kappa}=\theta_{ce}\prm{\kappa}=\theta_*\prm{\kappa}$. Further,
+$\varphi_{b\!f}\prm{\kappa}$ and $\varphi_{ce}\prm{\kappa}$ are conjunctions of
+$\varphi_*\prm{\kappa}$ with the instances of the conditions on the edge
+$(b,f)$ or on the edges $(b,c),(c,e)$, respectively. Hence, the path
+conditions $\varphi_{b\!f}\prm{\kappa},\varphi_{ce}\prm{\kappa}$ are defined as
+follows:
 \[
+\setlength{\arraycolsep}{0pt}
 \begin{array}{rcl}
-  \varphi_f\prm{\kappa}&~=~&\varphi_*\prm{\kappa}~\wedge~\sym{i}+\kappa\ge\sym{n}\\
-  \varphi_e\prm{\kappa}&=&\varphi_*\prm{\kappa}~\wedge~\sym{i}+\kappa<\sym{n}
+  \varphi_{b\!f}\prm{\kappa}&~=~&\varphi_*\prm{\kappa}~\wedge~\sym{i}+\kappa\ge\sym{n}\\
+  \varphi_{ce}\prm{\kappa}&=&\varphi_*\prm{\kappa}~\wedge~\sym{i}+\kappa<\sym{n}
     ~\wedge~\sym{A}(\sym{i}+\kappa)=\sym{x}
 \end{array}
 \]
 
-The overall effect of the considered program part is now fully described by
-a so-called \emph{template} consisting of the entry location $b$ and two
-triples $(f,\theta_f\prm{\kappa},\varphi_f\prm{\kappa})$ and
-$(e,\theta_e\prm{\kappa},\varphi_e\prm{\kappa})$.
+The overall effect of the considered cycle is now fully described by a
+so-called \emph{template} consisting of the entry location $b$ and two
+triples $((cdb)^\kappa
+f,\theta_{b\!f}\prm{\kappa},\varphi_{b\!f}\prm{\kappa})$ and $((cdb)^\kappa
+ce,\theta_{ce}\prm{\kappa},\varphi_{ce}\prm{\kappa})$, one for each exit
+edge. The first elements of these triples are expressions $(cdb)^\kappa f$
+and $ce(cdb)^\kappa ce$ representing sequences of locations passed in
+correspoding cycle executions. Technically, we only need to remember the
+correspoding exit location $f$ and $e$ to know where to continue the
+symbolic execution from. We include the whole expressions only for clarity
+of presentation.
 
 The template is applied during \emph{compact symbolic execution} of the
 program. The execution processes the first command \texttt{i:=0} in the
@@ -385,25 +411,34 @@ location $b$ for which we have the template.
 % $(b,\theta,\varphi)$ with entry location $b$. 
 % where $\theta(\var{i})=0$ and it assigns to each other variable he
 % corresponding symbol except for ...
-At this point, we apply the template instead of executing the original
+At this point, we can apply the template instead of executing the original
 program. The node $(b,\theta',\varphi')$ gets one successor for each triple
-of the template. The triple $(f,\theta_f\prm{\kappa},\varphi_f\prm{\kappa})$
-generates the successor $(f,\theta'_f\prm{\kappa},\varphi'_f\prm{\kappa})$. Note
-that we cannot use $(f,\theta_f\prm{\kappa},\varphi_f\prm{\kappa})$ directly as
-$\theta_f\prm{\kappa},\varphi_f\prm{\kappa}$ describe executions starting just at
-the entry location $b$, while $\theta'_f\prm{\kappa},\varphi'_f\prm{\kappa}$ have to
-reflect the effect of the executions starting at $a$. We create
-$\theta'_f\prm{\kappa},\varphi'_f\prm{\kappa}$ by composing
-$\theta_f\prm{\kappa},\varphi_f\prm{\kappa}$ with $\theta',\varphi'$. The
-composition is precisely described in the following section. In our simple
-program, $\theta',\varphi'$ reflect only the effect of assignment
-\texttt{i:=0}. Thus, $\theta'_f\prm{\kappa}$ equals to $\theta_f\prm{\kappa}$ where
-$\sym{i}$ is replaced by $0$ and $\varphi'_f\prm{\kappa}$ equals
-$\varphi_f\prm{\kappa}$ where $\sym{i}$ is replaced by $0$. The second triple
-$(e,\theta_e\prm{\kappa},\varphi_e\prm{\kappa})$ of the template generates the
-successor $(e,\theta'_e\prm{\kappa},\varphi'_e\prm{\kappa})$ analogously. The
-symbolic execution then continues from these successor in the standard way.
-The resulting \emph{compact symbolic execution tree} is depicted in
+of the template. The triple $((cdb)^\kappa
+f,\theta_f\prm{\kappa},\varphi_f\prm{\kappa})$ generates the successor
+$((cdb)^\kappa
+f,\theta'_{b\!f}\prm{\kappa},\varphi'_{b\!f}\prm{\kappa})$. Note that we
+cannot use $((cdb)^\kappa
+f,\theta_{b\!f}\prm{\kappa},\varphi_{b\!f}\prm{\kappa})$ directly as
+$\theta_{b\!f}\prm{\kappa},\varphi_{b\!f}\prm{\kappa}$ describe executions
+starting just at the entry location $b$, while
+$\theta'_{b\!f}\prm{\kappa},\varphi'_{b\!f}\prm{\kappa}$ have to reflect the
+effect of the executions starting at $a$. We create
+$\theta'_{b\!f}\prm{\kappa},\varphi'_{b\!f}\prm{\kappa}$ by composing
+$\theta_{b\!f}\prm{\kappa},\varphi_{b\!f}\prm{\kappa}$ with
+$\theta',\varphi'$. The composition is precisely described in the following
+section. In our simple program, $\theta',\varphi'$ reflect only the effect
+of assignment \texttt{i:=0}. Thus, $\theta'_{b\!f}\prm{\kappa}$ equals to
+$\theta_{b\!f}\prm{\kappa}$ where $\sym{i}$ is replaced by $0$ and
+$\varphi'_{b\!f}\prm{\kappa}$ equals $\varphi_{b\!f}\prm{\kappa}$ where
+$\sym{i}$ is replaced by $0$. The second triple $((cdb)^\kappa
+ce,\theta_{ce}\prm{\kappa},\varphi_{ce}\prm{\kappa})$ of the template
+generates the successor $((cdb)^\kappa
+ce,\theta'_{ce}\prm{\kappa},\varphi'_{ce}\prm{\kappa})$ analogously. Recall
+that the expressions $(cdb)^\kappa f$ and $ce(cdb)^\kappa ce$ only support
+intuitive meaning of the nodes in the tree. Only the last locations $f$ and
+$e$ of these expressions are technically significant. The symbolic execution
+then continues from these successor in the standard way. The resulting
+\emph{compact symbolic execution tree} is depicted in
 Figure~\ref{fig:linSrch}(c).
 
 The compact symbolic execution tree is much smaller than the classic
@@ -411,11 +446,17 @@ tree. In particular, the infinite path in the classic tree (highlighted by
 the grey region) corresponds to the single node $d$ in the compact
 tree. However, the two trees keep the same information. For example, the
 left leaf of the compact tree represents the following path condition
-\[
-\varphi\prm{\kappa}~=~\kappa\ge0~\wedge~ \forall\tau(0\le\tau<\kappa\implies
-(\tau<\sym{n}\,\wedge\,\sym{A}(\tau)\neq\sym{x}))~\wedge~\kappa<\sym{n}
-~\wedge~\sym{A}(\kappa)=\sym{x}.
-\]
+\begin{align*}
+  \varphi\prm{\kappa}~=~&\kappa\ge0~~\wedge\\
+  \wedge~&~\forall\tau(0\le\tau<\kappa\implies
+  (\tau<\sym{n}~\wedge~\sym{A}(\tau)\neq\sym{x}))~~\wedge\\
+  \wedge~&~\kappa<\sym{n}~~\wedge~~\sym{A}(\kappa)=\sym{x}
+\end{align*}
+% \[
+% \varphi\prm{\kappa}~=~\kappa\ge0~\wedge~ \forall\tau(0\le\tau<\kappa\implies
+% (\tau<\sym{n}\,\wedge\,\sym{A}(\tau)\neq\sym{x}))~\wedge~\kappa<\sym{n}
+% ~\wedge~\sym{A}(\kappa)=\sym{x}.
+% \]
 Let us mark all leafs on the left-hand side of the classic tree as
 $g_0,g_1,g_2,\ldots$ and let $\varphi_0,\varphi_1,\varphi_2,\ldots$ be the
 corresponding path conditions. One can easily compute each path condition
@@ -423,20 +464,24 @@ $\varphi_i$ as a conjunction of the conditions along the corresponding path
 in the figure of the tree and check that $\varphi_i$ is equivalent to
 $\varphi[i]$ for each $i\ge0$. For example,
 \[
+\setlength{\arraycolsep}{0pt}
 \begin{array}{rcl}
-\varphi_1&=
-&0<\sym{n}~\wedge~\sym{A}(0)\neq\sym{x}~\wedge~1<\sym{n}~\wedge~\sym{A}(1)=\sym{x}\\[2mm]
-\varphi\prm{1}&\equiv&\forall\tau(0\le\tau<1\implies
-(\tau<\sym{n}\,\wedge\,\sym{A}(\tau)\neq\sym{x}))~\wedge~1<\sym{n}
-~\wedge~\sym{A}(1)=\sym{x}
+  \varphi_1&~=~
+  &0<\sym{n}~\wedge~\sym{A}(0)\neq\sym{x}
+   ~\wedge~1<\sym{n}~\wedge~\sym{A}(1)=\sym{x}\\[2mm]
+  \varphi\prm{1}&\equiv&\forall\tau(0\le\tau<1\implies
+  (\tau<\sym{n}~\wedge~\sym{A}(\tau)\neq\sym{x}))~\wedge\\
+  &\wedge&1<\sym{n}~\wedge~\sym{A}(1)=\sym{x}
 \end{array}
 \]
-and hence $\varphi_1\equiv\varphi\prm{1}$. Similarly, each symbolic memory of a
-node $g_i$ is an instance $\theta\prm{i}$ of the parametrized symbolic memory in
-the left leaf of the compact tree. Analogous relations hold for leafs on the
-right-hand sides of the trees.
+and hence $\varphi_1\equiv\varphi\prm{1}$. Similarly, each symbolic memory
+of a node $g_i$ is an instance $\theta\prm{i}$ of the parametrized symbolic
+memory in the left leaf of the compact tree. Analogous relations hold for
+leafs on the right-hand sides of the compact and standard symbolic execution
+trees. To sum up, the compact symbolic execution tree carries in its leaves the
+same information as the standard symbolic execution tree. 
 
-\rem{V tech poslednich odstavcich by chtelo vic vyzdvihnout ten prinos. Je
+\todo{V tech poslednich odstavcich by chtelo vic vyzdvihnout ten prinos. Je
 tam, ze ten strom je hodne mensi, ale mozna bych uvedl, co to ma za
 dusledek. (zrychleni vypoctu, mensi spotreba pameti, \ldots). Anebo to mozna
 napsat hned v intru.}
@@ -465,7 +510,7 @@ napsat hned v intru.}
 %    \end{tabular}
 \caption{(a) A program with a function \texttt{countIf(A,n,x)}. (b)
 Symbolic execution tree of function \texttt{countIf}. (c) Compact
-symbolic execution tree of function \texttt{countIf}.
+symbolic execution tree of function \texttt{countIf}. \todo{Upravit, neni to hezky}
 %, where $\gamma_g^i \equiv
 %s_c^i.\theta\ese{t.\varphi_g\prm{\kappa_i}}$, $\gamma_f^i \equiv
 %s_c^i.\theta\ese{t.\varphi_f\prm{\kappa_i}}$, $s_g^i = s_c^i.\theta
@@ -475,56 +520,78 @@ symbolic execution tree of function \texttt{countIf}.
 \label{fig:countIf}
 \end{figure*}
 
-\color{blue}
-Let us now have a look at Figure~\ref{fig:countIf}(a) depicting a
-program with a function \texttt{countIf}. The function counts number
-of elements in array \texttt{A} having values equal to \texttt{x}. The
-count is accumulated in the variable \texttt{k}. Note that there is a
-program loop in the function entered in the location $c$ and the body
-of the loop consists of two paths $\textit{cdefc}$ and $\textit{cdfc}$.
+\smallskip Let us now consider a flowgraph of a function \texttt{countIf}
+depicted in Figure~\ref{fig:countIf}(a). The function counts the number of
+elements in array \texttt{A} having values equal to \texttt{x}. The count is
+accumulated in the variable \texttt{k}. One point of this example is to
+provide a better intuition for the term \emph{cycle} used in this
+paper. Basically, a cycle in the flowgraph is a path of the form
+$e_1e_2\ldots e_ne_1$ for some $n>0$, where all the nodes
+$e_1,e_2,\ldots,e_n$ are pairwise different. We consider only the cycles
+where $e_1$ is a target node of an edge not lying on the cycle. The location
+$e_1$ is called \emph{entry location} of the cycle. By \emph{exit edge} we
+mean an edge not lying on the cycle, but leading from a node of the
+cycle. Target nodes of exit edges are called \emph{exit locations}. The
+flowgraph of Figure~\ref{fig:countIf}(a) contains four cycles:
+\begin{center}
+  \setlength{\tabcolsep}{2pt}
+  \begin{tabular}{ll}
+    $p_1=cdefc$ & with exit edges $(c,g),(d,f)$ \\
+    $p_2=cdfc$ & with exit edges $(c,g),(d,e)$ \\
+    $p_3=fcdef$ & with exit edges $(c,g),(d,f)$ \\
+    $p_4=fcdf$ & with exit edges $(c,g),(d,e)$
+  \end{tabular}
+\end{center}
 
-In this the flowgraph there we can detect exactly three program parts
-\begin{align*}
-p_1 &= (c, \textit{cdefc}, \{ (c,g), (d,f) \}),\\
-p_2 &= (c, \textit{cdfc}, \{ (c,g), (d,e) \}),\\
-p_3 &= (f, \textit{fcdf}, \{ (c,g), (d,e) \}).
-\end{align*}
+\todo{Je nejaky duvod, proc neuvazovat i ten treti template?}
+% Let us now have a look at Figure~\ref{fig:countIf}(a) depicting a
+% program with a function \texttt{countIf}. The function counts number
+% of elements in array \texttt{A} having values equal to \texttt{x}. The
+% count is accumulated in the variable \texttt{k}. Note that there is a
+% program loop in the function entered in the location $c$ and the body
+% of the loop consists of two paths $\textit{cdefc}$ and $\textit{cdfc}$.
+
+% In this the flowgraph there we can detect exactly three program parts
+% \begin{align*}
+% p_1 &= (c, \textit{cdefc}, \{ (c,g), (d,f) \}),\\
+% p_2 &= (c, \textit{cdfc}, \{ (c,g), (d,e) \}),\\
+% p_3 &= (f, \textit{fcdf}, \{ (c,g), (d,e) \}).
+% \end{align*}
 Observe, that $(d,f)$ is the exit edge of $p_1$ even though the exit
-location $f$ belongs to the cyclic path $\textit{cdefc}$ of the part.
-The edge $(d,f)$ is the exit edge of $p_1$, because we can use it to
-escape from the cycle of the part. In this particular case the escape
-means to shorten the cycle.
+location $f$ belongs to the cycle. The reason is that the edge is not lying
+on the cyclic path defining the cycle.
 
-Also observe that both cyclic paths forming the body of the program
-loop are captured by the program parts $p_1$ and $p_2$ and are
-therefore ready for an independent analysis, i.e. for the computation
-of the related templates. On the other hand, the program part $p_3$
-has no meaningful purpose in the context of the program loop.
+% Also observe that both cyclic paths forming the body of the program
+% loop are captured by the program parts $p_1$ and $p_2$ and are
+% therefore ready for an independent analysis, i.e. for the computation
+% of the related templates. On the other hand, the program part $p_3$
+% has no meaningful purpose in the context of the program loop.
 
-Let us further suppose we have successfully analysed all the program
-parts $p_1, p_2$ and $p_3$ according to the procedure described above
-so we have templates $t_1, t_2$ and $t_3$ for the program parts $p_1,
-p_2$ and $p_3$ respectively. If compact symbolic execution reaches the
-location $c$, then there we have to choose one of the templates $t_1$
-and $t_2$ which we will instantiate into the compact symbolic
-execution tree. Obviously, we may choose any of the templates. For
-example, by choosing $t_1$ we simultaneously apply all possible
-numbers of subsequent iterations along the cyclic path \textit{cdefc}
-and stepping into either the location $g$ or $f$. Similarly when
-choosing $t_2$. In the Figure~\ref{fig:countIf}(b) there is depicted
-classic symbolic execution tree of the function \texttt{countIf}. 
-Grey regions there go down-left direction and they identify paths in
-the tree forming repetitions of the cyclic path of $p_1$.
-\todo{doplnit jak se vytvoril comaptni strom z toho klasickeho pri
-pouziti pouze $t_1$ a zadne jine.}
+Let us further suppose we have successfully analysed all cycles
+$p_1,p_2,p_3,p_4$ according to the procedure described above so we have the
+corresponding templates $t_1,t_2,t_3,t_4$. When the compact symbolic
+execution reaches the location $c$, we can either continue in the standard
+way or apply one of the templates $t_1$ and $t_2$ for the next
+step. Similarly, when $f$ is reached, we can either continue in the standard
+way or apply $t_3$ or $t_4$. Figure~\ref{fig:countIf}(c) shows a compact
+symbolic execution tree for the case that we always chose $t_1$ when
+visiting $c$ and we always use the standard symbolic execution step when
+visiting $f$. The tree is much smaller then the standard symbolic execution
+tree depicted in Figure~\ref{fig:countIf}(b). The grey regions in the
+standard symbolic execution tree mark iterations of the cycle $p_1$, whose
+symbolic execution is replaced by application of template $t_1$ in the
+compact symbolic execution tree.
 
-It is easy to imagine whole the situation above in the context of $p_2$ and
-$t_2$. Then grey regions would go down-right and we would collapse
-the tree from the right to the left. If we always choose randomly
-between $t_1$ and $t_2$ whenever we step into $c$, then we will
-collapse paths of the tree from both directions, but always according to
-our actual choice.
+% It is easy to imagine whole the situation above in the context of $p_2$ and
+% $t_2$. Then grey regions would go down-right and we would collapse
+% the tree from the right to the left. If we always choose randomly
+% between $t_1$ and $t_2$ whenever we step into $c$, then we will
+% collapse paths of the tree from both directions, but always according to
+% our actual choice.
 
+\todo{Dava tohle smysl? Proc bychom musime dat sanci i dalsim templatum?}
+
+\color{blue}
 Finally, let us discuss consequences of the following rule for
 choosing templates during compact symbolic execution: Whenever we step
 into a location at which we can instantiate a template, we do so. Now,
@@ -884,6 +951,8 @@ not sufficient).
 We start with formal definitions of the terms \emph{cycle} and
 \emph{template}, since they are essential for this section. We assume
 $P$ is a program throughout the section.
+
+\todo{Pozor, nemuze cyklus zacinat i v inicialnim uzlu programu?}
 
 \begin{dfn}[Cycle]\label{def:Part}
 Let $(u,e)$ be an edge of a flowgraph $f$ of $P$, $\pi = e \omega e$
@@ -1808,6 +1877,15 @@ programs.
 
 \bibliographystyle{plain}
 \bibliography{cse_issta2013}
+
+
+
+
+
+
+
+
+
 
 %\appendix
 %\begin{appendix}
