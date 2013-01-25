@@ -94,15 +94,17 @@
 \begin{abstract}
   We present a generalisation of King's symbolic execution technique called
   \emph{compact symbolic execution}. It is based on a concept of templates:
-  a template is a declarative parametric description of a program part,
-  whose any execution has some regularities in program states along
-  it. Typical sources of such regularities are program loops and recursive
-  calls. Using the templates, we are able to build a symbolic execution tree
-  where a single node represents arbitrarily many iterations of the
-  corresponding program part without loss of any information. This leads to
-  a considerable reduction of size of the symbolic execution tree. There are
-  even programs for which the resulting compact symbolic execution trees are
-  finite while the classic symbolic execution trees are infinite.
+  a template is a declarative parametric description of a cycle in the
+  control flow graph of a program. 
+  % program part, whose any execution has some regularities in program
+  % states along it. Typical sources of such regularities are program loops
+  % and recursive calls.
+  Using the templates, we are able to build a symbolic execution tree where
+  a single node represents arbitrarily many iterations of the corresponding
+  cycle without loss of any information. This leads to a considerable
+  reduction of size of the symbolic execution tree. There are even programs
+  for which the resulting compact symbolic execution trees are finite while
+  the classic symbolic execution trees are infinite.
 \end{abstract}
 
 \category{D.2.4}{Software Engineering}{Software/Program Verification}
@@ -122,7 +124,7 @@ Symbolic execution, Path Explosion Problem
 \section{Introduction} \label{sec:Introduction}
 
 Classic symbolic execution as proposed by King in 1976~\cite{Kin76}
-systematically explores all real execution paths in an analysed program.
+systematically explores all execution paths in an analysed program.
 % We commonly describe these paths in a tree structure called \emph{symbolic
 % execution tree}. Each path in the tree from its root to any leaf
 % represents one real path in the analysed program.
@@ -130,20 +132,40 @@ There is typically huge (or even infinite) number of execution paths even
 for very small and simple programs. Therefore, exploration of all execution
 paths is a serious problem known as \emph{path explosion problem}.
 
-Compact symbolic execution also explores all real execution paths, but in a
+Compact symbolic execution also explores all execution paths, but in a
 compact manner. We analyse a given program \emph{before} we start its
-symbolic execution. We look for those parts of the program, which might
-produce execution paths with some regularities in program states along
-them. Typically, program loops and recursion produce such regularities. We
-analyse these program parts independently from the rest of the program. The
-goal of the analysis is to find a \emph{template}, i.e.~a declarative
-parametric description of the complete behaviour of the analysed part.
-Later, whenever the symbolic execution enters a program part for which we
-have a template, we either proceed in the standard way or add to the
-symbolic execution tree just a single node that reflects a cumulative effect
-of any execution of the program part as represented by the template. This
-node has one successor for each edge leaving the program part. Symbolic
-execution continues from these successors in the standard way.
+symbolic execution. We look for cycles in the control flow graph of the
+program. %  which might produce execution paths with some regularities in
+% program states along them. Typically, program loops and recursion produce
+% such regularities.
+We analyse these cycles independently from the rest of the program. The goal
+of the analysis is to find a \emph{template}, i.e.~a declarative parametric
+description of the complete behaviour of the cycle. Later, whenever the
+symbolic execution enters a cycle for which we have a template, we either
+proceed in the standard way, or add to the symbolic execution tree only one
+successor node for each edge leaving the cycle. Each such a node reflects a
+cumulative effect of any execution of the cycle eventually leaving the cycle
+by the corresponding edge. Symbolic execution continues from these
+successors in the standard way. 
+
+If our algorithm fails to compute any template for a given program, then the
+compact symbolic execution reduces to the classic one. However, if a
+template for a cycle is found and applied, one node in the compact symbolic
+execution tree can represent all execution paths that differ only in number
+of iterations around the cycle. Such a node corresponds to (potentially
+infinitely) many nodes of the standard symbolic execution tree. Therefore,
+the compact symbolic execution typically produces much smaller trees
+comparing to the standard symbolic execution. Also, application of a
+template leads to a faster exploration of a execution paths (in one step, we
+explore all iterations of the cycle). As a results, test-generation
+techniques based on symbolic execution can be more successful (cover more
+locations in a given time limit) if they use compact symbolic execution.
+
+On the negative side, each application of a template adds one quantifier to
+a path conditions. As a result, SMT solvers fail to decide satisfiability of
+our path conditions more often than in the standard case. Experimental
+evaluation of our technique indicate that the benefits of our technique are
+in practice considerably higher than its drawbacks.
 
 % This node corresponds to an application of the template which specifies
 % changes of the symbolic state and path condition after leaving this
@@ -155,11 +177,6 @@ execution continues from these successors in the standard way.
 % \emph{jump} behind the part, where we continue with the classic symbolic
 % execution again.
 
-The worst case for compact symbolic execution occurs when we fail to
-compute any template for a given program. Compact symbolic execution then
-reduces to the classic one. \todo{Tohle neni uplne pravda diky
-  SAT-failum. Budem to tu resit?}
-
 \medskip The rest of the paper is organized as follows. The next section
 presents the basic idea of the compact symbolic execution using two
 illustrative examples. Section~\ref{sec:technique} provides a formal
@@ -167,8 +184,9 @@ description of the technique.
 % in a simple setting: templates with one parameter that are derived from
 % integer programs without function calls. Section~\ref{sec:extensions}
 % indicates possible extension of the technique.
-Experimental results are presented in Section~\ref{sec:experiments}. The
-last two sections discuss the related work and conclude the paper.
+Section~\ref{sec:experiments} is devoted to experimental implementation and
+experimental results. The last two sections discuss the related work and
+conclude the paper.
 
 %}}}
 %{{{ Basic idea
@@ -205,19 +223,24 @@ it returns \texttt{-1}.
 % \label{fig:linSrch}
 % \end{figure}
 
-\begin{figure*}[!htb]
-  \begin{center}
-    \begin{tabular}{cp{5ex}cp{5ex}c}
-      \input{fig_linSrch} &&
-      \input{fig_linSrchSET} &&
-      {\input{fig_linSrchCSET}}
-    \end{tabular}
-  \end{center}
+\begin{figure}[!htb]
+  \begin{tabular}{cc}
+    \multicolumn{2}{c}{\input{fig_linSrch}} \\
+    \hspace{-2ex}\input{fig_linSrchSET} &
+    \input{fig_linSrchCSET}
+  \end{tabular}
+  % \begin{center}
+  %   \begin{tabular}{cp{5ex}cp{5ex}c}
+  %     \input{fig_linSrch} &&
+  %     \input{fig_linSrchSET} &&
+  %     {\input{fig_linSrchCSET}}
+  %   \end{tabular}
+  % \end{center}
 \caption{(a) A flowgraph of a function \texttt{linSrch(A,n,x)}.
 (b) Classic symbolic execution tree of \texttt{linSrch}. (c) Compact
 symbolic execution tree of \texttt{linSrch}.}
 \label{fig:linSrch}
-\end{figure*}
+\end{figure}
 
 We first briefly describe the classic symbolic execution as proposed by
 King~\cite{Kin76}. Symbolic execution runs a program over symbols
@@ -228,17 +251,17 @@ symbol $\sym{v}$ to represent its input value.
 Symbolic execution maintains a \emph{symbolic memory} $\theta$ and a
 \emph{path condition} $\varphi$. At each state of the symbolic execution,
 $\theta$ assigns to each program variable its current value given as an
-expression over the symbols. For example, if the first command of a program is
-the assignment \texttt{i:=2*n+x}, then $\theta(\var{i})=2\sym{n}+\sym{x}$
-after the first step. The path condition $\varphi$ is a formula representing
+expression over the symbols. For example, if the first command of a program
+is the assignment \texttt{i:=2*n+x}, then $\theta(\var{i})=2\sym{n}+\sym{x}$
+after its execution. The path condition $\varphi$ is a formula representing
 the necessary and sufficient condition on the symbols (i.e.~on input values)
-to drive the execution along the current execution path. $\varphi$ is initially
-$\true$ and it can be updated at branching commands. For example, if we
-execute a command \texttt{if~(x>n+5)} (in a flowgraph, this corresponds to a
-location with two out-edges labelled by \texttt{x>n+5} and \texttt{x<=n+5}),
-we instantiate the condition with use of $\theta$ and we check whether the
-current path condition $\varphi$ implies validity of the instance or its
-negation. In other words, we ask for validity of
+to drive the execution along the current execution path. $\varphi$ is
+initially $\true$ and it can be updated at branching commands. For example,
+if we execute a command \texttt{if~(x>n+5)} (in a flowgraph, this
+corresponds to a location with two out-edges labelled by \texttt{x>n+5} and
+\texttt{x<=n+5}), we instantiate the condition with use of $\theta$ and we
+check whether the current path condition $\varphi$ implies validity of the
+instance or its negation. In other words, we ask for validity of
 \[
 \varphi\implies(\theta(\var{x})>\theta(\var{n})+5)
 ~~~~~~~\textrm{and}~~~~~~~
@@ -253,10 +276,10 @@ condition on the true branch to
 $\varphi\wedge(\theta(\var{x})>\theta(\var{n})+5)$ and the one on the false
 branch to $\varphi\wedge(\theta(\var{x})\le\theta(\var{n})+5)$. Due to the
 forks, symbolic execution is traditionally represented by a tree called
-\emph{symbolic execution tree}. Nodes of the tree (also called \emph{states}
-of the symbolic execution) are triples $(l,\theta,\varphi)$ consisting of
-the current program location $l$, symbolic memory $\theta$, and path
-condition $\varphi$.
+\emph{(classic) symbolic execution tree}. Nodes of the tree (also called
+\emph{states} of the symbolic execution) are triples $(l,\theta,\varphi)$
+consisting of the current program location $l$, symbolic memory $\theta$,
+and path condition $\varphi$.
 
 The symbolic execution tree for the program of Figure~\ref{fig:linSrch}(a)
 is depicted in Figure~\ref{fig:linSrch}(b). Note that the figure does not
@@ -308,12 +331,12 @@ We say that $b$ is an \emph{entry location} and $f,e$ are \emph{exit
 % \color{black}
 %
 Compact symbolic execution aims to effectively exploit the uniformity of all
-cycle executions. To do it, we need to find a unified declarative
+cycle executions. To do so, we need to find a unified declarative
 description of the \emph{effect} of all cycle executions on a symbolic
 memory and a path condition. Hence, we analyze the cycle separately from the
 rest of the flowgraph. In the following, the symbols
 $\sym{n},\sym{x},\sym{i},\sym{A}$ represent the values of the corresponding
-variables at the entry location $b$ before the first iteration.
+variables at the entry location $b$, before the first iteration.
 
 We first study the effect of all iterating parts of the cycle
 executions. One can see that each iteration increases the value of $\var{i}$
@@ -355,9 +378,12 @@ Therefore, the path condition after $\kappa$ iterations has the form
 where $\tau$-th line, $\tau\in\{0,1,\ldots,\kappa-1\}$, consists of two
 predicates resulting from evaluation of the conditions \texttt{i<n} and
 \texttt{A[i]!=x} respectively after $\tau$ iterations of the cycle,
-i.e.~during the $(\tau+1)$-st iteration. To uniformly describe all such path
-conditions for all values of parameter $\kappa$, we have to use an
-equivalent formula with a quantifier:
+i.e.~during the $(\tau+1)$-st iteration. Unfortunately, the conjunction
+above is not a first order formula as its length depends on the parameter
+$\kappa$, whose value can be arbitrary. The conjunction can be equivalently
+expressed by the following quantified formula:
+% To uniformly describe all such path
+% conditions for all values of $\kappa$, we have to use a quantified formula:
 \[
   \forall\tau(0\le\tau<\kappa\implies
   (\sym{i}+\tau<\sym{n}\,\wedge\,\sym{A}(\sym{i}+\tau)\neq\sym{x}))
@@ -399,11 +425,11 @@ triples $((cdb)^\kappa
 f,\theta_{b\!f}\prm{\kappa},\varphi_{b\!f}\prm{\kappa})$ and $((cdb)^\kappa
 ce,\theta_{ce}\prm{\kappa},\varphi_{ce}\prm{\kappa})$, one for each exit
 edge. The first elements of these triples are expressions $(cdb)^\kappa f$
-and $ce(cdb)^\kappa ce$ representing sequences of locations passed in
+and $(cdb)^\kappa ce$ representing sequences of locations passed in
 correspoding cycle executions. Technically, we only need to remember the
-correspoding exit location $f$ and $e$ to know where to continue the
+correspoding exit locations $f$ and $e$ to know where to continue the
 symbolic execution from. We include the whole expressions only for clarity
-of presentation.
+of presentation (and we will leave this practice in the formal definition).
 
 The template is applied during \emph{compact symbolic execution} of the
 program. The execution processes the first command \texttt{i:=0} in the
@@ -436,7 +462,7 @@ $\sym{i}$ is replaced by $0$. The second triple $((cdb)^\kappa
 ce,\theta_{ce}\prm{\kappa},\varphi_{ce}\prm{\kappa})$ of the template
 generates the successor $((cdb)^\kappa
 ce,\theta'_{ce}\prm{\kappa},\varphi'_{ce}\prm{\kappa})$ analogously. Recall
-that the expressions $(cdb)^\kappa f$ and $ce(cdb)^\kappa ce$ only support
+that the expressions $(cdb)^\kappa f$ and $(cdb)^\kappa ce$ only support
 intuitive meaning of the nodes in the tree. Only the last locations $f$ and
 $e$ of these expressions are technically significant. The symbolic execution
 then continues from these successor in the standard way. The resulting
@@ -464,7 +490,7 @@ $g_0,g_1,g_2,\ldots$ and let $\varphi_0,\varphi_1,\varphi_2,\ldots$ be the
 corresponding path conditions. One can easily compute each path condition
 $\varphi_i$ as a conjunction of the conditions along the corresponding path
 in the figure of the tree and check that $\varphi_i$ is equivalent to
-$\varphi[i]$ for each $i\ge0$. For example,
+$\varphi\prm{i}$ for each $i\ge0$. For example,
 \[
 \setlength{\arraycolsep}{0pt}
 \begin{array}{rcl}
@@ -479,14 +505,9 @@ $\varphi[i]$ for each $i\ge0$. For example,
 and hence $\varphi_1\equiv\varphi\prm{1}$. Similarly, each symbolic memory
 of a node $g_i$ is an instance $\theta\prm{i}$ of the parametrized symbolic
 memory in the left leaf of the compact tree. Analogous relations hold for
-leafs on the right-hand sides of the compact and standard symbolic execution
+leafs on the right-hand sides of the compact and classic symbolic execution
 trees. To sum up, the compact symbolic execution tree carries in its leaves the
-same information as the standard symbolic execution tree. 
-
-\todo{V tech poslednich odstavcich by chtelo vic vyzdvihnout ten prinos. Je
-tam, ze ten strom je hodne mensi, ale mozna bych uvedl, co to ma za
-dusledek. (zrychleni vypoctu, mensi spotreba pameti, \ldots). Anebo to mozna
-napsat hned v intru.}
+same information as the classic symbolic execution tree. 
 
 \begin{figure*}[!htb]
     \begin{tabular}{cc}
@@ -528,7 +549,7 @@ elements in array \texttt{A} having values equal to \texttt{x}. The count is
 accumulated in the variable \texttt{k}. One point of this example is to
 provide a better intuition for the term \emph{cycle} used in this
 paper. Basically, a cycle in the flowgraph is a path of the form
-$e_1e_2\ldots e_ne_1$ for some $n>0$, where all the nodes
+$e_1e_2\ldots e_ne_1$ for some $n>1$, where all the nodes
 $e_1,e_2,\ldots,e_n$ are pairwise different. We consider only the cycles
 where $e_1$ is a target node of an edge not lying on the cycle. The location
 $e_1$ is called \emph{entry location} of the cycle. By \emph{exit edge} we
@@ -538,14 +559,12 @@ flowgraph of Figure~\ref{fig:countIf}(a) contains four cycles:
 \begin{center}
   \setlength{\tabcolsep}{2pt}
   \begin{tabular}{ll}
-    $p_1=cdefc$ & with exit edges $(c,g),(d,f)$ \\
-    $p_2=cdfc$ & with exit edges $(c,g),(d,e)$ \\
-    $p_3=fcdef$ & with exit edges $(c,g),(d,f)$ \\
-    $p_4=fcdf$ & with exit edges $(c,g),(d,e)$
+    $p_1=\mathit{cdefc}$ & with exit edges $(c,g),(d,f)$ \\
+    $p_2=\mathit{cdfc}$ & with exit edges $(c,g),(d,e)$ \\
+    $p_3=\mathit{fcdef}$ & with exit edges $(c,g),(d,f)$ \\
+    $p_4=\mathit{fcdf}$ & with exit edges $(c,g),(d,e)$
   \end{tabular}
 \end{center}
-
-\todo{Je nejaky duvod, proc neuvazovat i ten treti template?}
 % Let us now have a look at Figure~\ref{fig:countIf}(a) depicting a
 % program with a function \texttt{countIf}. The function counts number
 % of elements in array \texttt{A} having values equal to \texttt{x}. The
@@ -577,37 +596,17 @@ way or apply one of the templates $t_1$ and $t_2$ for the next
 step. Similarly, when $f$ is reached, we can either continue in the standard
 way or apply $t_3$ or $t_4$. Figure~\ref{fig:countIf}(c) shows a compact
 symbolic execution tree for the case that we always chose $t_1$ when
-visiting $c$ and we always use the standard symbolic execution step when
-visiting $f$. The tree is much smaller then the standard symbolic execution
+visiting $c$ and we always use the classic symbolic execution step when
+visiting $f$. The tree is much smaller then the classic symbolic execution
 tree depicted in Figure~\ref{fig:countIf}(b). The grey regions in the
-standard symbolic execution tree mark iterations of the cycle $p_1$, whose
+classic symbolic execution tree mark iterations of the cycle $p_1$, whose
 symbolic execution is replaced by application of template $t_1$ in the
 compact symbolic execution tree.
 
-% It is easy to imagine whole the situation above in the context of $p_2$ and
-% $t_2$. Then grey regions would go down-right and we would collapse
-% the tree from the right to the left. If we always choose randomly
-% between $t_1$ and $t_2$ whenever we step into $c$, then we will
-% collapse paths of the tree from both directions, but always according to
-% our actual choice.
-
-\todo{Dava tohle smysl? Proc bychom musime dat sanci i dalsim templatum?}
-
-\color{blue}
-Finally, let us discuss consequences of the following rule for
-choosing templates during compact symbolic execution: Whenever we step
-into a location at which we can instantiate a template, we do so. Now,
-let us suppose that compact symbolic execution of the function
-\texttt{countIf} just reached the location $f$. From that moment on
-only the template $t_3$ can be instantiated into the tree bellow the
-current vertex (labelled by $f$). This is because the location $c$
-will then never by reached. Therefore, to give a chance to the other
-templates we always also consider a possibility to continue from any
-location by classic symbolic execution, i.e. without instantiation of
-a template even if there available in the location. Nevertheless
-observe, that the rule above does not affect correctness of the
-execution.
-\color{black}
+\todo{pokud je v entry nodu $e$ vice cyklu a nemame pro vsechny template,
+je dobry dat moznost udelat i normalni symbolicky krok, abychom o par kroku
+dal mohli aplikovat template pro ten samy cyklus (pro ktery z $e$ nebyl
+template) jen s jinym entry nodem.}
 
 %}}}
 %{{{ Description of the technique
@@ -618,6 +617,7 @@ This section describes the compact symbolic execution formally. For
 simplicity, we formulate the algorithm for programs manipulating only
 integer variables and multidimensional integer arrays. The algorithm
 supports function calls. 
+
 % Nevertheless, the algorithm can be extended to handle
 % variables of other types, function calls, etc.
 
@@ -625,45 +625,48 @@ supports function calls.
 
 \subsection{Preliminaries}
 
-\color{blue}
-\begin{dfn}[Program] \label{def:Program}
-A \emph{program} is a collection of functions and global variables.
+First of all, we describe the cosidered model of programs, recall classic
+symbolic execution, and define composition and equivalence of symbolic
+program states.
+
+\smallskip
+%\begin{dfn}[Program] \label{def:Program}
+A \emph{program} is a finite collection of functions and global variables.
 Each function has its own local variables. All program variables and
-functions have different names. Exactly one function is marked as a
-starting one. Each function is represented as an oriented graph.
-Vertices in a graph identify program locations, while edges define
-transitions between them. We distinguish a single entry and an exit
-location in each graph. There is no in-edge to an entry location and
-there is no out-edge from an exit one. We label edges by actions to be
-taken when moving between connected locations. An action can be:
+functions have different names. Exactly one function is marked as the
+starting one. Each function is represented as a finite flowgraph, where
+vertices identify program locations and edges define transitions between the
+locations. Each function contains two distinguished locations: an
+\emph{entry location} and an \emph{exit location}. There is no edge leading
+to an entry location and no edge leading from an exit location. Each edge is
+labeled by an action to be taken when moving along the edge. We support five
+types of actions:
 \begin{itemize}
-\item[(1)] An assignment of the form $<$variable$>${\tt
-:=}$<$expression$>$,
-
-\item[(2)] Call by value statements\\(a) $<$variable$>${\tt
-:=}$<$function-name$>${\tt (}$<$arg-list$>${\tt )}, or\\(b)
-$<$function-name$>${\tt (}$<$arg-list$>${\tt )}
-
-\item[(3)] A return value statement {\tt ret }$<$expression$>$,
-
-\item[(4)] {\tt skip} statement, which does nothing, or
-
-\item[(5)] A boolean expression over program variables, which
-either enables or disables its edge.
+\item[(1)] an assignment of the form $<$variable$>${\tt :=}$<$expression$>$
+\item[(2)] call by value statements\\(a) $<$variable$>${\tt
+    :=}$<$function-name$>${\tt (}$<$arg-list$>${\tt )}, or\\(b)
+  $<$function-name$>${\tt (}$<$arg-list$>${\tt )}
+\item[(3)] a return value statement {\tt ret }$<$expression$>$
+\item[(4)] {\tt skip} statement, which does nothing
+\item[(5)] a boolean expression over program variables, which
+either enables or disables its edge
 \end{itemize}
-If an edge $e = (u,v)$ is labelled by one of the actions (1)-(4), then
-out-degree of $u$ is $1$. Otherwise, label of $e$ is an action (5),
+If an edge $(u,v)$ is labelled by one of the actions (1)-(4), then
+out-degree of $u$ is $1$. Otherwise, label of $(u,v)$ is an action (5),
 out-degree of $u$ is $2$ and its out-edges are labelled by boolean
-expressions $\gamma$ and $\neg \gamma$. No action (2) can reference
-the starting function. And for simplicity we do not consider pointer
-arithmetic nor heap allocations. We prevent invalid operations in
-actions (like division by zero, etc.) by branchings into error
-locations. An error location is any location with a single out-edge
-heading back to that location and labelled with {\tt skip} action.
-\end{dfn}
+expressions $\gamma$ and $\neg \gamma$. No action (2) can call the starting
+function. For simplicity, we assume that the program works only with integer
+variables and multidimensional intereg arrays (we do not consider consider
+pointer arithmetic, heap allocations, \ldots). We assume that a program
+prevents invalid operations in actions (like division by zero, etc.) by
+branchings into error locations. An error location is any location with a
+single out-edge heading back to that location and labelled with {\tt skip}
+action.
+%\end{dfn}
 
-We assume $P$ is a program throughout whole
-Section~\ref{sec:technique}.
+In the rest of the paper, $P$ is always a program.
+
+\textbf{TADY!!}
 
 An injective function from a set of all program variables of $P$ to a
 set of \emph{symbols} $\{ \alpha_0, \alpha_1, \alpha_2, \ldots \}$ is
