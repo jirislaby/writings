@@ -200,7 +200,7 @@ programs in the form of flowgraphs.
 % In this paper, we work with programs in form of flowgraphs.
 For example, the flowgraph of Figure~\ref{fig:linSrch}(a) implements
 standard linear search function.
-The function searches for the least index \texttt{i} 
+The function returns the least index \texttt{i} 
 %into the array \texttt{A} 
 such that \texttt{A[i]=x}. If \texttt{x} is not in \texttt{A} at all,
 then the result is \texttt{-1}. In both cases the result is saved in
@@ -431,6 +431,9 @@ correspoding cycle executions. Technically, we only need to remember the
 correspoding exit locations $f$ and $e$ to know where to continue the
 symbolic execution from. We include the whole expressions only for clarity
 of presentation (and we will leave this practice in the formal definition).
+Note that the triples have the same structure and meaning as states in
+standard symbolic execution tree. The only difference (except the sequences
+in the first elements) is that the triples contain a parameter. 
 
 The template is applied during \emph{compact symbolic execution} of the
 program. The execution processes the first command \texttt{i:=0} in the
@@ -736,7 +739,7 @@ $s_2=(l_2,\theta_2,\varphi_2)$ to be the state $s_1\compose
 s_2=(l_2,\theta_1\compose\theta_2,\varphi_1\wedge\theta_1\langle\varphi_2\rangle)$. The
 composed state corresponds to the symbolic state resulting from symbolic
 execution of the code that produced $s_1$ immediately followed by the code
-that produced $s_s$\note{$s_2$ right?}. 
+that produced $s_2$. 
 
 %--------------------------------------------------------------------------
 
@@ -886,6 +889,7 @@ if $l_1=l_2$, $\theta_1\equiv\theta_2$, and $\varphi_1\equiv\varphi_2$.
 The proof is a set of exercises based directly on definitions of applied
 notation.
 
+\todo{Dukaz je zakomentovany a je ve starem settingu.}
 %\begin{proof}
 % We split the proof of the lemma into separate points related to a
 % particular equivalences.
@@ -978,21 +982,20 @@ notation.
 %\qed
 %\end{proof}
 
-\smallskip
-We have seen in Section \ref{sec:basic} that checking satisfiability
-of a path condition is essential for the classic symbolic execution (see
-also \cite{Kin76}). And we will see, that such checks are also
-essential for the compact one. Unfortunately, programs commonly
-operate in undecidable theories (like Peano arithmetic). We therefore
-assume in this paper that each satisfiability query always terminates
-with a result either SAT, UNSAT, or FAILURE, with the obvious
-meanings.
-
 In the following, we often use the following dot-notation to access elements
 of a state: if $s$ is a symbolic state, then $s.l$ denotes its current
 program location, $s.\theta$ denotes its symbolic memory, and $s.\varphi$
 denotes its path condition. We use an analogous notation also for other
 tuples. The meaning is always clear from the context.
+
+\smallskip It is well known that checking satisfiability of path conditions
+is essential for the classic symbolic execution. And we will see that such
+checks are also essential for the compact symbolic execution. Unfortunately,
+programs commonly operate in undecidable theories (like Peano
+arithmetic). We therefore assume in this paper that each satisfiability
+query always terminates with a result either SAT, UNSAT, or FAILURE, with
+the obvious meanings.
+
 
   %}}}
   %{{{ Templates
@@ -1000,47 +1003,44 @@ tuples. The meaning is always clear from the context.
 \subsection{Templates and their computation}
 
 We start with formal definitions of the terms \emph{cycle} and
-\emph{template}, since they are essential for this section. We assume
-$P$ is a program throughout the section.
+\emph{template}, since they are essential for this section.
 
 \begin{dfn}[Cycle]\label{def:Part}
-Let $(u,e)$ be an edge of a flowgraph $f$ of $P$, $\pi = e \omega e$
-be a cyclic path in $P$ such that $\omega$ does not contain neither
-the entry location of $f$ nor the location $u$, and let $X = \{
-(u_1,x_1), \ldots, (u_n,x_n) \}$ be a non-empty set of all those edges
-of $P$, which do not belong to the path $\pi$, but each of their start
-vertices $u_i$ does. Then, a triple $C = (\pi, e, X) $ is a
-\emph{cycle} in $P$, where the path $\pi$ is a \emph{core} of $C$, $e$
-is an \emph{entry} into $C$, each edge $(u_i,x_i)$ is an \emph{exit
-edge} from $C$, and each location $x_i$ is called an \emph{exit} from
-$C$.
+Let $(u,e)$ be an edge of a flowgraph $P$, $\pi = e \omega e$
+be a cyclic path in $P$
+% such that $\omega$ does not contain neither the entry location of $f$ nor
+% the location $u$,
+and let $X = \{ (u_1,x_1), \ldots, (u_n,x_n) \}$ be a % non-empty
+set of all those edges of $P$, which do not belong to the path $\pi$, but
+each of their start vertices $u_i$ does. Then, a triple $C = (\pi, e, X) $
+is a \emph{cycle} in $P$, where the path $\pi$ is a \emph{core} of $C$, $e$
+is an \emph{entry location} of $C$, all edges in $X$ are \emph{exit edges}
+of $C$, and each location $x_i$ is called an \emph{exit location} of $C$.
 \end{dfn}
 
-\begin{dfn}[Template] \label{def:LoopTemplate}
-Let $T$ be a classic symbolic execution tree of $P$, $n>0$ be an
-integer, $l, l_1, \ldots, l_n$ be locations in $P$, $\kappa$ be a
-parameter, $\theta_1\prm{\kappa}, \ldots,$ $\theta_n\prm{\kappa}$ be
-symbolic memories, $\varphi_1\prm{\kappa}, \ldots,
-\varphi_n\prm{\kappa}$ be satisfiable boolean symbolic expressions
-such that for each $i,j \in \{ 1, \ldots, n \}, i \neq j$, we have
-$(\varphi_i \wedge \varphi_j) \equiv \false$, and let
-$\Xi_1\prm{\kappa}, \ldots, \Xi_n\prm{\kappa}$ be call stacks. Then a
-pair $t = (l,M)$, where $M = \{ (\theta_1, \varphi_1, \Xi_1, l_1),
-\ldots, (\theta_n,\varphi_n, \Xi_n, l_n) \})$ is a \emph{template} in
-$P$, if
-\begin{itemize}
-\item[(L1)] For each path $\pi = u \omega$ in $T$ from any vertex $u$
-satisfying $u.l = t.l$ to a leaf, there is a vertex $w \in \omega$, an
-index $i \in \{ 1, \ldots, n \}$, and an integer $\nu \geq 0$ such
-that $w.s \equiv u.s \compose
-(t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\nu}$.
+\todo{Nekde tady jsem skoncil s predelavkama!}
 
-\item[(L2)] For each vertex $u$ of $T$, an index $i \in \{ 1, \ldots,
-n \}$, and non-negative integer $\nu$ such that $u.l = t.l$ and
-$(u.\varphi \wedge u.\theta\ese{t.\varphi_i\prm{\nu}})$ is
-satisfiable, there is a successor $w$ of $u$ in $T$ such that $w.s
-\equiv u.s \compose (t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\nu}$.
-\end{itemize}
+\begin{dfn}[Template] \label{def:LoopTemplate} Let $T$ be a classic symbolic
+  execution tree of $P$, $n\ge0$ be an integer, $l, l_1, \ldots, l_n$ be
+  locations in $P$, $\kappa$ be a parameter, $\theta_1\prm{\kappa}, \ldots,$
+  $\theta_n\prm{\kappa}$ be symbolic memories, and $\varphi_1\prm{\kappa},
+  \ldots, \varphi_n\prm{\kappa}$ be satisfiable formulae such that for each
+  $i,j \in \{ 1, \ldots, n \}, i \neq j$, we have $(\varphi_i \wedge
+  \varphi_j) \equiv \false$.  Then a pair $t = (l,M)$, where $M =
+  \{(l_1,\theta_1,\varphi_1), \ldots, (l_n,\theta_n,\varphi_n)\}$, is a
+  \emph{template} in $P$, if
+  \begin{itemize}
+  \item[(L1)] For each path $\pi = u \omega$ in $T$ leading from a state $u$
+    satisfying $u.l = t.l$ to a leaf, there is a vertex $w \in \omega$, an
+    index $i \in \{ 1, \ldots, n \}$, and an integer $\nu \geq 0$ such that
+    $w.s \equiv u.s \compose 
+    (t.\theta_i,~t.\varphi_i,~t.`\Xi_i,~t.l_i)\prm{\nu}$.
+  \item[(L2)] For each vertex $u$ of $T$, an index $i \in \{ 1, \ldots, n
+    \}$, and non-negative integer $\nu$ such that $u.l = t.l$ and
+    $(u.\varphi \wedge u.\theta\ese{t.\varphi_i\prm{\nu}})$ is satisfiable,
+    there is a successor $w$ of $u$ in $T$ such that $w.s \equiv u.s
+    \compose (t.\theta_i,~t.\varphi_i,~t.\Xi_i,~t.l_i)\prm{\nu}$.
+  \end{itemize}
 \end{dfn}
 
 \begin{algorithm}[!tb]
