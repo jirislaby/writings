@@ -193,7 +193,7 @@ conclude the paper.
 
 \section{Basic Idea}\label{sec:basic}
 
-%\ref{sec:technique}
+\todo{Zrusit returny v prikladech a v popisech!}
 
 For purposes of the presentation we represent functions of analysed
 programs in form of flowgraphs.
@@ -615,8 +615,12 @@ template) jen s jinym entry nodem.}
 
 This section describes the compact symbolic execution formally. For
 simplicity, we formulate the algorithm for programs manipulating only
-integer variables and multidimensional integer arrays. The algorithm
-supports function calls. 
+integer variables and read-only multidimensional integer arrays, and with no
+function calls. The algorithm can be extended to handle other program
+features including modifiable arrays, function calls, variables of other
+types, dynamically allocated memory etc. The first two mentioned features
+are actually supported in our experimental implementation mentioned in the
+next section.
 
 % Nevertheless, the algorithm can be extended to handle
 % variables of other types, function calls, etc.
@@ -625,142 +629,231 @@ supports function calls.
 
 \subsection{Preliminaries}
 
-First of all, we describe the cosidered model of programs, recall classic
-symbolic execution, and define composition and equivalence of symbolic
-program states.
+First of all, we present the considered model of programs and define
+composition and equivalence of symbolic program states.
 
-\smallskip
-%\begin{dfn}[Program] \label{def:Program}
-A \emph{program} is a finite collection of functions and global variables.
-Each function has its own local variables. All program variables and
-functions have different names. Exactly one function is marked as the
-starting one. Each function is represented as a finite flowgraph, where
-vertices identify program locations and edges define transitions between the
-locations. Each function contains two distinguished locations: an
-\emph{entry location} and an \emph{exit location}. There is no edge leading
-to an entry location and no edge leading from an exit location. Each edge is
-labeled by an action to be taken when moving along the edge. We support five
-types of actions:
+Programs are represented in the form of flowgraphs. A \emph{flowgraph} is a
+tuple $P=(V,E,l_s,l_e,\iota)$, where $(V,E)$ is a finite oriented graph,
+elements of $V$ are called \emph{locations}, $l_s,l_e\in V$ are \emph{start}
+and \emph{end locations}, and $\iota:E\rightarrow\mathcal{I}$ is a function
+assigning to each edge $e$ an \emph{instruction} $\iota(e)$. A location is
+\emph{branching} if its out-degree is $2$. All other locations have
+out-degree at most $1$. The in-degree of start location $l_s$ and the
+out-degree of end location $l_e$ is 0. We use two kinds of instruction: an
+assignment instruction $\var{a}\texttt{:=}e$ for some scalar variable
+$\var{a}$ and some expression $e$, and an assumption
+$\texttt{assume}(\gamma)$ for some quantifier-free formula $\gamma$ over
+program variables. Out-edges of any branching location are labelled with
+assumptions $\texttt{assume}(\gamma)$ and $\texttt{assume}(\neg\gamma)$ for
+some $\gamma$. We usually omit the keyword $\texttt{assume}$ in our
+flowgraphs. We consider only instructions operating on \emph{scalar
+  variables} $\var{a},\var{b},\ldots$ of type \texttt{Int} and
+multi-dimensional \emph{array variables} $\var{A},\var{B},\ldots$ of type
+\texttt{Int}$^k\rightarrow$\texttt{Int}. We assume that a flowgraph prevents
+invalid operations (like division by zero, etc.) by branchings into error
+locations. An error location is any location without any outgoing edge which
+is not the end location. In the rest of the paper, $P$ is always a
+flowchart.
+
+\medskip By \emph{symbolic expressions} we mean all expressions build with
+integers, standard integer operations and functions, and
 \begin{itemize}
-\item[(1)] an assignment of the form $<$variable$>${\tt :=}$<$expression$>$
-\item[(2)] call by value statements\\(a) $<$variable$>${\tt
-    :=}$<$function-name$>${\tt (}$<$arg-list$>${\tt )}, or\\(b)
-  $<$function-name$>${\tt (}$<$arg-list$>${\tt )}
-\item[(3)] a return value statement {\tt ret }$<$expression$>$
-\item[(4)] {\tt skip} statement, which does nothing
-\item[(5)] a boolean expression over program variables, which
-either enables or disables its edge
+\item a \emph{symbol} $\sym{a}$ for each scalar variable $\var{a}$,
+\item a \emph{function symbol} $\sym{A}$ for each array variable $\var{A}$,
+  where arity of $\sym{A}$ corresponds to the dimension of array $\var{A}$,
+\item a countable set $\{\kappa_1,\tau_1,\kappa_2,\tau_2,\ldots\}$ of
+  \emph{parameters}, and
+\item a construct $\ite(\varphi,e_1,e_2)$, of meaning
+  ``\textbf{i}f-\textbf{t}hen-\textbf{e}lse'', where $e_1,e_2$ are symbolic
+  expressions and $\varphi$ is a first order formula over symbols and
+  parameters. The value of $\ite(\varphi,e_1,e_2)$ is $e_1$ if $\varphi$
+  holds and $e_2$ otherwise.
 \end{itemize}
-If an edge $(u,v)$ is labelled by one of the actions (1)-(4), then
-out-degree of $u$ is $1$. Otherwise, label of $(u,v)$ is an action (5),
-out-degree of $u$ is $2$ and its out-edges are labelled by boolean
-expressions $\gamma$ and $\neg \gamma$. No action (2) can call the starting
-function. For simplicity, we assume that the program works only with integer
-variables and multidimensional intereg arrays (we do not consider consider
-pointer arithmetic, heap allocations, \ldots). We assume that a program
-prevents invalid operations in actions (like division by zero, etc.) by
-branchings into error locations. An error location is any location with a
-single out-edge heading back to that location and labelled with {\tt skip}
-action.
-%\end{dfn}
 
-In the rest of the paper, $P$ is always a program.
+% Let $f,e_1,\ldots,e_n$ be symbolic expressions and $x_1,\ldots,x_n$ be path
+% counters or symbols corresponding to scalar variables. Then
+% $f[x_1/e_1,\ldots,x_n/e_n]$ is a symbolic expression $f$ where all
+% occurrences of all $x_i$ are simultaneously replaced by expressions
+% $e_i$. To shorten the notation, we write $f[\vec{x}/\vec{e}]$ when the
+% meaning is clearly given by a context. We also use the notation
+% $\varphi[\vec{x}/\vec{e}]$ with the analogous meaning for formulae
+% $\varphi$.
 
-\textbf{TADY!!}
+A \emph{symbolic memory} is a function $\theta$ assigning to each scalar
+variable $\var{a}$ a symbolic expression and to each array variable
+$\var{A}$ the function symbol $\sym{A}$. \emph{Initial symbolic memory}
+$\Theta$ assigns to each scalar variable $\var{a}$ the corresponding symbol
+$\sym{a}$.
+% Let $\var{a}$ be a scalar variable and $e$ be a symbolic expression. Then
+% $\theta[\var{a}\rightarrow e]$ is a symbolic memory equal to $\theta$
+% except for variable $\var{a}$, where $\theta[\var{a}\rightarrow
+% e](\var{a})=e$.
+We sometimes use the notation $\theta\prm{\kappa}$ to emphasize that
+$\theta$ is a symbolic memory using a single parameter $\kappa$.  We use an
+analogous notation $\varphi\prm{\kappa}$ to emphasize that the first order
+formula $\varphi$ has only one free parameter $\kappa$. For an integer
+$\nu>0$, $\theta\prm{\nu}$ and $\varphi\prm{\nu}$ denote the symbolic memory
+$\theta\prm{\kappa}$ and the formula $\varphi\prm{\kappa}$ where all (free)
+occurrences of $\kappa$ are replaced by~$\nu$.
+ 
+The notation $\theta(\cdot)$ is used in a more general way. It always
+denotes the operation of replacing each (scalar or array) variable $\var{a}$
+by $\theta(\var{a})$. $\theta\langle\cdot\rangle$ denotes the operation on
+symbolic expressions or formulae, where all occurrences of all symbols
+$\sym{a}$ are simultaneously replaced by $\theta(\var{a})$. Additionally,
+$\theta_1\compose\theta_2$ denotes \emph{composition of symbolic memories}
+$\theta_1$ and $\theta_2$ satisfying
+$(\theta_1\compose\theta_2)(\var{a})=\theta_1\langle\theta_2(\var{a})\rangle$
+for each variable $\var{a}$. Intuitively, the symbolic memory
+$\theta_1\compose\theta_2$ represents an overall effect of a code with
+effect $\theta_1$ followed by a code with effect $\theta_2$.
 
-An injective function from a set of all program variables of $P$ to a
-set of \emph{symbols} $\{ \alpha_0, \alpha_1, \alpha_2, \ldots \}$ is
-an \emph{initial symbolic memory} of $P$ denoted by $\Theta$. For each
-program variable \var{a} its symbol $\Theta(\var{a})$ represents some
-yet unknown value of that variable. So, $\Theta(\var{a})$ must belong
-to a domain of \var{a} (i.e.~$\Theta(\var{a})$ is of \var{a}'s type).
-We further distinguish a set $\{ \kappa_1, \tau_1, \kappa_2, \tau_2,
-\ldots \}$ of variables, called \emph{parameters}, ranging over
-non-negative integers. A \emph{numeric symbolic expression} is an
-application of denoted operators of $P$'s language to numeric
-constants, symbols, or parameters. A \emph{boolean symbolic
-expression} is either an equality or inequality predicate over numeric
-symbolic expressions, or an application of quantifiers or logical
-connectives to other boolean symbolic expressions. We require for any
-boolean symbolic expression $\varphi$ that all symbols in it have only
-free occurrences there. On the other hand, we put no restriction to
-occurrences of parameters in $\varphi$. A \emph{symbolic expression}
-is either numeric or boolean symbolic expression. \emph{Symbolic
-memory} is a function $\theta$ from program variables to a set of
-symbolic expressions. For each local variable \var{a} \emph{not}
-defined at a location $l$, we have $\theta(\var{a}) =
-\Theta(\var{a})$.   A \emph{call stack} $\Xi$ is a finite sequence of
-stack records of the form $(\sigma,l)$, where $\sigma$ is a
-restriction of a symbolic memory to local variables and $l$ is a
-return location. A \emph{program state} is a tuple $s = (\theta,
-\varphi, \Xi, l)$, where $\theta$ is a symbolic memory, $\varphi$ is a
-path condition, $\Xi$ is a call stack and $l$ is a current program
-location. When we want to emphasise that a set $\bld{\kappa}$ contains
-all the parameters having a free occurrence in any of symbolic
-expressions in a program state  $s$, we denote it as
-$s\prm{\bld{\kappa}}$, and we commonly abbreviate that $\bld{\kappa}$
-is a set of parameters in $s$. The notation also applies to the
-components of $s$, i.e.~we write $\theta\prm{\bld{\kappa}}$,
-$\varphi\prm{\bld{\kappa}}$, and $\Xi\prm{\bld{\kappa}}$. We now
-describe a substitution of parameters. Each function $\bld{\nu}$ from
-a finite set of parameters to non-negative integers is a
-\emph{valuation} of the parameters. If $\bld{\kappa}$ is a set of
-parameters in a state $s$, and $\bld{\nu}$ is a valuation of these
-parameters, then $s\prm{\bld{\nu}}$ is the program state
-$s\prm{\bld{\kappa}}$, where each free occurrence of each parameter
-$\kappa \in \bld{\kappa}$ anywhere in $s\prm{\bld{\kappa}}$ is
-substituted by the number $\bld{\nu}(\kappa)$. We typically compute
-$s\prm{\bld{\nu}}$ form $s\prm{\bld{\kappa}}$ per component. In case
-$\bld{\kappa} = \{ \kappa \}$ and $\bld{\nu}(\kappa) = \nu$ we
-commonly abbreviate $s\prm{\bld{\nu}}$ and $s\prm{\{\kappa\}}$ to
-$s\prm{\nu}$ and $s\prm{\kappa}$ respectively. Once we have all the
-basic terms defined, we can finally define the key properties of
-compact symbolic execution.
+% Finally, for vectors $\vec{u}=(u_1,\ldots,u_n)$ and
+% $\vec{v}=(v_1,\ldots,v_n)$ we use $\vec{u}\le\vec{v}$ as an abbreviation
+% for $u_1\le v_1\wedge\ldots\wedge u_n\le v_n$.
 
-We often use the following dot-notation to access elements of tuples.
-If $s = (\theta, \varphi, \Xi, l)$ is a program state, then $s.\theta$
-denotes its symbolic memory, $s.\varphi$ denotes its path condition,
-$s.\Xi$ is its call stack and $s.l$ is its current program location.
-Further, if $u$ is a vertex of a symbolic execution tree, then $u.s$
-denotes a program state labelling the vertex. And instead of
-$u.s.\theta$, $u.s.\varphi$, $u.s.\Xi$, and $u.s.l$ we simply write
-$u.\theta$, $u.\varphi$, $u.\Xi$, and $u.l$ respectively. Finally, if
-$\Xi$ is a call stack, then we use the dot-notation to access a record
-at the top of the call stack. For example, $\Xi.l$ denotes a return
-location of a record at the top of $\Xi$.
+\medskip \emph{Symbolic program state} (or simply a \emph{state}) is a
+triple $s=(l,\theta,\varphi)$ of a location $l$, symbolic memory $\theta$
+and first order formula over symbols and parameters $\varphi$ called
+\emph{path condition}. \emph{Initial state} is the triple
+$(l_s,\Theta,\true)$ where $l_s$ is the start location and $\Theta$ is the
+initial symbolic memory.
 
-\begin{dfn}[Composition]\label{def:Composition}
-Let $\Xi = [r_0, \ldots, r_m]$ and $\Xi' = [r_0', \ldots, r_n']$ be
-call stacks, and $s = (\theta, \varphi, \Xi, l)$ and $s' = (\theta',
-\varphi', \Xi', l')$ be program states. Then a composite program state
-$s \compose s' = (\theta \compose \theta',~\varphi \wedge
-\theta\ese{\varphi'}, \Xi \compose (\theta \compose \Xi'), l')$, where
-$\theta\ese{\varphi'}$ is a symbolic expression constructed from
-$\varphi'$ such that all symbols $\alpha_i$ in $\varphi'$ are
-simultaneously substituted by symbolic expressions
-$\theta(\Theta^{-1}(\alpha_i))$, $\theta \compose \theta'$ is a symbolic
-memory such that for each variable \var{a} we have $(\theta \compose
-\theta')(\var{a}) = \theta\ese{\theta'(\var{a})}$, $\theta \compose \Xi'
-= [\bar{r}_0', \ldots, \bar{r}_n']$, where each $\bar{r}_i'$ is equal
-to $r_i$ except for the first component being $\bar{r}_i'.\sigma =
-\theta \compose r_i'.\sigma$, and $\Xi \compose (\theta \compose \Xi') = [r_0,
-\ldots,$ $ r_m, \bar{r}_0', \ldots, \bar{r}_n']$.
-\end{dfn}
+We define \emph{composition of states} $s_1=(l_1,\theta_1,\varphi_1)$ and
+$s_2=(l_2,\theta_2,\varphi_2)$ to be the state $s_1\compose
+s_2=(l_2,\theta_1\compose\theta_2,\varphi_1\wedge\theta_1\langle\varphi_2\rangle)$. The
+composed state corresponds to the symbolic state resulting from symbolic
+execution of the code that produced $s_1$ immediately followed by the code
+that produced $s_s$. 
 
-\begin{dfn}[Equivalence]\label{def:Equivalence}
-Let $\varphi$, $\varphi'$ be symbolic expressions, $\theta$, $\theta'$
-be symbolic memories, $\Xi = [r_0, \ldots, r_m]$, $\Xi' = [r_0',
-\ldots, r_n']$ be call stacks, and $s$, $s'$ be program states. Then
-$\varphi \equiv \varphi'$, if $\varphi$ and $\varphi'$ are either
-logically equivalent boolean symbolic expressions or numeric symbolic
-expressions such that $(\varphi = \varphi') \equiv \true$. $\theta
-\equiv \theta'$, if for each variable \var{a} we have $\theta(\var{a})
-\equiv \theta'(\var{a})$. $\Xi \equiv \Xi'$, if $m = n$ and for each
-$i \in \{0, \ldots, m\}$ we have $r_i.\sigma$ and $r_i'.\sigma$ are
-defined for the same variables with equivalent values and $r_i.l =
-r_i'.l$. Finally, $s \equiv s'$, if both $s$ and $s'$ have equal or
-equivalent components.
-\end{dfn}
+
+
+%--------------------------------------------------------------------------
+
+% \color{blue}
+% %\begin{dfn}[Program] \label{def:Program}
+% A \emph{program} is a finite collection of functions and global variables.
+% Each function has its own local variables. All program variables and
+% functions have different names. Exactly one function is marked as the
+% starting one. Each function is represented as a finite flowgraph, where
+% vertices identify program locations and edges define transitions between the
+% locations. Each function contains two distinguished locations: an
+% \emph{entry location} and an \emph{exit location}. There is no edge leading
+% to an entry location and no edge leading from an exit location. Each edge is
+% labeled by an action to be taken when moving along the edge. We support five
+% types of actions:
+% \begin{itemize}
+% \item[(1)] an assignment of the form $<$variable$>${\tt :=}$<$expression$>$
+% \item[(2)] call by value statements\\(a) $<$variable$>${\tt
+%     :=}$<$function-name$>${\tt (}$<$arg-list$>${\tt )}, or\\(b)
+%   $<$function-name$>${\tt (}$<$arg-list$>${\tt )}
+% \item[(3)] a return value statement {\tt ret }$<$expression$>$
+% \item[(4)] {\tt skip} statement, which does nothing
+% \item[(5)] a boolean expression over program variables, which
+% either enables or disables its edge
+% \end{itemize}
+% If an edge $(u,v)$ is labelled by one of the actions (1)-(4), then
+% out-degree of $u$ is $1$. Otherwise, label of $(u,v)$ is an action (5),
+% out-degree of $u$ is $2$ and its out-edges are labelled by boolean
+% expressions $\gamma$ and $\neg \gamma$. No action (2) can call the starting
+% function. For simplicity, we assume that the program works only with integer
+% variables and multidimensional intereg arrays (we do not consider consider
+% pointer arithmetic, heap allocations, \ldots). We assume that a program
+% prevents invalid operations in actions (like division by zero, etc.) by
+% branchings into error locations. An error location is any location with a
+% single out-edge heading back to that location and labelled with {\tt skip}
+% action.
+% %\end{dfn}
+
+% In the rest of the paper, $P$ is always a program.
+
+
+% An injective function from a set of all program variables of $P$ to a
+% set of \emph{symbols} $\{ \alpha_0, \alpha_1, \alpha_2, \ldots \}$ is
+% an \emph{initial symbolic memory} of $P$ denoted by $\Theta$. For each
+% program variable \var{a} its symbol $\Theta(\var{a})$ represents some
+% yet unknown value of that variable. So, $\Theta(\var{a})$ must belong
+% to a domain of \var{a} (i.e.~$\Theta(\var{a})$ is of \var{a}'s type).
+% We further distinguish a set $\{ \kappa_1, \tau_1, \kappa_2, \tau_2,
+% \ldots \}$ of variables, called \emph{parameters}, ranging over
+% non-negative integers. A \emph{numeric symbolic expression} is an
+% application of denoted operators of $P$'s language to numeric
+% constants, symbols, or parameters. A \emph{boolean symbolic
+% expression} is either an equality or inequality predicate over numeric
+% symbolic expressions, or an application of quantifiers or logical
+% connectives to other boolean symbolic expressions. We require for any
+% boolean symbolic expression $\varphi$ that all symbols in it have only
+% free occurrences there. On the other hand, we put no restriction to
+% occurrences of parameters in $\varphi$. A \emph{symbolic expression}
+% is either numeric or boolean symbolic expression. \emph{Symbolic
+% memory} is a function $\theta$ from program variables to a set of
+% symbolic expressions. For each local variable \var{a} \emph{not}
+% defined at a location $l$, we have $\theta(\var{a}) =
+% \Theta(\var{a})$.   A \emph{call stack} $\Xi$ is a finite sequence of
+% stack records of the form $(\sigma,l)$, where $\sigma$ is a
+% restriction of a symbolic memory to local variables and $l$ is a
+% return location. A \emph{program state} is a tuple $s = (\theta,
+% \varphi, \Xi, l)$, where $\theta$ is a symbolic memory, $\varphi$ is a
+% path condition, $\Xi$ is a call stack and $l$ is a current program
+% location. When we want to emphasise that a set $\bld{\kappa}$ contains
+% all the parameters having a free occurrence in any of symbolic
+% expressions in a program state  $s$, we denote it as
+% $s\prm{\bld{\kappa}}$, and we commonly abbreviate that $\bld{\kappa}$
+% is a set of parameters in $s$. The notation also applies to the
+% components of $s$, i.e.~we write $\theta\prm{\bld{\kappa}}$,
+% $\varphi\prm{\bld{\kappa}}$, and $\Xi\prm{\bld{\kappa}}$. We now
+% describe a substitution of parameters. Each function $\bld{\nu}$ from
+% a finite set of parameters to non-negative integers is a
+% \emph{valuation} of the parameters. If $\bld{\kappa}$ is a set of
+% parameters in a state $s$, and $\bld{\nu}$ is a valuation of these
+% parameters, then $s\prm{\bld{\nu}}$ is the program state
+% $s\prm{\bld{\kappa}}$, where each free occurrence of each parameter
+% $\kappa \in \bld{\kappa}$ anywhere in $s\prm{\bld{\kappa}}$ is
+% substituted by the number $\bld{\nu}(\kappa)$. We typically compute
+% $s\prm{\bld{\nu}}$ form $s\prm{\bld{\kappa}}$ per component. In case
+% $\bld{\kappa} = \{ \kappa \}$ and $\bld{\nu}(\kappa) = \nu$ we
+% commonly abbreviate $s\prm{\bld{\nu}}$ and $s\prm{\{\kappa\}}$ to
+% $s\prm{\nu}$ and $s\prm{\kappa}$ respectively. Once we have all the
+% basic terms defined, we can finally define the key properties of
+% compact symbolic execution.
+
+% We often use the following dot-notation to access elements of tuples.
+% If $s = (\theta, \varphi, \Xi, l)$ is a program state, then $s.\theta$
+% denotes its symbolic memory, $s.\varphi$ denotes its path condition,
+% $s.\Xi$ is its call stack and $s.l$ is its current program location.
+% Further, if $u$ is a vertex of a symbolic execution tree, then $u.s$
+% denotes a program state labelling the vertex. And instead of
+% $u.s.\theta$, $u.s.\varphi$, $u.s.\Xi$, and $u.s.l$ we simply write
+% $u.\theta$, $u.\varphi$, $u.\Xi$, and $u.l$ respectively. Finally, if
+% $\Xi$ is a call stack, then we use the dot-notation to access a record
+% at the top of the call stack. For example, $\Xi.l$ denotes a return
+% location of a record at the top of $\Xi$.
+
+% \begin{dfn}[Composition]\label{def:Composition}
+% Let $\Xi = [r_0, \ldots, r_m]$ and $\Xi' = [r_0', \ldots, r_n']$ be
+% call stacks, and $s = (\theta, \varphi, \Xi, l)$ and $s' = (\theta',
+% \varphi', \Xi', l')$ be program states. Then a composite program state
+% $s \compose s' = (\theta \compose \theta',~\varphi \wedge
+% \theta\ese{\varphi'}, \Xi \compose (\theta \compose \Xi'), l')$, where
+% $\theta\ese{\varphi'}$ is a symbolic expression constructed from
+% $\varphi'$ such that all symbols $\alpha_i$ in $\varphi'$ are
+% simultaneously substituted by symbolic expressions
+% $\theta(\Theta^{-1}(\alpha_i))$, $\theta \compose \theta'$ is a symbolic
+% memory such that for each variable \var{a} we have $(\theta \compose
+% \theta')(\var{a}) = \theta\ese{\theta'(\var{a})}$, $\theta \compose \Xi'
+% = [\bar{r}_0', \ldots, \bar{r}_n']$, where each $\bar{r}_i'$ is equal
+% to $r_i$ except for the first component being $\bar{r}_i'.\sigma =
+% \theta \compose r_i'.\sigma$, and $\Xi \compose (\theta \compose \Xi') = [r_0,
+% \ldots,$ $ r_m, \bar{r}_0', \ldots, \bar{r}_n']$.
+% \end{dfn}
+
+We say that symbolic memories $\theta_1$ and $\theta_2$ are equivalent,
+written $\theta_1\equiv\theta_2$, if, for each variable $\var{a}$, the
+formula $\theta_1(\var{a})=\theta_2(\var{a})$ holds. Further, we write
+$\varphi_1\equiv\varphi_2$ if the two formulae are equivalent in the logical
+sense. Finally, two states $s_1=(l_1,\theta_1,\varphi_1)$ and
+$s_2=(l_2,\theta_2,\varphi_2)$ are \emph{equivalent}, written $s_1\equiv s_2$,
+if $l_1=l_2$, $\theta_1\equiv\theta_2$, and $\varphi_1\equiv\varphi_2$.
 
 \begin{lem}[Equivalent Compositions]\label{lem:EquivalentCompositions}
 Let $s, s'$, and $s''$ be program states, $\bld{\nu}$ and $\bld{\nu}'$
@@ -866,8 +959,8 @@ if there is $(\kappa, \nu) \in \bld{\nu}$ and $(\kappa, \nu') \in
 \qed
 \end{proof}
 \end{lem}
-\color{black}
 
+\smallskip
 We have seen in Section \ref{sec:basic} that checking satisfiability
 of path condition is essential for the classic symbolic execution (see
 also \cite{Kin76}). And we will see, that such checks are also
@@ -877,86 +970,18 @@ assume in this paper that each satisfiability query always terminates
 with a result either SAT, UNSAT, or FAILURE, with the obvious
 meanings.
 
-% For a loop $C$ with an entry node $v$, a \emph{flowgraph induced by the loop},
-% denoted as $P(C,v)$, is the subgraph of the original flowgraph induced by $C$
-% where $v$ is marked as the start node, a fresh node $v'$ is added and marked
-% as the target node, and every edge $(u,v)\in E$ leading to $v$ is replaced
-% by an edge $(u,v')$ labelled with the same instruction as one of the edge $(u, v)$.
 
-A flowgraph is a tuple $P=(V,E,l_s,\iota)$, where $(V,E)$ is a finite
-oriented graph, elements of $V$ are called \emph{locations}, $l_s\in V$ is a
-\emph{start} location, and $\iota:E\rightarrow\mathcal{I}$ is a function
-assigning to each edge $e$ an \emph{instruction} $\iota(e)$. A location is
-\emph{branching} if its out-degree is $2$. All other locations have
-out-degree at most $1$. We use two kinds of instruction: an assignment
-instruction $\var{a}\texttt{:=}e$ for some scalar variable $\var{a}$ and
-some expression $e$, and an assumption $\texttt{assume}(\gamma)$ for some
-quantifier-free formula $\gamma$ over program variables. Out-edges of any
-branching location are labelled with assumptions $\texttt{assume}(\gamma)$
-and $\texttt{assume}(\neg\gamma)$ for some $\gamma$. We usually omit the
-keyword $\texttt{assume}$ in our flowgraphs. We consider only instructions
-operating on \emph{scalar variables} $\var{a},\var{b},\ldots$ of type
-\texttt{Int} and multi-dimensional \emph{array variables}
-$\var{A},\var{B},\ldots$ of type
-\texttt{Int}$^k\rightarrow$\texttt{Int}. Flowgraphs are also called
-\emph{programs}.
+We often use the following dot-notation to access elements of a state: if
+$s$ is a symbolic state, then $s.l$ denotes its current program location,
+$s.\theta$ denotes its symbolic memory, and $s.\varphi$ denotes its path
+condition. We use an analogous notation also for other tuples. The meaning
+is always clear from the context. 
 
-\medskip By \emph{symbolic expressions} we mean all expressions build with
-integers, standard integer operations and functions, and
-\begin{itemize}
-\item a \emph{symbol} $\sym{a}$ for each scalar variable $\var{a}$,
-\item a \emph{function symbol} $\sym{A}$ for each array variable $\var{A}$,
-  where arity of $\sym{A}$ corresponds to the dimension of array $\var{A}$,
-\item a countable set $\{\kappa_1,\tau_1,\kappa_2,\tau_2,\ldots\}$ of
-  \emph{parameters}, and
-\item a construct $\ite(\varphi,e_1,e_2)$, of meaning
-  ``\textbf{i}f-\textbf{t}hen-\textbf{e}lse'', where $e_1,e_2$ are symbolic
-  expressions and $\varphi$ is a first order formula over symbols and
-  parameters. The value of $\ite(\varphi,e_1,e_2)$ is $e_1$ if $\varphi$
-  holds and $e_2$ otherwise.
-\end{itemize}
-
-% Let $f,e_1,\ldots,e_n$ be symbolic expressions and $x_1,\ldots,x_n$ be path
-% counters or symbols corresponding to scalar variables. Then
-% $f[x_1/e_1,\ldots,x_n/e_n]$ is a symbolic expression $f$ where all
-% occurrences of all $x_i$ are simultaneously replaced by expressions
-% $e_i$. To shorten the notation, we write $f[\vec{x}/\vec{e}]$ when the
-% meaning is clearly given by a context. We also use the notation
-% $\varphi[\vec{x}/\vec{e}]$ with the analogous meaning for formulae
-% $\varphi$.
-
-A \emph{symbolic memory} is a function $\theta$ assigning to each scalar
-variable $\var{a}$ a symbolic expression and to each array variable
-$\var{A}$ the function symbol $\sym{A}$.
-% Let $\var{a}$ be a scalar variable and $e$ be a symbolic expression. Then
-% $\theta[\var{a}\rightarrow e]$ is a symbolic memory equal to $\theta$
-% except for variable $\var{a}$, where $\theta[\var{a}\rightarrow
-% e](\var{a})=e$.
-The notation $\theta(\cdot)$ is used in a more general way. It always
-denotes the operation of replacing each (scalar or array) variable $\var{a}$
-by $\theta(\var{a})$. $\theta\langle\cdot\rangle$ denotes the operation on
-symbolic expressions or formulae, where all occurrences of all symbols
-$\sym{a}$ are simultaneously replaced by $\theta(\var{a})$. Additionally,
-$\theta_1\langle\theta_2\rangle$ denotes composition of two symbolic
-memories $\theta_1$ and $\theta_2$ satisfying
-$\theta_1\langle\theta_2\rangle(\var{a})=\theta_1\langle\theta_2(\var{a})\rangle$
-for each variable $\var{a}$. Intuitively, the symbolic memory
-$\theta_1\langle\theta_2\rangle$ represents an overall effect of a code with
-effect $\theta_1$ followed by a code with effect $\theta_2$.
-
-% Finally, for vectors $\vec{u}=(u_1,\ldots,u_n)$ and
-% $\vec{v}=(v_1,\ldots,v_n)$ we use $\vec{u}\le\vec{v}$ as an abbreviation
-% for $u_1\le v_1\wedge\ldots\wedge u_n\le v_n$.
-
-\medskip \emph{Symbolic state} (or simply a \emph{state}) is a triple
-$s=(l,\theta,\varphi)$ of a location $l$, symbolic memory $\theta$ and first
-order formula over symbols and parameters $\varphi$ called \emph{path
-  condition}. \emph{Initial state} is the triple $(l_s,\theta_s,\true)$
-where $l_s$ is the start location and $\theta_s$ is the symbolic memory
-assigning to each variable $\var{a}$ the corresponding symbol $\sym{a}$. We
-assume that the reader is familiar with standard symbolic execution (we
+We assume that the reader is familiar with standard symbolic execution (we
 refer to~\cite{Kin76} if the intuition provided in the previous section is
 not sufficient).
+
+
 
   %}}}
   %{{{ Templates
