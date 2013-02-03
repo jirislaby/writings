@@ -1,0 +1,167 @@
+Index: include/klee/Interpreter.h
+===================================================================
+--- include/klee/Interpreter.h	(revision 168705)
++++ include/klee/Interpreter.h	(working copy)
+@@ -149,6 +149,10 @@
+ 
+   virtual void getCoveredLines(const ExecutionState &state,
+                                std::map<const std::string*, std::set<unsigned> > &res) = 0;
++
++  virtual unsigned getMemoryOperationCount() = 0;
++
++  virtual unsigned getConcretizationCount() = 0;
+ };
+ 
+ } // End klee namespace
+Index: lib/Core/Executor.cpp
+===================================================================
+--- lib/Core/Executor.cpp	(revision 168705)
++++ lib/Core/Executor.cpp	(working copy)
+@@ -220,6 +220,11 @@
+            cl::init(0));
+   
+   cl::opt<double>
++  LimitToConcretize("limit-to-concretize",
++                 cl::desc("Set limit after which the symbolic expression will be concretized (default=0.0 (off))"),
++                 cl::init(0.0));
++
++  cl::opt<double>
+   MaxSTPTime("max-stp-time",
+              cl::desc("Maximum amount of time for a single query (default=0s (off)). Enables --use-forked-stp"),
+              cl::init(0.0));
+@@ -363,7 +368,10 @@
+     ivcEnabled(false),
+     stpTimeout(MaxSTPTime != 0 && MaxInstructionTime != 0
+       ? std::min(MaxSTPTime,MaxInstructionTime)
+-      : std::max(MaxSTPTime,MaxInstructionTime)) {
++      : std::max(MaxSTPTime,MaxInstructionTime)),
++    limitToBeConcretized(LimitToConcretize),
++    memoryOperationCount(0),
++    concretizationCount(0)  {
+   if (stpTimeout) UseForkedSTP = true;
+   STPSolver *stpSolver = new STPSolver(UseForkedSTP, STPOptimizeDivides);
+   Solver *solver = 
+@@ -3061,7 +3069,12 @@
+   Expr::Width type = (isWrite ? value->getWidth() : 
+                      getWidthForLLVMType(target->inst->getType()));
+   unsigned bytes = Expr::getMinBytesForWidth(type);
++  double begTime,endTime;
++  bool toBeConcretized;
++  toBeConcretized = false;
+ 
++  incMemoryOperationCount();
++
+   if (SimplifySymIndices) {
+     if (!isa<ConstantExpr>(address))
+       address = state.constraints.simplifyExpr(address);
+@@ -3073,11 +3086,16 @@
+   ObjectPair op;
+   bool success;
+   solver->setTimeout(stpTimeout);
++  begTime = util::getWallTime();
+   if (!state.addressSpace.resolveOne(state, solver, address, op, success)) {
+     address = toConstant(state, address, "resolveOne failure");
+     success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
+   }
++  endTime = util::getWallTime();
+   solver->setTimeout(0);
++  if (limitToBeConcretized > 0 && ((endTime - begTime) > limitToBeConcretized)) {
++  	toBeConcretized = true;
++  }
+ 
+   if (success) {
+     const MemoryObject *mo = op.first;
+@@ -3090,10 +3108,15 @@
+ 
+     bool inBounds;
+     solver->setTimeout(stpTimeout);
++    begTime = util::getWallTime();
+     bool success = solver->mustBeTrue(state, 
+                                       mo->getBoundsCheckOffset(offset, bytes),
+                                       inBounds);
+     solver->setTimeout(0);
++    endTime = util::getWallTime();
++    if (limitToBeConcretized > 0 && ((endTime - begTime) > limitToBeConcretized)) {
++    	toBeConcretized = true;
++    }
+     if (!success) {
+       state.pc = state.prevPC;
+       terminateStateEarly(state, "Query timed out (bounds check).");
+@@ -3116,7 +3139,10 @@
+         
+         if (interpreterOpts.MakeConcreteSymbolic)
+           result = replaceReadWithSymbolic(state, result);
+-        
++        if (toBeConcretized) {
++         	value = toConstant(state,result,"Limit to concrete reached while reading");
++         	incConcretizationCount();
++        }
+         bindLocal(target, state, result);
+       }
+ 
+Index: lib/Core/Executor.h
+===================================================================
+--- lib/Core/Executor.h	(revision 168705)
++++ lib/Core/Executor.h	(working copy)
+@@ -395,6 +395,11 @@
+   void initTimers();
+   void processTimers(ExecutionState *current,
+                      double maxInstTime);
++
++  double limitToBeConcretized;
++
++  unsigned memoryOperationCount;
++  unsigned concretizationCount;
+                 
+ public:
+   Executor(const InterpreterOptions &opts, InterpreterHandler *ie);
+@@ -468,6 +473,22 @@
+                                std::map<const std::string*, std::set<unsigned> > &res);
+ 
+   Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
++
++  void incMemoryOperationCount() {
++    this->memoryOperationCount++;
++  }
++
++  unsigned getMemoryOperationCount() {
++   	return this->memoryOperationCount;
++  }
++
++  void incConcretizationCount() {
++    this->concretizationCount++;
++  }
++
++  unsigned getConcretizationCount() {
++   	return this->concretizationCount;
++  }
+ };
+   
+ } // End klee namespace
+Index: tools/klee/main.cpp
+===================================================================
+--- tools/klee/main.cpp	(revision 168705)
++++ tools/klee/main.cpp	(working copy)
+@@ -1447,6 +1447,10 @@
+     delete[] pArgv[i];
+   delete[] pArgv;
+ 
++  unsigned MOCount,ConCount;
++  MOCount = interpreter->getMemoryOperationCount();
++  ConCount = interpreter->getConcretizationCount();
++
+   delete interpreter;
+ 
+   uint64_t queries = 
+@@ -1479,6 +1483,11 @@
+     << "KLEE: done: invalid queries = " << queriesInvalid << "\n"
+     << "KLEE: done: query cex = " << queryCounterexamples << "\n";
+ 
++  handler->getInfoStream()
++  	<< "\n"
++		<< "KLEE: done: Memory operations = " << MOCount << "\n"
++		<< "KLEE: done: Concretizations = " << ConCount << "\n";
++
+   std::stringstream stats;
+   stats << "\n";
+   stats << "KLEE: done: total instructions = " 
