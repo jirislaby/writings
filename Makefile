@@ -1,5 +1,5 @@
 TEX=latex
-PROJ=cse_issta2013
+PROJ=cse_atva2013
 
 all: $(PROJ).dvi
 pdf: $(PROJ).pdf
