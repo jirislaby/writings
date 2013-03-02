@@ -70,26 +70,46 @@
 
 \author{Jiri Slaby \and Jan Strej\v{c}ek \and Marek Trt\'{\i}k}
 
-\institute{Faculty of Informatics, Masaryk University\\
-  Botanick\'{a} 68a, 60200 Brno, Czech Republic\\
-  \email{\{slaby,strejcek,trtik\}@fi.muni.cz}}
+%\institute{Faculty of Informatics, Masaryk University\\
+%  Botanick\'{a} 68a, 60200 Brno, Czech Republic\\
+%  \email{\{slaby,strejcek,trtik\}@fi.muni.cz}
+%}
+\institute{Masaryk University, Czech Republic\\
+  \email{\{slaby,strejcek,trtik\}@fi.muni.cz}
+}
 
 \maketitle
 
 \begin{abstract}
-  We present a generalisation of King's symbolic execution technique called
-  \emph{compact symbolic execution}. It is based on a concept of templates:
-  a template is a declarative parametric description of a cycle in the
-  control flow graph of a program. 
-  % program part, whose any execution has some regularities in program
-  % states along it. Typical sources of such regularities are program loops
-  % and recursive calls.
-  Using the templates, we are able to build a symbolic execution tree where
-  a single node represents arbitrarily many iterations of the corresponding
-  cycle without loss of any information. This leads to a considerable
-  reduction of size of the symbolic execution tree. There are even programs
-  for which the resulting compact symbolic execution trees are finite while
-  the classic symbolic execution trees are infinite.
+We present a generalisation of King's symbolic execution technique
+called \emph{compact symbolic execution}. It proceeds in two steps.
+First, we analyse cyclic paths in the control flow graph of a given
+program, independently form the rest of the program. Our goal is to
+compute a so called \emph{template} for each such cyclic path. A
+template is a declarative parametric description of all possible
+program states, which may leave the analysed cyclic path after any
+number of iterations along it. In the second step, we execute the
+program symbolically with the templates in hand. The result is a
+\emph{compact} symbolic execution tree. A compact tree always carry
+the same information in all its leaves as the corresponding classic
+tree, resulting from the classic symbolic execution. Nevertheless, a
+compact tree is typically incomparably smaller then the corresponding
+classic tree. There are even programs for which compact symbolic
+execution trees are finite while classic symbolic execution trees are
+infinite.
+%  We present a generalisation of King's symbolic execution technique called
+%  \emph{compact symbolic execution}. It is based on a concept of templates:
+%  a template is a declarative parametric description of a cycle in the
+%  control flow graph of a program. 
+%  % program part, whose any execution has some regularities in program
+%  % states along it. Typical sources of such regularities are program loops
+%  % and recursive calls.
+%  Using the templates, we are able to build a symbolic execution tree where
+%  a single node represents arbitrarily many iterations of the corresponding
+%  cycle without loss of any information. This leads to a considerable
+%  reduction of size of the symbolic execution tree. There are even programs
+%  for which the resulting compact symbolic execution trees are finite while
+%  the classic symbolic execution trees are infinite.
 \end{abstract}
 
 % \category{D.2.4}{Software Engineering}{Software/Program Verification}
@@ -111,68 +131,83 @@
 
 Classic symbolic execution as proposed by King in 1976~\cite{Kin76}
 systematically explores all execution paths in an analysed program.
-% We commonly describe these paths in a tree structure called \emph{symbolic
-% execution tree}. Each path in the tree from its root to any leaf
-% represents one real path in the analysed program.
-There is typically a huge (or even infinite) number of execution paths even
-for very small and simple programs. Therefore, exploration of all execution
-paths is a serious problem known as \emph{path explosion problem}.
+There is typically a huge (or even infinite) number of execution paths
+even for very small and simple programs. Therefore, exploration of all
+execution paths is a serious problem known as \emph{path explosion
+problem}.
 
 Compact symbolic execution also explores all execution paths, but in a
 compact manner. We analyse a given program \emph{before} we start its
-symbolic execution. We look for cycles in the control flow graph of the
-program. %  which might produce execution paths with some regularities in
-% program states along them. Typically, program loops and recursion produce
-% such regularities.
-We analyse these cycles independently from the rest of the program. The goal
-of the analysis is to find a \emph{template}, i.e.~a declarative parametric
-description of the complete behavior of the cycle. Later, whenever the
-symbolic execution enters a cycle for which we have a template, we either
-proceed in the standard way, or add to the symbolic execution tree only one
-successor node for each edge leaving the cycle. Each such a node reflects a
-cumulative effect of any execution of the cycle eventually leaving the cycle
-by the corresponding edge. Symbolic execution continues from these
-successors in the standard way. 
+symbolic execution. We look for cyclic paths in the control flow graph
+of the program and we analyse them independently from the rest of the
+program. The goal of each such analysis is to find a \emph{template},
+i.e.~a declarative parametric description of all possible program
+states leaving the analysed cyclic path after any number of iterations
+along it. Of course, the analysis can be unsuccessful for some cyclic
+paths. Once we have collected templates of the analysed program, we
+execute it symbolically. We use the templates during the execution to
+build a compact symbolic execution tree as follows. We proceed just
+like in classic symbolic execution until we enter a cyclic path, for
+which we have a template. Now we can instantiate the template into the
+computed compact tree. We append to the current leave node of the tree
+exactly one successor node for each edge leaving the cyclic path. Each
+such the successor node reflects a cumulative effect of any execution
+of the cyclic path eventually leaving the path by the corresponding
+edge. Symbolic execution then continues from these successors in the
+classic way again. 
 
-If our algorithm fails to compute any template for a given program, then the
-compact symbolic execution reduces to the classic one. However, if a
-template for a cycle is found and applied, one node in the compact symbolic
-execution tree can represent all execution paths that differ only in number
-of iterations around the cycle. Such a node corresponds to (potentially
-infinitely) many nodes of the standard symbolic execution tree. Therefore,
-the compact symbolic execution typically produces much smaller trees
-comparing to the standard symbolic execution. Also, application of a
-template leads to a faster exploration of execution paths (in one step, we
-explore all iterations of the cycle). As a results, test-generation
-techniques based on symbolic execution can be more successful (cover more
-locations in a given time limit) if they use compact symbolic execution.
+If our algorithm fails to compute any template for a given program,
+then the compact symbolic execution reduces to the classic one.
+However, if a template for a cyclic path is found and later
+instantiated, then a single leaf node in the compact symbolic
+execution tree represents all execution paths that differ only in
+number of iterations around the cyclic path. Such a leaf node
+corresponds to (potentially infinitely) many leaf nodes of the classic
+symbolic execution tree. Therefore, the compact symbolic execution
+typically produces much smaller trees comparing to the trees computed
+by the classic symbolic execution. But still, a set of all leaves of
+the compact tree represents exactly the same set of real execution
+paths of the analysed program as a set of all leaves of the classic
+tree. On the negative side, each instantiation of a template adds one
+universal quantifier to path conditions (as we will see later). Thus
+in compact symbolic execution we generally loose that nice property of
+classic symbolic execution, where path conditions are always
+quantifier free formulae. Therefore, satisfiability queries in compact
+symbolic execution are more difficult for SMT solvers and they
+typically take more time. The higher complexity of queries also
+increases a ratio of cases, where an SMT solver fails to decide
+a query at all. Thus classic symbolic execution is able to add
+more nodes into the computed tree in a given time unit then the
+compact one. However, our experimental evaluation indicates that
+compact symbolic execution commonly explores execution paths of a
+given program faster then the classic one.
 
-On the negative side, each application of a template adds one quantifier to
-path conditions. As a result, SMT solvers fail to decide satisfiability of
-our path conditions more often than in the standard case. Experimental
-evaluation of our technique indicates that the benefits of our technique are
-in practice considerably higher than its drawbacks.
+%Also, an instantiation of a template leads to a
+%faster exploration of execution paths, since in one step we explore
+%all iterations of the related cyclic path. As a result,
+%test-generation techniques based on symbolic execution can be more
+%successful, i.e. to cover more locations in a given time limit, if
+%they use compact symbolic execution.
 
-% This node corresponds to an application of the template which specifies
-% changes of the symbolic state and path condition after leaving this
-% program part, i.e.~after leaving the node of the symbolic tree.
+%On the negative side, each instantiation of a template adds one
+%universal quantifier to path conditions. As a result, SMT solvers fail
+%to decide satisfiability of our path conditions more often than in the
+%classic case. Experimental evaluation of our technique indicates that
+%the benefits of our technique are in practice considerably higher than
+%its drawbacks.
 
-% we instantiate the template into the end
-% of the current path by adding a \emph{single} vertex, representing
-% \emph{any} symbolic execution through the part, and then we simply
-% \emph{jump} behind the part, where we continue with the classic symbolic
-% execution again.
-
-\medskip The rest of the paper is organized as follows. The next section
-presents the basic idea of the compact symbolic execution using two
-illustrative examples. Section~\ref{sec:technique} provides a formal
-description of the technique.
-% in a simple setting: templates with one parameter that are derived from
-% integer programs without function calls. Section~\ref{sec:extensions}
-% indicates possible extension of the technique.
-Section~\ref{sec:experiments} is devoted to experimental implementation and
-experimental results. The last two sections discuss the related work and
-conclude the paper.
+% Honzo, je mi jasne, ze tento text budes hledat. Nez ho ale 
+% opet odkomentujes, tak skutecne zvaz, jestli je tento prehled
+% pro 15 strankovy clanek se 6 sekcema, z nichz polovina (Intro,
+% Related Work a Conclusion) jsou zcela typicky ve vsech clancich,
+% OPRAVDU nutne potrebny.
+%The rest of the paper is organized as follows. The next section
+%presents the basic idea of the compact symbolic execution using two
+%illustrative examples. Section~\ref{sec:technique} provides a formal
+%description of the technique.
+%Section~\ref{sec:experiments} is devoted to experimental implementation and
+%experimental results. The last two sections discuss the related work and
+%conclude the paper.
 
 %}}}
 %{{{ Basic idea
