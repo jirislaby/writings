@@ -343,7 +343,7 @@ and $(c,e)$ to leave it.
 % % as an \emph{entry} location into the part, since we enter the part by
 % % stepping into the location $b$. In general, there can be several entries
 % % into the part. But we are always interested only in that one, which is
-% % related to the entry vertex of that path in a classic symbolic execution
+% % related to the entry node of that path in a classic symbolic execution
 % % tree, we want to eliminate. The entry location $b$ is highlighted by green
 % % colour in the figure.
 % To complete the part, we further need to specify \emph{exits} from the part.
@@ -557,122 +557,135 @@ trees.
 
 \section{Description of the Technique}\label{sec:technique}
 
-This section describes the compact symbolic execution formally. For
-simplicity, we formulate the algorithm for programs manipulating only
-integer variables and read-only multidimensional integer arrays, and with no
-function calls. The algorithm can be extended to handle other program
-features including modifiable arrays, function calls, variables of other
-types, dynamically allocated memory etc. The first two mentioned features
-are actually supported in our experimental implementation mentioned in the
-next section.
-
-% Nevertheless, the algorithm can be extended to handle
-% variables of other types, function calls, etc.
+This section describes the compact symbolic execution in details. For
+simplicity of the presentation, we only consider programs consisting
+of a single flowgraph and manipulating integer variables and read-only
+arrays. Extensions to other data types, symbolic writes into arrays,
+function calls or recursion are straightforward (see
+Appendix~\ref{sec:Extensons})\todo{dodat ten appendix}.
 
   %{{{ Preliminaries
 
 \subsection{Preliminaries}
 
-First of all, we present the considered model of programs and define
-composition and equivalence of symbolic program states.
+In this section we introduce several basic terms and notations, which
+we intensively use throughout whole Section~\ref{sec:technique}.
 
-Programs are represented in the form of flowgraphs. A \emph{flowgraph} is a
-tuple $P=(V,E,l_s,l_e,\iota)$, where $(V,E)$ is a finite oriented graph,
-elements of $V$ are called \emph{locations}, $l_s,l_e\in V$ are \emph{start}
-and \emph{end locations}, and $\iota:E\rightarrow\mathcal{I}$ is a function
-assigning to each edge $e$ an \emph{instruction} $\iota(e)$. A location is
-\emph{branching} if its out-degree is $2$. All other locations have
-out-degree at most $1$. The in-degree of start location $l_s$ and the
-out-degree of end location $l_e$ is 0. We use two kinds of instruction: an
-assignment instruction $\var{a}\texttt{:=}e$ for some scalar variable
-$\var{a}$ and some expression $e$, and an assumption
-$\texttt{assume}(\gamma)$ for some quantifier-free formula $\gamma$ over
-program variables. Out-edges of any branching location are labelled with
-assumptions $\texttt{assume}(\gamma)$ and $\texttt{assume}(\neg\gamma)$ for
-some $\gamma$. We usually omit the keyword $\texttt{assume}$ in our
-flowgraphs. We consider only instructions operating on \emph{scalar
-  variables} $\var{a},\var{b},\ldots$ of type \texttt{Int} and
-multi-dimensional \emph{array variables} $\var{A},\var{B},\ldots$ of type
-\texttt{Int}$^k\rightarrow$\texttt{Int}. We assume that a flowgraph prevents
-invalid operations (like division by zero, etc.) by branchings into error
-locations. An error location is any location without any outgoing edge which
-is not the end location. In the rest of the paper, $P$ is always a
-flowchart.
+%First of all, we present the considered model of programs and define
+%composition and equivalence of symbolic program states.
+%
+%Programs are represented in the form of flowgraphs. A \emph{flowgraph} is a
+%tuple $P=(V,E,l_s,l_e,\iota)$, where $(V,E)$ is a finite oriented graph,
+%elements of $V$ are called \emph{locations}, $l_s,l_e\in V$ are \emph{start}
+%and \emph{end locations}, and $\iota:E\rightarrow\mathcal{I}$ is a function
+%assigning to each edge $e$ an \emph{instruction} $\iota(e)$. A location is
+%\emph{branching} if its out-degree is $2$. All other locations have
+%out-degree at most $1$. The in-degree of start location $l_s$ and the
+%out-degree of end location $l_e$ is 0. We use two kinds of instruction: an
+%assignment instruction $\var{a}\texttt{:=}e$ for some scalar variable
+%$\var{a}$ and some expression $e$, and an assumption
+%$\texttt{assume}(\gamma)$ for some quantifier-free formula $\gamma$ over
+%program variables. Out-edges of any branching location are labelled with
+%assumptions $\texttt{assume}(\gamma)$ and $\texttt{assume}(\neg\gamma)$ for
+%some $\gamma$. We usually omit the keyword $\texttt{assume}$ in our
+%flowgraphs. We consider only instructions operating on \emph{scalar
+%  variables} $\var{a},\var{b},\ldots$ of type \texttt{Int} and
+%multi-dimensional \emph{array variables} $\var{A},\var{B},\ldots$ of type
+%\texttt{Int}$^k\rightarrow$\texttt{Int}. We assume that a flowgraph prevents
+%invalid operations (like division by zero, etc.) by branchings into error
+%locations. An error location is any location without any outgoing edge which
+%is not the end location. In the rest of the paper, $P$ is always a
+%flowchart.
+%
+%\medskip By \emph{symbolic expressions} we mean all expressions built with
+%integers, standard integer operations and functions, and
+%\begin{itemize}
+%\item a \emph{symbol} $\sym{a}$ for each scalar variable $\var{a}$,
+%\item a \emph{function symbol} $\sym{A}$ for each array variable $\var{A}$,
+%  where arity of $\sym{A}$ corresponds to the dimension of array $\var{A}$,
+%\item a countable set $\{\kappa_1,\tau_1,\kappa_2,\tau_2,\ldots\}$ of
+%  \emph{parameters}\note{tohle je matouci -- ceho to jsou parametry?}, and
+%\item a construct $\ite(\varphi,e_1,e_2)$, of meaning
+%  ``\textbf{i}f-\textbf{t}hen-\textbf{e}lse'', where $e_1,e_2$ are symbolic
+%  expressions and $\varphi$ is a first order formula over symbols and
+%  parameters. The value of $\ite(\varphi,e_1,e_2)$ is $e_1$ if $\varphi$
+%  holds and $e_2$ otherwise.
+%\end{itemize}
+%
+%% Let $f,e_1,\ldots,e_n$ be symbolic expressions and $x_1,\ldots,x_n$ be path
+%% counters or symbols corresponding to scalar variables. Then
+%% $f[x_1/e_1,\ldots,x_n/e_n]$ is a symbolic expression $f$ where all
+%% occurrences of all $x_i$ are simultaneously replaced by expressions
+%% $e_i$. To shorten the notation, we write $f[\vec{x}/\vec{e}]$ when the
+%% meaning is clearly given by a context. We also use the notation
+%% $\varphi[\vec{x}/\vec{e}]$ with the analogous meaning for formulae
+%% $\varphi$.
+%
+%A \emph{symbolic memory} is a function $\theta$ assigning to each scalar
+%variable $\var{a}$ a symbolic expression and to each array variable
+%$\var{A}$ the function symbol $\sym{A}$. \emph{Initial symbolic memory}
+%$\Theta$ assigns to each scalar variable $\var{a}$ the corresponding symbol
+%$\sym{a}$.
+%% Let $\var{a}$ be a scalar variable and $e$ be a symbolic expression. Then
+%% $\theta[\var{a}\rightarrow e]$ is a symbolic memory equal to $\theta$
+%% except for variable $\var{a}$, where $\theta[\var{a}\rightarrow
+%% e](\var{a})=e$.
+%\emph{Symbolic program state} (or simply a \emph{state}) is a triple
+%$s=(l,\theta,\varphi)$ of a location $l$, symbolic memory $\theta$ and first
+%order formula over symbols and parameters $\varphi$ called \emph{path
+%  condition}. \emph{Initial state} is the triple $(l_s,\Theta,\true)$ where
+%$l_s$ is the start location and $\Theta$ is the initial symbolic memory. We
+%assume that the reader is familiar with standard symbolic execution (we
+%refer to~\cite{Kin76} if the intuition provided in the previous section is
+%not sufficient).
 
-\medskip By \emph{symbolic expressions} we mean all expressions built with
-integers, standard integer operations and functions, and
-\begin{itemize}
-\item a \emph{symbol} $\sym{a}$ for each scalar variable $\var{a}$,
-\item a \emph{function symbol} $\sym{A}$ for each array variable $\var{A}$,
-  where arity of $\sym{A}$ corresponds to the dimension of array $\var{A}$,
-\item a countable set $\{\kappa_1,\tau_1,\kappa_2,\tau_2,\ldots\}$ of
-  \emph{parameters}\note{tohle je matouci -- ceho to jsou parametry?}, and
-\item a construct $\ite(\varphi,e_1,e_2)$, of meaning
-  ``\textbf{i}f-\textbf{t}hen-\textbf{e}lse'', where $e_1,e_2$ are symbolic
-  expressions and $\varphi$ is a first order formula over symbols and
-  parameters. The value of $\ite(\varphi,e_1,e_2)$ is $e_1$ if $\varphi$
-  holds and $e_2$ otherwise.
-\end{itemize}
-
-% Let $f,e_1,\ldots,e_n$ be symbolic expressions and $x_1,\ldots,x_n$ be path
-% counters or symbols corresponding to scalar variables. Then
-% $f[x_1/e_1,\ldots,x_n/e_n]$ is a symbolic expression $f$ where all
-% occurrences of all $x_i$ are simultaneously replaced by expressions
-% $e_i$. To shorten the notation, we write $f[\vec{x}/\vec{e}]$ when the
-% meaning is clearly given by a context. We also use the notation
-% $\varphi[\vec{x}/\vec{e}]$ with the analogous meaning for formulae
-% $\varphi$.
-
-A \emph{symbolic memory} is a function $\theta$ assigning to each scalar
-variable $\var{a}$ a symbolic expression and to each array variable
-$\var{A}$ the function symbol $\sym{A}$. \emph{Initial symbolic memory}
-$\Theta$ assigns to each scalar variable $\var{a}$ the corresponding symbol
-$\sym{a}$.
-% Let $\var{a}$ be a scalar variable and $e$ be a symbolic expression. Then
-% $\theta[\var{a}\rightarrow e]$ is a symbolic memory equal to $\theta$
-% except for variable $\var{a}$, where $\theta[\var{a}\rightarrow
-% e](\var{a})=e$.
-\emph{Symbolic program state} (or simply a \emph{state}) is a triple
-$s=(l,\theta,\varphi)$ of a location $l$, symbolic memory $\theta$ and first
-order formula over symbols and parameters $\varphi$ called \emph{path
-  condition}. \emph{Initial state} is the triple $(l_s,\Theta,\true)$ where
-$l_s$ is the start location and $\Theta$ is the initial symbolic memory. We
-assume that the reader is familiar with standard symbolic execution (we
-refer to~\cite{Kin76} if the intuition provided in the previous section is
-not sufficient).
-
-We sometimes use the notation $\theta\prm{\bld{\kappa}}$ to emphasize that
-$\bld{\kappa}$ is the set of parameters appearing in symbolic memory
+We use the notation $\theta\prm{\bld{\kappa}}$ to emphasize that
+$\bld{\kappa}$ is the set of parameters appearing in the symbolic memory
 $\theta$. We use an analogous notation $\varphi\prm{\bld{\kappa}}$ to
 emphasize $\bld{\kappa}$ is the set of parameters with free occurences in
-the first order formula $\varphi$. We also write $s\prm{\bld{\kappa}}$ if
-$s=(l,\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}})$. Let $\bld{\nu}$
-be a valuation of parameters from $\bld{\kappa}$. By $\theta\prm{\nu}$,
-$\varphi\prm{\nu}$, and $s\prm{\bld{\nu}}$ we denote the symbolic memory
-$\theta\prm{\bld{\kappa}}$, the formula $\varphi\prm{\bld{\kappa}}$, and
-state $s\prm{\bld{\kappa}}$ where each (free) occurrence of
-$\kappa\in\bld{\kappa}$ is replaced by~$\bld{\nu}(\kappa)$. If
+the first order formula $\varphi$. We also write $s\prm{\bld{\kappa}}$
+or $(l,\theta,\varphi)\prm{\bld{\kappa}}$, if
+$s=(l,\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}})$ .
+
+Each function $\bld{\nu}$ from a finite set of parameters to non-negative integers is a \emph{valuation} of the parameters.
+% Let $\bld{\nu}$ be a valuation of parameters from $\bld{\kappa}$.
+  By $\theta\prm{\bld{\nu}}$,
+$\varphi\prm{\bld{\nu}}$, and $s\prm{\bld{\nu}}$ we denote a symbolic memory
+$\theta\prm{\bld{\kappa}}$, a formula $\varphi\prm{\bld{\kappa}}$, and
+a program state $s\prm{\bld{\kappa}}$ respectively, where all free occurrences of each
+$\kappa\in\bld{\kappa}$ are replaced by~$\bld{\nu}(\kappa)$. If
 $\bld{\kappa}=\{\kappa\}$ is a singleton and $\bld{\nu}(\kappa)=\nu$, we
 simply write $\theta\prm{\kappa},\varphi\prm{\kappa},s\prm{\kappa}$ instead
 of $\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}},s\prm{\bld{\kappa}}$
 and $\theta\prm{\nu},\varphi\prm{\nu},s\prm{\nu}$ instead of
 $\theta\prm{\bld{\nu}},\varphi\prm{\bld{\nu}},s\prm{\bld{\nu}}$.
- 
-Further, we use the notation $\theta(\cdot)$\note{tohle je divne, jakou
-\emph{tu} notaci? A co ma znamenat ta $\cdot$} in a more general way. It
-always denotes the operation of replacing each (scalar or array) variable
-$\var{a}$\note{tohle cele tady vypada jako pretizene a (nahrada za $\var{a}$ a
-$\var{A}$, nestalo by za to zavest nejake v, coz by zahrnulo a nebo A, takhle
-se v tom orientuje spatne. Treba v dalsi vete ted nevim, jestli se to definuje
-i pro A.)} by $\theta(\var{a})$.  $\theta\langle\cdot\rangle$ denotes the
-operation on symbolic expressions or formulae, where all occurrences of all
-symbols $\sym{a}$ are simultaneously replaced by
-$\theta(\var{a})$. Additionally, $\theta_1\compose\theta_2$ denotes
-\emph{composition of symbolic memories} $\theta_1$ and $\theta_2$ satisfying
+
+If $\theta$ is a symbolic memory and $\varphi$ is an symbolic
+expression, then $\theta\langle\varphi\rangle$ is the symbolic expression
+$\varphi$, where all occurrences of all symbols $\sym{a}$ are
+simultaneously replaced by $\theta(\var{a})$, i.e.~by the symbolic value
+of the corresponding variable in $\theta$.
+
+When $\theta_1$ and $\theta_2$ are two symbolic memories, then
+$\theta_1\compose\theta_2$ is a \emph{composed symbolic memory}
+satisfying
 $(\theta_1\compose\theta_2)(\var{a})=\theta_1\langle\theta_2(\var{a})\rangle$
 for each variable $\var{a}$. Intuitively, the symbolic memory
 $\theta_1\compose\theta_2$ represents an overall effect of a code with
 effect $\theta_1$ followed by a code with effect $\theta_2$.
+ 
+ 
+%Further, we use the notation $\theta(\cdot)$ in a more general way. It
+%always denotes the operation of replacing each (scalar or array) variable
+%$\var{a}$ by $\theta(\var{a})$.  $\theta\langle\cdot\rangle$ denotes the
+%operation on symbolic expressions or formulae, where all occurrences of all
+%symbols $\sym{a}$ are simultaneously replaced by
+%$\theta(\var{a})$. Additionally, $\theta_1\compose\theta_2$ denotes
+%\emph{composition of symbolic memories} $\theta_1$ and $\theta_2$ satisfying
+%$(\theta_1\compose\theta_2)(\var{a})=\theta_1\langle\theta_2(\var{a})\rangle$
+%for each variable $\var{a}$. Intuitively, the symbolic memory
+%$\theta_1\compose\theta_2$ represents an overall effect of a code with
+%effect $\theta_1$ followed by a code with effect $\theta_2$.
 
 % Finally, for vectors $\vec{u}=(u_1,\ldots,u_n)$ and
 % $\vec{v}=(v_1,\ldots,v_n)$ we use $\vec{u}\le\vec{v}$ as an abbreviation
@@ -693,7 +706,7 @@ that produced $s_2$.
 % Each function has its own local variables. All program variables and
 % functions have different names. Exactly one function is marked as the
 % starting one. Each function is represented as a finite flowgraph, where
-% vertices identify program locations and edges define transitions between the
+% nodes identify program locations and edges define transitions between the
 % locations. Each function contains two distinguished locations: an
 % \emph{entry location} and an \emph{exit location}. There is no edge leading
 % to an entry location and no edge leading from an exit location. Each edge is
@@ -778,8 +791,8 @@ that produced $s_2$.
 % If $s = (\theta, \varphi, \Xi, l)$ is a program state, then $s.\theta$
 % denotes its symbolic memory, $s.\varphi$ denotes its path condition,
 % $s.\Xi$ is its call stack and $s.l$ is its current program location.
-% Further, if $u$ is a vertex of a symbolic execution tree, then $u.s$
-% denotes a program state labelling the vertex. And instead of
+% Further, if $u$ is a node of a symbolic execution tree, then $u.s$
+% denotes a program state labelling the node. And instead of
 % $u.s.\theta$, $u.s.\varphi$, $u.s.\Xi$, and $u.s.l$ we simply write
 % $u.\theta$, $u.\varphi$, $u.\Xi$, and $u.l$ respectively. Finally, if
 % $\Xi$ is a call stack, then we use the dot-notation to access a record
@@ -804,40 +817,48 @@ that produced $s_2$.
 % \ldots,$ $ r_m, \bar{r}_0', \ldots, \bar{r}_n']$.
 % \end{dfn}
 
-We say that symbolic memories $\theta_1$ and $\theta_2$ are equivalent,
-written $\theta_1\equiv\theta_2$, if, for each variable $\var{a}$, the
-formula $\theta_1(\var{a})=\theta_2(\var{a})$ holds. Further, we write
-$\varphi_1\equiv\varphi_2$ if the two formulae are equivalent in the logical
-sense. Finally, two states $s_1=(l_1,\theta_1,\varphi_1)$ and
-$s_2=(l_2,\theta_2,\varphi_2)$ are \emph{equivalent}, written $s_1\equiv s_2$,
-if $l_1=l_2$, $\theta_1\equiv\theta_2$, and $\varphi_1\equiv\varphi_2$.
+%We say that symbolic memories $\theta_1$ and $\theta_2$ are equivalent,
+%written $\theta_1\equiv\theta_2$, if, for each variable $\var{a}$, the
+%formula $\theta_1(\var{a})=\theta_2(\var{a})$ holds. Further, we write
+%$\varphi_1\equiv\varphi_2$ if the two formulae are equivalent in the logical
+%sense. Finally, two states $s_1=(l_1,\theta_1,\varphi_1)$ and
+%$s_2=(l_2,\theta_2,\varphi_2)$ are \emph{equivalent}, written $s_1\equiv s_2$,
+%if $l_1=l_2$, $\theta_1\equiv\theta_2$, and $\varphi_1\equiv\varphi_2$.
 
-\begin{lem}[Equivalent Compositions]\label{lem:EquivalentCompositions}
-  Let $s$, $s'$, and $s''$ be program states, $\bld{\nu}$ and $\bld{\nu}'$
-  be valuations of parameters in $s$ and $s'$ respectively such that
-  $\bld{\nu} \cup \bld{\nu}'$ is also a valuation, $\theta$, $\theta'$, and
-  $\theta''$ be symbolic memories, and $\varphi$ and $\psi \wedge \psi'$ be
-  formulae. The following relations hold:
-  \begin{enumerate}
-  \item $(\theta \compose \theta')\ese{\varphi} \equiv
-    \theta\ese{\theta'\ese{\varphi}}$
-  \item $\theta\ese{\psi} \wedge \theta\ese{\psi'} \equiv \theta\ese{\psi
-      \wedge \psi'}$
-  \item $\theta \compose (\theta' \compose \theta'') \equiv (\theta \compose
-    \theta') \compose \theta''$
-  \item $s \compose (s' \compose s'') \equiv (s \compose s') \compose s''$
-  \item $s\prm{\bld{\nu}} \compose s'\prm{\bld{\nu}'} \equiv (s \compose
-    s')\prm{\bld{\nu} \cup \bld{\nu}'}$
-  \end{enumerate}
-\end{lem}
+%\begin{dfn}[Composition]\label{def:Composition}
+%Let $s = (l, \theta, \varphi)$ and $s' = (\theta', \varphi', \Xi', l')$ be program states. Then a composite program state $s \circ s' = (\theta \circ \theta',~\varphi \wedge \theta\ese{\varphi'}, \Xi \circ (\theta \circ \Xi'), l')$, where $\theta\ese{\varphi'}$ is a symbolic expression constructed from $\varphi'$ such that all symbols $\alpha_i$ in $\varphi'$ are simultaneously substituted by symbolic expressions $\theta(\Theta^{-1}(\alpha_i))$, $\theta \circ \theta'$ is a symbolic memory such that for each variable \var{a} we have $(\theta \circ \theta')(\var{a}) = \theta\ese{\theta'(\var{a})}$, $\theta \circ \Xi' = [\bar{r}_0', \ldots, \bar{r}_n']$, where each $\bar{r}_i'$ is equal to $r_i$ except for the first component being $\bar{r}_i'.\sigma = \theta \circ r_i'.\sigma$, and $\Xi \circ (\theta \circ \Xi') = [r_0, \ldots,$ $ r_m, \bar{r}_0', \ldots, \bar{r}_n']$, .
+%\end{dfn}
+%
 
-In the following, we often use the following dot-notation to access elements
-of a state: if $s$ is a symbolic state, then $s.l$ denotes its current
-program location, $s.\theta$ denotes its symbolic memory, and $s.\varphi$
-denotes its path condition. We use an analogous notation also for other
-tuples. The meaning is always clear from the context.
+%\begin{lem}[Equivalent Compositions]\label{lem:EquivalentCompositions}
+%  Let $s$, $s'$, and $s''$ be program states, $\bld{\nu}$ and $\bld{\nu}'$
+%  be valuations of parameters in $s$ and $s'$ respectively such that
+%  $\bld{\nu} \cup \bld{\nu}'$ is also a valuation, $\theta$, $\theta'$, and
+%  $\theta''$ be symbolic memories, and $\varphi$ and $\psi \wedge \psi'$ be
+%  formulae. The following relations hold:
+%  \begin{enumerate}
+%  \item $(\theta \compose \theta')\ese{\varphi} \equiv
+%    \theta\ese{\theta'\ese{\varphi}}$
+%  \item $\theta\ese{\psi} \wedge \theta\ese{\psi'} \equiv \theta\ese{\psi
+%      \wedge \psi'}$
+%  \item $\theta \compose (\theta' \compose \theta'') \equiv (\theta \compose
+%    \theta') \compose \theta''$
+%  \item $s \compose (s' \compose s'') \equiv (s \compose s') \compose s''$
+%  \item $s\prm{\bld{\nu}} \compose s'\prm{\bld{\nu}'} \equiv (s \compose
+%    s')\prm{\bld{\nu} \cup \bld{\nu}'}$
+%  \end{enumerate}
+%\end{lem}
 
-\smallskip It is well known that checking satisfiability of path conditions
+We often use a dot-notation to access elements of tuples. For example,
+if $s = (l, \theta, \varphi)$ is a program state, then $s.l$ denotes
+its current location, $s.\theta$ denotes its symbolic memory, and
+$s.\varphi$ denotes its path condition. If the meaning is clear from
+the context we omit sequences of dots when accessing target
+components. For example, if $u$ is a node of a symbolic tree with a
+program state $u.s$, then we write $u.l$, $u.\theta$, and $u.\varphi$
+instead of $u.s.l$, $u.s.\theta$, and $u.s.\varphi$.
+
+It is well known that checking satisfiability of path conditions
 is essential for the classic symbolic execution. And we will see that such
 checks are also essential for the compact symbolic execution. Unfortunately,
 programs commonly operate in undecidable theories (like Peano
@@ -851,21 +872,24 @@ the obvious meanings.
 
 \subsection{Templates and their computation}
 
-%We start with formal definitions of the terms \emph{cycle} and
-%\emph{template}, since they are essential for this section.
+We start with a formal definition of a term \emph{cycle}, representing
+any part of a flowgraph, for which it makes any sense to compute a
+template for, and then we define the term \emph{template} itself.
+%, since they are essential for this section.
 
-%\begin{dfn}[Cycle]\label{def:Part}
-%Let $(u,e)$ be an edge of a flowgraph $P$, $\pi = e \omega e$
-%be a cyclic path in $P$
-%% such that $\omega$ does not contain neither the entry location of $f$ nor
-%% the location $u$,
-%and let $X = \{ (u_1,x_1), \ldots, (u_n,x_n) \}$ be a % non-empty
-%set of all those edges of $P$, which do not belong to the path $\pi$, but
-%each of their start vertices $u_i$ does. Then, a triple $C = (\pi, e, X) $
-%is a \emph{cycle} in $P$, where the path $\pi$ is a \emph{core} of $C$, $e$
-%is an \emph{entry location} of $C$, all edges in $X$ are \emph{exit edges}
-%of $C$, and each location $x_i$ is called an \emph{exit location} of $C$.
-%\end{dfn}
+\begin{dfn}[Cycle]\label{def:Part}
+Let $(u,e)$ be an edge of a flowgraph $P$, $\pi = e \omega e$ be a
+cyclic path in $P$ s.t. $\omega$ is not empty path and all nodes in
+$e\omega$ are all distinct,
+% such that $\omega$ does not contain neither the entry location of $f$ nor
+% the location $u$,
+and let $X = \{ (u_1,x_1), \ldots, (u_n,x_n) \}$ be a % non-empty
+set of all those edges of $P$, which do not belong to the path $\pi$, but
+each of their start nodes $u_i$ does. Then, a triple $C = (\pi, e, X) $
+is a \emph{cycle} in $P$, where the path $\pi$ is a \emph{core} of $C$, $e$
+is an \emph{entry location} of $C$, all edges in $X$ are \emph{exit edges}
+of $C$, and each location $x_i$ is called an \emph{exit location} of $C$.
+\end{dfn}
 
 \begin{dfn}[Template] \label{def:LoopTemplate} Let $T$ be a classic symbolic
   execution tree of $P$, $n\ge0$ be an integer, $l, l_1, \ldots, l_n$ be
@@ -1130,7 +1154,7 @@ failed to explore whole path-space of the executed program.
     \label{alg:executeSymbolically:InitialState}
     Let $Q$ be a queue of states initially containing only $s_0$ \;
         \label{alg:executeSymbolically:InitialQ}
-    Into the empty tree $T$ insert the root vertex labelled by $s_0$\;
+    Into the empty tree $T$ insert the root node labelled by $s_0$\;
         \label{alg:executeSymbolically:Root}
     \Repeat{\rm $Q$ becomes empty}{ \label{alg:executeSymbolically:LoopBegin}
         Extract the first state $s$ from $Q$ \;
@@ -1173,13 +1197,13 @@ failed to explore whole path-space of the executed program.
             \ForEach{\rm state $s' \in S$ s.t. $s'.\varphi$ is satisfiable}{
                     \label{alg:executeSymbolically:AddSATSuccessors}
                     Insert $s'$ at the end of $Q$ \; 
-                    Insert a new vertex $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
+                    Insert a new node $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
                     \label{alg:executeSymbolically:CreateVertex}
             }
             \ForEach{\rm state $s' \in S$ s.t. satisfiability query of $s'.\varphi$ results in FAILURE}{
                     \label{alg:executeSymbolically:LailedLeafBegin}
-                    Insert a new vertex $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
-                    Mark the vertex $v$ in $T$ as failed leaf.
+                    Insert a new node $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
+                    Mark the node $v$ in $T$ as failed leaf.
                     \label{alg:executeSymbolically:LailedLeafEnd}
             }
     } \label{alg:executeSymbolically:LoopEnd}
@@ -1199,13 +1223,13 @@ without and with $\Box$-lines respectively. We further assume that
 neither $T$ nor $T'$ contain failed leaves.
 
 \begin{thm}[Soundness]
-For each leaf vertex $e \in T$ there is a leaf vertex $e' \in T'$ and
+For each leaf node $e \in T$ there is a leaf node $e' \in T'$ and
 a valuation  $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
 e'.s\prm{\bld{\nu}}$.
 \end{thm}
 
 \begin{thm}[Completeness]
-For each leaf vertex $e' \in T'$ there is a leaf vertex $e \in T$ and
+For each leaf node $e' \in T'$ there is a leaf node $e \in T$ and
 a valuation $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
 e'.s\prm{\bld{\nu}}$.
 \end{thm}
@@ -1486,7 +1510,7 @@ sooner. Approaches \cite{G07,AGT08} share the same goal as the previous
 ones. Only, they focus on a computation of function summaries rather than on
 program loops. Our goal is completely different: Instead of guiding
 exploration of paths in classic symbolic execution tree, we collapse paths
-(with regularities in states along them) into single vertices in compact
+(with regularities in states along them) into single nodes in compact
 symbolic execution tree.
 %Paths in compact symbolic execution tree can thus be exponentially
 %shorter than corresponding paths in the classic one.
@@ -1552,8 +1576,18 @@ program loops, which is not the case for~\cite{ST12}.
 %}}}
 %{{{ Conclusion 
 
-%\section{Conclusion}\label{sec:conclusion}
-%
+\section{Conclusion}\label{sec:conclusion}
+
+Compact symbolic execution accepts information about known behaviour
+of an executed program in advance, in form of templates. A template is
+absolutely precise declarative parametric summary of all possible
+symbolic executions leaving a given cyclic path after arbitrary number
+of iterations along it. During compact symbolic execution templates
+are instantiated into the constructed compact symbolic execution tree
+in a form of several nodes, which replace expensive and potentially
+infinite exploration of the corresponding summarised part of the
+program.
+
 %Compact symbolic execution is a generalisation of the classic one. It
 %takes advantage over the classic symbolic execution by accepting
 %information about an executed program in advance, in form of
@@ -1622,13 +1656,13 @@ program loops, which is not the case for~\cite{ST12}.
     \begin{tabular}{cc}
         {\input{fig_countIf}} & {\input{fig_countIfCSET}} \\
         (a) & (b)
-        \\ \\
-        \multicolumn{2}{c}{\input{fig_countIfSET}} \\
-        \multicolumn{2}{c}{(c)}
+%        \\ \\
+%        \multicolumn{2}{c}{\input{fig_countIfSET}} \\
+%        \multicolumn{2}{c}{(c)}
     \end{tabular}
 \caption{(a) A program \texttt{countIf(A,n,x)}.
 (b) Compact tree of \texttt{countIf}.
-(c) Classic tree of \texttt{countIf}.
+%(c) Classic tree of \texttt{countIf}.
 }
 \label{fig:countIf}
 \end{figure*}
@@ -1687,6 +1721,16 @@ non-degenerated binary tree.
 
 \setcounter{lem}{0}
 \setcounter{thm}{0}
+
+\begin{dfn}[Equivalence]\label{def:Equivalence}
+Let $\varphi$, $\varphi'$ be symbolic expressions, $\theta$, $\theta'$
+be symbolic memories, and $s$, $s'$ be program states. Then $\varphi
+\equiv \varphi'$, if $\varphi$ and $\varphi'$ are either logically
+equivalent formulae or two terms such that $\varphi = \varphi'$ is
+valid. $\theta \equiv \theta'$, if for each variable \var{a} we have
+$\theta(\var{a}) \equiv \theta'(\var{a})$. Finally, $s \equiv s'$, if
+both $s$ and $s'$ have equal or equivalent components.
+\end{dfn}
 
 \begin{lem}[Equivalent Compositions]
   Let $s$, $s'$, and $s''$ be program states, $\bld{\nu}$ and $\bld{\nu}'$
@@ -1794,14 +1838,14 @@ Let $T$ be a classic symbolic execution tree of $P$, $(e, \theta,
 \ref{alg:template:begin}, and $(x, \hat{\theta}, \hat{\varphi})$ be a
 symbolic state computed at line \ref{alg:template:exitState} (for some
 exit edge from
-$X$). Further, let $u$ be a vertex of $T$ such that $u.l = e$, and let
+$X$). Further, let $u$ be a node of $T$ such that $u.l = e$, and let
 $\delta = u_0 \ldots u_1 \ldots u_2$ $\ldots u_{\nu} \ldots w$ be a path
 in $T$ starting at $u$ (i.e.~$u_0 = u$), then iterating the core $\pi$
 exactly $\nu \geq 0$ times (i.e.~all the nodes $u_i \in \delta$ are
 exactly those having $u_i.l = e$), and then $\delta$ finally leaves
-the core $\pi$ by following the path towards the vertex $w$,
+the core $\pi$ by following the path towards the node $w$,
 satisfying $w.l = x$. We use the memory composition operation to
-express memories of the vertices $u_i$ along $\delta$ as follows.
+express memories of the nodes $u_i$ along $\delta$ as follows.
 \begin{align*}
 u_1.\theta &= u.\theta \compose \theta
 \\
@@ -1820,7 +1864,7 @@ u.\theta \compose \theta^i$ and we get
 \begin{align*}
 w.\theta = u.\theta \compose (\theta^{\nu} \compose \hat{\theta}).
 \end{align*}
-We proceed similarly to express path conditions of the vertices along
+We proceed similarly to express path conditions of the nodes along
 $\delta$.
 \begin{align*}
 u_1.\varphi &\equiv u.\varphi \wedge u.\theta\ese{\varphi} \equiv
@@ -1933,7 +1977,7 @@ containing $\delta$ as its suffix:
 u.\theta\ese{\theta^0\ese{\varphi} \wedge \ldots \wedge
 \theta^{\nu-1}\ese{\varphi} \wedge \theta^{\nu}\ese{\hat{\varphi}}}.
 \end{align*}
-%where $u.\varphi$ is a classic path condition for a path from the root of $T$ down to $u$ and the formula $u.\theta\ese{\theta^0\ese{\varphi} \wedge \ldots \wedge \theta^{\nu-1}\ese{\varphi} \wedge \theta^{\nu}\ese{\hat{\varphi}}}$ uniquely identifies classic symbolic execution (see Definition~\ref{def:Composition} and Lemma~\ref{lem:EquivalentCompositions}) of the core $\pi$ exactly $\nu$ times followed by from the vertex $u$ is the  classic 
+%where $u.\varphi$ is a classic path condition for a path from the root of $T$ down to $u$ and the formula $u.\theta\ese{\theta^0\ese{\varphi} \wedge \ldots \wedge \theta^{\nu-1}\ese{\varphi} \wedge \theta^{\nu}\ese{\hat{\varphi}}}$ uniquely identifies classic symbolic execution (see Definition~\ref{def:Composition} and Lemma~\ref{lem:EquivalentCompositions}) of the core $\pi$ exactly $\nu$ times followed by from the node $u$ is the  classic 
 \qed
 \end{proof}
 \end{thm}
@@ -1977,31 +2021,31 @@ respectively. We further assume that neither $T$ nor $T'$ contain
 failed leaves.
 
 \begin{thm}[Soundness]
-For each leaf vertex $e \in T$ there is a leaf vertex $e' \in T'$ and
+For each leaf node $e \in T$ there is a leaf node $e' \in T'$ and
 a valuation  $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
 e'.s\prm{\bld{\nu}}$.
 \begin{proof}
-Let $\pi$ be the path in $T$ from the root to the leaf vertex $e$. We
+Let $\pi$ be the path in $T$ from the root to the leaf node $e$. We
 prove the theorem by the following induction:
 
-\emph{Basic case}: The root vertices $r$ and $r'$ of $T$ and $T'$
+\emph{Basic case}: The root nodes $r$ and $r'$ of $T$ and $T'$
 respectively are labelled by the same program state $s_0$ (see lines
 \ref{alg:executeSymbolically:InitialState} and
 \ref{alg:executeSymbolically:Root} of
 Algorithm~\ref{alg:executeSymbolically}). Therefore, $r.s \equiv
 r'.s\prm{\bld{\nu}}$, for $\bld{\nu} = \emptyset$.
 
-\emph{Inductive step}: Let $u \in \pi$, $u \neq e$, $u'$ be a vertex
+\emph{Inductive step}: Let $u \in \pi$, $u \neq e$, $u'$ be a node
 of $T'$, and $\bld{\nu}$ be a valuation such that $u.s \equiv
 u'.s\prm{\bld{\nu}}$. We show, there is a successor $w$ of $u$ in
-$\pi$, a successor vertex $w'$ of $u'$ in $T'$, and a valuation
+$\pi$, a successor node $w'$ of $u'$ in $T'$, and a valuation
 $\bld{\nu}'$ such that $w.s \equiv w'.s\prm{\bld{\nu}'}$. There are
 two possible cases in Algorithm~\ref{alg:executeSymbolically} for
 $u'.s$:
 
 (1) We reach line~\ref{alg:executeSymbolically:Unrolling}: According
 to Definition~\ref{def:LoopTemplate}~(L1), there is a successor
-vertex $w$ of $u$ in $\pi$, an index $i$, and a non-negative integer
+node $w$ of $u$ in $\pi$, an index $i$, and a non-negative integer
 $\nu$ for $\kappa$ such that
 \begin{align*}
 w.s &\equiv u.s \compose (t.l_i, t.\theta_i\prm{\kappa},
@@ -2031,18 +2075,18 @@ where $\bld{\nu'} = \bld{\nu}$.
 \end{thm}
 
 \begin{thm}[Completeness]
-For each leaf vertex $e' \in T'$ there is a leaf vertex $e \in T$ and
+For each leaf node $e' \in T'$ there is a leaf node $e \in T$ and
 a valuation $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
 e'.s\prm{\bld{\nu}}$.
 \begin{proof}
-Let $\pi'$ be the path in $T'$ from the root to the leaf vertex $e'$.
+Let $\pi'$ be the path in $T'$ from the root to the leaf node $e'$.
 We prove the theorem by the following induction:
 
-\emph{Basic case}: The root vertices $r$ and $r'$ of $T$ and $T'$
+\emph{Basic case}: The root nodes $r$ and $r'$ of $T$ and $T'$
 respectively are labelled by the same program state $s_0$ (see lines
 \ref{alg:executeSymbolically:InitialState} and
 \ref{alg:executeSymbolically:Root}). Let us construct a non-empty set
-$U$ of vertices of $T$ such that for each valuation $\bld{\nu}$ of
+$U$ of nodes of $T$ such that for each valuation $\bld{\nu}$ of
 parameters in $r'.s$ such that $r'.\varphi\prm{\bld{\nu}}$ is
 satisfiable, there is $u \in U$ such that $u.s \equiv
 r'.s\prm{\bld{\nu}}$. Obviously $U = \{ r \}$, because $r'.\varphi$
@@ -2050,11 +2094,11 @@ contains no parameter (so $r.s \equiv r'.s\prm{\bld{\nu}}$, for each
 $\bld{\nu})$.
 
 \emph{Inductive step}:  Let $u' \in \pi'$, $u' \neq e'$ and $U$ be a
-non-empty set of vertices of $T$ such that for each valuation
+non-empty set of nodes of $T$ such that for each valuation
 $\bld{\nu}$ of parameters in $u'.s$ such that
 $u'.\varphi\prm{\bld{\nu}}$ is satisfiable, there is $u \in U$ such
 that $u.s \equiv u'.s\prm{\bld{\nu}}$. We show, there is a successor
-$w'$ of $u'$ in $\pi'$ and a non-empty set $W$ of vertices of $T$ such
+$w'$ of $u'$ in $\pi'$ and a non-empty set $W$ of nodes of $T$ such
 that for each valuation $\bld{\nu}'$ of parameters in $w'.s$ such that
 $w'.\varphi\prm{\bld{\nu}'}$ is satisfiable, there is $w \in W$ such
 that $w.s \equiv w'.s\prm{\bld{\nu}'}$. And we further show that each
@@ -2075,7 +2119,7 @@ $\kappa$ introduced at
 line~\ref{alg:executeSymbolically:UnrollingFreshKappa}. From
 line~\ref{alg:executeSymbolically:SuccessorInUnrolling} we see that
 $u'.\varphi\prm{\bld{\nu}'}$ is satisfiable. Therefore, there is a
-vertex $u \in U$ such that $u.s \equiv u'.s\prm{\bld{\nu}'}$.
+node $u \in U$ such that $u.s \equiv u'.s\prm{\bld{\nu}'}$.
 According to Definition~\ref{def:LoopTemplate}~(L2) there is a
 successor $w$ of $u$ in $T$ such that
 \begin{align*}
@@ -2093,7 +2137,7 @@ t.\varphi_i\prm{\kappa}))\prm{\bld{\nu}}
 Therefore, $w \in W$.
 
 (2) Otherwise, we reach
-line~\ref{alg:executeSymbolically:ClassicStep}: Let $u$ be any vertex
+line~\ref{alg:executeSymbolically:ClassicStep}: Let $u$ be any node
 in $U$. Since $u.s \equiv u'.s\prm{\bld{\nu}}$ for some valuation
 $\bld{\nu}$ for which $u'.\varphi\prm{\bld{\nu}}$ is satisfiable, and
 since all direct successors of both $u$ and $u'$ are computed by
