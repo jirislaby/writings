@@ -18,7 +18,8 @@
 \newtheorem{lem}{Lemma}%[section]
 
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
-\newcommand{\todo}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
+\newcommand{\oldtodo}[1]{{\scriptsize{{\textcolor{red}{[#1]}}}}}
+\newcommand{\todo}[1]{\marginpar{\scriptsize\textcolor{red}{#1}}}
 \newcommand{\rem}[1]{{\scriptsize{{\textcolor{magenta}{[#1]}}}}}
 %\newcommand{\note}[1]{{\scriptsize{{\textcolor{magenta}{[#1]}}}}}
 %\renewcommand{\todo}[1]{}
@@ -56,6 +57,7 @@
 \newcommand{\aarg}[2]{#1~{\it //~#2}}
 \newcommand{\aargm}[2]{\\ \qquad \aarg{#1}{#2}}
 \newcommand{\aset}{\ensuremath{\longleftarrow}}
+\newcommand{\sat}{\texttt{satisfiable}}
 
 %}}}
 
@@ -526,19 +528,22 @@ execution trees.
 \section{Description of the Technique}\label{sec:technique}
 
 This section describes the compact symbolic execution in details. For
-simplicity of the presentation, we only consider programs consisting
-of a single flowgraph and manipulating integer variables and read-only
-arrays. Extensions to other data types, symbolic writes into arrays,
-function calls or recursion are straightforward (see
-Appendix~\ref{sec:Extensions})\todo{dodat ten appendix}.
+simplicity, we consider only programs represented by a single flowgraph
+manipulating integer variables and read-only integer arrays. Extension of
+the technique to writable integer arrays is described in
+Appendix~\ref{sec:Extensions}.\todo{Dodat ten appendix. Posledni veta se da
+  smazat (bude zmineno v experimental results).} The technique can be
+further extended to handle other data types and function calls.
 
   %{{{ Preliminaries
 
 \subsection{Preliminaries}
 
-In this section we introduce several basic terms and notations, which
-we intensively use throughout whole Section~\ref{sec:technique}.
+Besides the terms and notation introduced in the previous section, we use
+also the following terms and notation.
 
+\todo{Tady je zakomentovaná definice flowgrafu a symbolickeho vyrazu. Oboji
+  tu IMHO chybi (i kdyz by se urcite dalo zkratit).}
 %First of all, we present the considered model of programs and define
 %composition and equivalence of symbolic program states.
 %
@@ -607,36 +612,36 @@ we intensively use throughout whole Section~\ref{sec:technique}.
 %refer to~\cite{Kin76} if the intuition provided in the previous section is
 %not sufficient).
 
-We use the notation $\theta\prm{\bld{\kappa}}$ to emphasize that
-$\bld{\kappa}$ is the set of parameters appearing in the symbolic memory
-$\theta$. We use an analogous notation $\varphi\prm{\bld{\kappa}}$ to
-emphasize $\bld{\kappa}$ is the set of parameters with free occurences in
-the first order formula $\varphi$. We also write $s\prm{\bld{\kappa}}$
-or $(l,\theta,\varphi)\prm{\bld{\kappa}}$, if
-$s=(l,\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}})$ .
+We write $\theta\prm{\bld{\kappa}}$ to emphasize that $\bld{\kappa}$ is the
+set of parameters appearing in the symbolic memory $\theta$. Similarly, we
+write $\varphi\prm{\bld{\kappa}}$ to emphasize that $\bld{\kappa}$ is the
+set of parameters with free occurences in the formula $\varphi$.
+\todo{Potrebujem $s\prm{\bld{\kappa}}$ a $s\prm{\bld{\nu}}$?}  We also
+write $s\prm{\bld{\kappa}}$ or $(l,\theta,\varphi)\prm{\bld{\kappa}}$, if
+$s=(l,\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}})$.
 
-Each function $\bld{\nu}$ from a finite set of parameters to non-negative integers is a \emph{valuation} of the parameters.
+A \emph{valuation of parameters} is a function $\bld{\nu}$ from a finite set
+of parameters to non-negative integers.
 % Let $\bld{\nu}$ be a valuation of parameters from $\bld{\kappa}$.
-  By $\theta\prm{\bld{\nu}}$,
-$\varphi\prm{\bld{\nu}}$, and $s\prm{\bld{\nu}}$ we denote a symbolic memory
-$\theta\prm{\bld{\kappa}}$, a formula $\varphi\prm{\bld{\kappa}}$, and
-a program state $s\prm{\bld{\kappa}}$ respectively, where all free occurrences of each
-$\kappa\in\bld{\kappa}$ are replaced by~$\bld{\nu}(\kappa)$. If
-$\bld{\kappa}=\{\kappa\}$ is a singleton and $\bld{\nu}(\kappa)=\nu$, we
-simply write $\theta\prm{\kappa},\varphi\prm{\kappa},s\prm{\kappa}$ instead
-of $\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}},s\prm{\bld{\kappa}}$
-and $\theta\prm{\nu},\varphi\prm{\nu},s\prm{\nu}$ instead of
+By $\theta\prm{\bld{\nu}}$, $\varphi\prm{\bld{\nu}}$, and $s\prm{\bld{\nu}}$
+we denote a symbolic memory $\theta\prm{\bld{\kappa}}$, a formula
+$\varphi\prm{\bld{\kappa}}$, and a program state $s\prm{\bld{\kappa}}$
+respectively, where all free occurrences of each $\kappa\in\bld{\kappa}$ are
+replaced by~$\bld{\nu}(\kappa)$. If $\bld{\kappa}=\{\kappa\}$ is a singleton
+and $\bld{\nu}(\kappa)=\nu$, we simply write
+$\theta\prm{\kappa},\varphi\prm{\kappa},s\prm{\kappa}$ instead of
+$\theta\prm{\bld{\kappa}},\varphi\prm{\bld{\kappa}},s\prm{\bld{\kappa}}$ and
+$\theta\prm{\nu},\varphi\prm{\nu},s\prm{\nu}$ instead of
 $\theta\prm{\bld{\nu}},\varphi\prm{\bld{\nu}},s\prm{\bld{\nu}}$.
 
-If $\theta$ is a symbolic memory and $\varphi$ is an symbolic
-expression, then $\theta\langle\varphi\rangle$ is the symbolic expression
-$\varphi$, where all occurrences of all symbols $\sym{a}$ are
-simultaneously replaced by $\theta(\var{a})$, i.e.~by the symbolic value
-of the corresponding variable in $\theta$.
+If $\theta$ is a symbolic memory and $\varphi$ is a formula or a symbolic
+expression, then $\theta\langle\varphi\rangle$ denotes $\varphi$ where all
+occurrences of all symbols $\sym{a}$ are simultaneously replaced by
+$\theta(\var{a})$, i.e.~by the value of the corresponding variable stored in
+$\theta$.
 
 When $\theta_1$ and $\theta_2$ are two symbolic memories, then
-$\theta_1\compose\theta_2$ is a \emph{composed symbolic memory}
-satisfying
+$\theta_1\compose\theta_2$ is a \emph{composed symbolic memory} satisfying
 $(\theta_1\compose\theta_2)(\var{a})=\theta_1\langle\theta_2(\var{a})\rangle$
 for each variable $\var{a}$. Intuitively, the symbolic memory
 $\theta_1\compose\theta_2$ represents an overall effect of a code with
@@ -817,46 +822,214 @@ that produced $s_2$.
 %  \end{enumerate}
 %\end{lem}
 
-We often use a dot-notation to access elements of tuples. For example,
-if $s = (l, \theta, \varphi)$ is a program state, then $s.l$ denotes
-its current location, $s.\theta$ denotes its symbolic memory, and
-$s.\varphi$ denotes its path condition. If the meaning is clear from
-the context we omit sequences of dots when accessing target
-components. For example, if $u$ is a node of a symbolic tree with a
-program state $u.s$, then we write $u.l$, $u.\theta$, and $u.\varphi$
-instead of $u.s.l$, $u.s.\theta$, and $u.s.\varphi$.
+\todo{Overit, ze tuhle notaci nepouzivam i jinde nez u stavu a uzlu
+  SE-stromu. Pokud ano, tak snad jen v Appendixu a tam to dodefinujem.}  We
+often use a dot-notation to denote elements of a program state $s$: $s.l$
+denotes its current location, $s.\theta$ denotes its symbolic memory, and
+$s.\varphi$ denotes its path condition. Further, if $u$ is a node of a
+symbolic tree labelled by a program state $s$, then we write $u.l$,
+$u.\theta$, and $u.\varphi$ instead of $s.l$, $s.\theta$, and $s.\varphi$.
 
-It is well known that checking satisfiability of path conditions
-is essential for the classic symbolic execution. And we will see that such
-checks are also essential for the compact symbolic execution. Unfortunately,
-programs commonly operate in undecidable theories (like Peano
-arithmetic). We therefore assume in this paper that each satisfiability
-query always terminates with a result either SAT, UNSAT, or FAILURE, with
-the obvious meanings.
+Considered integer programs operate in undecidable theories (like Peano
+arithmetic). We assume that there is a function $\sat(\varphi)$ that returns
+SAT if it can prove satisfiability of $\varphi$, UNSAT if it can prove
+unsatisfiability of $\varphi$, and UNKOWN otherwise.
 
   %}}}
   %{{{ Templates
 
 \subsection{Templates and their computation}
 
-We start with a formal definition of a term \emph{cycle}, representing
-any part of a flowgraph, for which it makes any sense to compute a
-template for, and then we define the term \emph{template} itself.
-%, since they are essential for this section.
-
+We start with a formal definition of \emph{cycle}, i.e.~a cyclic path with a
+specified entry location and exit edges.
 \begin{dfn}[Cycle]\label{def:Part}
-Let $(u,e)$ be an edge of a flowgraph $P$, $\pi = e \omega e$ be a
-cyclic path in $P$ s.t. $\omega$ is not empty path and all nodes in
-$e\omega$ are all distinct,
+  Let $(u,e)$ be an edge of a flowgraph $P$, $\pi=e\omega e$ be a cyclic
+  path in $P$ such that $ue$ is not a suffix of $\pi$ and all nodes in
+  $\omega e$ are pairwise distinct,
 % such that $\omega$ does not contain neither the entry location of $f$ nor
 % the location $u$,
-and let $X = \{ (u_1,x_1), \ldots, (u_n,x_n) \}$ be a % non-empty
-set of all those edges of $P$, which do not belong to the path $\pi$, but
-each of their start nodes $u_i$ does. Then, a triple $C = (\pi, e, X) $
-is a \emph{cycle} in $P$, where the path $\pi$ is a \emph{core} of $C$, $e$
-is an \emph{entry location} of $C$, all edges in $X$ are \emph{exit edges}
-of $C$, and each location $x_i$ is called an \emph{exit location} of $C$.
+  and let $X=\{(u_1,x_1),\ldots,(u_n,x_n)\}$ be the set of all edges of $P$
+  that do not belong to the path $\pi$, but their start nodes
+  $u_1,\ldots,u_n$ lie on $\pi$. Then $C = (\pi,e,X) $ is a \emph{cycle} in
+  $P$, the path $\pi$ is a \emph{core} of $C$, $e$ is an \emph{entry
+    location} of $C$, all edges in $X$ are \emph{exit edges} of $C$, and
+  each location $x_i$ is called an \emph{exit location} of $C$.
 \end{dfn}
+
+A template for a cycle $(\pi,e,X)$ is a pair $(e,M)$, where $M$ is a set
+containing one parametric program state for each exit edge of the cycle.  A
+template for a given cycle can be computed by
+Algorithm~\ref{alg:template}. The algorithm uses a function
+$\texttt{executePath}(P,\rho)$ which applies classic symbolic execution to
+instructions on the path $\rho$ in the program $P$ and returns the resulting
+symbolic state $(u,\theta,\varphi)$, where $u$ is the last location in
+$\rho$.
+
+\begin{algorithm}[!tb]
+  \caption{computeTemplate}\label{alg:template}
+  \KwIn{a program $P$ and a cycle $(\pi,e,X)$}
+  \KwOut{a template $(e,M)$ or {\bf null } (if the computation fails)}
+  \BlankLine
+  \DontPrintSemicolon
+$(e,\theta,\varphi)\aset\texttt{executePath(}P,\pi\texttt{)}$\;
+\label{alg:template:begin}
+\If{\rm $\sat(\varphi)\neq$ SAT}{
+  \label{alg:template:satCheck1}
+  \Return{\bf null}
+}
+Set $\theta_*\prm{\kappa}(\var{a})=\bot$~~for each integer variable $\var{a}$\;
+Set $\theta_*\prm{\kappa}(\var{a})=\sym{a}$~~for each array variable $\var{a}$\;
+\label{alg:template:memoryBegin}
+% and \mbox{~~~~~~$\theta_*\prm{\kappa}(\var{A})=\sym{A}$ for each
+%  array variable $\var{A}$}\\
+\Repeat{$\var{change} = \false$}{ \label{alg:template:repeatBegin}
+  $\var{change} \aset \false$\;
+  \ForEach{{\rm integer variable} $\var{a}$}{
+    \label{alg:template:repeat:foreachBegin}
+    \If{$\theta_*\prm{\kappa}(\var{a})=\bot$}{
+      \label{alg:template:repeatIsBot}
+      \If{$\theta(\var{a})=\sym{a}+c$~~for some constant $c$}{
+        \label{alg:template:repeat:foreach:BranchAritSeq}
+        $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}+\kappa\cdot c$\;
+        $\var{change} \aset \true$\;
+      }  
+      \If{$\theta(\var{a})=\sym{a}\cdot c$~~for some constant $c$}{
+        \label{alg:template:repeat:foreach:BranchGeomSeq}
+        $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}\cdot c^\kappa$\;
+        $\var{change} \aset \true$\;
+      }
+      \If{$\theta(\var{a})=g$~~for some symbolic expression $g$ such
+        \mbox{~~~that $\theta_*\prm{\kappa}(\var{b})\neq\bot$ for each symbol $\sym{b}$ in $g$}}{
+        \label{alg:template:repeat:foreach:BranchTemporary}
+        $\theta_*\prm{\kappa}(\var{a}) \aset
+        \ite(\kappa>0,\theta_*[\kappa-1]\langle g\rangle,\sym{a})$\;
+        $\var{change} \aset \true$\;
+      }  
+      % \If{$\theta(\var{a})=\sym{a}$~~~and \var{a} is an array }{
+      %   \label{alg:template:repeat:foreach:BranchImutableArray}
+      %   $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}$\;
+      %   $\var{change} \aset \true$\;
+      %   \label{alg:template:repeat:foreachEnd}
+      %   \label{alg:template:repeat:foreach:BranchLast}
+      % }  
+      % \oldtodo{pridat pripad pro monotonni zapis do pole}
+    }
+  }
+}
+\label{alg:template:repeatEnd}
+\If{$\theta_*\prm{\kappa}(\var{a})=\bot$ for some variable $\var{a}$}{
+  \label{alg:template:isMemoryPrecise}
+  \Return{\bf null}
+}
+$\varphi_*\prm{\kappa}\aset\kappa\ge 0~\wedge~
+\forall\tau(0\le\tau<\kappa\implies\theta_*\prm{\tau}\langle\varphi\rangle)$\;
+\label{alg:template:endMemory}
+$M\aset\emptyset$\; \label{alg:template:secondPartBegin}
+\ForEach{$(u,x) \in X$}{
+  \label{alg:template:foreach2begin}
+  Let $\rho$ be the prefix of $\pi$ from $e$ to $u$ \;
+  \label{alg:template:pathToExit}
+  $(x,\theta,\varphi)\aset\texttt{executePath(}P,\rho x\texttt{)}$\;
+  \label{alg:template:exitState}
+  \If{\rm $\sat(\varphi)=$ SAT}{
+    \label{alg:template:satCheck2}
+    $M\aset M \cup \{ (x,~\theta_*\prm{\kappa} \compose \theta,~
+    \varphi_*\prm{\kappa} \wedge \theta_*\prm{\kappa}
+    \langle\varphi\rangle) \}$
+    \label{alg:template:extendM}
+    \label{alg:template:foreach2end}
+  }
+}
+\Return{$(e,M)$}
+\label{alg:template:end}
+\end{algorithm}
+
+The first part of the algorithm (lines
+\ref{alg:template:begin}--\ref{alg:template:endMemory}) tries to derive a
+parametric symbolic memory $\theta_*\prm{\kappa}$ and a parametric path
+condition $\varphi_*\prm{\kappa}$, which together describe the symbolic
+state after $\kappa$ iterations over the core $\pi$ of the cycle $C$, for
+any $\kappa \geq 0$. Initially, at line~\ref{alg:template:begin}, we compute
+the effect of a \emph{single} iteration of the core $\pi$ and then we check
+whether the iteration is feasible. If we cannot prove its feasibility, we
+stop the template computation and return \textbf{null}.\footnote{It can be
+  the case that the iteration is in fact feasible and a chosen SMT solver
+  just failed to prove it. However, as parametric path conditions of the
+  resulting template are derived from $\varphi$, it is highly probable that
+  any application of the template in compact symbolic execution would lead
+  to failures of the SMT solver. Such a template is useless.}  Otherwise, we
+get a symbolic state $(e,\theta,\varphi)$, whose elements $\theta$ and
+$\varphi$ form a basis for the computation of $\theta_*\prm{\kappa}$ and
+$\varphi_*\prm{\kappa}$. First we compute $\theta_*\prm{\kappa}$. As arrays
+are read-only, we directly set $\theta_*\prm{\kappa}(\var{a})$ to $\sym{a}$
+for each array variable $\var{a}$. For integer variables, we initialise
+$\theta_*\prm{\kappa}$ to an undefined value $\bot$. Then, in the loop at
+lines \ref{alg:template:repeatBegin}--\ref{alg:template:repeatEnd} we try to
+increase precision of $\theta_*\prm{\kappa}$.
+
+\textbf{TADY!}
+
+The loop terminates when we are unable to improve value of any variable. We
+improve variables separately one by one in the nested loop at lines
+\ref{alg:template:repeat:foreachBegin}--\ref{alg:template:repeat:foreachEnd}.
+Observe, that we improve only those variables which are still
+uninitialised. In other words, any variable can be improved at most once;
+from the undefined value $\bot$ to an exact symbolic value for the variable
+after all $\kappa$ iterations. Variables are improved according to a content
+of $\theta$. Branching statements at lines
+\ref{alg:template:repeat:foreach:BranchAritSeq}, and
+\ref{alg:template:repeat:foreach:BranchGeomSeq} are supposed to recognise,
+whether symbolic value $\theta(\texttt{a})$ for an improved variable
+\texttt{a} is in one of exact forms. Only for these exact forms we know how
+to express values of variables exactly after any $\kappa$ iterations. For
+example, at line \ref{alg:template:repeat:foreach:BranchAritSeq} there we
+recognise arithmetic progressions, and at line
+\ref{alg:template:repeat:foreach:BranchGeomSeq} there we recognise geometric
+ones. Note that the case when the value of a scalar variable is not changed
+along $\pi$ at all is covered at line
+\ref{alg:template:repeat:foreach:BranchAritSeq}, because constant
+progression is a special arithmetic progression ($c = 0$). Obviously, one
+can add a recognition of other progressions of values. Here we present only
+those, which are the most common in majority of programs.  Once we cannot
+improve $\theta_*\prm{\kappa}$ any more, we get to line
+\ref{alg:template:isMemoryPrecise}. There we check whether we succeeded to
+express \emph{all} the variables exactly. If we failed for at least one
+variable, then we fail to compute a template for $C$, and we return
+\textbf{null}. Otherwise, at line \ref{alg:template:endMemory} there we use
+$\theta_*\prm{\kappa}$ to compute the formula $\varphi_*\prm{\kappa}$ from
+$\varphi$. We already gave an intuition about the structure of the formula
+in Section~\ref{sec:basic}.
+
+In the second part of the algorithm (lines
+\ref{alg:template:secondPartBegin}--\ref{alg:template:end}) there we
+compute elements of the set $M$ of the resulting template. As we
+already know from Section~\ref{sec:basic}, we try to compute a single 
+element of $M$ for each exit edge $(u, x) \in X$. At line
+\ref{alg:template:pathToExit} there we compute a path $\rho$ form the
+entry location $e$ to $u$ (along $\pi$), where we escape from $\pi$
+into the location $x$. Next we symbolically execute the path $\rho x$
+at line \ref{alg:template:exitState}. Only in case the path $\rho x$
+is feasible, we can escape $\pi$ by taking the exit edge $(u,x)$.
+Therefore, only in this case we add a new element into $M$ at line
+\ref{alg:template:extendM}. We already understand the structure of the
+added element based on the intuition we get in
+Section~\ref{sec:basic}.
+
+
+\textbf{Pozor, odtud dal se to musi predelat vic!}
+
+define a \emph{template}. Note that the term is defined independently
+of cycle. Roughly speaking, template is a pair $(l,M)$ of a program location
+$l$ and a set of parametric program states $M$ such that for each node $u$
+in a symbolic execution tree satisfying $u.l=l$, it holds that the subtree
+starting with $u$ has a prefix described by contains a node with program
+location $l$, then the corresponding subtree
+
+
+any subtree of a 
+symbolic execution tree
+declarative description of a
+subtree of symbolic execution tree. 
 
 \begin{dfn}[Template] \label{def:LoopTemplate} Let $T$ be a classic symbolic
   execution tree of $P$, $n\ge0$ be an integer, $l, l_1, \ldots, l_n$ be
@@ -879,158 +1052,6 @@ of $C$, and each location $x_i$ is called an \emph{exit location} of $C$.
     \compose (t.l_i,~t.\theta_i,~t.\varphi_i)\prm{\nu}$.
   \end{itemize}
 \end{dfn}
-
-\begin{algorithm}[!tb]
-  \caption{computeTemplate}\label{alg:template}
-  \KwIn{a program $P$, and a cycle $(\pi,e,X)$}
-  \KwOut{the resulting template $(e,M)$ or {\bf null } (if we fail)}
-  \BlankLine
-  \DontPrintSemicolon
-$(e,\theta,\varphi)\aset\texttt{executePath(}P,\pi\texttt{)}$\;
-\label{alg:template:begin}
-\If{$\varphi$ is not satisfiable or we fail to decide}{
-  \label{alg:template:satCheck1}
-  \Return{\bf null}
-}
-Set $\theta_*\prm{\kappa}(\var{a})=\bot$ for each variable $\var{a}$\;
-\label{alg:template:memoryBegin}
-% and \mbox{~~~~~~$\theta_*\prm{\kappa}(\var{A})=\sym{A}$ for each
-%  array variable $\var{A}$}\\
-\Repeat{$\var{change} = \false$}{ \label{alg:template:repeatBegin}
-  $\var{change} \aset \false$\;
-  \ForEach{{\rm variable} $\var{a}$}{
-    \label{alg:template:repeat:foreachBegin}
-    \If{$\theta_*\prm{\kappa}(\var{a})=\bot$}{
-      \label{alg:template:repeatIsBot}
-      \If{$\theta(\var{a})=\sym{a}+c$~~~for some constant $c$}{
-        \label{alg:template:repeat:foreach:BranchAritSeq}
-        $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}+\kappa\cdot c$\;
-        $\var{change} \aset \true$\;
-      }  
-      \If{$\theta(\var{a})=\sym{a}\cdot c$~~~for some constant $c$}{
-        \label{alg:template:repeat:foreach:BranchGeomSeq}
-        $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}\cdot c^\kappa$\;
-        $\var{change} \aset \true$\;
-      }
-      \If{$\theta(\var{a})=g$~~~for some symbolic expression $g$ such
-        \mbox{~~~that $\theta_*\prm{\kappa}(\var{b})\neq\bot$ for each  symbol $\sym{b}$ in $g$}}{
-        \label{alg:template:repeat:foreach:BranchTemporary}
-        $\theta_*\prm{\kappa}(\var{a}) \aset
-        \ite(\kappa>0,\theta_*[\kappa-1]\langle g\rangle,\sym{a})$\;
-        $\var{change} \aset \true$\;
-      }  
-      \If{$\theta(\var{a})=\sym{a}$~~~and \var{a} is an array }{
-        \label{alg:template:repeat:foreach:BranchImutableArray}
-        $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}$\;
-        $\var{change} \aset \true$\;
-        \label{alg:template:repeat:foreachEnd}
-        \label{alg:template:repeat:foreach:BranchLast}
-      }  
-      \todo{pridat pripad pro monotonni zapis do pole}
-    }
-  }
-}
-\label{alg:template:repeatEnd}
-\If{$\theta_*\prm{\kappa}(\var{a})=\bot$ for some variable $\var{a}$}{
-  \label{alg:template:isMemoryPrecise}
-  \Return{\bf null}
-}
-$\varphi_*\prm{\kappa}\aset\kappa\ge 0~\wedge~
-\forall\tau(0\le\tau<\kappa\implies\theta_*\prm{\tau}\langle\varphi\rangle)$\;
-\label{alg:template:endMemory}
-$M\aset\emptyset$\; \label{alg:template:secondPartBegin}
-\ForEach{$(u,x) \in X$}{
-  \label{alg:template:foreach2begin}
-  Let $\rho$ be the prefix of $\pi$ from $e$ to $u$ \;
-  \label{alg:template:pathToExit}
-  $(x,\theta,\varphi)\aset\texttt{executePath(}P,\rho x\texttt{)}$\;
-  \label{alg:template:exitState}
-  \If{\rm $\varphi$ is satisfiable}{
-    \label{alg:template:satCheck2}
-    $M\aset M \cup \{ (x,~\theta_*\prm{\kappa} \compose \theta,~
-    \varphi_*\prm{\kappa} \wedge \theta_*\prm{\kappa}
-    \langle\varphi\rangle) \}$
-    \label{alg:template:extendM}
-    \label{alg:template:foreach2end}
-  }
-}
-\Return{$(e,M)$}
-\label{alg:template:end}
-\end{algorithm}
-
-Now we focus on the computation of a template $t = (e, M)$ from a
-cycle $C = (\pi,e,X)$ of a program $P$. Algorithm~\ref{alg:template}
-describes the computation. It uses a function
-$\texttt{executePath}(P,\rho)$ which applies classic symbolic
-execution to actions of edges along the passed path $\rho$ in the
-passed program $P$ and returns the resulting symbolic state
-$(u,\theta,\varphi)$, where $u$ is the last location in $\rho$.
-
-The first part of the algorithm (lines
-\ref{alg:template:begin}--\ref{alg:template:endMemory}) tries to
-derive a parametric symbolic memory $\theta_*\prm{\kappa}$ and a
-parametric path condition $\varphi_*\prm{\kappa}$, which together
-describe symbolic state after $\kappa$ iterations over the core $\pi$
-of the cycle $C$, for any $\kappa \geq 0$. Initially, at
-line~\ref{alg:template:begin}, we compute the effect of a
-\emph{single} iteration of the core $\pi$ and then we check whether
-the iteration is feasible. If it is not, it does not make sense to
-compute the template and thus the algorithm terminates with failure,
-i.e. it returns \textbf{null}. Otherwise, we get a symbolic state
-$(e,\theta,\varphi)$, whose elements $\theta$ and $\varphi$ form a
-basis for the computation of $\theta_*\prm{\kappa}$ and
-$\varphi_*\prm{\kappa}$. First we compute $\theta_*\prm{\kappa}$. We
-initialise $\theta_*\prm{\kappa}$ such that each variable is assigned
-an undefined value $\bot$. Then, in the loop at lines
-\ref{alg:template:repeatBegin}--\ref{alg:template:repeatEnd} we try to
-increase precision of $\theta_*\prm{\kappa}$. The loop terminates, if
-we are unable to improve value of any variable any further. We improve
-variables separately one by one in the nested loop at lines
-\ref{alg:template:repeat:foreachBegin}--\ref{alg:template:repeat:foreachEnd}.
-Observe, that we improve only those variables which are still
-uninitialised. In other words, any variable can be improved at most
-once; from the undefined value $\bot$ to an exact symbolic value for
-the variable after all $\kappa$ iterations. Variables are improved
-according to a content of $\theta$. Branching statements at lines
-\ref{alg:template:repeat:foreach:BranchAritSeq}, and
-\ref{alg:template:repeat:foreach:BranchGeomSeq} are supposed to
-recognise, whether symbolic value $\theta(\texttt{a})$ for an improved
-variable \texttt{a} is in one of exact forms. Only for these exact
-forms we know how to express values of variables exactly after any
-$\kappa$ iterations. For example, at line
-\ref{alg:template:repeat:foreach:BranchAritSeq} there we recognise
-arithmetic progressions, and at line
-\ref{alg:template:repeat:foreach:BranchGeomSeq} there we recognise
-geometric ones. Note that the case when the value of a scalar variable is not
-changed along $\pi$ at all is covered at line
-\ref{alg:template:repeat:foreach:BranchAritSeq}, because constant
-progression is a special arithmetic progression ($c = 0$). Obviously,
-one can add a recognition of other progressions of values. Here we
-present only those, which are the most common in majority of programs.
-Once we cannot improve $\theta_*\prm{\kappa}$ any more, we get to line
-\ref{alg:template:isMemoryPrecise}. There we check whether we
-succeeded to express \emph{all} the variables exactly. If we failed
-for at least one variable, then we fail to compute a template for $C$,
-and we return \textbf{null}. Otherwise, at line
-\ref{alg:template:endMemory} there we use $\theta_*\prm{\kappa}$ to
-compute the formula $\varphi_*\prm{\kappa}$ from $\varphi$. We already
-gave an intuition about the structure of the formula in
-Section~\ref{sec:basic}.
-
-In the second part of the algorithm (lines
-\ref{alg:template:secondPartBegin}--\ref{alg:template:end}) there we
-compute elements of the set $M$ of the resulting template. As we
-already know from Section~\ref{sec:basic}, we try to compute a single 
-element of $M$ for each exit edge $(u, x) \in X$. At line
-\ref{alg:template:pathToExit} there we compute a path $\rho$ form the
-entry location $e$ to $u$ (along $\pi$), where we escape from $\pi$
-into the location $x$. Next we symbolically execute the path $\rho x$
-at line \ref{alg:template:exitState}. Only in case the path $\rho x$
-is feasible, we can escape $\pi$ by taking the exit edge $(u,x)$.
-Therefore, only in this case we add a new element into $M$ at line
-\ref{alg:template:extendM}. We already understand the structure of the
-added element based on the intuition we get in
-Section~\ref{sec:basic}.
 
 %We finish this section by formulating correctness and termination
 %theorems for Algorithm~\ref{alg:template}.
@@ -1167,7 +1188,7 @@ failed to explore whole path-space of the executed program.
                     Insert a new node $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
                     \label{alg:executeSymbolically:CreateVertex}
             }
-            \ForEach{\rm state $s' \in S$ s.t. satisfiability query of $s'.\varphi$ results in FAILURE}{
+            \ForEach{\rm state $s' \in S$ s.t. satisfiability query of $s'.\varphi$ results in UNKNOWN}{
                     \label{alg:executeSymbolically:LailedLeafBegin}
                     Insert a new node $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
                     Mark the node $v$ in $T$ as failed leaf.
