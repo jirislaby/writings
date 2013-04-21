@@ -838,7 +838,7 @@ unsatisfiability of $\varphi$, and UNKOWN otherwise.
   %}}}
   %{{{ Templates
 
-\subsection{Templates and their computation}
+\subsection{Templates and Their Computation}
 
 We start with a formal definition of \emph{cycle}, i.e.~a cyclic path with a
 specified entry location and exit edges.
@@ -1066,27 +1066,30 @@ Appendix~\ref{sec:Proofs}.
   %}}}
   %{{{ Compact symbolic execution
 
-\subsection{Compact symbolic execution}
+\subsection{Compact Symbolic Execution}
 
-The compact symbolic execution is formally defined in
-Algorithm~\ref{alg:executeSymbolically}. If we ignore the lines marked
-by $\Box$, then we get classic symbolic execution. But, as we focus on
-compact symbolic execution, we describe the algorithm with $\Box$
-lines included. The algorithm accepts a program $P$ and a finite set
-$p$ of templates resulting from analyses of some cycles in $P$. At
-lines~\ref{alg:executeSymbolically:InitialState}--\ref{alg:executeSymbolically:InitialQ},
-there we create an initial state and insert it into a queue $Q$. The queue
-$Q$ keeps all the program states waiting for their processing in the
-\textbf{repeat}-\textbf{until} loop (lines
+The compact symbolic execution is formally defined by
+Algorithm~\ref{alg:executeSymbolically}. If we ignore the lines marked by
+$\Box$, then we get the classic symbolic execution. As we focus on compact
+symbolic execution, we describe the algorithm with $\Box$ lines
+included. The algorithm gets a program $P$ and a finite set $p$ of templates
+resulting from analyses of some cycles in $P$.
+Lines~\ref{alg:executeSymbolically:InitialState}--\ref{alg:executeSymbolically:Root}
+create an initial program state, insert it into a queue $Q$, and creates the
+root of symbolic execution tree $T$ labelled by the state. 
+
+The queue $Q$ keeps all the program states waiting for their processing in
+the \textbf{repeat}-\textbf{until} loop (lines
 \ref{alg:executeSymbolically:LoopBegin}--\ref{alg:executeSymbolically:LoopEnd}). The
 key part of the loop's body begins at
-line~\ref{alg:executeSymbolically:GetTemplatesAt}, where we select at
-most one of templates in $p$, whose entry locations match the actual
-program location $s.l$. Note that there can be more then one template
-available at $s.l$. We do not put any constraints to the selection
-strategy. We may for example choose randomly. Also note that we may
-choose none of the templates (i.e. we select \textbf{null}), even if
-there are available templates at $s.l$.
+line~\ref{alg:executeSymbolically:GetTemplatesAt}, where we select at most
+one template of $p$ with entry location mathcing the actual program location
+$s.l$. Note that there can be more than one template available at $s.l$ as
+more cyclic paths can go through the location. We do not put any constraints
+in the selection strategy. We may for example choose randomly. Also note
+that we may choose none of the templates (i.e.~we select \textbf{null}), if
+there is no template in $p$ for location $s.l$ or even if there are such
+templates in $p$.
 % all those
 %templates from the set $p$, whose entry locations match an actual program
 %location $l$. If the selection is not empty, we choose one template $(l,M)$
@@ -1095,54 +1098,50 @@ there are available templates at $s.l$.
 % line~\ref{alg:executeSymbolically:ChooseTemplate}.
 %We do not put any constraints to the selection strategy. We may for example
 %choose randomly.
-If the selection is a template $t$, then we first get a fresh
-parameter at line~\ref{alg:executeSymbolically:UnrollingFreshKappa}
-and then we replace an original parameter in all tuples of $t.M$ by
-the fresh one. This replacement is supposed to prevent parameter
-collisions with those in already applied templates. In the
+If a template $t=(s.l,M)$ is selected, then we get a fresh parameter
+(line~\ref{alg:executeSymbolically:UnrollingFreshKappa}) and replace the
+original parameter in all tuples of $M$ by the fresh one. This replacement
+prevents collisions of parameters of already applied templates. The
 \textbf{foreach} loop at
 lines~\ref{alg:executeSymbolically:Unrolling}--\ref{alg:executeSymbolically:UnrollingEnd}
-we create a successor state $s'$ for each tuple of $t.M$.
+creates a successor state $s'$ for each program state in $M$.
 % (see line~\ref{alg:executeSymbolically:SuccessorInUnrolling}).
-If the selection computed at
-line~\ref{alg:executeSymbolically:GetTemplatesAt} is \texttt{null}, we
-proceed to line~\ref{alg:executeSymbolically:ClassicStep}, where we
-compute successor states of the state $s$ by classic symbolic
-execution. The computed successor states are inserted into the queue
-$Q$ and into computed compact symbolic execution $T$ in the
+If we the template selection at
+line~\ref{alg:executeSymbolically:GetTemplatesAt} returns \texttt{null}, we
+proceed to line~\ref{alg:executeSymbolically:ClassicStep} and compute
+successor states of the state $s$ by the classic symbolic execution.  The
+successor states with provably satisfiable path condition are inserted into
+the queue $Q$ and into the compact symbolic execution $T$ in the
 \textbf{foreach} loop at
 lines~\ref{alg:executeSymbolically:AddSATSuccessors}--\ref{alg:executeSymbolically:CreateVertex}.
-Note that only successor states with satisfiable path conditions are
-considered. And finally, the \textbf{foreach} loop at lines
-\ref{alg:executeSymbolically:LailedLeafBegin}--\ref{alg:executeSymbolically:LailedLeafEnd}
-is supposed to collect those successors $s'$ of the state $s$ for
-which we are unable to decide satisfiability of the path condition
-$s'.\varphi$. We insert these states into the resulting tree as so
-called \emph{failed leaves}. A presence of a failed leaf in the
-resulting tree indicates that applied symbolic execution has
-failed to explore whole path-space of the executed program.
-
-
+The \textbf{foreach} loop at
+lines~\ref{alg:executeSymbolically:LailedLeafBegin}--\ref{alg:executeSymbolically:LailedLeafEnd}
+handles the successor states with path conditions for which we are unable to
+decide satisfiability; these states are inserted into the resulting tree $T$
+as so called \emph{failed leaves}. A presence of a failed leaf in the
+resulting tree indicates that applied symbolic execution has failed to
+explore whole path-space of the executed program.  We do not continue
+computation from these states as there is usually a plethora of other states
+with provably satisfiable path conditions.
 
 \begin{algorithm}[!t]
     \caption{\texttt{executeSymbolically}} \label{alg:executeSymbolically}
     \KwIn{a program $P$ to be executed 
-        \KwInSep \hspace{-1.1cm}\lmark{$\Box$}\hspace{0.9cm}
-         a finite set $p$ of templates computed for cycles in $P$
+        \KwInSep \hspace{-1.1cm}\lmark{$\Box$}\hspace{0.97cm}
+         and a finite set $p$ of templates computed for cycles in $P$
     }
     \KwOut{a symbolic execution tree $T$ of $P$ (compact tree in $\Box$--version)}
     \BlankLine
     \DontPrintSemicolon
-    $s_0 \aset (\theta_I,\true,[],\text{the entry location of the
-    starting function})$\;        
+    $s_0 \aset (\text{the starting location of }P,\theta_I,\true)$\;        
     \label{alg:executeSymbolically:InitialState}
     Let $Q$ be a queue of states initially containing only $s_0$ \;
         \label{alg:executeSymbolically:InitialQ}
-    Into the empty tree $T$ insert the root node labelled by $s_0$\;
+    Insert the root node labelled by $s_0$ to the empty tree $T$\;
         \label{alg:executeSymbolically:Root}
     \Repeat{\rm $Q$ becomes empty}{ \label{alg:executeSymbolically:LoopBegin}
         Extract the first state $s$ from $Q$ \;
-        \If{\rm $s.l$ is either exit from the starting function or an error location}{
+        \If{\rm $s.l$ is either an exit from $P$ or an error location}{
           \textbf{continue}
         }
             $S \aset \emptyset$ \;
@@ -1154,16 +1153,19 @@ failed to explore whole path-space of the executed program.
             \lmark{$\Box$}
             \If {\rm $t \neq $ \bf{null}}{
                 \lmark{$\Box$}
+                Let $M$ be the second element of $t$, i.e.~$t=(s.l,M)$\; 
+                \lmark{$\Box$}
                 $\kappa \aset \texttt{getFreshParam()}$ \;
                     \label{alg:executeSymbolically:UnrollingFreshKappa}
                 \lmark{$\Box$}
                 Replace all occurrences of the former parameter in
-                    all tuples in $t.M$ by $\kappa$\;
+                    $M$ by $\kappa$\;
                 \lmark{$\Box$}
-                \ForEach{$(\theta,\varphi,\Xi,l)\prm{\kappa} \in t.M$}{
+                \ForEach{$(l,\theta\prm{\kappa},\varphi\prm{\kappa})\in M$}{
                         \label{alg:executeSymbolically:Unrolling}
                     \lmark{$\Box$}
-                    $s' \aset s \compose (\theta,\varphi,\Xi,l)\prm{\kappa}$\;
+                    $s' \aset s
+                        \compose(l,\theta\prm{\kappa},\varphi\prm{\kappa})$\;
                     \label{alg:executeSymbolically:SuccessorInUnrolling}
                     \lmark{$\Box$}
                     Insert $s'$ into $S$\;
@@ -1178,16 +1180,18 @@ failed to explore whole path-space of the executed program.
             }
             Let $u$ be the leaf of $T$ whose label is $s$ \;
                     \label{alg:executeSymbolically:GetLeaf}
-            \ForEach{\rm state $s' \in S$ s.t. $s'.\varphi$ is satisfiable}{
+            \ForEach{\rm state $s' \in S$ such that $\sat(s'.\varphi)=$ SAT}{
                     \label{alg:executeSymbolically:AddSATSuccessors}
                     Insert $s'$ at the end of $Q$ \; 
-                    Insert a new node $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
+                    Insert a new node $v$ labelled with $s'$ and 
+                    a new edge $(u,v)$ into $T$ \;
                     \label{alg:executeSymbolically:CreateVertex}
             }
-            \ForEach{\rm state $s' \in S$ s.t. satisfiability query of $s'.\varphi$ results in UNKNOWN}{
+            \ForEach{\rm state $s'\in S$ such that $\sat(s'.\varphi)=$ UNKNOWN}{
                     \label{alg:executeSymbolically:LailedLeafBegin}
-                    Insert a new node $v$ labelled with $s'$ and a new edge $(u,v)$ both into $T$ \;
-                    Mark the node $v$ in $T$ as failed leaf.
+                    Insert a new node $v$ labelled with $s'$ and 
+                    a new edge $(u,v)$ into $T$ \;
+                    Mark the node $v$ in $T$ as a failed leaf
                     \label{alg:executeSymbolically:LailedLeafEnd}
             }
     } \label{alg:executeSymbolically:LoopEnd}
@@ -1199,17 +1203,18 @@ failed to explore whole path-space of the executed program.
 %\ref{alg:executeSymbolically:LailedLeafBegin}, where we check for
 %satisfiability of $s'.\varphi$ only if it differs from $s.\varphi$.
 
-We finish this section by formulating and proving soundness and
-completeness theorems for compact symbolic execution. We assume that
-$T$ and $T'$ are classic and compact symbolic execution trees of the
-program $P$ computed by Algorithm~\ref{alg:executeSymbolically}
-without and with $\Box$-lines respectively. We further assume that
-neither $T$ nor $T'$ contain failed leaves.
+We finish this section by soundness and completeness theorems for compact
+symbolic execution. We assume that $T$ and $T'$ are classic and compact
+symbolic execution trees of the program $P$ computed by
+Algorithm~\ref{alg:executeSymbolically} without and with $\Box$-lines
+respectively. The theorems hold on assumtion that our $\sat(\varphi)$
+function never returns UNKNOWN, i.e.~neither $T$ nor $T'$ contain failed
+leaves. Proofs of both theorems are in Appendix~\cite{sec:Proofs}.
 
 \begin{thm}[Soundness]
-For each leaf node $e \in T$ there is a leaf node $e' \in T'$ and
-a valuation  $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
-e'.s\prm{\bld{\nu}}$.
+  For each leaf node $e \in T$ there is a leaf node $e' \in T'$ and a
+  valuation $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
+  e'.s\prm{\bld{\nu}}$.
 \end{thm}
 
 \begin{thm}[Completeness]
@@ -1218,12 +1223,15 @@ a valuation $\bld{\nu}$ of parameters in $e'.s$ such that $e.s \equiv
 e'.s\prm{\bld{\nu}}$.
 \end{thm}
 
-Note that in both theorems there we only discuss relation between all
-\emph{finite} paths in the trees $T$ and $T'$. Some infinite paths in
-$T$ need not be present in $T'$. After all, it was our intention to
-eliminate infinite paths like the one at Figure~\ref{fig:linSrch}(b).
+Note that in both theorems discuss only relation between all \emph{finite}
+branches of the trees $T$ and $T'$. Some infinite branches of $T$ (like the
+one at Figure~\ref{fig:linSrch}(b)) corresponding to infinite iterations
+along a cyclic path need not be present in $T'$. As symbolic execution is
+typically used to cover as many reachable program locations as possible,
+missing infinite iterations along cyclic paths can be seen as a feature
+rather than a drawback.
 
-%}}}
+  %}}}
   %{{{ Extensions
 
 %\subsection{Extensions of the technique}
