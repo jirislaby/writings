@@ -44,7 +44,7 @@
      \logo SL
 
      \vspace{2cm}
-     {\bf\huge Automatic Bug-finding Techniques for Linux Kernel}\\[0.8in]
+     {\bf\huge Automatic Bug-finding Techniques for\\[0.5em]Large Projects}\\[0.8in]
 
      {\sc\large Dissertation Thesis}\\[0.4in]
 
@@ -77,37 +77,86 @@
 
 \section{Introduction}
 In the contemporary world, we are surrounded by devices making our lives
-easier. It counts from modern lifts which speak to us to supercomputers
-helping to treat cancer such as \emph{IBM Watson}~\cite{watson-cancer}. Today
-it happens that most devices are featuring fast processing units allowing
-developers to implement arbitrary functions in them. However being written by
-humans vastly, sometimes it leads to errant behavior. There were several
-approaches how to avoid or find and dismiss errors from programs and over the
-past two decades many new techniques appeared.
+easier. It counts from modern lifts which speak to us by natural language to
+supercomputers helping to treat cancer such as \emph{IBM
+Watson}~\cite{watson-cancer}. Most present devices are featuring fast
+processing units allowing developers to implement arbitrary functions in them.
+However being written by humans vastly, sometimes it leads to errant behavior
+of the implementations. And errors waste money of companies. The later in the
+development cycle an error is revealed, the more expensive it is to fix that.
+There were several approaches how to avoid or find and dismiss errors from
+programs automatically, in the early phases of development, and over the past
+two decades many new techniques appeared too.
+
+Many of those were adopted or even developed by companies to make their
+products safer. For example Microsoft introduced SDV toolkit~\cite{sdv} based
+on SLAM~\cite{} to improve situation around Windows drivers, and
+\textsc{Sage}~\cite{sage} which found errors in core Windows parts like a
+parser for cursor files. Other companies like Coverity, Klocwork or XXX came with
+their products~\cite{coverity, klocwork} emerged to
+offer a service to check code of their customers.  Although some of the
+companies also check the open source code like the Linux kernel or core system
+libraries, developers usually have no control over the check frequency, thus
+have no chance to check their code on demand.
+
+For those reasons, some groups decided to implement their own, freely
+available, checkers~\cite{stanse, cppcheck, findbugs, smatch, sparse}. They
+vary in precision, speed and of course in the method used for finding bugs.
+So developers may use them at any time at their will, but often they get
+results with much higher false reports rate than from a commercial tool.
 
 \subsection{Motivation}
-Although many approaches exist, some are not applicable to real software due
-to high computation time needs or sometimes even because of inability to read
-sources in the offshoot of a language the projects are written in. In this
-thesis we aim at mapping and investigation of current techniques used for code
-analysis and their application on real, large software projects.
+Although many approaches exist, mostly they are implemented in some version,
+but some are not applicable to real software due to high computation time
+needs or sometimes even because of inability to read sources in the offshoot
+of a language the projects are written in. In this thesis we aim at mapping
+and investigation of current techniques used for code analysis and their
+application on real, large software projects.
 
-For that purpose, we chose the Linux kernel. It is a large project running on
-zillion machines over the world and kernels of operating systems should
-generally be error-free, because even a minor error would allow an arbitrary
-attacker to obtain administrator privileges on a machine running such a
-vulnerable system. There are examples of such errors like
-in~\cite{exploit_vmsplice, exploit_proto_ops, exploit_tun}. Hence there is a
+There exist hundreds of projects of that size fitting our needs in this case.
+At the first glance it could look like we should specifically aim at kernels
+of operating systems, because it may seem like a crash of a user space
+application causes only pain to a user. But think about a vulnerability in
+a random web browser or database system (which consist of millions lines of
+code too) that could lead to stolen user's personal data.  Hence we should not
+only consider kernels of operating systems, but also user space programs in
+this respect.
+
+On the other hand operating systems should generally be error-free, because
+even a minor error would allow an arbitrary attacker to obtain administrator
+privileges on a machine running such a vulnerable system.  Then, they can
+steal whatever data they want and it is way easier to gain access to other
+machines in the same network, than attacking from outside~\footnote{There are
+usually no firewalls inside the network for example.}. We chose the Linux
+kernel in particular, because it is a large project running on zillion
+machines over the world.  There are examples of such errors like
+in~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}. Hence there is a
 call for techniques to possibly eliminate all errors the kernels contain.
 
 \subsection{State of the Art}
-Used/selected techniques for code analysis...
+This section is deserved to description and current state of techniques for
+code analysis referred to later in the text.
 
-Some info about slicing.
+\paragraph{Slicing} Slicing was first described in~\cite{slicing}. It is a
+technique to eliminate unneeded lines of code from a program. This is always
+computed with respect to some code location and variables which we are
+interested in at that place. Only the code that can affect the variables there
+is left in the program. This is for example useful for debugging purposes to
+understand how values are propagated to a variable. The location and variables
+are called \emph{slicing criteria}.
 
-Description of each technique, (bounded) model-checking inclusive.
+The main two branches of slicing are \emph{dynamic} and \emph{static}. The
+former considers one concrete input when computing the slice and may
+potentially result in more sliced code. Static slicing on the other hand
+computes the slice generally, with no input restrictions. More details about
+slicing and its variations and uses can be seen in~\cite{slicing_survey}.
+
+\paragraph{Model Checking} \todo{Honzo, toto prosim precti, jestli neblabolim.}
+Description of each technique, (bounded~\cite{bmc_survey})
+model-checking~\cite{mc_survey} inclusive.
 
 Static Analysis -- the most ready/useful
+PC Lint FlexeLint PolySpace CodePro Analytix
 
 Abstract Interpretation~\cite{cousot}
 
@@ -117,15 +166,20 @@ Symbolic Execution~\cite{king}
 
 \subsection{Specifics of the Linux Kernel}
 Real code; self-contained code; call to be bug-free, otherwise
-exploitable~\cite{exploit_vmsplice,exploit_proto_ops,exploit_tun}
+exploitable~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}
 
 \subsection{Checking the Linux Kernel}
 \stan~\cite{stanse}, projects like LDV (ISPRAS), Coverity~\cite{coverity},
 \textsc{Cppcheck}~\cite{cppcheck}, \clang~\cite{clang}, \sparse~\cite{sparse}
 
 \subsection{The Goals}
-Research deployment of static analysis on the Linux kernel, pros+cons, design
-new techniques or improve the contemporary ones.
+The primary goal of this thesis is to research deployment of static analysis
+on large, critical, software projects. In particular, we aim specifically at
+the Linux kernel in some sections. We considered contemporary approaches used
+for code analysis and tried to apply them to a large code base. Based on the
+results we obtain, we would like to discuss pros and cons of the techniques.
+This will result either in a design of new techniques or improvement of the
+contemporary ones (or both).
 
 \newpage
 \section{Stanse}
