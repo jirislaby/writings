@@ -5,6 +5,7 @@
 \usepackage[utf8x]{inputenc}
 \usepackage[IL2]{fontenc}
 \usepackage[final]{hyperref}
+\usepackage[all]{hypcap}
 \usepackage{graphicx}
 %\usepackage{multirow}
 \usepackage{pdfpages}
@@ -54,8 +55,8 @@
      \vfill
 \end{center}
      {\bf Supervisor:} prof. RNDr. Antonín Kučera, Ph.D.\\
-     {\bf Supervisor-specialist:} doc. RNDr. Jan Strejček, PhD.\\[1cm]
-     {\bf Supervisor's Signature: ......................}
+     {\bf Supervisor-specialist:} doc. RNDr. Jan Strejček, PhD.\\[1.5cm]
+     {\bf Supervisor's Signature:} \rule{5cm}{0.5pt}
 \end{titlepage}
 
 \pagestyle{plain}
@@ -76,7 +77,7 @@
 \pagenumbering{arabic}
 
 \section{Introduction} \todo{correctness = soundness + completness + termination
-(Dupal); ISO 9000:2000}
+(Dupal)}
 In the contemporary world, we are surrounded by devices making our lives
 easier. It counts from modern lifts which speak to us by natural language to
 supercomputers helping to treat cancer such as \emph{IBM
@@ -115,8 +116,8 @@ inclusive, to make the program misbehave or crash, to catch and fix program
 errors. This approach is called \emph{dynamic program testing}. It indeed
 takes huge amount of time to perform systematic testing of large projects. And
 yet, dynamic testing needs obviously a runnable executable which is not
-usually available in the early phases of development.  Testers can help in
-that case by creating simple binaries that exercises only finished subsystems,
+usually available in the early phases of development. Testers can help in
+that case by creating simple binaries that exercise only finished subsystems,
 by so-called \emph{unit tests}. However tests, especially the manually written
 ones, often do not cover all possible paths in the program. Actually, it was
 shown in~\cite{klee} that a set of unit tests developed for over fifteen years
@@ -190,7 +191,7 @@ On the other hand operating systems should generally be error-free, because
 even a minor error would allow an arbitrary attacker to obtain administrator
 privileges on a machine running such a vulnerable system.  Then, they can
 steal whatever data they want and it is way easier to gain access to other
-machines in the same network, than attacking from outside~\footnote{There are
+machines in the same network, than attacking from outside\footnote{There are
 usually no managed firewalls for the traffic flowing inside the network for
 example.}.  We chose the Linux kernel in particular, because it is a large
 project running on zillion machines over the world.  There are examples of
@@ -198,9 +199,65 @@ such errors like in~\cite{exploit_vmsplice, exploit_proto_ops,
 exploit_userns}. Hence there is a call for techniques to possibly eliminate
 all errors the kernels contain.
 
+\subsection{Background}
+This section is devoted to introduce the reader into the terms used throughout
+the thesis.
+
+\paragraph{Types of Analyses} Every analysis implemented has some properties.
+There are properties that are interesting for users when deciding which of the
+available implementations to choose for their project. Consider the example in
+Figure~\ref{fig:lst_sens} which we will use to demonstrate the properties
+explained below.
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+int fun(int a) {
+  int x = 1;
+
+  if (a == 2) (*@ \label{lst:sens_cond} @*)
+    x = a; (*@ \label{lst:sens_xa} @*)
+  x = 3; (*@ \label{lst:sens_x3} @*)
+  return x; (*@ \label{lst:sens_ret} @*)
+}
+void fun2(void) {
+  fun(5);
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Code demonstrating properties of analyses}\label{fig:lst_sens}
+\end{figure}
+
+First, one analysis may take into account order of program statements, another
+will not. When we take an analysis that is watching values stored into
+variables, for our code this would mean the analysis will report that possible
+values in \texttt{x} at line~\ref{lst:sens_ret} with \texttt{return} is either
+simply 3 (the last store to \texttt{x} before \texttt{return} proper), or any
+of 1, value of \texttt{a}, or 3 (the analysis does not care about the order,
+hence takes them all).  This is called \emph{flow sensitivity}, or
+\emph{insensitivity} respectively.  Second, an analysis may or may not
+remember conditions used for branching. If it does, in our example, \texttt{x}
+is then reported to be one of 1, 2, or 3, because \texttt{a} was noted to be 2
+before the assignment on line~\ref{lst:sens_xa}. In the other case, \texttt{x}
+is announced to be 1, 3, or whatever value the analysis previously computed
+\texttt{a} can be. We have just described \emph{path sensitivity}.  Finally,
+an analysis is called to be \emph{context-sensitive} if it considers calling
+context (call-stack). In other words whether the analysis is inter- or only
+intra-procedural. In our example, a context-sensitive analysis says \texttt{x}
+can be 1 or 3 since \texttt{a == 3} is false on line~\ref{lst:sens_cond}. The
+counterpart would say \texttt{x} can be any value due to the assignment on
+line~\ref{lst:sens_xa} (\texttt{a} can be whatever).
+
+\paragraph{Correctness}
+
 \subsection{State of the Art}
 This section is deserved to description and current state of techniques for
 code analysis referred to later in the text.
+
+\paragraph{Data-flow analysis}
+remove this?
 
 \paragraph{Static Analysis} Under the term of static analysis we understand
 analyzing code without directly executing it on a processor. This is exactly
