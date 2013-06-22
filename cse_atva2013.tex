@@ -25,6 +25,8 @@
 %\renewcommand{\todo}[1]{}
 %\renewcommand{\rem}[1]{}
 %\renewcommand{\note}[1]{}
+\newcommand{\marek}[1]{{{\textcolor{blue}{#1}}}}
+%\renewcommand{\marek}[1]{}
 
 \newcommand{\false}{\ensuremath{\mathit{false}}}
 \newcommand{\true}{\ensuremath{\mathit{true}}}
@@ -870,6 +872,12 @@ specified entry location and exit edges.
   each location $x_i$ is called an \emph{exit location} of $C$.
 \end{dfn}
 
+\marek{
+We emphasise that the core of a cycle is a cyclic path in a graph
+sense. Therefore, there is no direct relation between loop constructs
+of a programming language and our definition of a cycle (see
+Appendix~\ref{sec:LoopsCycles} of~\cite{TECHREP} for more details).}
+
 A template for a cycle $(\pi,e,X)$ is a pair $(e,M)$, where $M$ is a set
 containing one parametric program state for each exit edge of the cycle.  A
 template for a given cycle can be computed by
@@ -887,9 +895,9 @@ $\rho$.
   \DontPrintSemicolon
 $(e,\theta,\varphi)\aset\texttt{executePath(}P,\pi\texttt{)}$\;
 \label{alg:template:begin}
-\If{\rm $\sat(\varphi)\neq$ SAT}{
+\lIf{\rm $\sat(\varphi)\neq$ SAT}{
   \label{alg:template:satCheck1}
-  \Return{\bf null}
+  \Return{\bf null} \;
 }
 Set $\theta_*\prm{\kappa}(\var{a})=\sym{a}$~~for each array variable $\var{a}$\;
 Set $\theta_*\prm{\kappa}(\var{a})=\bot$~~for each integer variable $\var{a}$\;
@@ -902,17 +910,17 @@ Set $\theta_*\prm{\kappa}(\var{a})=\bot$~~for each integer variable $\var{a}$\;
     \label{alg:template:repeat:foreachBegin}
     \If{$\theta_*\prm{\kappa}(\var{a})=\bot$}{
       \label{alg:template:repeatIsBot}
-      \If{$\theta(\var{a})=\sym{a}+c$~~for some constant $c$}{
+      \If{$\theta(\var{a})=\sym{a}+c$~~{\rm for some constant} $c$}{
         \label{alg:template:repeat:foreach:BranchAritSeq}
         $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}+\kappa\cdot c$\;
         $\var{change} \aset \true$\;
       }  
-      \If{$\theta(\var{a})=\sym{a}\cdot c$~~for some constant $c$}{
+      \If{$\theta(\var{a})=\sym{a}\cdot c$~~{\rm for some constant} $c$}{
         \label{alg:template:repeat:foreach:BranchGeomSeq}
         $\theta_*\prm{\kappa}(\var{a}) \aset \sym{a}\cdot c^\kappa$\;
         $\var{change} \aset \true$\;
       }
-      \If{$\theta(\var{a})=g$~~for some symbolic expression $g$ such
+      \If{\rm $\theta(\var{a})=g$~~for some symbolic expression $g$ such
         \mbox{~~~that $\theta_*\prm{\kappa}(\var{b})\neq\bot$ for each symbol $\sym{b}$ in $g$}}{
         \label{alg:template:repeat:foreach:BranchTemporary}
         $\theta_*\prm{\kappa}(\var{a}) \aset
@@ -933,9 +941,9 @@ Set $\theta_*\prm{\kappa}(\var{a})=\bot$~~for each integer variable $\var{a}$\;
   }
 }
 \label{alg:template:repeatEnd}
-\If{$\theta_*\prm{\kappa}(\var{a})=\bot$ for some variable $\var{a}$}{
+\lIf{$\theta_*\prm{\kappa}(\var{a})=\bot$ {\rm for some variable} $\var{a}$}{
   \label{alg:template:isMemoryPrecise}
-  \Return{\bf null}
+  \Return{\bf null} \;
 }
 $\varphi_*\prm{\kappa}\aset\kappa\ge 0~\wedge~
 \forall\tau(0\le\tau<\kappa\implies\theta_*\prm{\tau}\langle\varphi\rangle)$\;
@@ -947,9 +955,9 @@ $M\aset\emptyset$\; \label{alg:template:secondPartBegin}
   \label{alg:template:pathToExit}
   $(x,\theta,\varphi)\aset\texttt{executePath(}P,\rho x\texttt{)}$\;
   \label{alg:template:exitState}
-  \If{\rm $\sat(\varphi)=$ UNKNOWN}{
+  \lIf{\rm $\sat(\varphi)=$ UNKNOWN}{
     \label{alg:template:satCheck2a}
-    \Return{\bf null}
+    \Return{\bf null} \;
   }
   \If{\rm $\sat(\varphi)=$ SAT}{
     \label{alg:template:satCheck2b}
@@ -1337,7 +1345,7 @@ over time.
 \begin{table*}[!t]
   \begin{center}
     \setlength{\tabcolsep}{4pt}
-    \renewcommand\arraystretch{1.1}
+    \renewcommand\arraystretch{1.06}
     \begin{tabular}{|c||c|c|c||c|c|c||c|c||}
       \hline
       & \multicolumn{3}{c||}{\textbf{Templates}}
@@ -1349,20 +1357,20 @@ over time.
        Time & States & SMTFail &
        Time & States \\
       \hline
-        hello          & 12.3 & 2 & 126 & 2.3   & 187   & 0  & 4.5 & 2262\\
-        HW             & 31.9 & 4 & 252 & 45.4  & 1048  & 4  & T/O & 223823\\
-        HWM            & 48.1 & 5 & 336 & T/O   & 5125  & 24 & T/O & 162535\\
-        matrIR         & 4.2  & 4 & 28  & 82.9  & 1234  & 6  & T/O & 270737\\
-        matrIR\_dyn    & 14.8 & 5 & 30  & 240.5 & 2472  & 13 & T/O & 267636\\
-        VM             & 8.6  & 6 & 64  & T/O   & 2274  & 64 & T/O & 205577\\
-        VMS            & 4.2  & 3 & 32  & 5.4   & 466   & 0  & 99.8 & 281263\\
-        decode\_packets& 18.3 & 5 & 26  & 39.9  & 1276  & 0  & 16.3 & 8992 \\
-        WinDriver      & 17.8 & 5 & 26  & 59.2  & 1370  & 1  & T/O & 206903\\
-        EQCNT          & 12.2 & 3 & 12  & 10.6  & 345   & 0  & T/O & 179803\\
+        hello          & 12.3 & 2 & 126(2) & 2.3   & 187   & 0  & 4.5 & 2262\\
+        HW             & 31.9 & 4 & 252(4) & 45.4  & 1048  & 4  & T/O & 223823\\
+        HWM            & 48.1 & 5 & 336(5) & T/O   & 5125  & 24 & T/O & 162535\\
+        matrIR         & 4.2  & 4 & 28(4)  & 82.9  & 1234  & 6  & T/O & 270737\\
+        matrIR\_dyn    & 14.8 & 5 & 30(5)  & 240.5 & 2472  & 13 & T/O & 267636\\
+        VM             & 8.6  & 6 & 64(6)  & T/O   & 2274  & 64 & T/O & 205577\\
+        VMS            & 4.2  & 3 & 32(3)  & 5.4   & 466   & 0  & 99.8 & 281263\\
+        decode\_packets& 18.3 & 5 & 26(5)  & 39.9  & 1276  & 0  & 16.3 & 8992 \\
+        WinDriver      & 17.8 & 5 & 26(5)  & 59.2  & 1370  & 1  & T/O & 206903\\
+        EQCNT          & 12.2 & 3 & 12(3)  & 10.6  & 345   & 0  & T/O & 179803\\
       \hline
-        EQCNTex        & 5.8  & 4 & 24  & T/O   & 10581 & 0  & T/O & 251061\\
-        OneLoop        & 0.1  & 1 & 2   & 0.1   & 41    & 0  & T/O & 38230\\
-        TwoLoops       & 0.3  & 2 & 4   & 0.1   & 25    & 0  & T/O & 917343\\
+        EQCNTex        & 5.8  & 4 & 24(4)  & T/O   & 10581 & 0  & T/O & 251061\\
+        OneLoop        & 0.1  & 1 & 2(1)   & 0.1   & 41    & 0  & T/O & 38230\\
+        TwoLoops       & 0.3  & 2 & 4(2)   & 0.1   & 25    & 0  & T/O & 917343\\
       \hline
       \hline
         \textbf{Total time} &
@@ -1377,16 +1385,18 @@ over time.
     templates and building of compact symbolic execution tree.
     All the times are in seconds, where 'T/O' identifies
     exceeding 5 minutes timeout. 'Count' represents the number of computed
-    templates, 'Cycles' show the number of detected cycles. 'SMTFail'
-    represents the number of failed SMT queries. There was no SMT failure
-    during classic SE of our benchmarks.}
+    templates, 'Cycles' show the number of detected cycles \marek{in
+    form ``all(symbolically-executable)" (see
+    Appendix~\ref{sec:ManyDetected} of~\cite{TECHREP} for more details)}. 'SMTFail'    
+    represents the number of failed SMT queries. There was no SMT
+    failure during classic SE of our benchmarks.}
   \label{tab:Expriments}
 \end{table*}
 
 \begin{table*}[!t]
   \begin{center}
     \setlength{\tabcolsep}{4pt}
-    \renewcommand\arraystretch{1.2}
+    \renewcommand\arraystretch{1.1}
     \begin{tabular}{|c||c|c|c|c|c|c|}
       \hline
          &{\textbf{Time}}&{\textbf{safe}}&{\textbf{unsafe}}&
@@ -1512,10 +1522,15 @@ summarisation basically caches results of some finite part of symbolic
 execution for later fast reuse, our templates are supposed to \emph{replace}
 potentially infinite parts of symbolic executions by a single node.
 
-Techniques~\cite{QNR11,SH10} group paths of classic symbolic
-execution tree according to an a priori given constraints on a program
-output, while exploring only one path per group. We do not require any such
-constraints.
+\marek{
+Techniques~\cite{QNR11,SH10} group paths of classic symbolic execution
+tree according to their effect on symbolic values of a priori given
+output variables. We consider all program variables and execution
+paths have summarised their effect on cycles.}
+%Techniques~\cite{QNR11,SH10} group paths of classic symbolic
+%execution tree according to an a priori given constraints on a program
+%output, while exploring only one path per group. We do not require any such
+%constraints.
 
 Finally, in our previous work~\cite{ST12} we compute, for a given program
 and a target location in it, a non-trivial necessary condition for reaching
@@ -2084,6 +2099,109 @@ Therefore, $w \in W$.
 \end{proof}
 
 %}}}
+
+\section{Program Loops and Cycles}
+\label{sec:LoopsCycles}
+
+\marek{
+In this section we want to emphasise the difference between loop
+constructs of programming languages and cycles formally defined in
+Definition~\ref{def:Part}. In particular, we show on two examples that
+the terms like ``branching inside a loop" or ``loop nesting", which
+are commonly used for description of loops written in some programming
+language, have no meaning for cycles as defined in this paper. The
+reason is that the core of a cycle from Definition~\ref{def:Part} is a
+single cyclic path in graph sense. Let us consider C programs depicted
+at~Figure~\ref{fig:cse:LoopsCycles} (a) and (b) and the corresponding
+flowgraphs depicted at~Figure~\ref{fig:cse:LoopsCycles} (c) and (d)
+respectively.}
+
+\begin{figure}[!htb]
+\begin{center}
+\begin{tabular}{ccc}
+\begin{tabular}{l}
+\texttt{a=0;}\\
+\texttt{for (i=0; i<n; ++i)}\\
+\texttt{~~~~if (*)}\\
+\texttt{~~~~~~~~a=a+1;}\\
+\texttt{~~~~else}\\
+\texttt{~~~~~~~~a=a+2;}\\
+\end{tabular}
+& ~~~~~~~~~ &
+\begin{tabular}{l}
+\texttt{for(i=1; i<n; ++i)}\\
+\texttt{~~for(j=i; j>0 \&\& A[j-1]>A[j]; --j)}\\
+\texttt{~~~~swap(A[j-1],A[j]);}\\
+\end{tabular}
+\\ \\
+(a) & & (b)
+\\ \\
+\begin{tabular}{c}
+\includegraphics[width=4cm]{fig_cse_loopscycles_intbranch}
+\end{tabular}
+& &
+\begin{tabular}{c}
+\includegraphics[width=4.5cm]{fig_cse_loopscycles_nested}
+\end{tabular}
+\\
+(c) & & (d)
+\end{tabular}
+\end{center}
+\caption{\marek{(a) A single program loop with internal branching. The symbol
+$*$ represents any branching condition. (b) Two nested program loops
+(insertion sort). (c) A flowgraph corresponding to (a) with four
+independent cycles with cores \textit{abcea}, \textit{abdea},
+\textit{eabce}, and \textit{eabde}. (d) A flowgraph corresponding to
+(b) with seven independent cycles with cores \textit{abda},
+\textit{abcda}, \textit{bdab}, \textit{bcdab}, \textit{bcefb},
+\textit{dabd}, and \textit{dabcd}.}}
+\label{fig:cse:LoopsCycles}
+\end{figure}
+
+\marek{
+We can immediately see that cycles in both flowgraphs are identified 
+independently to others and exactly the same way. Namely, they are
+identified without being concerned about layout of the related program
+loops.}
+
+\section{Experiments: Many Not-Executable Cycles Detected}
+\label{sec:ManyDetected}
+
+\marek{
+Before we analyse a benchmark program we first translate it into the
+LLVM byte code and then we translate the byte code into flowgraphs.
+LLVM has instructions \texttt{icmp} to evaluate equality or inequality
+predicates. For example, the line of LLVM code depicted at
+Figure~\ref{fig:cse:icmp_rep}(a) assigns to \texttt{c} a result of the
+comparison \texttt{a != 0}. We translate this instruction into a
+flowgraph as is depicted at Figure~\ref{fig:cse:icmp_rep}(b).}
+
+\begin{figure}[!htb]
+\begin{center}
+\begin{tabular}{ccc}
+\begin{tabular}{c}
+\texttt{\%c = icmp ne i32 \%a, 0}
+\end{tabular}
+ & ~~~~~~~~~~~~~~ &
+\begin{tabular}{c}
+\includegraphics[width=3cm]{fig_cse_icmp_rep}
+\end{tabular}
+\\
+(a) & & (b)
+\end{tabular}
+\end{center}
+\caption{\marek{Translation of the LLVM instruction (a) into the corresponding flowgraph representation (b).}}
+\label{fig:cse:icmp_rep}
+\end{figure}
+
+\marek{
+Therefore, if there are \texttt{icmp} instructions in loops of LLVM
+byte code, then we detect exponentially many cycles in the resulting
+flowgraph representation compared to number of cycles in the source
+LLVM byte code. Moreover, only few of all possible combinations of
+executions through branchings introduced by \texttt{icmp} instructions
+are possible. Thus only few of all detected cycles are symbolically
+executable.}
 
 \end{document}
 
