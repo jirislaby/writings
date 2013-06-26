@@ -300,17 +300,17 @@ edge $(b,f)$ or along the edges $(b,c)$ and $(c,e)$ to leave it.
 % \color{blue}
 % % We first specify and then analyse a \emph{program part} consisting of
 % % the locations $b,c,d,e,f$ and of all the edges between them. The part
-% % is highlighted by a light grey region at Figure~\ref{fig:linSrch}~(a).
+% % is highlighted by a light grey region in Figure~\ref{fig:linSrch}~(a).
 % % We can see, the locations' sequence $b,c,d,b$ forms a cyclic path in
 % % the part.
 % The sequence is the only source of the path in the grey
-% regions at Figure~\ref{fig:linSrch}~(b).
+% regions in Figure~\ref{fig:linSrch}~(b).
 % % In general, a part may contain several cyclic paths, but we are only
 % % interested in those, which are responsible for a production of those paths
 % % in classic symbolic execution tree, we want to eliminate. Therefore, we
 % % call a set of all such ``responsible" cyclic paths as a \emph{core} of the
 % % part. In our example, the cyclic path $b,c,d,b$ is the core of the
-% % part. It is highlighted by a grey region at
+% % part. It is highlighted by a grey region in
 % % Figure~\ref{fig:linSrch}~(a). Next, we mark the location $b$ of the part
 % % as an \emph{entry} location into the part, since we enter the part by
 % % stepping into the location $b$. In general, there can be several entries
@@ -1249,7 +1249,7 @@ e'\!.s\prm{\bld{\nu}}$.
 
 Note that in both theorems we discuss only relation between all \emph{finite}
 branches of the trees $T$ and $T'$. Some infinite branches of $T$ (like the
-one at Figure~\ref{fig:linSrch}(b)) corresponding to infinite iterations
+one in Figure~\ref{fig:linSrch}(b)) corresponding to infinite iterations
 along a cyclic path need not be present in $T'$. As symbolic execution is
 typically used to cover as many reachable program locations as possible,
 missing infinite iterations along cyclic paths can be seen as a feature
@@ -2102,6 +2102,45 @@ Therefore, $w \in W$.
 
 %}}}
 
+\section{Experiments: Many Non-Executable Cycles Detected}
+\label{sec:ManyDetected}
+
+\marek{
+Before we analyse a benchmark program we first translate it into the
+LLVM byte code and then we translate the byte code into flowgraphs.
+LLVM has an instruction \texttt{icmp} to evaluate equality or inequality
+predicates. For example, the line of LLVM code depicted in
+Figure~\ref{fig:cse:icmp_rep}(a) assigns to \texttt{c} a result of the
+comparison \texttt{a != 0}. We translate this instruction into a
+flowgraph as is depicted in Figure~\ref{fig:cse:icmp_rep}(b).}
+
+\begin{figure}[!htb]
+\begin{center}
+\begin{tabular}{ccc}
+\begin{tabular}{c}
+\texttt{\%c = icmp ne i32 \%a, 0}
+\end{tabular}
+ & ~~~~~~~~~~~~~~ &
+\begin{tabular}{c}
+\includegraphics[width=2.5cm]{fig_cse_icmp_rep}
+\end{tabular}
+\\
+(a) & & (b)
+\end{tabular}
+\end{center}
+\caption{\marek{Translation of the LLVM instruction (a) into the corresponding flowgraph representation (b).}}
+\label{fig:cse:icmp_rep}
+\end{figure}
+
+\marek{
+Therefore, if there are \texttt{icmp} instructions in loops of LLVM
+byte code, then we detect exponentially many cycles in the resulting
+flowgraph representation compared to a number of cycles in the source
+LLVM byte code. Moreover, only few of all possible combinations of
+executions through branchings introduced by \texttt{icmp} instructions
+are possible. Thus only few of all detected cycles are symbolically
+executable.}
+
 \section{Program Loops and Cycles}
 \label{sec:LoopsCycles}
 
@@ -2113,9 +2152,9 @@ the terms like ``branching inside a loop" or ``loop nesting", which
 are commonly used for description of loops written in some programming
 language, have no meaning for cycles as defined in this paper. The
 reason is that the core of a cycle from Definition~\ref{def:Part} is a
-single cyclic path in graph sense. Let us consider C programs depicted
-at~Figure~\ref{fig:cse:LoopsCycles} (a) and (b) and the corresponding
-flowgraphs depicted at~Figure~\ref{fig:cse:LoopsCycles} (c) and (d)
+single cyclic path in the graph sense. Let us consider C programs depicted
+in Figure~\ref{fig:cse:LoopsCycles} (a) and (b) and the corresponding
+flowgraphs depicted in Figure~\ref{fig:cse:LoopsCycles} (c) and (d)
 respectively.}
 
 \begin{figure}[!htb]
@@ -2165,45 +2204,6 @@ We can immediately see that cycles in both flowgraphs are identified
 independently to others and exactly the same way. Namely, they are
 identified without being concerned about layout of the related program
 loops.}
-
-\section{Experiments: Many Not-Executable Cycles Detected}
-\label{sec:ManyDetected}
-
-\marek{
-Before we analyse a benchmark program we first translate it into the
-LLVM byte code and then we translate the byte code into flowgraphs.
-LLVM has instructions \texttt{icmp} to evaluate equality or inequality
-predicates. For example, the line of LLVM code depicted at
-Figure~\ref{fig:cse:icmp_rep}(a) assigns to \texttt{c} a result of the
-comparison \texttt{a != 0}. We translate this instruction into a
-flowgraph as is depicted at Figure~\ref{fig:cse:icmp_rep}(b).}
-
-\begin{figure}[!htb]
-\begin{center}
-\begin{tabular}{ccc}
-\begin{tabular}{c}
-\texttt{\%c = icmp ne i32 \%a, 0}
-\end{tabular}
- & ~~~~~~~~~~~~~~ &
-\begin{tabular}{c}
-\includegraphics[width=3cm]{fig_cse_icmp_rep}
-\end{tabular}
-\\
-(a) & & (b)
-\end{tabular}
-\end{center}
-\caption{\marek{Translation of the LLVM instruction (a) into the corresponding flowgraph representation (b).}}
-\label{fig:cse:icmp_rep}
-\end{figure}
-
-\marek{
-Therefore, if there are \texttt{icmp} instructions in loops of LLVM
-byte code, then we detect exponentially many cycles in the resulting
-flowgraph representation compared to number of cycles in the source
-LLVM byte code. Moreover, only few of all possible combinations of
-executions through branchings introduced by \texttt{icmp} instructions
-are possible. Thus only few of all detected cycles are symbolically
-executable.}
 
 \end{document}
 
