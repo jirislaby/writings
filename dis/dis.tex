@@ -1,6 +1,7 @@
 % vim: textwidth=78 ai spell spelllang=en
 \documentclass[11pt,a4paper]{article}
 
+\usepackage{amsmath}
 \usepackage[table]{xcolor}
 \usepackage[utf8x]{inputenc}
 \usepackage[IL2]{fontenc}
@@ -29,6 +30,9 @@
 
 \newcommand{\nb}[1]{\marginpar{\scriptsize #1}}
 \newcommand{\todo}[1]{\nb{\textcolor{red}{#1}}}
+\newcommand{\var}[1]{{\tt #1}}
+\newcommand{\sym}[1]{\ensuremath{\underline{#1}}}
+\newcommand{\true}{\ensuremath{\mathit{true}}}
 
 \newcommand{\cdb}{\textsc{ClabureDB}\xspace}
 \newcommand{\clang}{\textsc{Clang}\xspace}
@@ -37,6 +41,8 @@
 \newcommand{\sparse}{\textsc{Sparse}\xspace}
 \newcommand{\stan}{\textsc{Stanse}\xspace}
 \newcommand{\symbio}{\textsc{Symbiotic}\xspace}
+
+\newtheorem{dfn}{Definition}
 
 % stanse article
 \newcommand{\TC}{\textsc{ThreadChecker}\xspace}
@@ -234,11 +240,12 @@ throughout the thesis. Every implemented analysis has some properties.  There
 are properties that are interesting for users when deciding which of the
 available implementations to choose for their project. 
 
-\paragraph{Formal Parameters} Usually, an important parameter for users of an
-analysis is to know whether the output of the analysis makes some sense or if
-there will be any output in finite time at all. We often consider three
-terms with respect to this: \emph{soundness} (sometimes called
-\emph{correctness}), \emph{termination} and \emph{completeness}.
+\subsubsection{Formal Parameters}\label{sec:formal_params}
+Usually, an important parameter for users of an analysis is to know whether
+the output of the analysis makes some sense or if there will be any output in
+finite time at all. We often consider three terms with respect to this:
+\emph{soundness} (sometimes called \emph{correctness}), \emph{termination} and
+\emph{completeness}.
 \begin{itemize}
 \item Soundness: When an analysis is sound, whatever it reports, it conforms
 to the definition of the algorithm, nothing more than that is reported. Many
@@ -258,16 +265,17 @@ negatives.
 \end{itemize}
 
 Since these three are orthogonal we cannot want all from one analysis, as it
-would be against the Halting problem. So it is very common to implement
-analyses that only terminate and are complete, i.e. unsound. Some are not even
-complete. This is often to reduce false positives stemming from unsoundness
-character.
+would be in contradiction of the Halting problem proof. So it is very common
+to implement analyses that only terminate and are complete, i.e. unsound. Some
+are not even complete. The latter is often to reduce false positives stemming
+from unsoundness character.
 
-\paragraph{Types of Analyses} One such property is how are separate commands
-and functions present in some code handled by the analysis. Consider the
-example in Figure~\ref{fig:lst_sens} and also consider an analysis that is
-watching values stored into variables and thus is able to report this to the
-user. We will use both of them to demonstrate the properties explained below.
+\subsubsection{Sensitivity of Analyses}\label{sec:sensitivity}
+Another interesting property of analyses is how are the analyses handling
+separate commands and functions present in some code. Consider the example in
+Figure~\ref{fig:lst_sens} and also consider an analysis that is watching
+values stored into variables and is thus able to report this to the user. We
+will use both of them to demonstrate the properties explained below.
 
 \begin{figure}[htb]
 \begin{center}
@@ -287,40 +295,82 @@ void fun2(void) {
 \end{lstlisting}
 \end{tabular}
 \end{center}
-\caption{Code used for demonstration of analyses properties}\label{fig:lst_sens}
+\caption{Code used for demonstration of analyses sensitivity}
+\label{fig:lst_sens}
 \end{figure}
 
-There are three basic properties we are considering when we are choosing an
-analysis:
+Given the example above we are able to describe the following three basic
+properties we usually consider when we are choosing an analysis
+implementation:
 \begin{itemize}
 \item One implementation may take into account order of program statements,
-another may not. For our code this would mean the analysis will report that
-possible values in \texttt{x} at line~\ref{lst:sens_ret} is either simply 3
-(the last store to \texttt{x} before \texttt{return} proper), or with
-considerably less precision any of 1, value of \texttt{a}, or 3 (the analysis
-does not care about the order, hence takes and reports them all).  This is
-called \emph{flow sensitivity}, or \emph{insensitivity} respectively.
+another may completely ignore the line numbers. For our code this would mean
+the analysis will report that possible values in \texttt{x} at
+line~\ref{lst:sens_ret} is either simply 3 (the last store to \texttt{x}
+before \texttt{return} proper), or with considerably less precision any of 1,
+value of \texttt{a}, or 3 (the analysis does not care about the order, hence
+takes and reports them all).  This is called \emph{flow sensitivity}, or
+\emph{insensitivity} respectively.
+
 \item An analysis may or may not remember conditions used for branching. If it
 does, in our example, \texttt{x} is then reported to be one of 1, 2, or 3,
 because \texttt{a} was noted to be 2 before the assignment on
 line~\ref{lst:sens_xa}. In the other case, \texttt{x} is announced to be 1, 3,
 or whatever value the analysis previously computed \texttt{a} can be. We have
 just described \emph{path sensitivity}.
+
 \item An analysis is called to be \emph{context-sensitive} if it considers
 calling context (call-stack). In other words whether the analysis is inter- or
 only intra-procedural. In our example, a context-sensitive analysis says
 \texttt{x} can be 1 or 3 since the condition \texttt{a == 3} is false on
 line~\ref{lst:sens_cond}. The counterpart would say \texttt{x} can be any
 value due to the assignment on line~\ref{lst:sens_xa} (the analysis has to
-assume \texttt{a} can contain whatever value).
+assume \texttt{a} can contain whatever value to be complete).
+\end{itemize}
+
+\subsubsection{Types of Analyses}\label{sec:types_anal}
+Analyses are also divided into sets of what information they provide. There
+are two properties in this category presented below. More on those are in
+section~\ref{sec:data-flow}
+
+\begin{itemize}
+\item \emph{May/must:} Sometimes we are interested whether some result given
+by an analysis must hold definitely or may hold sometimes. If we get back to
+the example of Figure~\ref{fig:lst_sens} and an analysis says \texttt{x}
+\emph{must} be a constant at line~\ref{lst:sens_ret}, we can just return that
+constant and eliminate all the preceding code. This would not be possible with
+an answer ``maybe'' given by the \emph{may} analysis. May analysis is useful
+on the other hand for example if we are interested whether a divisor in a
+division may be sometimes zero. In that case we report an error.  Must
+analysis will not necessarily find this bug.
+
+\item \emph{Backward/forward:} for flow-sensitive analyses, the way of
+propagation of the information is important. We may want to know at each line
+of a program what are the variables used further in the code (to see whether
+we need to hold its value still in a register for example). This needs going
+from backwards and propagate this information to the beginning of a function
+where the variable is defined. At each line we can see that information then.
+On the other hand to see at each line which variables are already set to any
+value, we need to propagate forwards.
 \end{itemize}
 
 \subsection{State of the Art}
 This section is deserved to description and current state of techniques for
 code analysis referred to later in the text.
 
-\paragraph{Data-flow analysis}
-remove this?
+\paragraph{Data-flow analysis}\label{sec:data-flow}
+basic principles. Basic analyses and their
+categorization~\ref{sec:types_anal}.
+
+\begin{verbatim}
+     |      may    |    must
+-----+-------------+-------------
+forw | reaching    | available
+     | definitions | expressions
+-----+-------------+-------------
+back | live        | very busy
+     | variables   | expressions
+\end{verbatim}
 
 \paragraph{Static Analysis} Under the term of static analysis we understand
 analyzing code without directly executing it on a processor. This is exactly
@@ -340,8 +390,6 @@ remove dynamic array out-of-bounds checking in java if we know the bounds.
 debugging purposes
 
 automatic test generation
-
-(path,flow)-sensitivity+inter/intra-procedural analysis
 
 soundness + completeness
 
@@ -407,6 +455,8 @@ approaches including the two described in preceding sections. Section
 \ref{sec:fmics} in a software competition. Finally, we conclude with summaries
 of what we have done.
 
+
+
 \newpage
 \section{Stanse}\label{sec:stanse}
 At the beginning of the PhD studies, we were surveying the current known
@@ -434,9 +484,80 @@ checking the kernel. We were inspired by success of
 tool including the theory behind and report of successes and failures.
 
 \subsection{Abstract Interpretation}\label{sec:ai}
-\emph{Abstract Interpretation} is a technique that has a history stretching
-back to the 1970s. Back then, it was formalized by Cousot\&Cousot in
-\cite{cousot}.
+Data-flow analysis is only a limited tool for deciding some properties about
+the analysis. There was a call to formalize the process to decide correctness
+of algorithms conveniently. \emph{Abstract interpretation} is a technique that
+has a history stretching back to the 1970s. Back then, it was formalized by
+Cousot\&Cousot in \cite{cousot}. It is designed so that users of the formalism
+are able to decide whether their analysis is correct, if it terminates, and to
+design more precision levels of an analysis consistently.
+
+\subsubsection{Lattices}
+Abstract interpretation is build upon lattice theory. Let us first define
+lattice and show some examples of lattices used later.
+\begin{dfn}[Lattice]
+\end{dfn}
+
+\subsection{Points-to Analysis}
+For languages using pointers like C, it is important to know where these
+pointers point to. Consider the global integer variable and an integer pointer
+as are in the code depicted in Figure~\ref{fig:lst_ptsto}. Without knowing
+that \texttt{p} can point-to and actually changes \texttt{x} we would conclude
+that \texttt{fun} always returns 0. But it returns whatever it gets on the
+input as a parameter \texttt{a}. For that purpose algorithms known as
+\emph{Points-to analysis} (sometimes referred as \emph{Pointer analysis})
+exist. 
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+int fun(int a) {
+  static int x;
+  int *p = &x;
+  *p = a;
+  return x;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Points-to demonstrative example} \label{fig:lst_ptsto}
+\end{figure}
+
+\emph{Alias analysis} is a bit different to points-to analysis in what is able
+to tell about pointers. Alias analysis can only conclude that two pointers
+either point to the same location or not. It cannot report the set of possible
+targets. This is sometimes sufficient and for example \llvm as of 3.1 provides
+its optimization passes only with alias analysis. This was a problem for us 
+
+The same as for other analyses, points-to analysis have always one of  the
+properties described in each point of section~\ref{sec:sensitivity}. Points-to
+analyses are often parametrized by another sensitivity: sensitivity for
+structure fields.
+
+\paragraph{Field-sensitivity} In languages allowing structured constructs, like
+\texttt{struct} in C, we have two options: to consider each of the member
+of such an object or ignore them. Obviously ignoring that information leads to
+faster analysis, however imprecisions occur. The imprecisions are two-fold:
+each member itself can be a pointer and should have its own points-to set, and
+knowing exactly to which member of a structure a pointer points-to is indeed
+useful information. On the other hand, when we want more precise analysis,
+there are two steps, with different precision. First, \emph{field-based
+sensitivity} have only one global information about structure members, per
+each member name. So when we have two totally different structures \texttt{a}
+and \texttt{b} containing a member \texttt{void *x}, this analysis considers
+them to be the same and updates \texttt{x}'s points-to set any time
+\texttt{a.x} or \texttt{b.x} is set to point to a new object. The other
+analysis, the true \emph{field-sensitive} one, properly handles members of
+structures in natural sense, but for a higher computation price, of course.
+
+\begin{verbatim}
+(call, 1) -> {  }
+(%1, -1) -> { (call, 0) }
+\end{verbatim}
+
+There are many different known approaches to pointer analysis, differing in
+speed and accuracy.
 
 \subsection{The Tool}
 
@@ -594,20 +715,12 @@ changed if streaming performance becomes a problem in the future.
 
 \subsubsection{Pointer Analysis in \stan}
 
-Since C programs tend to heavily use pointers, it almost always becomes a
-necessity to use some form of pointer analysis. There are many different
-known approaches to pointer analysis, differing in speed and accuracy. As
-each bug-finding/program analysis technique may have different requirements
-regarding pointer analysis, a framework like \stan
-should ideally implement several different pointer analysis techniques and
-provide them to its checkers.
-
-Nevertheless, the \stan framework currently provides just two pointer
-analyses: \textit{Steensgaard}'s~\cite{steensgaard} and
+Since each bug-finding/program analysis technique may have different
+requirements regarding pointer analysis, the \stan framework currently
+provides two pointer analyses: \textit{Steensgaard}'s~\cite{steensgaard} and
 \textit{Shapiro-Horowitz}'s~\cite{shapiro_horwitz}. Both analyses are
-\emph{may} analyses -- they compute an over-approximation of an accurate
-solution. The \textit{Steensgard}'s analysis is very fast and it is widely
-used in practice.  On the other hand it is not very accurate. The
+\emph{may} analyses. The \textit{Steensgard}'s analysis is very fast and it is
+widely used in practice.  On the other hand it is not very accurate. The
 \textit{Shapiro-Horowitz}'s analysis allows parametrisation between
 \textit{Steensgard}'s and \textit{Andersen}'s analyses. One can therefore
 balance between speed of \textit{Steensgard}'s analysis and accuracy of
@@ -1056,7 +1169,78 @@ slicing and its variations and uses can be seen in section~\ref{sec:fmics}
 and in~\cite{slicing_survey}, of course.
 
 \subsection{Symbolic Execution}\label{sec:se}
-Theory about SE
+Theory about SE; extended to heap in S.Khurshid, C.S.Păsăreanu, and W.Visser.
+Generalized symbolic execution for model checking andtesting. In Proceedings
+of TACAS. Springer, 2003. Generalized in X.Deng, J.Lee, and Robby. Efficient
+and formal generalized symbolic execution. Automated Software Engineering,
+2011
+
+For libraries: S.Khurshid and Y.L.Suen. Generalizing symbolic execution to
+library classes. In Proceedings of PASTE. ACM, 2005.
+
+Path explosion: 1,10,12,19 z atvy.
+
+\begin{figure}[!htb]
+  \begin{tabular}{ccc}
+  TBD & TBD & TBD
+%    \hspace{-4ex}\input{fig_linSrch} &
+%    \hspace{-4.5ex}\input{fig_linSrchSET} &
+%    \hspace{-1.5ex}\input{fig_linSrchCSET}
+  \end{tabular}
+  \caption{(a) A flowgraph \texttt{linSrch(A,n,x)}. (b) Classic symbolic
+    execution tree of \texttt{linSrch}. (c) Compact symbolic execution tree
+    of \texttt{linSrch}.}
+  \label{fig:linSrch}
+\end{figure}
+
+Symbolic execution runs a program over \emph{symbols} representing arbitrary
+input values. For each input variable $\var{v}$, we denote a symbol passed
+to it as $\sym{v}$. A \emph{program state} is a triple $(l,\theta,\varphi)$
+consisting of a current program location $l$ in the flowgraph, a
+\emph{symbolic memory} $\theta$, and a \emph{path condition}
+$\varphi$. $\theta$ assigns to each program variable its current symbolic
+value, i.e.~an expression over the symbols. For example, if the first
+instruction of a program is the assignment \texttt{i:=2*n+x}, then
+$\theta(\var{i})=2\sym{n}+\sym{x}$ after its execution. The path condition
+$\varphi$ is a quantifier-free first order logic formula representing a
+necessary and sufficient condition on symbols to drive the execution along
+the currently executed path. $\varphi$ is initially $\true$ and it can be
+updated at program branchings. For example, in a location with two out-edges
+labelled by \texttt{x>n+5} and \texttt{x<=n+5}, we instantiate the
+conditions with use of the current $\theta$ and we check whether the current
+path condition $\varphi$ implies their validity. Namely, we ask for validity
+of implications $\varphi \rightarrow \theta(\var{x}) > \theta(\var{n}) + 5$
+and $\varphi \rightarrow \theta(\var{x}) \leq \theta(\var{n}) + 5$.
+%\[
+%\varphi\implies(\theta(\var{x})>\theta(\var{n})+5)
+%~~~~~~~\textrm{and}~~~~~~~
+%\varphi\implies(\theta(\var{x})\le\theta(\var{n})+5).
+%\] 
+If the first implication is valid, the symbolic execution continues along
+the first branch. If the second implication is valid, the symbolic execution
+continues along the second branch. If none of them is valid, it means that
+we can follow either of the two branches.  Hence, the symbolic execution
+forks in order to execute both branches.  In this case, we update the path
+condition on the first branch to $\varphi \wedge \theta(\var{x}) >
+\theta(\var{n}) + 5$ and the one on the second branch to $\varphi \wedge
+\theta(\var{x}) \leq \theta(\var{n}) + 5$. Note that the whole program state
+is forked into two states in this case.
+
+Due to the forks, symbolic execution is traditionally represented by a tree
+called \emph{classic symbolic execution tree}. Nodes of the tree are
+labelled by program states computed during the execution.
+% \todo{For brevity of notation, we identify nodes with program states
+% labelling them.}
+Edges of the tree correspond to transitions between program states labelling
+their end nodes. In Figure~\ref{fig:linSrch}(b), there is a classic symbolic
+execution tree of the flowgraph from Figure~\ref{fig:linSrch}(a). For
+readability of figures, nodes are not labelled by program states, but only
+by the current location in the flowgraph. In addition, we label branching
+edges by instances of the corresponding branching conditions in the
+flowgraph. These labels allow us to reconstruct the path condition for each
+node in the tree: it is the conjunction of labels of all edges along the
+path from the root to the node. Note that contents of symbolic memories are
+not depicted in the figure.
 
 \subsection{Introduction}
 
