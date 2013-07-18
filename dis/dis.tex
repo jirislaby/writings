@@ -400,7 +400,7 @@ approaches described in detail by Cousot\&Cousot in~\cite{cousot}. It will be
 described in detail in section~\ref{sec:ai}.
 
 \paragraph{Symbolic Execution}
-\cite{king}, \klee~\cite{klee} and clones. It will be described in detail in
+It will be described in detail in
 section~\ref{sec:se}.
 
 \paragraph{Slicing} Slicing was first described in~\cite{slicing}. It is a
@@ -485,18 +485,69 @@ tool including the theory behind and report of successes and failures.
 
 \subsection{Abstract Interpretation}\label{sec:ai}
 Data-flow analysis is only a limited tool for deciding some properties about
-the analysis. There was a call to formalize the process to decide correctness
-of algorithms conveniently. \emph{Abstract interpretation} is a technique that
-has a history stretching back to the 1970s. Back then, it was formalized by
-Cousot\&Cousot in \cite{cousot}. It is designed so that users of the formalism
-are able to decide whether their analysis is correct, if it terminates, and to
-design more precision levels of an analysis consistently.
+the analysis. There was a call to formalize the process which would for
+example to decide correctness and soundness of algorithms conveniently.
+\emph{Abstract interpretation} is a technique that has a history stretching
+back to the 1970s. Back then, it was formalized by Cousot\&Cousot in
+\cite{cousot}. It is designed so that users of the formalism are able to
+decide whether their analysis is correct, if it terminates, and to design more
+precision levels of an analysis consistently as we will see later.
 
-\subsubsection{Lattices}
-Abstract interpretation is build upon lattice theory. Let us first define
-lattice and show some examples of lattices used later.
-\begin{dfn}[Lattice]
+As the name of the analysis suggests, there is an abstraction of how values
+are handled in an analysed program. Let us show this on a demonstrative
+example. Consider a program in Figure~\ref{fig:lst_ai_intro} and an analysis
+that should decide whether \texttt{i} is even at the end (ignore overflows at
+this moment).
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+void fun(int x)
+  i = 3; (*@ \label{lst:ai_intro_set1} @*)
+  while (x)
+    i += 2; (*@ \label{lst:ai_intro_set2} @*)
+  return i;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Code used for demonstration of abstract interpretation}
+\label{fig:lst_ai_intro}
+\end{figure}
+
+First, consider an ``abstraction'' that abstracts the code in no way, i.e. we
+take concrete evaluation. There are only two lines in the code that store
+something to \texttt{i}: lines~\ref{lst:ai_intro_set1} and
+\ref{lst:ai_intro_set2}. The former simply sets \texttt{i} to \texttt{3}, so
+we just remember that. The latter, increases \texttt{i} repeatedly, so we have
+to remember \texttt{i} can be there anything from $\{3,5,7,\ldots\}$. As we can
+see we would need infinite time and memory to store all possible values from
+all possible runs of the program (to later decide oddness of the numbers).
+
+On the other hand, if we only remember abstract information such as ``this
+number is odd/even'', and define how arithmetic addition behaves on those, we
+need to store only a single value of $\{\text{even}, \text{odd},
+\text{unknown}, \text{unset}\}$.
+
+Abstract interpretation is built upon lattice theory. Let us first define
+lattice and show some examples of lattices depicted as Hasse diagrams.
+\begin{dfn}[Lattice] is a partially ordered set where arbitrary two elements
+have a least upper bound (supremum) and a greatest lower bound (infimum).
 \end{dfn}
+
+In fact, abstract interpretation is well defined also when we have as a base,
+only a semi-lattice, i.e. a lattice with only one bound for any two elements,
+supremum in particular.
+
+\begin{dfn}[Abstract interpretation] is a tuple $\mathcal{A}=(A, \leq,
+\sqsubseteq, \bot, \top, f)$, where $A$ is a semi-lattice $(A, \leq,
+\sqsubseteq, \bot, \top)$ of the abstract values (abstract domain)
+and $f$ is a transform function that changes abstract states according to
+instructions in some code.
+\end{dfn}
+
+$\gamma$ $\alpha$
 
 \subsection{Points-to Analysis}
 For languages using pointers like C, it is important to know where these
@@ -1169,16 +1220,11 @@ slicing and its variations and uses can be seen in section~\ref{sec:fmics}
 and in~\cite{slicing_survey}, of course.
 
 \subsection{Symbolic Execution}\label{sec:se}
-Theory about SE; extended to heap in S.Khurshid, C.S.Păsăreanu, and W.Visser.
-Generalized symbolic execution for model checking andtesting. In Proceedings
-of TACAS. Springer, 2003. Generalized in X.Deng, J.Lee, and Robby. Efficient
-and formal generalized symbolic execution. Automated Software Engineering,
-2011
+\cite{king}, \klee~\cite{klee} and clones. 
+Theory about SE; extended to heap~\cite{se_heap}; generalized
+in~\cite{se_gener}; for libs~\cite{se_libs}
 
-For libraries: S.Khurshid and Y.L.Suen. Generalizing symbolic execution to
-library classes. In Proceedings of PASTE. ACM, 2005.
-
-Path explosion: 1,10,12,19 z atvy.
+Path explosion: \cite{pex_ddse},\cite{G07},\cite{partial_loop},\cite{SPmCS09}.
 
 \begin{figure}[!htb]
   \begin{tabular}{ccc}
