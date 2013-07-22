@@ -13,8 +13,7 @@
 \usepackage{xspace}
 \usepackage[final]{listings}
 \usepackage{tikz}
-\usetikzlibrary{arrows,shapes}
-\usetikzlibrary{plothandlers}
+\usetikzlibrary{arrows,shapes,positioning,plothandlers}
 
 \setlength{\textwidth}{140mm}
 \setlength{\textheight}{220mm}
@@ -351,16 +350,232 @@ we need to hold its value still in a register for example). This needs going
 from backwards and propagate this information to the beginning of a function
 where the variable is defined. At each line we can see that information then.
 On the other hand to see at each line which variables are already set to any
-value, we need to propagate forwards.
+value, we need to propagate the information forwards.
 \end{itemize}
+
+\subsubsection{Code Parsing}
+While we presented the terms above directly on programming languages
+nicely readable by people, analysis are performed on an abstraction level
+better understandable by computers. There are several structures used by
+computers in code analysis. This section will describe the process of creating
+these structures from the human readable format and description of the
+structures proper.
+
+First, to be able to understand text given on input, we must know its rules of
+use. Every character, word or sentence have to have a predefined rule with
+definition of their meaning. In natural languages this is usually written down
+and marked as \emph{grammar} of that language\footnote{Not to be confused with
+formal definition of grammar at the moment.}. The same holds for computer
+programming languages. For each programming language, we have a set of rules,
+where we define allowed characters (usually basic alphabet with parenthesis,
+curly braces, and operating symbols), how words are created (what are
+identifiers, reserved words etc.) and how well-defined sentences look like
+(expressions, commands). This is accompanied with an explanation what each
+sentence mean (semantics). So when we write for example \texttt{char X;} in C,
+we know we have declared a variable which is capable to hold at least 8 bits
+(an ASCII character in other words).
+
+Each language has its more or less formally defined grammar. For C, an ISO
+standard exists~\cite{ansi_c}, the same as for C++~\cite{ansi_cpp}. This is
+not the case for Java, where the rules are defined by the Sun's
+implementation, so it is a \emph{de facto} standard. Sun tried twice to
+standardize Java, but they withdrew the drafts both times~\cite{java_non_std}.
+
+\begin{figure}[tb]
+\begin{center}
+\begin{tabular}{c}
+    \tikzstyle{stat} = [rounded corners,thick,draw,minimum size=5mm,bottom
+    color=black!15,top color=black!5]
+    \tikzstyle{phas} = [thick,draw,minimum size=8mm]
+    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+    \begin{tikzpicture}[node distance=5mm]
+        \node [stat] (S) {Source};
+        \node [phas] (LEX) [right=of S] {Lexer}
+          edge [pre] node {} (S);
+        \node [stat] (TOK) [right=of LEX] {Tokens}
+          edge [pre] node {} (LEX);
+        \node [phas] (PAR) [right=of TOK] {Parser}
+          edge [pre] node {} (TOK);
+        \node [stat] (AST) [right=of PAR] {Syntax Tree}
+          edge [pre] node {} (PAR);
+        \node [stat] (CFG) [above right=of AST] {CFG}
+          edge [pre] node {} (AST);
+        \node [stat] (OTH) [below right=of AST] {\ldots}
+          edge [pre] node {} (AST);
+    \end{tikzpicture} \\ (a) \\[3ex]
+    \begin{tabular}{cp{2em}c}
+    \begin{lstlisting}[language=C]
+void fun(int a)
+{ /* comment */
+  int b = 0;
+  if (a)
+    b = 5;
+  a = 3 * b;
+}
+    \end{lstlisting} & &
+    \begin{lstlisting}
+key:void id:fun LPAR key:int id:a RPAR
+LCUR
+  key:int id:b SEMIC
+  key:if LPAR id:c RPAR
+    id:b EQ num:5 SEMIC
+  id:a EQ num:3 MULT id:b SEMIC
+RCUR
+    \end{lstlisting} \\
+    (b) & & (c)
+    \end{tabular} \\[10ex]
+    \begin{tabular}{cc}
+    \tikzstyle{astn1} = [thick,draw,minimum size=5mm]
+    \tikzstyle{astn2} = [thick,draw,minimum size=5mm,bottom color=black!10,top
+    color=black!10]
+    \begin{tikzpicture}[level/.style={sibling distance = 2.5cm/#1,
+    level distance = 1cm}]
+      \node [astn1] {\texttt{fun}}
+	  child [sibling distance=1.8cm] { node [astn1] {\texttt{void}} }
+	  child { node [astn2] {param} 
+	    child { node [astn1] {\texttt{int}} }
+	    child { node [astn1] {\texttt{c}} }
+	  }
+	  child [sibling distance=4.2cm] { node [astn2] {body} 
+	    child [sibling distance=2cm] { node [astn2] {decl}
+	      child { node [astn1] {\texttt{int}} }
+	      child { node [astn1] {\texttt{a}} }
+	      child { node [astn1] {\texttt{b}}
+		child { node [astn1] (L_1) {\texttt{0}} }
+	      }
+	    }
+	    child [sibling distance=2cm] { node [astn1] {\texttt{if}} 
+	      child { node [astn1] (L_2) {\texttt{a}} }
+	      child { node [astn1] (L_3) {\texttt{=}}
+		child { node [astn1] {\texttt{b}} }
+		child { node [astn1] {\texttt{5}} }
+	      }
+	    }
+	    child [sibling distance=2cm] { node [astn1] (L_4) {\texttt{=}} 
+	      child { node [astn1] {\texttt{a}} }
+	      child { node [astn1] {\texttt{*}}
+		child { node [astn1] {\texttt{3}} }
+		child { node [astn1] {\texttt{b}} }
+	      }
+	    }
+	  }
+	  ;
+	  \node [red,node distance=-1mm,font=\scriptsize,above left=of L_1] {1};
+	  \node [red,node distance=-1mm,font=\scriptsize,above=of L_2] {2};
+	  \node [red,node distance=-1mm,font=\scriptsize,above=of L_3] {3};
+	  \node [red,node distance=-1mm,font=\scriptsize,above=of L_4] {4};
+    \end{tikzpicture} &
+    \tikzstyle{cfg} = [text=red,circle,thick,draw,minimum size=5mm]
+    \begin{tikzpicture}[<-,>=stealth',node distance=5mm]
+      \node (S) {};
+      \node [cfg,node distance=3mm] (L_1) [below=of S] {1}
+        edge node {} (S);
+      \node [cfg] (L_2) [below=of L_1] {2}
+        edge node {} (L_1);
+      \node [cfg] (L_3) [below left=of L_2] {3}
+        edge node {\texttt{a}} (L_2);
+      \node [cfg] (L_4) [below right=of L_3] {4}
+        edge node {\texttt{!a}} (L_2)
+        edge node {} (L_3);
+      \node [node distance=3mm,below=of L_4] {}
+        edge node {} (L_4);
+    \end{tikzpicture}
+    
+    \\ (d) & (e)
+    \end{tabular}
+\end{tabular}
+\end{center}
+    \caption{(a) Process of creating program structures computers understand
+    better than human readable source codes; (b) code example; (c) lexer
+    output; (d) abstract syntax tree; (e) control flow graph.}
+  \label{fig:parsing_process}
+\end{figure}
+
+Having the standard, we can start writing a transformer that will read
+source code in the human readable form on input and produce output which is
+easy to work with by computers/programmers. Such transofrmers are called
+\emph{parsers}.  The whole process of parsing is depicted in
+Figure~\ref{fig:parsing_process}.  As we can see there are several stages. In
+further text we will demonstrate the phases on the basis of C programming
+language.
+
+First, the input is read by \emph{lexical analyzer} (lexer) character by
+character. It consults with rules how proper words are formed by characters
+and it starts creating so-called tokens. Tokens are character sequences that
+are marked by information whether they are text, a number, reserved keyword
+(\texttt{int}, \texttt{const}, \ldots), identifier (\texttt{some\_variable}),
+or any other kind defined in the standard. We can see how this was done on our
+example in Figure~\ref{fig:parsing_process}~(c).
+
+A list of these tokens is then passed to the input of \emph{syntactic
+analyzer} (parser). It investigates the rules defined by the grammar again and
+looks whether the sentences are correct. In case they are, parsers usually
+build an \emph{abstract syntax tree} (AST). Now, all the irrelevant
+information is forgotten (abstracted) and the rest is stored in a tree as is
+depicted in Figure~\ref{fig:parsing_process}~(d). It is usual that further
+passes in the compiler pipeline add more information to the nodes of this
+tree. Note that the figure does not depict a tree of the whole program. It
+would consist of more functions, global variable declarations and so on. This
+is only a subtree corresponding to our function from the example in that
+figure.
+
+We can see that we can derive any information we need about the program from
+the AST. As an example we have built a \emph{control flow graph} (CFG) of that
+function in Figure~\ref{fig:parsing_process}~(e). Control flow graph is a
+graph where nodes contain commands and edges contain conditions on edges
+coming from branches. We can see the three commands in our example which we
+refer back to the to AST using numbers for short. The entry point of the
+function is the node with no predecessors, the exit point is the node with no
+successors and branching is a node with more than one successor. Sometimes,
+for easier explanation of an algorithm, commands are on the edges.
+
+In some projects, lexers and parsers are written by hand in the same
+programming language as the rest of the project. This can be seen in
+\texttt{gcc} compiler for example. But there also exist tools that help to
+generate lexers and parsers. Implementers just need to write down a formal
+grammar, specifiy tokens and push the button. Depending on the formal grammar
+preferred by the implementer, there are various tools. For LL(*) grammars, one
+of the most known tools is antlr~\cite{antlr4}. Flex and
+Bison~\cite{flex_bison} are used to generate LALR parsers.
 
 \subsection{State of the Art}
 This section is deserved to description and current state of techniques for
 code analysis referred to later in the text.
 
+\paragraph{Static Analysis} Under the term of static analysis we understand
+analyzing code without directly executing it on a processor. I.e. to perform
+exactly the opposite of dynamic analysis or testing where a program is
+executed and either automatically fed by some input in some form or tested
+manually by testers. This has the nice side-effect that the code need not be
+finished when we want to analyzed it statically. It does not limit static
+analysis the same the dynamic one does, it can be used whenever in the
+development cycles we want. It can be used in several fields of the computer
+science. \emph{Optimizing compilers} can eliminate unused code, propagate
+constants where variables would have to be left otherwise, or remove
+implicitly added runtime out-of-bounds checks from the code if it knows the
+bounds (as it happens in Java). \emph{Debuggers} can limit themselves only to
+code that is relevant to variables user is interested in, or print possible
+sources of values currently stored in a tracked variable. \emph{Program tests}
+can be generated based on the analysis of a program to cover more code
+paths.And of course static analysis is a prerequisite for \emph{static
+analyzers} to exist in the first place.
+
+Moreover if the static analysis is well-defined according to some rules
+defined e.g. by Cousot's framework, as we will see later, we are able to
+decide whether it is sound, complete and whether it terminates.
+
+the most ready/useful
+
+PC Lint FlexeLint PolySpace (approximate upper limit is 50kkloc) CodePro
+Analytix PREfix/PREfast Astree CodeSonar
+
+Coverity Prevent (xgcc), Extend (metal)
+
 \paragraph{Data-flow analysis}\label{sec:data-flow}
-basic principles. Basic analyses and their
-categorization~\ref{sec:types_anal}.
+One of the basic static analyses is \emph{data-flow analysis}. It collects
+information about possible values set in variables at specified points in
+code. 
+Basic analyses and their categorization~\ref{sec:types_anal}.
 
 \begin{verbatim}
      |      may    |    must
@@ -372,34 +587,12 @@ back | live        | very busy
      | variables   | expressions
 \end{verbatim}
 
-\paragraph{Static Analysis} Under the term of static analysis we understand
-analyzing code without directly executing it on a processor. This is exactly
-the opposite of dynamic analysis or testing where a program is executed and
-either automatically fed by some input in some form or tested manually bu
-testers.
-
-the most ready/useful
-
-PC Lint FlexeLint PolySpace (approximate upper limit is 50kkloc) CodePro
-Analytix PREfix/PREfast Astree CodeSonar
-
-Coverity Prevent (xgcc), Extend (metal)
-
-remove dynamic array out-of-bounds checking in java if we know the bounds.
-
-debugging purposes
-
-automatic test generation
-
-soundness + completeness
-
-works on incomplete code
-
 \paragraph{Abstract Interpretation} This is one of the static analysis
-approaches described in detail by Cousot\&Cousot in~\cite{cousot}. Values of
-variables in some program are abstracted in some specified manner. We can then
-ensure the analysis will terminate and will be correct (and sometimes sound).
-This technique will be described in detail in section~\ref{sec:ai}.
+approaches established by Cousot\&Cousot in~\cite{cousot}. Values of variables
+in some program are abstracted in some specified manner. We can then ensure
+the analysis will terminate and will be correct mostly at the price of
+precision loss. This technique will be described in detail later in
+section~\ref{sec:ai}.
 
 \paragraph{Symbolic Execution}
 It will be described in detail in section~\ref{sec:se}.
@@ -415,13 +608,56 @@ section~\ref{sec:slicing}.
 
 \paragraph{Model Checking} \todo{Honzo, toto prosim precti, jestli neblabolim.}
 This is a bit different technique from static analysis we are dealing in this
-thesis with. It does not take the program proper, but instead tries to prove
-some properties on a model of the program. Temporal and safety. XXX
+thesis with. It does not check the program proper, but instead tries to prove
+some properties on a model of the program. The model is represented by some
+finite state machine and the properties are a specified behaviour which has to
+be satisfied in time. For example a property can be ,,This message has to come
+as a reply in the future.'' Properties are described by logic formulas,
+usually in the temporal logic like LTL or CTL (see more about temporal logics
+in~\cite{temporal}). Correctness of the system is then established, if every
+run of the system corresponds to a particular formula. If it does not for some
+case, a counterexample consisting of system states is generated. Obviously,
+even if no counterexample is generated, the system still might not be correct
+in case its model or properties checked are incorrect.
 
-Description of each technique, (bounded~\cite{bmc_survey})
-model-checking~\cite{mc_survey} inclusive.
+These technique was spread even after introduction of \emph{symbolic model
+checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets of
+states by boolean functions. For example if we have two 1-bit wide variables
+\texttt{a} and \texttt{b} and their values are always the same (1 and 1 or 0
+and 0 pairwise), we can represent it by a formula \texttt{a} $\Leftrightarrow$
+\texttt{b} instead of storing all the values. The formulas can be represented
+in a space-saving way by \emph{Reduced Ordered Binary Decision
+Diagrams}~\cite{bdd} (ROBDD or simply BDD) were introduced to represent the
+set of states. Despite the exponential complexity still persists (due to path
+explosion problem), BDDs helped to limit the memory use a lot. Both symbolic
+model checking and BDDs allowed more complex systems to be checked on the same
+hardware (cf.~\cite{mc_symbolic1} again).
 
-E. M. Clarke, O. Grumberg and D.  A.  Peled. Model checking. MIT Press, 1999.
+In parallel to BDDs-based model checking, \emph{bounded model checking}
+exists. Instead of exploring the whole state space of the system model, there
+is a predefined constant \textit{k} which determines the maximum length of
+execution to be explored. If it explores all these \textit{k}-prefixes, either
+\textit{k} is incremented and the checking continues, or the model checker is
+stopped. It can have two reasons: the user set the top bound for \textit{k}
+(the analysis is of course incomplete in that case), or the execution is
+infeasible, because it runs out of resources. Model checking and bounded model
+checking are orthogonal techniques, it was shown in ~\cite{bmc_survey} that
+both of them reason about different class of properties.
+
+Due to path explosion problem and slow computers in the past, its use was
+limited rather to check small reactive systems in industry like processors or
+automotive control systems. Later, there appeared both less and more
+successful tools to check large software projects.  For example model checker
+\textsc{Blast}~\cite{blast} failed due to inability to reason about pointers
+in the Linux kernel drivers~\cite{blast_kernel}. On the other hand Microsoft
+started adopting their model checker \textsc{SLAM} and driver
+verifier~\cite{sdv} for checking Windows drivers and they apparently succeeded
+as they require every driver to be checked by this toolkit with predefined
+temporal rules before it is accepted.
+
+As this thesis does not deal with this type of analysis, curious readers are
+pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
+to~\cite{bmc_survey} about bounded model checking.
 
 \subsection{Specifics of the Large Projects}
 Real code; not easy to parse; handle information in memory; inter-procedural
