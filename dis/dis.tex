@@ -128,10 +128,13 @@ should not at least try hard for non-general cases. Companies have been always
 using techniques helping to avoid and remove errors from their programs.
 Even some kind of \emph{standardization} of used coding principles like code
 reviews or dictated coding style may reduce the number of introduced
-errors~\cite{topten}. For example, on embedded systems we can disable heap
-allocations to weed out all memory leaks. Or, some companies started adopting
-the ISO~9001:2000 standard to prove their internal management conforms to a
-standardized behaviour that tries to increase quality of their products.
+errors~\cite{topten}. The reason may be simpler code forced by a project
+management. They can ban complex constructs often leading to errors. Another
+example might be embedded systems where we can disable heap allocations and
+weed out one whole category of programming errors -- memory leaks. Some
+companies also started adopting standards like ISO~9001:2000. Their customers
+may be assured that the internal management of such company conforms to a
+standardized behaviour that tries to increase quality of developed products.
 
 Standardization cannot by definition evade programming errors completely.
 Since the early times of computer technology, programmers in companies, or
@@ -147,7 +150,10 @@ by so-called \emph{unit tests}. However tests, especially the manually written
 ones, often do not cover all possible paths in the program. Actually, it was
 shown in~\cite{klee} that a set of unit tests developed for over fifteen years
 can be augmented by 16 more per cents using automatic sophisticated techniques
-for tests generation.
+for tests generation. On the other hand, when an error is reported, it is
+guaranteed to be genuine. Dynamic testing cannot generate false positives,
+because we run the code in real-time with real data (if we look aside from
+broken hardware misdemeanour).
 
 \emph{Compilers} can help to warn about many primitive errors introduced into
 a program by a programmer. However compilers are designed to be really fast in
@@ -156,30 +162,32 @@ many warnings reported by compilers are rather by-products of performed
 optimizations and \emph{data-flow analyses} needed for the intermediate
 compilation phases. We have to emphasize that these kinds of checks got
 introduced even by optimizing compilers, they were not in the prior compilers
-at all. Separate \emph{lint-like} projects that used to fill this gap were
-widespread at that time instead. These were based also on the data-flow
-analysis, but mostly they were more computationally expensive and were giving
-more accurate results with more reports overall. These were the first attempts
-of \emph{static program testing} to stir the problems of finding errors in
-programs automatically, possibly in the early phases of development,
-and more importantly in the whole program and without the urge of dynamic
-execution.
+at all. Separate \emph{Lint-like} projects that used to fill this gap were
+widespread at that time instead. These were based on pattern matching and also
+on the data-flow analysis, but mostly they were more computationally expensive
+and were giving more accurate results with more reports overall. These were
+the first attempts of \emph{static program testing} to stir the problems of
+finding errors in programs automatically, possibly in the early phases of
+development, and more importantly in the whole program and without the urge of
+dynamic execution. The downside of the techniques often is the presence of
+reports that are not real. The code paths that an analyzer thinks exists in
+the code in fact do not. Mostly because analyzers in some sort ignore context.
+The tools suggest programmers to annotate the code, so that the tools have
+clues and can thus eliminate some of the false reports. 
 
 In fact, much more sophisticated techniques like~\cite{cousot, king} were
-described theoretically couple of years before \textsc{Lint} was presented.
+described theoretically couple years before \textsc{Lint} was presented.
 However they came of real use even lately, when computers become powerful
 enough to finish computation of such analyses in reasonable time.  Now, having
 the computation power and multi-processor (thousand cores are not exceptions
 today) machines, we witness a rapid improvement of the situation over the past
-two decades. We could also see many new techniques emerging.
-\todo{coding policy helps so static analyzers -- simpler code}
-
-Many of those were adopted or even developed by companies to make their
-products safer. For example Microsoft introduced SDV toolkit~\cite{sdv} based
-on \textsc{Slam} to improve situation around Windows drivers, and
-\textsc{Sage}~\cite{sage} which found errors in core Windows parts like a
-parser for cursor files. Other companies like Coverity, Grammatech, Klocwork,
-or MathWorks presented their products~\cite{coverity, codesonar, klocwork,
+two decades. We could also see many new techniques emerging. Many of those
+were adopted or even developed by companies to make their products safer. For
+example Microsoft introduced SDV toolkit~\cite{sdv} based on \textsc{Slam} to
+improve situation around Windows drivers, and \textsc{Sage}~\cite{sage} which
+found errors in core Windows parts like a parser of cursor files. Other
+companies like Coverity, Gimpel Software, Grammatech, Klocwork, or MathWorks
+presented their products~\cite{coverity, pclint, codesonar, klocwork,
 polyspace} to offer a service to check code of their customers. Although some
 of the companies also check open source code like the Linux
 kernel\footnote{\url{http://scan.coverity.com/}} or core system libraries,
@@ -221,18 +229,24 @@ of operating systems, but also user space programs in this respect.
 On the other hand operating system kernels should generally be error-free more
 than the others, because even a minor error would allow an arbitrary attacker
 to obtain administrator privileges on a machine running such a vulnerable
-system.  Examples of such errors are in~\cite{exploit_vmsplice,
-exploit_proto_ops, exploit_userns}. Then, the attackers can steal whatever
-data they want. And yet it is way easier to gain access to other machines in
-the same network, than attacking same machines from outside\footnote{There are
-usually no managed firewalls for the traffic flowing among computers inside
-one subnetwork for example.}. There are many operating system kernels. We can
-think of BSDs (NetBSD, FreeBSD, OpenBSD, \ldots), GNU Hurd, Linux, Mac OS,
-Minix, Windows, and many others.  Nevertheless, we have to limit ourselves to
-those, which are freely available, their source code inclusive, which are used
-widely and which have considerably large source code base. The Linux kernel
-fits our requirements in particular, because it is a large open-source project
-running on zillion machines over the world.
+system or crash it. For such \emph{denial of service} (DoS) it sometimes
+suffices to write a ``killer'' string to a special file or even send a packet
+with a specific structure over the network. Note the attacker can do it
+remotely from a place thousands miles far away. Examples of such errors are
+in~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns} or
+\cite[p.0x400]{hacking}, more to be
+found at National Vulnerability Database~\cite{nvd}.  Then, the attackers can
+steal whatever data they want.  And yet it is way easier to gain access to
+other machines in the same network, than attacking same machines from
+outside\footnote{There are usually no managed firewalls for the traffic
+flowing among computers inside one subnetwork for example.}. There are many
+operating system kernels. We can think of BSDs (NetBSD, FreeBSD, OpenBSD,
+\ldots), GNU Hurd, Linux, Mac OS, Minix, Windows, and perhaps many others.
+Nevertheless, we have to limit ourselves to those, which are freely available,
+their source code inclusive, which are used widely and which have considerably
+large source code base. The Linux kernel fits our requirements in particular,
+because it is a large open-source project running on zillion machines over the
+world.
 
 \subsection{Background}
 This section is devoted to introduce the reader into the terms we use
@@ -564,7 +578,7 @@ regard to this. For LL(*) grammars, one of the most known tools is
 antlr~\cite{antlr4}. Flex and Bison~\cite{flex_bison} are used to generate LR
 parsers. This introduction does not pretend to be complete as we do not need
 more information for the purposes of this thesis; more on parsers can be
-learnt from~\cite{dragon}.
+learnt from~\cite{dragon,muchnick}.
 
 \subsection{State of the Art}
 This section is deserved to description and current state of techniques for
@@ -594,13 +608,21 @@ decide whether it is sound, complete and whether it terminates. Without those
 properties, optimizing compilers would generate invalid code for example.
 
 the most ready/useful\todo{XXX}
+There are many successful tools based on static analysis. 
+Unfortunately it is
+not really known 
 
 PC Lint FlexeLint PolySpace (approximate upper limit is 50kkloc) CodePro
 Analytix PREfix/PREfast Astree CodeSonar
 
 Coverity Prevent (xgcc), Extend (metal)
 
-\paragraph{Data-flow analysis}\label{sec:data-flow}
+\paragraph{Pattern Matching}\label{sec:pattern_matching}
+The simplest analysis is to check code for some patterns. We can take
+\texttt{grep} regular expression pattern matcher give it a pattern for ``/ 0''
+and see if we did that stupid zero division error somewhere in the code.
+
+\paragraph{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
 information about possible values set in variables at specified points in
 code. This is usually computed by stabilizing sets of equations, i.e.
@@ -695,12 +717,15 @@ Very busy expr. & Must & B   & $\bigcap$ & Y & None           & All expr. \\
   \label{fig:data_flow_examples}
 \end{figure}
 
-In Figure~\ref{fig:data_flow_examples}, we show examples of analyses of a
-different kind and how they are (informally) defined. Note that in some
+In Figure~\ref{fig:data_flow_examples}, we show examples of basic analyses of
+a different kind and how they are (informally) defined. Note that in some
 analyses, the sets are not called $gen$ and $kill$, but the principle is the
 same. Also we can see the tight correspondence between may/must and $join$
 operator and between forwards/backwards and switching of $in$ and $out$ sets.
-For further reading of data-flow analyses, use~\cite{dragon}.
+This was only an introduction to data-flow analysis, for further reading,
+use~\cite{dragon, muchnick}.
+
+Data-flow analysis forms a base for optimizing compilers. It is used in 
 
 \paragraph{Abstract Interpretation} This is one of the static analysis
 approaches established by Cousot\&Cousot in~\cite{cousot}. Values of variables
@@ -905,6 +930,18 @@ instructions in some code.
 \end{dfn}
 
 $\gamma$ $\alpha$
+
+Cousots laid down the foundation for others. It slowly stopped being
+extensively used, but it attracted attention again in 2000. It was thanks to
+the work of Engler et al. on a meta compilation based technique described
+in~\cite{metacomp}. There, program developers specify properties of the system
+in \textsc{Metal}~\cite{metal} language, compile it into an internal
+representation and the tool applies the specification on all executable paths
+in a particular function. Violation of the specification on a path is then
+reported as an error. The compiler used for \textsc{Metal} compilation is a
+modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
+redefines \textsc{gcc}'s internal code representation, data types and applies
+the analysis on a such modified structure.
 
 \subsection{Points-to Analysis}
 For languages using pointers like C, it is important to know where these
@@ -1565,6 +1602,9 @@ where it does not work.
 \section{FMICS}\label{sec:fmics}
 Example of false-negatives/positives -- where it does not work, description of
 where it does not work.
+
+\subsection{LLVM Points-to Analysis}
+field-sensitivity using GEP
 
 \subsection{Slicing}\label{sec:slicing}
 Theory about slicing XXX \ldots
