@@ -250,9 +250,11 @@ world.
 
 \subsection{Background}
 This section is devoted to introduce the reader into the terms we use
-throughout the thesis. Every implemented analysis has some properties.  There
-are properties that are interesting for users when deciding which of the
-available implementations to choose for their project. 
+throughout the thesis. First, since every implemented analysis has some
+properties, we describe the interesting ones. They are usually looked at when
+deciding which of the available implementations to choose for a project.
+Second, there is a small introduction to code parsing as we deal with source
+codes in this thesis and we indeed need to parse them.
 
 \subsubsection{Formal Parameters}\label{sec:formal_params}
 Usually, an important parameter for users of an analysis is to know whether
@@ -580,7 +582,43 @@ parsers. This introduction does not pretend to be complete as we do not need
 more information for the purposes of this thesis; more on parsers can be
 learnt from~\cite{dragon,muchnick}.
 
-\subsection{State of the Art}
+\subsection{Specifics of the Large Projects}
+Real code; not easy to parse; handle information in memory; inter-procedural
+analyses; speed of the analyzer has to be relatively high
+
+\subsubsection{Linux Kernel}
+self-contained code; call to be bug-free, otherwise
+exploitable~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}
+
+\subsection{Checking the Linux Kernel}
+Projects/software used for checking the Linux kernel.
+
+\stan~\cite{stanse}, projects like LDV (ISPRAS), Coverity~\cite{coverity},
+\textsc{Cppcheck}~\cite{cppcheck}, \clang~\cite{clang}, \sparse~\cite{sparse}
+
+\subsection{The Goals}
+The primary goal of this thesis is to research deployment of static analysis
+on large, critical, software projects. In particular, we aim specifically at
+the Linux kernel in some sections. We considered contemporary approaches used
+for code analysis and tried to apply them to a large code base. Based on the
+results we obtain, we would like to discuss pros and cons of the techniques.
+This will result either in a design of new techniques or improvement of the
+contemporary ones (or both).
+
+\paragraph{Thesis Organization}
+In the following section~\ref{sec:state} we deal with description of
+techniques and their current state of the art.  In section~\ref{sec:stanse},
+we discuss abstract interpretation, how we implemented it in our tool and its
+pros and cons. We continue in section \ref{sec:fmics} by an approach to
+eliminate false positive resulting from abstract interpretation analysis.
+Section \ref{sec:clabure} then draws a comparison\todo{really?} of different
+approaches including the two described in preceding sections. Section
+\ref{sec:svcomp} shows successes of a tool described in section
+\ref{sec:fmics} in a software competition. Finally, we conclude with summaries
+of what we have done.
+
+\newpage
+\section{State of the Art}\label{sec:state}
 This section is deserved to description and current state of techniques for
 code analysis referred to later in the text.
 
@@ -617,12 +655,12 @@ Analytix PREfix/PREfast Astree CodeSonar
 
 Coverity Prevent (xgcc), Extend (metal)
 
-\paragraph{Pattern Matching}\label{sec:pattern_matching}
+\subsection{Pattern Matching}\label{sec:pattern_matching}
 The simplest analysis is to check code for some patterns. We can take
 \texttt{grep} regular expression pattern matcher give it a pattern for ``/ 0''
 and see if we did that stupid zero division error somewhere in the code.
 
-\paragraph{Data-flow Analysis}\label{sec:data-flow}
+\subsection{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
 information about possible values set in variables at specified points in
 code. This is usually computed by stabilizing sets of equations, i.e.
@@ -727,145 +765,15 @@ use~\cite{dragon, muchnick}.
 
 Data-flow analysis forms a base for optimizing compilers. It is used in 
 
-\paragraph{Abstract Interpretation} This is one of the static analysis
-approaches established by Cousot\&Cousot in~\cite{cousot}. Values of variables
-in some program are abstracted in some specified manner. We can then ensure
-the analysis will terminate and will be correct mostly at the price of
-precision loss. This technique will be described in detail later in
-section~\ref{sec:ai}.
-
-\paragraph{Symbolic Execution}
-Another analysis this thesis deals with is \emph{symbolic execution}. Instead
-of trying to analyze a program zillion times with concrete, initialized, data,
-symbolic execution represents program inputs by symbolic values. The program
-is then executed and program expressions are manipulated including the
-symbolic values. \code{a = read()} no longer means we have to . Symbolic execution will be described in detail in
-section~\ref{sec:se}.
-
-\paragraph{Slicing} Slicing was first described in~\cite{slicing}. It is a
-technique to eliminate unneeded lines of code from a program. This is always
-computed with respect to some code location and variables which we are
-interested in at that place. Only the code that can affect the variables there
-is left in the program. This is for example useful for debugging purposes to
-understand how values are propagated to a variable. The location and variables
-are called \emph{slicing criteria}. It will be described in detail in
-section~\ref{sec:slicing}.
-
-\paragraph{Model Checking} \todo{Honzo, toto prosim precti, jestli neblabolim.}
-This is a bit different technique from static analysis we are dealing in this
-thesis with. It does not check the program proper, but instead tries to prove
-some properties on a model of the program. The model is represented by some
-finite state machine and the properties are a specified behaviour which has to
-be satisfied in time. For example a property can be ,,This message has to come
-as a reply in the future.'' Properties are described by logic formulas,
-usually in the temporal logic like LTL or CTL (see more about temporal logics
-in~\cite{temporal}). Correctness of the system is then established, if every
-run of the system corresponds to a particular formula. If it does not for some
-case, a counterexample consisting of system states is generated. Obviously,
-even if no counterexample is generated, the system still might not be correct
-in case its model or properties checked are incorrect.
-
-These technique was spread even after introduction of \emph{symbolic model
-checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets of
-states by boolean functions. For example if we have two 1-bit wide variables
-\texttt{a} and \texttt{b} and their values are always the same (1 and 1 or 0
-and 0 pairwise), we can represent it by a formula \texttt{a} $\Leftrightarrow$
-\texttt{b} instead of storing all the values. The formulas can be represented
-in a space-saving way by \emph{Reduced Ordered Binary Decision
-Diagrams}~\cite{bdd} (ROBDD or simply BDD) were introduced to represent the
-set of states. Despite the exponential complexity still persists (due to path
-explosion problem), BDDs helped to limit the memory use a lot. Both symbolic
-model checking and BDDs allowed more complex systems to be checked on the same
-hardware (cf.~\cite{mc_symbolic1} again).
-
-In parallel to BDDs-based model checking, \emph{bounded model checking}
-exists. Instead of exploring the whole state space of the system model, there
-is a predefined constant \textit{k} which determines the maximum length of
-execution to be explored. If it explores all these \textit{k}-prefixes, either
-\textit{k} is incremented and the checking continues, or the model checker is
-stopped. It can have two reasons: the user set the top bound for \textit{k}
-(the analysis is of course incomplete in that case), or the execution is
-infeasible, because it runs out of resources. Model checking and bounded model
-checking are orthogonal techniques, it was shown in ~\cite{bmc_survey} that
-both of them reason about different class of properties.
-
-Due to path explosion problem and slow computers in the past, its use was
-limited rather to check small reactive systems in industry like processors or
-automotive control systems. Later, there appeared both less and more
-successful tools to check large software projects.  For example model checker
-\textsc{Blast}~\cite{blast} failed due to inability to reason about pointers
-in the Linux kernel drivers~\cite{blast_kernel}. On the other hand Microsoft
-started adopting their model checker \textsc{SLAM} and driver
-verifier~\cite{sdv} for checking Windows drivers and they apparently succeeded
-as they require every driver to be checked by this toolkit with predefined
-temporal rules before it is accepted.
-
-As this thesis does not deal with this type of analysis, curious readers are
-pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
-to~\cite{bmc_survey} about bounded model checking.
-
-\subsection{Specifics of the Large Projects}
-Real code; not easy to parse; handle information in memory; inter-procedural
-analyses; speed of the analyzer has to be relatively high
-
-\subsubsection{Linux Kernel}
-self-contained code; call to be bug-free, otherwise
-exploitable~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}
-
-\subsection{Checking the Linux Kernel}
-Projects/software used for checking the Linux kernel.
-
-\stan~\cite{stanse}, projects like LDV (ISPRAS), Coverity~\cite{coverity},
-\textsc{Cppcheck}~\cite{cppcheck}, \clang~\cite{clang}, \sparse~\cite{sparse}
-
-\subsection{The Goals}
-The primary goal of this thesis is to research deployment of static analysis
-on large, critical, software projects. In particular, we aim specifically at
-the Linux kernel in some sections. We considered contemporary approaches used
-for code analysis and tried to apply them to a large code base. Based on the
-results we obtain, we would like to discuss pros and cons of the techniques.
-This will result either in a design of new techniques or improvement of the
-contemporary ones (or both).
-
-\paragraph{Thesis Organization} In section \ref{sec:stanse}, we discuss
-abstract interpretation, how we implemented it in our tool and its pros and
-cons. We continue in section \ref{sec:fmics} by an approach to eliminate false
-positive resulting from abstract interpretation analysis. Section
-\ref{sec:clabure} then draws a comparison\todo{really?} of different
-approaches including the two described in preceding sections. Section
-\ref{sec:svcomp} shows successes of a tool described in section
-\ref{sec:fmics} in a software competition. Finally, we conclude with summaries
-of what we have done.
-
-
-
-\newpage
-\section{Stanse}\label{sec:stanse}
-At the beginning of the PhD studies, we were surveying the current known
-techniques used for software checking. Of course many techniques were available
-and some software projects were in the development. One of the papers to
-really stir interest was~\cite{metacomp}, showing that static analysis can
-efficiently find many interesting bugs in real-world code.  This work
-eventually led to a successful commercial tool called
-\textsc{Coverity Prevent}~\cite{coverity}. Over the years, several other
-successful tools, like \textsc{CodeSonar}~\cite{codesonar} or
-\textsc{Klocwork}~\cite{klocwork}, appeared.  However, such fully-featured
-tools are neither free to obtain, nor is their code available (e.g.~for
-developing new algorithms or tailoring the existing tools to specific tasks).
-The existing free tools are usually severely limited in what they can do,
-especially when it comes to checking real-world C code such as the Linux kernel
-(e.g.~\textsc{Uno}~\cite{uno}, \textsc{Sparse}~\cite{sparse},
-\textsc{Smatch}~\cite{smatch}).  One notable exception is
-\textsc{FindBugs}~\cite{findbugs}, a successful tool, but working solely on
-Java code.
-
-We decided to implement an open source program for finding bugs aimed at
-checking the kernel. We were inspired by success of
-\textsc{xgcc}~\cite{metacomp} and its property-description language
-\textsc{Metal}~\cite{metal}. In this section we follow the development of the
-tool including the theory behind and report of successes and failures.
 
 \subsection{Abstract Interpretation}\label{sec:ai}
+This is one of the static analysis approaches established by Cousot\&Cousot
+in~\cite{cousot}. Values of variables in some program are abstracted in some
+specified manner. We can then ensure the analysis will terminate and will be
+correct mostly at the price of precision loss. 
+
+\todo{XXX}
+
 Data-flow analysis is only a limited tool for deciding some properties about
 the analysis. There was a call to formalize the process which would for
 example to decide correctness and soundness of algorithms conveniently.
@@ -941,7 +849,157 @@ in a particular function. Violation of the specification on a path is then
 reported as an error. The compiler used for \textsc{Metal} compilation is a
 modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
 redefines \textsc{gcc}'s internal code representation, data types and applies
-the analysis on a such modified structure.
+the analysis on a such modified structure. Programming languages supported by
+\textsc{xgcc} are C and C++.
+
+\subsection{Symbolic Execution}\label{sec:se}
+Another analysis this thesis deals with is \emph{symbolic execution}. Instead
+of trying to analyze a program zillion times with concrete, initialized, data,
+symbolic execution represents program inputs by symbolic values. The program
+is then executed and program expressions are manipulated including the
+symbolic values. \code{a = read()} no longer means we have to .\todo{XXX}
+
+\cite{king}, \klee~\cite{klee} and clones. 
+Theory about SE; extended to heap~\cite{se_heap}; generalized
+in~\cite{se_gener}; for libs~\cite{se_libs}
+
+Path explosion: \cite{pex_ddse},\cite{G07},\cite{partial_loop},\cite{SPmCS09}.
+
+\begin{figure}[!htb]
+  \begin{tabular}{ccc}
+  TBD & TBD & TBD
+%    \hspace{-4ex}\input{fig_linSrch} &
+%    \hspace{-4.5ex}\input{fig_linSrchSET} &
+%    \hspace{-1.5ex}\input{fig_linSrchCSET}
+  \end{tabular}
+  \caption{(a) A flowgraph \texttt{linSrch(A,n,x)}. (b) Classic symbolic
+    execution tree of \texttt{linSrch}. (c) Compact symbolic execution tree
+    of \texttt{linSrch}.}
+  \label{fig:linSrch}
+\end{figure}
+
+Symbolic execution runs a program over \emph{symbols} representing arbitrary
+input values. For each input variable $\code{v}$, we denote a symbol passed
+to it as $\sym{v}$. A \emph{program state} is a triple $(l,\theta,\varphi)$
+consisting of a current program location $l$ in the flowgraph, a
+\emph{symbolic memory} $\theta$, and a \emph{path condition}
+$\varphi$. $\theta$ assigns to each program variable its current symbolic
+value, i.e.~an expression over the symbols. For example, if the first
+instruction of a program is the assignment \texttt{i:=2*n+x}, then
+$\theta(\code{i})=2\sym{n}+\sym{x}$ after its execution. The path condition
+$\varphi$ is a quantifier-free first order logic formula representing a
+necessary and sufficient condition on symbols to drive the execution along
+the currently executed path. $\varphi$ is initially $\true$ and it can be
+updated at program branchings. For example, in a location with two out-edges
+labelled by \texttt{x>n+5} and \texttt{x<=n+5}, we instantiate the
+conditions with use of the current $\theta$ and we check whether the current
+path condition $\varphi$ implies their validity. Namely, we ask for validity
+of implications $\varphi \rightarrow \theta(\code{x}) > \theta(\code{n}) + 5$
+and $\varphi \rightarrow \theta(\code{x}) \leq \theta(\code{n}) + 5$.
+%\[
+%\varphi\implies(\theta(\code{x})>\theta(\code{n})+5)
+%~~~~~~~\textrm{and}~~~~~~~
+%\varphi\implies(\theta(\code{x})\le\theta(\code{n})+5).
+%\] 
+If the first implication is valid, the symbolic execution continues along
+the first branch. If the second implication is valid, the symbolic execution
+continues along the second branch. If none of them is valid, it means that
+we can follow either of the two branches.  Hence, the symbolic execution
+forks in order to execute both branches.  In this case, we update the path
+condition on the first branch to $\varphi \wedge \theta(\code{x}) >
+\theta(\code{n}) + 5$ and the one on the second branch to $\varphi \wedge
+\theta(\code{x}) \leq \theta(\code{n}) + 5$. Note that the whole program state
+is forked into two states in this case.
+
+Due to the forks, symbolic execution is traditionally represented by a tree
+called \emph{classic symbolic execution tree}. Nodes of the tree are
+labelled by program states computed during the execution.
+% \todo{For brevity of notation, we identify nodes with program states
+% labelling them.}
+Edges of the tree correspond to transitions between program states labelling
+their end nodes. In Figure~\ref{fig:linSrch}(b), there is a classic symbolic
+execution tree of the flowgraph from Figure~\ref{fig:linSrch}(a). For
+readability of figures, nodes are not labelled by program states, but only
+by the current location in the flowgraph. In addition, we label branching
+edges by instances of the corresponding branching conditions in the
+flowgraph. These labels allow us to reconstruct the path condition for each
+node in the tree: it is the conjunction of labels of all edges along the
+path from the root to the node. Note that contents of symbolic memories are
+not depicted in the figure.
+
+
+\subsection{Slicing}\label{sec:slicing}
+Slicing was first described in~\cite{slicing}. It is a technique to eliminate
+unneeded lines of code from a program. This is always computed with respect to
+some code location and variables which we are interested in at that place.
+Only the code that can affect the variables there is left in the program. This
+is for example useful for debugging purposes to understand how values are
+propagated to a variable. The location and variables are called \emph{slicing
+criteria}.
+
+Theory about slicing XXX \ldots
+
+The main two branches of slicing are \emph{dynamic} and \emph{static}. The
+former considers one concrete input when computing the slice and may
+potentially result in more sliced code. Static slicing on the other hand
+computes the slice generally, with no input restrictions. More details about
+slicing and its variations and uses can be seen in section~\ref{sec:fmics}
+and in~\cite{slicing_survey}, of course.
+
+
+\subsection{Model Checking} \todo{Honzo, toto prosim precti, jestli neblabolim.}
+This is a bit different technique from static analysis we are dealing in this
+thesis with. It does not check the program proper, but instead tries to prove
+some properties on a model of the program. The model is represented by some
+finite state machine and the properties are a specified behaviour which has to
+be satisfied in time. For example a property can be ,,This message has to come
+as a reply in the future.'' Properties are described by logic formulas,
+usually in the temporal logic like LTL or CTL (see more about temporal logics
+in~\cite{temporal}). Correctness of the system is then established, if every
+run of the system corresponds to a particular formula. If it does not for some
+case, a counterexample consisting of system states is generated. Obviously,
+even if no counterexample is generated, the system still might not be correct
+in case its model or properties checked are incorrect.
+
+These technique was spread even after introduction of \emph{symbolic model
+checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets of
+states by boolean functions. For example if we have two 1-bit wide variables
+\texttt{a} and \texttt{b} and their values are always the same (1 and 1 or 0
+and 0 pairwise), we can represent it by a formula \texttt{a} $\Leftrightarrow$
+\texttt{b} instead of storing all the values. The formulas can be represented
+in a space-saving way by \emph{Reduced Ordered Binary Decision
+Diagrams}~\cite{bdd} (ROBDD or simply BDD) were introduced to represent the
+set of states. Despite the exponential complexity still persists (due to path
+explosion problem), BDDs helped to limit the memory use a lot. Both symbolic
+model checking and BDDs allowed more complex systems to be checked on the same
+hardware (cf.~\cite{mc_symbolic1} again).
+
+In parallel to BDDs-based model checking, \emph{bounded model checking}
+exists. Instead of exploring the whole state space of the system model, there
+is a predefined constant \textit{k} which determines the maximum length of
+execution to be explored. If it explores all these \textit{k}-prefixes, either
+\textit{k} is incremented and the checking continues, or the model checker is
+stopped. It can have two reasons: the user set the top bound for \textit{k}
+(the analysis is of course incomplete in that case), or the execution is
+infeasible, because it runs out of resources. Model checking and bounded model
+checking are orthogonal techniques, it was shown in~\cite{bmc_survey} that
+both of them reason about different class of properties. (Although there can
+be an intersection.)
+
+Due to path explosion problem and slow computers in the past, its use was
+limited rather to check small reactive systems in industry like processors or
+automotive control systems. Later, there appeared both less and more
+successful tools to check large software projects. For example model checker
+\textsc{Blast}~\cite{blast} failed due to inability to reason about pointers
+in the Linux kernel drivers~\cite{blast_kernel}. On the other hand Microsoft
+started adopting their model checker \textsc{SLAM} and driver
+verifier~\cite{sdv} for checking Windows drivers and they apparently succeeded
+as they require every driver to be checked by this toolkit with predefined
+temporal rules before it is accepted.
+
+As this thesis does not deal with this type of analysis, curious readers are
+pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
+to~\cite{bmc_survey} about bounded model checking.
 
 \subsection{Points-to Analysis}
 For languages using pointers like C, it is important to know where these
@@ -1003,6 +1061,33 @@ structures in natural sense, but for a higher computation price, of course.
 
 There are many different known approaches to pointer analysis, differing in
 speed and accuracy.
+
+
+\newpage
+\section{Stanse}\label{sec:stanse}
+At the beginning of the PhD studies, we were surveying the current known
+techniques used for software checking. Of course many techniques were available
+and some software projects were in the development. One of the papers to
+really stir interest was~\cite{metacomp}, showing that static analysis can
+efficiently find many interesting bugs in real-world code.  This work
+eventually led to a successful commercial tool called
+\textsc{Coverity Prevent}~\cite{coverity}. Over the years, several other
+successful tools, like \textsc{CodeSonar}~\cite{codesonar} or
+\textsc{Klocwork}~\cite{klocwork}, appeared.  However, such fully-featured
+tools are neither free to obtain, nor is their code available (e.g.~for
+developing new algorithms or tailoring the existing tools to specific tasks).
+The existing free tools are usually severely limited in what they can do,
+especially when it comes to checking real-world C code such as the Linux kernel
+(e.g.~\textsc{Uno}~\cite{uno}, \textsc{Sparse}~\cite{sparse},
+\textsc{Smatch}~\cite{smatch}).  One notable exception is
+\textsc{FindBugs}~\cite{findbugs}, a successful tool, but working solely on
+Java code.
+
+We decided to implement an open source program for finding bugs aimed at
+checking the kernel. We were inspired by success of
+\textsc{xgcc}~\cite{metacomp} and its property-description language
+\textsc{Metal}~\cite{metal}. In this section we follow the development of the
+tool including the theory behind and report of successes and failures.
 
 \subsection{The Tool}
 
@@ -1605,85 +1690,6 @@ where it does not work.
 
 \subsection{LLVM Points-to Analysis}
 field-sensitivity using GEP
-
-\subsection{Slicing}\label{sec:slicing}
-Theory about slicing XXX \ldots
-
-The main two branches of slicing are \emph{dynamic} and \emph{static}. The
-former considers one concrete input when computing the slice and may
-potentially result in more sliced code. Static slicing on the other hand
-computes the slice generally, with no input restrictions. More details about
-slicing and its variations and uses can be seen in section~\ref{sec:fmics}
-and in~\cite{slicing_survey}, of course.
-
-\subsection{Symbolic Execution}\label{sec:se}
-\cite{king}, \klee~\cite{klee} and clones. 
-Theory about SE; extended to heap~\cite{se_heap}; generalized
-in~\cite{se_gener}; for libs~\cite{se_libs}
-
-Path explosion: \cite{pex_ddse},\cite{G07},\cite{partial_loop},\cite{SPmCS09}.
-
-\begin{figure}[!htb]
-  \begin{tabular}{ccc}
-  TBD & TBD & TBD
-%    \hspace{-4ex}\input{fig_linSrch} &
-%    \hspace{-4.5ex}\input{fig_linSrchSET} &
-%    \hspace{-1.5ex}\input{fig_linSrchCSET}
-  \end{tabular}
-  \caption{(a) A flowgraph \texttt{linSrch(A,n,x)}. (b) Classic symbolic
-    execution tree of \texttt{linSrch}. (c) Compact symbolic execution tree
-    of \texttt{linSrch}.}
-  \label{fig:linSrch}
-\end{figure}
-
-Symbolic execution runs a program over \emph{symbols} representing arbitrary
-input values. For each input variable $\code{v}$, we denote a symbol passed
-to it as $\sym{v}$. A \emph{program state} is a triple $(l,\theta,\varphi)$
-consisting of a current program location $l$ in the flowgraph, a
-\emph{symbolic memory} $\theta$, and a \emph{path condition}
-$\varphi$. $\theta$ assigns to each program variable its current symbolic
-value, i.e.~an expression over the symbols. For example, if the first
-instruction of a program is the assignment \texttt{i:=2*n+x}, then
-$\theta(\code{i})=2\sym{n}+\sym{x}$ after its execution. The path condition
-$\varphi$ is a quantifier-free first order logic formula representing a
-necessary and sufficient condition on symbols to drive the execution along
-the currently executed path. $\varphi$ is initially $\true$ and it can be
-updated at program branchings. For example, in a location with two out-edges
-labelled by \texttt{x>n+5} and \texttt{x<=n+5}, we instantiate the
-conditions with use of the current $\theta$ and we check whether the current
-path condition $\varphi$ implies their validity. Namely, we ask for validity
-of implications $\varphi \rightarrow \theta(\code{x}) > \theta(\code{n}) + 5$
-and $\varphi \rightarrow \theta(\code{x}) \leq \theta(\code{n}) + 5$.
-%\[
-%\varphi\implies(\theta(\code{x})>\theta(\code{n})+5)
-%~~~~~~~\textrm{and}~~~~~~~
-%\varphi\implies(\theta(\code{x})\le\theta(\code{n})+5).
-%\] 
-If the first implication is valid, the symbolic execution continues along
-the first branch. If the second implication is valid, the symbolic execution
-continues along the second branch. If none of them is valid, it means that
-we can follow either of the two branches.  Hence, the symbolic execution
-forks in order to execute both branches.  In this case, we update the path
-condition on the first branch to $\varphi \wedge \theta(\code{x}) >
-\theta(\code{n}) + 5$ and the one on the second branch to $\varphi \wedge
-\theta(\code{x}) \leq \theta(\code{n}) + 5$. Note that the whole program state
-is forked into two states in this case.
-
-Due to the forks, symbolic execution is traditionally represented by a tree
-called \emph{classic symbolic execution tree}. Nodes of the tree are
-labelled by program states computed during the execution.
-% \todo{For brevity of notation, we identify nodes with program states
-% labelling them.}
-Edges of the tree correspond to transitions between program states labelling
-their end nodes. In Figure~\ref{fig:linSrch}(b), there is a classic symbolic
-execution tree of the flowgraph from Figure~\ref{fig:linSrch}(a). For
-readability of figures, nodes are not labelled by program states, but only
-by the current location in the flowgraph. In addition, we label branching
-edges by instances of the corresponding branching conditions in the
-flowgraph. These labels allow us to reconstruct the path condition for each
-node in the tree: it is the conjunction of labels of all edges along the
-path from the root to the node. Note that contents of symbolic memories are
-not depicted in the figure.
 
 \subsection{Introduction}
 
