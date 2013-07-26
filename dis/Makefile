@@ -1,12 +1,14 @@
 TEX=latex
 PROJ=dis
+CHAPTERS=intro state
+CHAPTERS_SRC=$(patsubst %,%.tex,$(CHAPTERS))
 
 all: $(PROJ).dvi
 pdf: $(PROJ).pdf
 ps: $(PROJ).ps
 bib: $(PROJ).bbl
 
-$(PROJ).dvi: $(PROJ).tex FORCE
+$(PROJ).dvi: $(PROJ).tex $(CHAPTERS_SRC) FORCE
 
 $(PROJ).tex: $(PROJ).bbl
 

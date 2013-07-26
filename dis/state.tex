@@ -1,0 +1,445 @@
+% vim: textwidth=78 ai spell spelllang=en filetype=tex
+
+\section{State of the Art}\label{sec:state}
+This section is deserved to description and current state of techniques for
+code analysis referred to later in the text.
+
+\paragraph{Static Analysis} Under the term of static analysis we understand
+analyzing code without directly executing it on a processor. I.e. to perform
+exactly the opposite of dynamic analysis or testing where a program is
+executed and either automatically fed by some input in some form or tested
+manually by testers. This has the nice side-effect that the implementation
+need not be finished when we want to analyze it statically. So the static
+analysis not as limited as the dynamic one, it can be used whenever we want in
+the development cycle. Static analysis is thus used in several fields of the
+computer science. \emph{Optimizing compilers} can eliminate unused code,
+propagate constants where variables would have to be left otherwise, or remove
+implicitly added runtime out-of-bounds checks from the code if it knows the
+bounds (as it happens in Java). \emph{Debuggers} can limit themselves only to
+code that is relevant to variables a programmer is interested in, or print
+possible sources of values currently stored in a tracked variable.
+\emph{Program tests} can be generated based on the analysis of a program to
+cover more code paths. And of course static analysis is a prerequisite for
+\emph{static analyzers} to exist in the first place.
+
+Moreover if the static analysis is well-defined according to some rules
+defined e.g. by Cousot's framework, as we will see later, we are able to
+decide whether it is sound, complete and whether it terminates. Without those
+properties, optimizing compilers would generate invalid code for example.
+
+the most ready/useful\todo{XXX}
+There are many successful tools based on static analysis. 
+Unfortunately it is
+not really known 
+
+PC Lint FlexeLint PolySpace (approximate upper limit is 50kkloc) CodePro
+Analytix PREfix/PREfast Astree CodeSonar
+
+Coverity Prevent (xgcc), Extend (metal)
+
+\subsection{Pattern Matching}\label{sec:pattern_matching}
+The simplest analysis is to check code for some patterns. We can take
+\texttt{grep} regular expression pattern matcher give it a pattern for ``/ 0''
+and see if we did that stupid zero division error somewhere in the code.
+
+\subsection{Data-flow Analysis}\label{sec:data-flow}
+One of the basic static analyses is \emph{data-flow analysis}. It collects
+information about possible values set in variables at specified points in
+code. This is usually computed by stabilizing sets of equations, i.e.
+computing their fixpoint. For each statement $s$ we have a pair of equations:
+
+\begin{equation} \label{eq:data_flow}
+\begin{aligned}
+out_s & = trans_s(in_s) \\
+in_s & = join_{p\in pred_s}(out_p)
+\end{aligned}
+\end{equation}
+
+We define transfer function $trans$ to transform input set $in_s$ of a
+statement $s$ to the output set $out_s$ according to the effect of $s$ in a
+particular analysis. Join operator $join$ takes output sets of all
+predecessors and combines it together. It is usually set intersection or
+union depending whether the analysis is to be may or must. Depending whether
+an analysis is forwards or backwards (cf.  Section~\ref{sec:types_anal}), the
+$in$ set is bound to incoming or outcoming control flow graph edge
+respectively. Similarly for the $out$ set.
+
+One of the basic data-flow analyses is \emph{reaching definitions}. At some
+point in code, we are interested in all statements where a variable was set
+and was not re-set during the control flow to our point. With this
+information we can tell whether some variable was already set at the point it
+is used or if we should report about an uninitialized access. Let us
+demonstrate that on the following example. There, reaching definition set at
+line~\ref{lst:reach_use} is a set of the two labels $\{\ref{lst:reach_def1},
+\ref{lst:reach_def2} \}$, where we define \texttt{a}. Note that
+line~\ref{lst:reach_def0} does not belong there because \texttt{a} was re-set
+later on all paths to line~\ref{lst:reach_use}.
+\begin{lstlisting}[language=C]
+a = 1; (*@ \label{lst:reach_def0} @*)
+if (x)
+  a = 3; (*@ \label{lst:reach_def1} @*)
+else
+  a = 4; (*@ \label{lst:reach_def2} @*)
+b = a; (*@ \label{lst:reach_use} @*)
+\end{lstlisting}
+
+Formally, let us denote the set of statements as $S$. To compute reaching
+definitions we define join operator as $\bigcup$ and the transfer function as
+follows:
+\begin{align*}
+trans_s(in) & = gen_s \cup (in - kill_s) \\
+gen_s & = 
+\begin{cases}
+\{s\}     & \text{$s$ is an assignment} \\
+\emptyset & \text{otherwise}
+\end{cases} \\
+kill_s & =
+\begin{cases}
+\{x \in S \mid \text{$x$ is $a = b$} \wedge x \neq s \} & \text{$s$ is an
+assignment $a = c$} \\
+\emptyset & \text{otherwise}
+\end{cases} \\
+\end{align*}
+In other words we generate a statement when a variable is set and we kill all
+other assignments which set the very same variable at any other point.
+Finally, we compute a fixpoint of the equations~\ref{eq:data_flow} to have
+reaching definitions on each entry and exit of a statement ($in_s$, $out_s$).
+
+\begin{figure}[tb]
+\begin{center}
+\begin{tabular}{c}
+\begin{tabular}{|c|c|c|} \hline
+         &      May    & Must        \\ \hline
+Forward  & Reaching    & Available   \\
+analysis & definitions & expressions \\ \hline
+Backward & Live        & Very busy   \\
+analysis & variables   & expressions \\ \hline
+\end{tabular} \\ (a) \\[2ex]
+
+\begin{tabular}{|l|c|c|c|c|c|c|} \hline
+Analysis        & M/M  & F/B & $join$    & R & $gen$          & $kill$ \\ \hline
+Reaching defs.  & May  & F   & $\bigcup$ & N & Set variables  & Other assigns \\
+\hline
+Available expr. & Must & F   & $\bigcap$ & N & Computed expr. & Other expr. \\
+\hline
+Live variables  & May  & B   & $\bigcup$ & Y & Used variables & Set
+variables \\ \hline
+Very busy expr. & Must & B   & $\bigcap$ & Y & None           & All expr. \\
+\hline
+\end{tabular} \\ (b)
+\end{tabular}
+\end{center}
+    \caption{Examples of data-flow analyses according to may/must and
+    forward/backward rules: (a) split according to may/must and
+    backward/forward rules; (b) summarization of properties of the analyses.
+    F/B means forwards/backwards, S denotes whether $in$ and $out$ sets are
+    switched.}
+  \label{fig:data_flow_examples}
+\end{figure}
+
+In Figure~\ref{fig:data_flow_examples}, we show examples of basic analyses of
+a different kind and how they are (informally) defined. Note that in some
+analyses, the sets are not called $gen$ and $kill$, but the principle is the
+same. Also we can see the tight correspondence between may/must and $join$
+operator and between forwards/backwards and switching of $in$ and $out$ sets.
+This was only an introduction to data-flow analysis, for further reading,
+use~\cite{dragon, muchnick}.
+
+Data-flow analysis forms a base for optimizing compilers. It is used in 
+
+
+\subsection{Abstract Interpretation}\label{sec:ai}
+This is one of the static analysis approaches established by Cousot\&Cousot
+in~\cite{cousot}. Values of variables in some program are abstracted in some
+specified manner. We can then ensure the analysis will terminate and will be
+correct mostly at the price of precision loss. 
+
+\todo{XXX}
+
+Data-flow analysis is only a limited tool for deciding some properties about
+the analysis. There was a call to formalize the process which would for
+example to decide correctness and soundness of algorithms conveniently.
+\emph{Abstract interpretation} is a technique that has a history stretching
+back to the 1970s. Back then, it was formalized by Cousot\&Cousot in
+\cite{cousot}. It is designed so that users of the formalism are able to
+decide whether their analysis is correct, if it terminates, and to design more
+precision levels of an analysis consistently as we will see later.
+
+As the name of the analysis suggests, there is an abstraction of how values
+are handled in an analysed program. Let us show this on a demonstrative
+example. Consider a program in Figure~\ref{fig:lst_ai_intro} and an analysis
+that should decide whether \texttt{i} is even at the end (ignore overflows at
+this moment).
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+void fun(int x)
+  i = 3; (*@ \label{lst:ai_intro_set1} @*)
+  while (x)
+    i += 2; (*@ \label{lst:ai_intro_set2} @*)
+  return i;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Code used for demonstration of abstract interpretation}
+\label{fig:lst_ai_intro}
+\end{figure}
+
+First, consider an ``abstraction'' that abstracts the code in no way, i.e. we
+take concrete evaluation. There are only two lines in the code that store
+something to \texttt{i}: lines~\ref{lst:ai_intro_set1} and
+\ref{lst:ai_intro_set2}. The former simply sets \texttt{i} to \texttt{3}, so
+we just remember that. The latter, increases \texttt{i} repeatedly, so we have
+to remember \texttt{i} can be there anything from $\{3,5,7,\ldots\}$. As we can
+see we would need infinite time and memory to store all possible values from
+all possible runs of the program (to later decide oddness of the numbers).
+
+On the other hand, if we only remember abstract information such as ``this
+number is odd/even'', and define how arithmetic addition behaves on those, we
+need to store only a single value of $\{\text{even}, \text{odd},
+\text{unknown}, \text{unset}\}$.
+
+Abstract interpretation is built upon lattice theory. Let us first define
+lattice and show some examples of lattices depicted as Hasse diagrams.
+\begin{dfn}[Lattice] is a partially ordered set where arbitrary two elements
+have a least upper bound (supremum) and a greatest lower bound (infimum).
+\end{dfn}
+
+In fact, abstract interpretation is well defined also when we have as a base,
+only a semi-lattice, i.e. a lattice with only one bound for any two elements,
+supremum in particular.
+
+\begin{dfn}[Abstract interpretation] is a tuple $\mathcal{A}=(A, \leq,
+\sqsubseteq, \bot, \top, f)$, where $A$ is a semi-lattice $(A, \leq,
+\sqsubseteq, \bot, \top)$ of the abstract values (abstract domain)
+and $f$ is a transform function that changes abstract states according to
+instructions in some code.
+\end{dfn}
+
+$\gamma$ $\alpha$
+
+Cousots laid down the foundation for others. It slowly stopped being
+extensively used, but it attracted attention again in 2000. It was thanks to
+the work of Engler et al. on a meta compilation based technique described
+in~\cite{metacomp}. There, program developers specify properties of the system
+in \textsc{Metal}~\cite{metal} language, compile it into an internal
+representation and the tool applies the specification on all executable paths
+in a particular function. Violation of the specification on a path is then
+reported as an error. The compiler used for \textsc{Metal} compilation is a
+modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
+redefines \textsc{gcc}'s internal code representation, data types and applies
+the analysis on a such modified structure. Programming languages supported by
+\textsc{xgcc} are C and C++.
+
+\subsection{Symbolic Execution}\label{sec:se}
+Another analysis this thesis deals with is \emph{symbolic execution}. Instead
+of trying to analyze a program zillion times with concrete, initialized, data,
+symbolic execution represents program inputs by symbolic values. The program
+is then executed and program expressions are manipulated including the
+symbolic values. \code{a = read()} no longer means we have to .\todo{XXX}
+
+\cite{king}, \klee~\cite{klee} and clones. 
+Theory about SE; extended to heap~\cite{se_heap}; generalized
+in~\cite{se_gener}; for libs~\cite{se_libs}
+
+Path explosion: \cite{pex_ddse},\cite{G07},\cite{partial_loop},\cite{SPmCS09}.
+
+\begin{figure}[!htb]
+  \begin{tabular}{ccc}
+  TBD & TBD & TBD
+%    \hspace{-4ex}\input{fig_linSrch} &
+%    \hspace{-4.5ex}\input{fig_linSrchSET} &
+%    \hspace{-1.5ex}\input{fig_linSrchCSET}
+  \end{tabular}
+  \caption{(a) A flowgraph \texttt{linSrch(A,n,x)}. (b) Classic symbolic
+    execution tree of \texttt{linSrch}. (c) Compact symbolic execution tree
+    of \texttt{linSrch}.}
+  \label{fig:linSrch}
+\end{figure}
+
+Symbolic execution runs a program over \emph{symbols} representing arbitrary
+input values. For each input variable $\code{v}$, we denote a symbol passed
+to it as $\sym{v}$. A \emph{program state} is a triple $(l,\theta,\varphi)$
+consisting of a current program location $l$ in the flowgraph, a
+\emph{symbolic memory} $\theta$, and a \emph{path condition}
+$\varphi$. $\theta$ assigns to each program variable its current symbolic
+value, i.e.~an expression over the symbols. For example, if the first
+instruction of a program is the assignment \texttt{i:=2*n+x}, then
+$\theta(\code{i})=2\sym{n}+\sym{x}$ after its execution. The path condition
+$\varphi$ is a quantifier-free first order logic formula representing a
+necessary and sufficient condition on symbols to drive the execution along
+the currently executed path. $\varphi$ is initially $\true$ and it can be
+updated at program branchings. For example, in a location with two out-edges
+labelled by \texttt{x>n+5} and \texttt{x<=n+5}, we instantiate the
+conditions with use of the current $\theta$ and we check whether the current
+path condition $\varphi$ implies their validity. Namely, we ask for validity
+of implications $\varphi \rightarrow \theta(\code{x}) > \theta(\code{n}) + 5$
+and $\varphi \rightarrow \theta(\code{x}) \leq \theta(\code{n}) + 5$.
+%\[
+%\varphi\implies(\theta(\code{x})>\theta(\code{n})+5)
+%~~~~~~~\textrm{and}~~~~~~~
+%\varphi\implies(\theta(\code{x})\le\theta(\code{n})+5).
+%\] 
+If the first implication is valid, the symbolic execution continues along
+the first branch. If the second implication is valid, the symbolic execution
+continues along the second branch. If none of them is valid, it means that
+we can follow either of the two branches.  Hence, the symbolic execution
+forks in order to execute both branches.  In this case, we update the path
+condition on the first branch to $\varphi \wedge \theta(\code{x}) >
+\theta(\code{n}) + 5$ and the one on the second branch to $\varphi \wedge
+\theta(\code{x}) \leq \theta(\code{n}) + 5$. Note that the whole program state
+is forked into two states in this case.
+
+Due to the forks, symbolic execution is traditionally represented by a tree
+called \emph{classic symbolic execution tree}. Nodes of the tree are
+labelled by program states computed during the execution.
+% \todo{For brevity of notation, we identify nodes with program states
+% labelling them.}
+Edges of the tree correspond to transitions between program states labelling
+their end nodes. In Figure~\ref{fig:linSrch}(b), there is a classic symbolic
+execution tree of the flowgraph from Figure~\ref{fig:linSrch}(a). For
+readability of figures, nodes are not labelled by program states, but only
+by the current location in the flowgraph. In addition, we label branching
+edges by instances of the corresponding branching conditions in the
+flowgraph. These labels allow us to reconstruct the path condition for each
+node in the tree: it is the conjunction of labels of all edges along the
+path from the root to the node. Note that contents of symbolic memories are
+not depicted in the figure.
+
+
+\subsection{Slicing}\label{sec:slicing}
+Slicing was first described in~\cite{slicing}. It is a technique to eliminate
+unneeded lines of code from a program. This is always computed with respect to
+some code location and variables which we are interested in at that place.
+Only the code that can affect the variables there is left in the program. This
+is for example useful for debugging purposes to understand how values are
+propagated to a variable. The location and variables are called \emph{slicing
+criteria}.
+
+Theory about slicing XXX \ldots
+
+The main two branches of slicing are \emph{dynamic} and \emph{static}. The
+former considers one concrete input when computing the slice and may
+potentially result in more sliced code. Static slicing on the other hand
+computes the slice generally, with no input restrictions. More details about
+slicing and its variations and uses can be seen in section~\ref{sec:fmics}
+and in~\cite{slicing_survey}, of course.
+
+
+\subsection{Model Checking} \todo{Honzo, toto prosim precti, jestli neblabolim.}
+This is a bit different technique from static analysis we are dealing in this
+thesis with. It does not check the program proper, but instead tries to prove
+some properties on a model of the program. The model is represented by some
+finite state machine and the properties are a specified behaviour which has to
+be satisfied in time. For example a property can be ,,This message has to come
+as a reply in the future.'' Properties are described by logic formulas,
+usually in the temporal logic like LTL or CTL (see more about temporal logics
+in~\cite{temporal}). Correctness of the system is then established, if every
+run of the system corresponds to a particular formula. If it does not for some
+case, a counterexample consisting of system states is generated. Obviously,
+even if no counterexample is generated, the system still might not be correct
+in case its model or properties checked are incorrect.
+
+These technique was spread even after introduction of \emph{symbolic model
+checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets of
+states by boolean functions. For example if we have two 1-bit wide variables
+\texttt{a} and \texttt{b} and their values are always the same (1 and 1 or 0
+and 0 pairwise), we can represent it by a formula \texttt{a} $\Leftrightarrow$
+\texttt{b} instead of storing all the values. The formulas can be represented
+in a space-saving way by \emph{Reduced Ordered Binary Decision
+Diagrams}~\cite{bdd} (ROBDD or simply BDD) were introduced to represent the
+set of states. Despite the exponential complexity still persists (due to path
+explosion problem), BDDs helped to limit the memory use a lot. Both symbolic
+model checking and BDDs allowed more complex systems to be checked on the same
+hardware (cf.~\cite{mc_symbolic1} again).
+
+In parallel to BDDs-based model checking, \emph{bounded model checking}
+exists. Instead of exploring the whole state space of the system model, there
+is a predefined constant \textit{k} which determines the maximum length of
+execution to be explored. If it explores all these \textit{k}-prefixes, either
+\textit{k} is incremented and the checking continues, or the model checker is
+stopped. It can have two reasons: the user set the top bound for \textit{k}
+(the analysis is of course incomplete in that case), or the execution is
+infeasible, because it runs out of resources. Model checking and bounded model
+checking are orthogonal techniques, it was shown in~\cite{bmc_survey} that
+both of them reason about different class of properties. (Although there can
+be an intersection.)
+
+Due to path explosion problem and slow computers in the past, its use was
+limited rather to check small reactive systems in industry like processors or
+automotive control systems. Later, there appeared both less and more
+successful tools to check large software projects. For example model checker
+\textsc{Blast}~\cite{blast} failed due to inability to reason about pointers
+in the Linux kernel drivers~\cite{blast_kernel}. On the other hand Microsoft
+started adopting their model checker \textsc{SLAM} and driver
+verifier~\cite{sdv} for checking Windows drivers and they apparently succeeded
+as they require every driver to be checked by this toolkit with predefined
+temporal rules before it is accepted.
+
+As this thesis does not deal with this type of analysis, curious readers are
+pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
+to~\cite{bmc_survey} about bounded model checking.
+
+\subsection{Points-to Analysis}
+For languages using pointers like C, it is important to know where these
+pointers point to. Consider the global integer variable and an integer pointer
+as are in the code depicted in Figure~\ref{fig:lst_ptsto}. Without knowing
+that \texttt{p} can point-to and actually changes \texttt{x} we would conclude
+that \texttt{fun} always returns 0. But it returns whatever it gets on the
+input as a parameter \texttt{a}. For that purpose algorithms known as
+\emph{Points-to analysis} (sometimes referred as \emph{Pointer analysis})
+exist. 
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+int fun(int a) {
+  static int x;
+  int *p = &x;
+  *p = a;
+  return x;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Points-to demonstrative example} \label{fig:lst_ptsto}
+\end{figure}
+
+\emph{Alias analysis} is a bit different to points-to analysis in what is able
+to tell about pointers. Alias analysis can only conclude that two pointers
+either point to the same location or not. It cannot report the set of possible
+targets. This is sometimes sufficient and for example \llvm as of 3.1 provides
+its optimization passes only with alias analysis. This was a problem for us 
+
+The same as for other analyses, points-to analysis have always one of  the
+properties described in each point of section~\ref{sec:sensitivity}. Points-to
+analyses are often parametrized by another sensitivity: sensitivity for
+structure fields.
+
+\paragraph{Field-sensitivity} In languages allowing structured constructs, like
+\texttt{struct} in C, we have two options: to consider each of the member
+of such an object or ignore them. Obviously ignoring that information leads to
+faster analysis, however imprecisions occur. The imprecisions are two-fold:
+each member itself can be a pointer and should have its own points-to set, and
+knowing exactly to which member of a structure a pointer points-to is indeed
+useful information. On the other hand, when we want more precise analysis,
+there are two steps, with different precision. First, \emph{field-based
+sensitivity} have only one global information about structure members, per
+each member name. So when we have two totally different structures \texttt{a}
+and \texttt{b} containing a member \texttt{void *x}, this analysis considers
+them to be the same and updates \texttt{x}'s points-to set any time
+\texttt{a.x} or \texttt{b.x} is set to point to a new object. The other
+analysis, the true \emph{field-sensitive} one, properly handles members of
+structures in natural sense, but for a higher computation price, of course.
+
+\begin{verbatim}
+(call, 1) -> {  }
+(%1, -1) -> { (call, 0) }
+\end{verbatim}
+
+There are many different known approaches to pointer analysis, differing in
+speed and accuracy.

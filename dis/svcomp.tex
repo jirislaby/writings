@@ -1,0 +1,135 @@
+% vim: textwidth=78 ai spell spelllang=en filetype=tex
+
+\section{Participating SV-COMP 2013 -- Symbiotic}\label{sec:svcomp}
+Implementing inter-procedural LLVM slicer~\cite{llvm-slicer}, \symbio~\cite{symbiotic} and
+participating~\cite{symbiotic-svcomp}.
+
+\subsection{Verification Approach}\label{sec:approach}
+
+\symbio implements our technique~\cite{symbiotic} that combines
+instrumentation, program slicing, and symbolic execution in order to detect
+bugs described by finite state machines. More precisely, we instrument a given
+program with code that tracks runs of state machines representing various
+erroneous behaviors. If an instrumented state machine enters an error location
+during a program execution, then the original program contains a bug specified
+by the machine. After instrumentation, we slice~\cite{slicing} the program to
+reduce its size without affecting runs of state machines. Finally, we
+symbolically execute~\cite{king} the sliced program to find bugs in the
+program.
+
+As reachability of an \texttt{ERROR} label is the only bug considered in the
+SV-COMP, we have modified our instrumentor to put \texttt{assert(0)}
+function calls at \texttt{ERROR} labels in the code. Given the instrumented
+code, we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is
+in turn interprocedurally sliced with respect to slicing criteria, which are
+the instrumented \texttt{assert} calls. In other words we remove all the
+code except the one that has an effect on reachability of \texttt{assert}
+calls. The sliced \textsc{Llvm} bitcode is finally symbolically executed by
+\textsc{Klee}~\cite{klee}. There are several possible outputs that
+\textsc{Klee} may generate. It can either find a reachable \texttt{assert}
+and report it, or finish the computation without any report, or terminate in
+some errant way (out of time, out of memory, invalid memory dereference, or
+some internal error for example). We map these to the demanded answers:
+\texttt{UNSAFE}, \texttt{SAFE}, or \texttt{UNKNOWN} respectively. This is
+taken care of in a simple scripted filter.
+
+%}}}
+%{{{ Software architecture
+
+\subsection{Software Architecture}
+\paragraph{Libraries/External Tools} For the code translation and for
+operations with the \textsc{Llvm} bitcode we use
+\textsc{Llvm}/\textsc{Clang} 3.1\footnote{\url{http://llvm.org}}. The
+symbolic executor is \textsc{Klee} which itself uses the
+\textsc{Stp} constraint solver~\cite{stp}. We obtained both \textsc{Klee} and
+\textsc{Stp} from the respective GIT repositories and used the snapshots. For
+more information about \textsc{Klee}, see~\cite{klee}.
+
+\paragraph{Software Structure and Architecture} The architecture described
+in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
+The slicer is written as a plug-in for the optimizer \texttt{opt} from the
+\textsc{Llvm} suite. It is publicly available in a separate repository at
+\url{https://github.com/jirislaby/LLVMSlicer/}. The slicer improves the
+symbolic execution considerably. For ease of use, all parts of the tool
+pipeline are one by one run by a single script \texttt{runme}.
+
+\begin{figure}[tb]
+\begin{center}
+\input{images/pipeline.pspdftex}
+\end{center}
+  \caption{Pipeline of the tool}
+\label{fig:pipeline}
+\end{figure}
+
+\paragraph{Implementation Technology} The instrumentation is performed by a
+\texttt{bash} script using \texttt{sed}. The final filter also uses
+\texttt{bash} with the help of \texttt{grep}. The rest of the toolchain is
+written in C++ and compiled using \texttt{gcc}.
+
+%}}}
+%{{{ Discussion
+
+\subsection{Discussion of Strengths and Weaknesses of the Approach}
+
+The strength of the tool lies in its high precision of the answers. In theory,
+the only source of incorrect answers is the slicer: it can completely remove
+an infinite loop in some cases and thus an unreachable \texttt{ERROR} label
+located below the loop may become reachable. However, there is no such case
+in the competition benchmarks. 
+
+All incorrect answers produced by our tool in the competition are due to bugs
+in implementation.  Since the tool submission, we have fixed most of the bugs
+and improved the implementation a bit. The biggest change on the competition
+benchmarks can be seen in the category \emph{FeatureChecks} (118 files):
+
+\begin{center}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{|l|c|c|}
+    \hline
+    & Competition Version & Current Version \\ \hline 
+    Correct Answers \texttt{SAFE/UNSAFE} & 81 & 116 \\ \hline
+    Incorrect Answers \texttt{SAFE/UNSAFE} & 17 & 0 \\ \hline
+    \texttt{UNKNOWN} (including timeouts) & 20 & 2 \\ \hline
+  \end{tabular}
+\end{center}
+
+In general, the main weakness of the tool is a high percentage of
+\texttt{UNKNOWN} results. These results come mainly from high computation
+cost of the symbolic execution of programs with loops or recursion. This
+problem is relieved by slicing, but there are still many cases where the
+sliced code remains complex and symbolic execution runs out of time or
+memory. Other sources of \texttt{UNKNOWN} results are internal errors of
+\textsc{Klee} and general limitations of constraint solving.
+
+%}}}
+%{{{ Tool setup and configuration
+
+\subsection{Tool Setup and Configuration}
+\paragraph{Download and Installation Instructions}
+\begin{itemize}
+\item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
+\item Download \symbio 1 at: \url{https://sf.net/projects/symbiotic/}.
+\item Change the current directory to \texttt{/opt} (this location is
+	needed for \textsc{Klee}).
+\item Untar the archive with the tool.
+\item Change directory into \texttt{/opt/symbiotic}.
+\item Run \texttt{./runme <benchmark.c>} for each source file in the set.
+\end{itemize}
+
+\paragraph{Results Reported} \texttt{SAFE/UNSAFE/UNKWNOWN} answers match
+the competition rules. The counterexample for an error in some
+\texttt{<benchmark.c>} is generated for each error path in the benchmark to
+\texttt{<benchmark.c>-klee-out/}. There is also a sliced code referred by all
+the error paths.
+
+%}}}
+%{{{ Software project and contributors
+
+\subsection{Software Project and Contributors}
+The concept of the tool has been developed by the authors of this paper. The
+tool was implemented by Jiri Slaby (contact person), Marek Trt\'ik, and Ben
+Liblit (several fixes).  It is available under the GNU GPLv2 License and is
+hosted by the Faculty of Informatics, Masaryk University.
+
+
+
