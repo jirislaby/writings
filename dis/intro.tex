@@ -482,18 +482,69 @@ more information for the purposes of this thesis; more on parsers can be
 learnt from~\cite{dragon,muchnick}.
 
 \subsection{Specifics of the Large Projects}
-Real code; not easy to parse; handle information in memory; inter-procedural
-analyses; speed of the analyzer has to be relatively high
+In an ideal world, every code checking tool should be capable to parse and
+check any project that is out there. Unfortunately, that is not true in the
+real world. Tools often cannot even read source codes of a project or cannot
+find any error there. This happens when the tools, or the project, are highly
+specialized for example. However when a tool is ready to perform checking
+already, there is still a question: where to find the files to check? Should
+it just recursively crawl a specified directory and check all sources in
+there? But what if some source file includes another one and the inner is not
+compilable on its own as happens in the Linux kernel? There are two answers to
+that question: (a) ask the user to provide a list of files, or (b) add a
+support to the tool for a build system or integrated development environment
+(IDE) which the project is developed in.
+
+Having a list of files is not sufficient. Projects tend to pass special
+directives to a compiler such as paths where are header files, to define some
+macros on the command line, or to pre-include a specific files and so on.
+Again to be able to even parse the sources, we have to ``steal'' this
+information from the build system or ask a user to provide that. At this point
+it starts being infeasible for a large project. A single user, it need not
+even be a developer of the project, may somehow generate the file list, but
+will not definitely know all the flags passed to the compiler. The tools
+definitely need to \emph{support build systems}.
+
+So at this point we know what to check and how to correctly obtain an
+intermediate code structure from the source code. While the code can be
+self-contained so that we have all the information we need for the analysis,
+we have to bear in mind that all this information will barely fit into the
+memory. In other words, when parsing large project we have to think twice how
+and which information to store and where. The size also correlates with speed.
+The analyzer has to be relatively fast to be able to handle thousands files.
+
+The best code practices suggest to split functionality among smaller logical
+pieces for better readability and maintainability. Programmers usually put
+these pieces into separate functions. However these pieces alone are not
+useful when checking for errors. They are potential source of false positives.
+For example one function can lock a lock, another one unlocks it and they are
+called in a sequence from some other one. The two alone would generate a
+false-positive. But when the three are analyzed together, no false alarm is
+reported. This drags in the need of inter-procedural variants of analyses used
+by the checker. All the above are the specifics the tools have to deal with
+somehow so that they are usable on large project. And this is indeed a
+challenge!
 
 \subsubsection{Linux Kernel}
-self-contained code; call to be bug-free, otherwise
-exploitable~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}
+As we already mentioned earlier, there are many projects we can choose as a
+``large project'' in this thesis. There are three main categories we can think
+of: userspace programs, kernels of operating systems and whole self-standing
+embedded systems. When programmers develop some userspace programs, from the
+first category, they usually use some external libraries or code so that they
+are not reimplementing the wheel. This has one big disadvantage for software
+checking. When we want to have a correct analysis, we have to have an access
+to all of them. Moreover, depending on the analysis used, we may need also
+source codes of the libraries. But often, they are not available. Even if they
+are, they need not be necessarily written in the same language as the project
+we intend to check.
 
-\subsection{Checking the Linux Kernel}
-Projects/software used for checking the Linux kernel.
+For the ease of analysis, we should choose
+some self-contained code. It call to be bug-free, otherwise exploitable
 
-\stan~\cite{stanse}, projects like LDV (ISPRAS), Coverity~\cite{coverity},
-\textsc{Cppcheck}~\cite{cppcheck}, \clang~\cite{clang}, \sparse~\cite{sparse}
+And yet there is the author of this thesis
+who was biased when choosing a project. He is spending some time by Linux
+kernel development, so he knows the processes and has some considerable
+knowledge about the code too.
 
 \subsection{The Goals}
 The primary goal of this thesis is to research deployment of static analysis
