@@ -2,7 +2,8 @@
 
 \section{State of the Art}\label{sec:state}
 This section is deserved to description and current state of techniques for
-code analysis referred to later in the text.
+code analysis referred to later in the text. To be able to do that, we will
+first describe the techniques proper.
 
 \paragraph{Static Analysis} Under the term of static analysis we understand
 analyzing code without directly executing it on a processor. I.e. to perform
@@ -30,14 +31,29 @@ properties, optimizing compilers would generate invalid code for example.
 the most ready/useful\todo{XXX}
 
 \subsection{Pattern Matching}\label{sec:pattern_matching}
-The simplest automatic analysis we can think of is to check code for some
-patterns. We can take an instance of a regular expression pattern matcher like
-\texttt{grep}, give it a pattern ``/ 0'' and see if we did that stupid zero
-division error somewhere in the code. We demonstrated this only on a primitive
-level. People might add a comment like ``/ 0 happened here'' and we have a
-false-positive now. But there exist more robust techniques based on pattern
-matching. They, in some way, parse the code (which also removes comments like
-the above) and do pattern matching on some internal structure~\cite{findbugs}.
+The simplest automatic analysis we can think of is to find some predefined
+patterns in code.  We can take an instance of a regular expression pattern
+matcher like \texttt{grep}, give it a pattern ``/ 0'' and see if we did that
+stupid zero division error somewhere in the code. However this primitive
+approach may be a source of false-positives. This happens when developers
+comment their code with comments similar to ``/ 0 happened here''.  But there
+of course exist more robust techniques based on pattern matching. They, in
+some way, parse the code (which also removes comments like the above) and do
+pattern matching on some internal structure~\cite{findbugs}. If we recall the
+abstract syntax tree from Figure~\ref{fig:parsing_process}~(d), we can design
+a checker which would match AST subtrees. Then to match division by zero
+errors, we simply try to find a subtree in an AST like: \\
+\begin{center}
+    \tikzstyle{astn1} = [thick,draw,minimum size=5mm]
+    \begin{tikzpicture}[level/.style={sibling distance = 1cm/#1,
+    level distance = 1cm}]
+      \node [astn1] {\texttt{/}}
+	    child { node [astn1] {\texttt{3}} }
+	    child { node [astn1] {\texttt{b}} }
+	  ;
+    \end{tikzpicture}
+\end{center}
+
 
 \subsection{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
@@ -54,23 +70,27 @@ in_s & = join_{p\in pred_s}(out_p)
 
 We define transfer function $trans$ to transform input set $in_s$ of a
 statement $s$ to the output set $out_s$ according to the effect of $s$ in a
-particular analysis. Join operator $join$ takes output sets of all
+particular analysis. The join operator $join$ takes output sets of all
 predecessors and combines it together. It is usually set intersection or
-union depending whether the analysis is to be may or must. Depending whether
-an analysis is forwards or backwards (cf.  Section~\ref{sec:types_anal}), the
-$in$ set is bound to incoming or outcoming control flow graph edge
-respectively. Similarly for the $out$ set.
+union depending whether the analysis is to be may or must. And depending
+whether an analysis is forwards or backwards (cf.
+Section~\ref{sec:types_anal}), the $in$ set is bound to an incoming or
+outgoing control flow graph edge respectively. Vice versa for the $out$ set.
+These two sets are the result of the analysis before and after applying the
+effect of the statement.
 
 One of the basic data-flow analyses is \emph{reaching definitions}. At some
-point in code, we are interested in all statements where a variable was set
+point in code, we are interested in all statements where some variable was set
 and was not re-set during the control flow to our point. With this
-information we can tell whether some variable was already set at the point it
-is used or if we should report about an uninitialized access. Let us
-demonstrate that on the following example. There, reaching definition set at
-line~\ref{lst:reach_use} is a set of the two labels $\{\ref{lst:reach_def1},
-\ref{lst:reach_def2} \}$, where we define \texttt{a}. Note that
-line~\ref{lst:reach_def0} does not belong there because \texttt{a} was re-set
-later on all paths to line~\ref{lst:reach_use}.
+information we can decide whether some variable was set already at the point
+it is used. If it is not, we should report about an uninitialized access. Let
+us demonstrate that on the following example. There, the reaching definition
+set at line~\ref{lst:reach_use} is a set of the two labels
+$\{\ref{lst:reach_def1}, \ref{lst:reach_def2} \}$, where we define \texttt{a}.
+Note that line~\ref{lst:reach_def0} does not belong there because \texttt{a}
+was re-set later on all paths to line~\ref{lst:reach_use}.
+\begin{center}
+\begin{tabular}{c}
 \begin{lstlisting}[language=C]
 a = 1; (*@ \label{lst:reach_def0} @*)
 if (x)
@@ -79,10 +99,12 @@ else
   a = 4; (*@ \label{lst:reach_def2} @*)
 b = a; (*@ \label{lst:reach_use} @*)
 \end{lstlisting}
+\end{tabular}
+\end{center}
 
 Formally, let us denote the set of statements as $S$. To compute reaching
-definitions we define join operator as $\bigcup$ and the transfer function as
-follows:
+definitions we define join operator as set union ($\bigcup$) and the transfer
+function as follows:
 \begin{align*}
 trans_s(in) & = gen_s \cup (in - kill_s) \\
 gen_s & = 
@@ -97,10 +119,11 @@ assignment $a = c$} \\
 \emptyset & \text{otherwise}
 \end{cases} \\
 \end{align*}
-In other words we generate a statement when a variable is set and we kill all
-other assignments which set the very same variable at any other point.
-Finally, we compute a fixpoint of the equations~\ref{eq:data_flow} to have
-reaching definitions on each entry and exit of a statement ($in_s$, $out_s$).
+In other words we generate a statement when a variable is set there and we
+kill all other assignment statements which set the very same variable at any
+other point.  Finally, we compute a fixpoint of the
+equations~\ref{eq:data_flow} to have reaching definitions on each entry and
+exit of a statement ($in_s$, $out_s$).
 
 \begin{figure}[tb]
 \begin{center}
@@ -139,34 +162,26 @@ a different kind and how they are (informally) defined. Note that in some
 analyses, the sets are not called $gen$ and $kill$, but the principle is the
 same. Also we can see the tight correspondence between may/must and $join$
 operator and between forwards/backwards and switching of $in$ and $out$ sets.
-This was only an introduction to data-flow analysis, for further reading,
-use~\cite{dragon, muchnick}.
-
-Data-flow analysis forms a base for optimizing compilers. It is used in 
-
+This was only an introduction to the data-flow analysis. It is extensively
+used in optimizing compilers and in some static analyzers as will be described
+in section~\ref{sec:soa_tools}. For further reading, use~\cite{dragon,
+muchnick}.
 
 \subsection{Abstract Interpretation}\label{sec:ai}
-This is one of the static analysis approaches established by Cousot\&Cousot
-in~\cite{cousot}. Values of variables in some program are abstracted in some
-specified manner. We can then ensure the analysis will terminate and will be
-correct mostly at the price of precision loss. 
-
-\todo{XXX}
-
-Data-flow analysis is only a limited tool for deciding some properties about
-the analysis. There was a call to formalize the process which would for
-example to decide correctness and soundness of algorithms conveniently.
-\emph{Abstract interpretation} is a technique that has a history stretching
-back to the 1970s. Back then, it was formalized by Cousot\&Cousot in
-\cite{cousot}. It is designed so that users of the formalism are able to
-decide whether their analysis is correct, if it terminates, and to design more
-precision levels of an analysis consistently as we will see later.
+The data-flow analysis is only a limited tool for deciding some properties
+about the analysis. There was a call to formalize the process which would
+for example allow for convenient proofs of algorithms' correctness and
+soundness.  \emph{Abstract interpretation} is a technique that has a history
+stretching back to the 1970s. Back then, it was described by Cousot\&Cousot in
+\cite{cousot}. It is designed to allow users of the formalism to decide
+whether their analysis is correct, if it terminates, to formulate more
+precision levels of an analysis consistently and more as we will see later.
 
 As the name of the analysis suggests, there is an abstraction of how values
 are handled in an analysed program. Let us show this on a demonstrative
 example. Consider a program in Figure~\ref{fig:lst_ai_intro} and an analysis
-that should decide whether \texttt{i} is even at the end (ignore overflows at
-this moment).
+that should decide whether \texttt{i} is even at the end (let us ignore
+overflows at this moment).
 
 \begin{figure}[htb]
 \begin{center}
@@ -186,18 +201,29 @@ void fun(int x)
 \end{figure}
 
 First, consider an ``abstraction'' that abstracts the code in no way, i.e. we
-take concrete evaluation. There are only two lines in the code that store
+take the concrete evaluation. There are only two lines in the code that store
 something to \texttt{i}: lines~\ref{lst:ai_intro_set1} and
 \ref{lst:ai_intro_set2}. The former simply sets \texttt{i} to \texttt{3}, so
 we just remember that. The latter, increases \texttt{i} repeatedly, so we have
-to remember \texttt{i} can be there anything from $\{3,5,7,\ldots\}$. As we can
-see we would need infinite time and memory to store all possible values from
-all possible runs of the program (to later decide oddness of the numbers).
+to remember that \texttt{i} can be anything from $\{3,5,7,\ldots\}$ there. As
+we can see we would need infinite time and memory to store all possible values
+from all possible runs of the program (to later decide oddness of the
+numbers).
 
 On the other hand, if we only remember abstract information such as ``this
-number is odd/even'', and define how arithmetic addition behaves on those, we
-need to store only a single value of $\{\text{even}, \text{odd},
-\text{unknown}, \text{unset}\}$.
+number is odd/even'', and define how the arithmetic addition behaves on those,
+we need to store only a single value. We know that the arithmetic addition is
+defined as in the following table:
+\begin{center}
+\begin{tabular}{|c||c|c|} \hline
++    & odd  & even \\ \hline \hline
+odd  & even & odd  \\ \hline
+even & odd  & even \\ \hline
+\end{tabular}
+\end{center}
+
+
+of $\{\text{even},\,\text{odd},\, \text{unknown},\,\text{unset}\}$.  
 
 Abstract interpretation is built upon lattice theory. Let us first define
 lattice and show some examples of lattices depicted as Hasse diagrams.
@@ -442,7 +468,7 @@ structures in natural sense, but for a higher computation price, of course.
 There are many different known approaches to pointer analysis, differing in
 speed and accuracy.
 
-\subsection{Tools}
+\subsection{Tools}\label{sec:soa_tools}
 There are many successful tools based on static analysis. 
 Unfortunately it is not really known 
 
