@@ -93,23 +93,23 @@ directly in the code listing as comments.
   \centering
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
- 1: char *copy(char *dst, char *src, int n, int *L) {
- 2:    int i, len;                             // {U}
- 3:    len = 0;                                // {U}
- 4:    if (src != NULL && dst != NULL) {       // {U}
- 5:       len = n;                             // {U}
- 6:       lock(L);                             // {L}(*@\label{line:copy_lock}@*)
- 7:    }                                       // {U,L}
- 8:    i = 0;                                  // {U,L}
- 9:    while (i < len) {                       // {U,L}
-10:       dst[i] = src[i];                     // {U,L}
-11:       i++;                                 // {U,L}
-12:    }                                       // {U,L}
-13:    if (len > 0) {                          // {U,L}
-14:       unlock(L);                           // {DU,U}(*@\label{line:copy_unlock}@*)
-15:    }                                       // {U,L}
-16:    return dst;                             // {U,RL}(*@\label{line:copy_ret}@*)
-17: }
+char *copy(char *dst, char *src, int n, int *L) {
+   int i, len;                             // {U}
+   len = 0;                                // {U}
+   if (src != NULL && dst != NULL) {       // {U}
+      len = n;                             // {U}
+      lock(L);                             // {L}(*@\label{line:copy_lock}@*)
+   }                                       // {U,L}
+   i = 0;                                  // {U,L}
+   while (i < len) {                       // {U,L}
+      dst[i] = src[i];                     // {U,L}
+      i++;                                 // {U,L}
+   }                                       // {U,L}
+   if (len > 0) {                          // {U,L}
+      unlock(L);                           // {DU,U}(*@\label{line:copy_unlock}@*)
+   }                                       // {U,L}
+   return dst;                             // {U,RL}(*@\label{line:copy_ret}@*)
+}
     \end{lstlisting}
   \end{tabular}
     \caption{Function \texttt{copy} copying a source string \texttt{src}
@@ -551,54 +551,54 @@ machines are associated to dynamically allocated objects.
   \centering
   \begin{tabular}{c}
     \begin{lstlisting}[language=C]
- 1: const int smU  = 0;     // state U
- 2: const int smL  = 1;     // state L
- 3: const int smDU = 2;     // state DU
- 4: const int smDL = 3;     // state DL
- 5: const int smRL = 4;     // state RL
- 6:
- 7: const int smLOCK   = 0; // transition lock(x)
- 8: const int smUNLOCK = 1; // transition unlock(x)
- 9: const int smRETURN = 2; // transition return
-10:
-11: int smL1 = smU, smL2 = smU;
-12:
-13: int *smGetMachine(int *p) {
-14:    if (p == &L1) return &smL1;
-15:    if (p == &L2) return &smL2;
-16:    return NULL;         // unreachable
-17: }
-18:
-19: void smFire(int *SM, int transition) {
-20:    switch (*SM) {
-21:    case smU:
-22:       switch (transition) {
-23:       case smLOCK:
-24:          *SM = smL;
-25:          break;
-26:       case smUNLOCK:
-27:          assert(false); // double unlock
-28:          break;
-29:       default: break;
-30:       }
-31:       break;
-32:    case smL:
-33:       switch (transition) {
-34:       case smLOCK:
-35:          assert(false); // double lock
-36:          break;
-37:       case smUNLOCK:
-38:          *SM = smU;
-39:          break;
-40:       case smRETURN:
-41:          assert(false); // return in locked
-42:          break;
-43:       default: break;
-44:       }
-45:       break;
-46:    default: break;
-47:    }
-48: }
+const int smU  = 0;     // state U
+const int smL  = 1;     // state L
+const int smDU = 2;     // state DU
+const int smDL = 3;     // state DL
+const int smRL = 4;     // state RL
+
+const int smLOCK   = 0; // transition lock(x)
+const int smUNLOCK = 1; // transition unlock(x)
+const int smRETURN = 2; // transition return
+
+int smL1 = smU, smL2 = smU;
+
+int *smGetMachine(int *p) {
+   if (p == &L1) return &smL1;
+   if (p == &L2) return &smL2;
+   return NULL;         // unreachable
+}
+
+void smFire(int *SM, int transition) {
+   switch (*SM) {
+   case smU:
+      switch (transition) {
+      case smLOCK:
+         *SM = smL;
+         break;
+      case smUNLOCK:
+         assert(false); // double unlock
+         break;
+      default: break;
+      }
+      break;
+   case smL:
+      switch (transition) {
+      case smLOCK:
+         assert(false); // double lock
+         break;
+      case smUNLOCK:
+         *SM = smU;
+         break;
+      case smRETURN:
+         assert(false); // return in locked
+         break;
+      default: break;
+      }
+      break;
+   default: break;
+   }
+}
     \end{lstlisting}
   \end{tabular}
   \caption{Implementation of the state machine (\texttt{smFire}) and its
@@ -745,27 +745,27 @@ slicing criteria then comprises all such pairs.
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
- 1: char *buf1, *buf2;
- 2: int L1, L2;
- 3:
- 4: char *copy(char *dst, char *src, int n, int *L) {
- 5:    int len;
- 6:    len = 0;
- 7:    if (src != NULL && dst != NULL) {
- 8:       len = n;
- 9:       smFire(smGetMachine(L), smLOCK);
-10:    }
-11:    if (len > 0) {
-12:       smFire(smGetMachine(L), smUNLOCK);
-13:    }
-14:    smFire(smGetMachine(L), smRETURN);
-15:    return dst;
-16: }
-17:
-18: void foo(char *src, int n) {
-19:    copy(buf1, src, n, &L1);
-20:    copy(buf2, src, n, &L2);
-21: }
+char *buf1, *buf2;
+int L1, L2;
+
+char *copy(char *dst, char *src, int n, int *L) {
+   int len;
+   len = 0;
+   if (src != NULL && dst != NULL) {
+      len = n;
+      smFire(smGetMachine(L), smLOCK);
+   }
+   if (len > 0) {
+      smFire(smGetMachine(L), smUNLOCK);
+   }
+   smFire(smGetMachine(L), smRETURN);
+   return dst;
+}
+
+void foo(char *src, int n) {
+   copy(buf1, src, n, &L1);
+   copy(buf2, src, n, &L2);
+}
     \end{lstlisting}
     \end{tabular}
     \end{center}
@@ -823,16 +823,15 @@ call of \texttt{copy} explores more then $2^{31}$ real paths.
 
 \begin{figure}[!tb]
     \centering
-    \tikzstyle{loc} = [circle,thick,draw,inner sep=0.5pt,minimum size=3.5mm]
-    \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.1pt]%,minimum size=8mm]
+    \tikzstyle{loc} = [circle,thick,draw,minimum size=7mm]
+    \tikzstyle{loc2} = [circle,thick,draw]
     % \tikzstyle{loc} = [circle,thick,draw,inner sep=0.5pt]
     % \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.5pt]
     \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
     \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
     \footnotesize
-    \begin{tikzpicture}[node distance=0.65cm]
-%	\tikzstyle{every node}=[font=\tiny]
-	\tikzstyle{every node}=[font=\scriptsize]
+    \begin{tikzpicture}[node distance=1.1cm]
+	\tikzstyle{every node}=[font=\small]
         \node [loc] (0) {$19$};
         \node [loc] (1) [below of=0] {$6$}
             edge [pre] node {} (0);
