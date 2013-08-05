@@ -176,6 +176,8 @@ stretching back to the 1970s. Back then, it was described by Cousot\&Cousot in
 \cite{cousot}. It is designed to allow users of the formalism to decide
 whether their analysis is correct, if it terminates, to formulate more
 precision levels of an analysis consistently and more as we will see later.
+With this formalism, we can also interpret data-flow analyses as abstract
+interpretations, see~\cite{ai_intro} for examples.
 
 As the name of the analysis suggests, there is an abstraction of how values
 are handled in an analysed program. Let us show this on a demonstrative
@@ -212,28 +214,110 @@ numbers).
 
 On the other hand, if we only remember abstract information such as ``this
 number is odd/even'', and define how the arithmetic addition behaves on those,
-we need to store only a single value. We know that the arithmetic addition is
-defined as in the following table:
+we need to store only a single value. In particular, we know that the
+arithmetic addition in this case is defined as in Table~\ref{tab:oddness}. At
+the moment, limit yourself only to the first three columns and rows.
+\begin{table}[htb]
 \begin{center}
-\begin{tabular}{|c||c|c|} \hline
-+    & odd  & even \\ \hline \hline
-odd  & even & odd  \\ \hline
-even & odd  & even \\ \hline
+\begin{tabular}{|c||c|c||c|c|} \hline
++       & odd     & even    & unset   & unknown \\ \hline \hline
+odd     & even    & odd     & unknown & unknown \\ \hline
+even    & odd     & even    & unknown & unknown \\ \hline \hline
+unset   & unknown & unknown & unknown & unknown \\ \hline
+unknown & unknown & unknown & unknown & unknown \\ \hline
 \end{tabular}
 \end{center}
+  \caption{Behaviour of the arithmetic addition on odd and even numbers.}
+  \label{tab:oddness}
+\end{table}
 
+Let us continue with our example of Figure~\ref{fig:lst_ai_intro}. The first
+set to \texttt{i} happens on line~\ref{lst:ai_intro_set1}. \texttt{3} is
+abstracted as \textit{odd} there, so \texttt{i} is set to \textit{odd} there.
+Another set happens on line ~\ref{lst:ai_intro_set2} where we add \texttt{2}
+to \texttt{i}. \texttt{2} is abstracted as \textit{even} and since we know
+\texttt{i} is \textit{odd} at this point, the addition results, according to
+Table~\ref{tab:oddness} in \texttt{i} being still \textit{odd}.  We see, that
+in this simple program, we only need to remember that values of constants and
+variables in this program is one of $\{\text{\textit{even}},
+\,\text{\textit{odd}}, \,\text{\textit{unset}}\}$. Note that \textit{unset} is
+mostly referred to as $\bot$. However when we consider a condition like:
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+if (condition)
+  i = 1;
+else
+  i = 2;
+\end{lstlisting}
+\end{tabular}
+\end{center}
+what would be the abstract value of \texttt{i} after joining the two branches?
+The same as in the data-flow analysis, we have a kind of join operator which
+can in this case say \texttt{i} is \textit{unknown}, usually referred to as
+$\top$. So in fact, when we are computing the abstract interpretation of a
+program, we consider the full Table~\ref{tab:oddness}.
 
-of $\{\text{even},\,\text{odd},\, \text{unknown},\,\text{unset}\}$.  
-
-Abstract interpretation is built upon lattice theory. Let us first define
-lattice and show some examples of lattices depicted as Hasse diagrams.
+Before we can start deeper explanation of the abstract interpretation we have
+to first define lattice, which the abstract interpretation is built upon.
+We will show some examples of lattices depicted as Hasse diagrams.
 \begin{dfn}[Lattice] is a partially ordered set where arbitrary two elements
 have a least upper bound (supremum) and a greatest lower bound (infimum).
 \end{dfn}
 
-In fact, abstract interpretation is well defined also when we have as a base,
-only a semi-lattice, i.e. a lattice with only one bound for any two elements,
-supremum in particular.
+To represent values in our even/odd analysis, we define the ordered set such
+that \textit{even} is incomparable with \textit{odd}, $\bot$ is less than both
+and $\top$ is more than both. So in a Hasse diagram, the lattice looks like
+follows:
+\begin{center}
+    \begin{tikzpicture}[]
+      \node (TOP) {$\top$};
+      \node [below right=of TOP] (EVEN) {\textit{even}}
+        edge node {} (TOP);
+      \node [below left=of TOP] (ODD) {\textit{odd}}
+        edge node {} (TOP);
+      \node [below right=of ODD] (BOT) {$\bot$}
+        edge node {} (EVEN)
+        edge node {} (ODD);
+    \end{tikzpicture}
+\end{center}
+When a branching occurs in the source code we are interpreting, the join
+operator simply takes the values on input and performs lattice join on the
+lattice above.
+
+\begin{center}
+    \begin{tikzpicture}[]
+      \node (TOP) {$\top$};
+      \node [below right=of TOP] (PLUS) {$+$}
+        edge node {} (TOP);
+      \node [below left=of TOP] (MINUS) {$-$}
+        edge node {} (TOP);
+      \node [below right=of ODD] (BOT) {$\bot$}
+        edge node {} (PLUS)
+        edge node {} (MINUS);
+    \end{tikzpicture}
+\end{center}
+
+\begin{center}
+    \begin{tikzpicture}[]
+      \node (TOP) {$\top$};
+      \node [below right=of TOP] (PLUS) {$+$}
+        edge node {} (TOP);
+      \node [below=of TOP] (ZERO) {$0$}
+        edge node {} (TOP);
+      \node [below left=of TOP] (MINUS) {$-$}
+        edge node {} (TOP);
+      \node [below right=of ODD] (BOT) {$\bot$}
+        edge node {} (PLUS)
+        edge node {} (ZERO)
+        edge node {} (MINUS);
+    \end{tikzpicture}
+\end{center}
+
+
+%In fact, abstract interpretation is well defined also when we have as a base
+%only a semi-lattice, i.e. a lattice with only one bound for any two elements,
+%supremum in particular.
 
 \begin{dfn}[Abstract interpretation] is a tuple $\mathcal{A}=(A, \leq,
 \sqsubseteq, \bot, \top, f)$, where $A$ is a semi-lattice $(A, \leq,
@@ -244,18 +328,6 @@ instructions in some code.
 
 $\gamma$ $\alpha$
 
-Cousots laid down the foundation for others. It slowly stopped being
-extensively used, but it attracted attention again in 2000. It was thanks to
-the work of Engler et al. on a meta compilation based technique described
-in~\cite{metacomp}. There, program developers specify properties of the system
-in \textsc{Metal}~\cite{metal} language, compile it into an internal
-representation and the tool applies the specification on all executable paths
-in a particular function. Violation of the specification on a path is then
-reported as an error. The compiler used for \textsc{Metal} compilation is a
-modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
-redefines \textsc{gcc}'s internal code representation, data types and applies
-the analysis on a such modified structure. Programming languages supported by
-\textsc{xgcc} are C and C++.
 
 \subsection{Symbolic Execution}\label{sec:se}
 Another analysis this thesis deals with is \emph{symbolic execution}. Instead
@@ -481,6 +553,19 @@ Coverity Prevent (xgcc), Extend (metal)
 \url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
 \url{http://samate.nist.gov/index.php/Source_Code_Security_Analyzers.html}
 \url{http://web.archive.org/web/20050405224446/http://www.programming-x.com/programming/analyzer.html}
+
+Cousots laid down the foundation for others. It slowly stopped being
+extensively used, but it attracted attention again in 2000. It was thanks to
+the work of Engler et al. on a meta compilation based technique described
+in~\cite{metacomp}. There, program developers specify properties of the system
+in \textsc{Metal}~\cite{metal} language, compile it into an internal
+representation and the tool applies the specification on all executable paths
+in a particular function. Violation of the specification on a path is then
+reported as an error. The compiler used for \textsc{Metal} compilation is a
+modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
+redefines \textsc{gcc}'s internal code representation, data types and applies
+the analysis on a such modified structure. Programming languages supported by
+\textsc{xgcc} are C and C++.
 
 \subsection{Checking the Linux Kernel}
 Projects/software used for checking the Linux kernel.
