@@ -1,4 +1,4 @@
-% vim: textwidth=78 ai spell spelllang=en filetype=tex
+% vim: textwidth=78 ai spell spelllang=en filetype=tex sw=2
 
 \section{Participating SV-COMP 2013 -- Symbiotic}\label{sec:svcomp}
 Implementing inter-procedural LLVM slicer~\cite{llvm-slicer}, \symbio~\cite{symbiotic} and
@@ -55,7 +55,23 @@ pipeline are one by one run by a single script \texttt{runme}.
 
 \begin{figure}[tb]
 \begin{center}
-\input{images/pipeline.pspdftex}
+  \tikzstyle{stat} = [thick,draw,minimum size=1cm,node distance=1.5cm]
+  \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+  \begin{tikzpicture}[font=\sffamily]
+    \node (START) {};
+    \node [stat,right=of START] (INSTR) {Instrumentor}
+      edge [pre] node [label=above:{C}] {} (START);
+    \node [stat,right=of INSTR] (CLANG) {\textsc{Clang}}
+      edge [pre] node [label=above:{C}] {} (INSTR);
+    \node [stat,right=2cm of CLANG] (SLICER) {Slicer}
+      edge [pre] node [label=above:{LLVM}] {} (CLANG);
+    \node [stat,below=9mm of SLICER] (KLEE) {\textsc{Klee}}
+      edge [pre] node [label=right:{LLVM}] {} (SLICER);
+    \node [stat,left=2.8cm of KLEE] (FILTER) {Filter}
+      edge [pre] node [label=above:{\textsc{Klee} result}] {} (KLEE);
+    \node [left=4.9cm of FILTER] (FINISH) {}
+      edge [pre] node [label=above:{\texttt{SAFE/UNSAFE/UNKNOWN}}] {} (FILTER);
+  \end{tikzpicture}
 \end{center}
   \caption{Pipeline of the tool}
 \label{fig:pipeline}

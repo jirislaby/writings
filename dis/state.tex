@@ -1,4 +1,4 @@
-% vim: textwidth=78 ai spell spelllang=en filetype=tex
+% vim: textwidth=78 ai spell spelllang=en filetype=tex sw=2
 
 \section{State of the Art}\label{sec:state}
 This section is deserved to description and current state of techniques for
@@ -58,8 +58,16 @@ errors, we simply try to find a subtree in an AST like: \\
 \subsection{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
 information about possible values set in variables at specified points in
-code. This is usually computed by stabilizing sets of equations, i.e.
-computing their fixpoint. For each statement $s$ we have a pair of equations:
+code. This is usually computed by stabilizing sets of equations, usually by
+computing a fixed point of the equations:
+
+\begin{dfn}[Fixed point]
+A \emph{fixed point} of a function $f : D \rightarrow D$ is an element $x \in
+D$ such that $f(x) = x$. The set $fp(f)$ of fixed points of $f$ is $\{x \in D
+\mid f(x) = x \}$.
+\end{dfn}
+
+In the data-flow analysis, we have a pair of equations for each statement $s$:
 
 \begin{equation} \label{eq:data_flow}
 \begin{aligned}
@@ -182,7 +190,7 @@ interpretations, see~\cite{ai_intro} for examples.
 As the name of the analysis suggests, there is an abstraction of how values
 are handled in an analysed program. Let us show this on a demonstrative
 example. Consider a program in Figure~\ref{fig:lst_ai_intro} and an analysis
-that should decide whether \texttt{i} is even at the end (let us ignore
+that should decide whether \texttt{i} is positive at the end (let us ignore
 overflows at this moment).
 
 \begin{figure}[htb]
@@ -192,7 +200,7 @@ overflows at this moment).
 void fun(int x)
   i = 3; (*@ \label{lst:ai_intro_set1} @*)
   while (x)
-    i += 2; (*@ \label{lst:ai_intro_set2} @*)
+    i *= 2; (*@ \label{lst:ai_intro_set2} @*)
   return i;
 }
 \end{lstlisting}
@@ -207,84 +215,181 @@ take the concrete evaluation. There are only two lines in the code that store
 something to \texttt{i}: lines~\ref{lst:ai_intro_set1} and
 \ref{lst:ai_intro_set2}. The former simply sets \texttt{i} to \texttt{3}, so
 we just remember that. The latter, increases \texttt{i} repeatedly, so we have
-to remember that \texttt{i} can be anything from $\{3,5,7,\ldots\}$ there. As
+to remember that \texttt{i} can be anything from $\{6,12,\ldots\}$ there. As
 we can see we would need infinite time and memory to store all possible values
 from all possible runs of the program (to later decide oddness of the
 numbers).
 
 On the other hand, if we only remember abstract information such as ``this
-number is odd/even'', and define how the arithmetic addition behaves on those,
-we need to store only a single value. In particular, we know that the
-arithmetic addition in this case is defined as in Table~\ref{tab:oddness}. At
-the moment, limit yourself only to the first three columns and rows.
+number is positive/negative'', and define how the arithmetic multiplication
+behaves on those, we need to store only a single value. In particular, we know
+that the arithmetic multiplication in this case is defined as in
+Table~\ref{tab:multiplication}. At the moment, limit yourself only to the
+first three columns and rows.
 \begin{table}[htb]
 \begin{center}
 \begin{tabular}{|c||c|c||c|c|} \hline
-+       & odd     & even    & unset   & unknown \\ \hline \hline
-odd     & even    & odd     & unknown & unknown \\ \hline
-even    & odd     & even    & unknown & unknown \\ \hline \hline
-unset   & unknown & unknown & unknown & unknown \\ \hline
-unknown & unknown & unknown & unknown & unknown \\ \hline
+$\ast$   & negative & positive & unset   & unknown \\ \hline \hline
+negative & positive & negative & unknown & unknown \\ \hline
+positive & negative & positive & unknown & unknown \\ \hline \hline
+unset    & unknown  & unknown  & unknown & unknown \\ \hline
+unknown  & unknown  & unknown  & unknown & unknown \\ \hline
 \end{tabular}
 \end{center}
   \caption{Behaviour of the arithmetic addition on odd and even numbers.}
-  \label{tab:oddness}
+  \label{tab:multiplication}
 \end{table}
 
 Let us continue with our example of Figure~\ref{fig:lst_ai_intro}. The first
 set to \texttt{i} happens on line~\ref{lst:ai_intro_set1}. \texttt{3} is
-abstracted as \textit{odd} there, so \texttt{i} is set to \textit{odd} there.
-Another set happens on line ~\ref{lst:ai_intro_set2} where we add \texttt{2}
-to \texttt{i}. \texttt{2} is abstracted as \textit{even} and since we know
-\texttt{i} is \textit{odd} at this point, the addition results, according to
-Table~\ref{tab:oddness} in \texttt{i} being still \textit{odd}.  We see, that
-in this simple program, we only need to remember that values of constants and
-variables in this program is one of $\{\text{\textit{even}},
-\,\text{\textit{odd}}, \,\text{\textit{unset}}\}$. Note that \textit{unset} is
+abstracted as \textit{positive} there, so \texttt{i} is set to
+\textit{positive} there too.  Another set happens on line
+~\ref{lst:ai_intro_set2} where we multiply \texttt{i} by \texttt{2}.
+\texttt{2} is abstracted as \textit{positive} and since we know \texttt{i} is
+\textit{positive} at this point, the multiplication results, according to
+Table~\ref{tab:multiplication} in \texttt{i} being still \textit{positive}.
+We see, that in this simple program, we only need to remember that values of
+constants and variables in this program is one of \textit{negative},
+\textit{positive}, or possibly \textit{unset}. Note that \textit{unset} is
 mostly referred to as $\bot$. However when we consider a condition like:
 \begin{center}
 \begin{tabular}{c}
 \begin{lstlisting}[language=C]
 if (condition)
-  i = 1;
+  i = -1;
 else
-  i = 2;
+  i = 1;
 \end{lstlisting}
 \end{tabular}
 \end{center}
 what would be the abstract value of \texttt{i} after joining the two branches?
-The same as in the data-flow analysis, we have a kind of join operator which
-can in this case say \texttt{i} is \textit{unknown}, usually referred to as
-$\top$. So in fact, when we are computing the abstract interpretation of a
-program, we consider the full Table~\ref{tab:oddness}.
+The same as in the data-flow analysis case, we have a kind of join operator
+which can in this case say \texttt{i} is \textit{unknown}, usually referred to
+as $\top$. So in fact, when we are computing the abstract interpretation of a
+program, we consider full Table~\ref{tab:multiplication}.
 
 Before we can start deeper explanation of the abstract interpretation we have
-to first define lattice, which the abstract interpretation is built upon.
-We will show some examples of lattices depicted as Hasse diagrams.
-\begin{dfn}[Lattice] is a partially ordered set where arbitrary two elements
-have a least upper bound (supremum) and a greatest lower bound (infimum).
+to first define \emph{lattice}, which the abstract interpretation is built
+upon. Since lattices are based on \emph{partially ordered sets}, we will first
+define those and then we will show some examples of lattices depicted as Hasse
+diagrams. Finally we will define \emph{Galois connection} which is the final
+step needed before we define the abstract interpretation.
+
+\begin{dfn}[Partially ordered set]
+A partially ordered set $(L, \leq)$, denoted also as \emph{poset}, is a set
+$L$ accompanied with a relation $\leq$, where:
+\begin{enumerate}
+\item $\leq$ is reflexive: $\forall a \in L, a \leq a$.
+\item $\leq$ is transitive: $\forall a,b,c \in L, \text{ if } a \leq b \text{
+and } b \leq c \text{ then } a \leq c$.
+\item $\leq$ is antisymmetric: $\forall a,b \in L, \text{ if } a \leq b
+\text{ and } b \leq a \text{ then } a = b$.
+\end{enumerate}
 \end{dfn}
 
-To represent values in our even/odd analysis, we define the ordered set such
-that \textit{even} is incomparable with \textit{odd}, $\bot$ is less than both
-and $\top$ is more than both. So in a Hasse diagram, the lattice looks like
-follows:
-\begin{center}
-    \begin{tikzpicture}
-      \node (TOP) {$\top$};
-      \node [below right=of TOP] (EVEN) {\textit{even}}
-        edge node {} (TOP);
-      \node [below left=of TOP] (ODD) {\textit{odd}}
-        edge node {} (TOP);
-      \node [below right=of ODD] (BOT) {$\bot$}
-        edge node {} (EVEN)
-        edge node {} (ODD);
-    \end{tikzpicture}
-\end{center}
-When a branching occurs in the source code we are interpreting, the join
-operator simply takes the values on input and performs lattice join on the
-lattice above.
+\begin{dfn}[Poset bounds]
+We also define these four terms with respect to partially ordered sets:
+\begin{itemize}
+\item $a \in L$ is an \emph{upper bound} of $X \subseteq L$ if and only if
+$\forall a' \in X, a' \leq a$.
+\item $a \in L$ is a \emph{lower bound} of $X \subseteq L$ if and only if
+$\forall a' \in X, a \leq a'$.
+\item $a \in L$ is the \emph{least upper bound} (supremum) of $X \subseteq L$
+if and only if $\forall a' \in X, a' \leq a \text{ and } \forall a'' \in L,
+\text{ if } \forall a' \in X, a' \leq a'' \text{ then } a \leq
+a''$.
+\item Similarly for the \emph{greatest lower bound} (infimum).
+\end{itemize}
+\end{dfn}
+Note that supremum and infimum do not necessarily exist. But if they do, they
+are unique.
 
+\begin{dfn}[Lattice]
+A \emph{lattice} $(L,\,\leq,\,\sqcup.\,\sqcap)$ is a partially ordered set
+$(L,\,\leq)$ where arbitrary two elements $a$ and $b$ have a supremum $a
+\sqcup b$ and an infimum $a \sqcap b$.
+\end{dfn}
+
+\begin{dfn}[Complete lattice]
+A \emph{complete lattice} $(L,\leq,\bot,\top,\sqcup,\,\sqcap)$ is a
+lattice $(L,\,\leq,\,\sqcup.\,\sqcap)$ such that every set $X \subseteq L$ has
+a least upper bound $\sqcup X$ and a greatest lower bound $\sqcap X$. Namely,
+$L$ has a least element $\bot = \sqcup \emptyset$ and a greatest element $\top
+= \sqcap L$.
+\end{dfn}
+
+In the abstract interpretation, complete lattices are used to represent both
+concrete and abstract values.  Lattices gives us the possibility to use its
+operators when we are interpreting a program. For example, when a branching
+occurs, the join operator needed when joining the branches simply takes the
+values present on the outputs of both branches and performs lattice join
+($\sqcup$) of the values in that lattice. Of course, we have to define a pair
+of functions $(\alpha, \gamma)$ that convert concrete values to the abstract
+ones ($\alpha$) and vice versa ($\gamma$).  We will focus on this aspect more
+precisely later, first, let us show some examples of lattices.
+
+We were considering positive/negative analysis. To represent values in that
+abstraction, we naturally define the complete lattice.  \textit{Positive}
+($\oplus$) is incomparable to \textit{negative} ($\ominus$) as switching from
+one to the other when joining branches would be pointless. $\bot$ is less than
+both since we start with \textit{unset} values and want to go upper when any
+of the values is set.  Finally, $\top$ is greater than both to catch the case
+of \textit{unknown} when branches bring different values. The pair of
+functions to convert from/to this abstraction is easily conceivable:
+\begin{align*}
+\alpha(x) & = 
+\begin{cases}
+\ominus & x < 0 \\
+\oplus & \text{otherwise}
+\end{cases} \\
+\gamma(x) & =
+\begin{cases}
+\mathbb{Z}_0^+ & x = \oplus \\
+\mathbb{Z}^-   & \text{otherwise}
+\end{cases} \\
+\end{align*}
+
+A Hasse diagram for such a lattice would look like follows:
+
+\begin{center}
+  \begin{tikzpicture}
+    \node (TOP) {$\top$};
+    \node [below right=of TOP] (PLUS) {$\oplus$}
+      edge node {} (TOP);
+    \node [below left=of TOP] (MINUS) {$\ominus$}
+      edge node {} (TOP);
+    \node [below right=of MINUS] (BOT) {$\bot$}
+      edge node {} (PLUS)
+      edge node {} (MINUS);
+  \end{tikzpicture}
+\end{center}
+
+We may want a more precise abstraction represented by the lattice below.
+There, we also remember whether the value of a variable is 0.  This can become
+useful if we have a multiplication or division in the code.  For
+multiplication, we can propagate the zero constant, for division, we can tell
+whether we are dividing by zero for example. Extending $(\alpha, \gamma)$ from
+the previous example is straightforward in this case.
+
+\begin{center}
+  \begin{tikzpicture}
+    \node (TOP) {$\top$};
+    \node [below right=of TOP] (PLUS) {$\oplus$}
+      edge node {} (TOP);
+    \node [below=of TOP] (ZERO) {\texttt{0}}
+      edge node {} (TOP);
+    \node [below left=of TOP] (MINUS) {$\ominus$}
+      edge node {} (TOP);
+    \node [below=of ZERO] (BOT) {$\bot$}
+      edge node {} (PLUS)
+      edge node {} (ZERO)
+      edge node {} (MINUS);
+  \end{tikzpicture}
+\end{center}
+
+We were also working with concrete ``abstraction'' at the beginning of this
+section. First, let us have a look at a lattice of an abstraction where we
+remember only a single value of a variable:
 \begin{center}
   \begin{tikzpicture}
     \node {$\top$}
@@ -309,37 +414,52 @@ lattice above.
       edge node {} (N_8);
   \end{tikzpicture}
 \end{center}
-
+Naturally, joining branches where values are different gives \textit{unknown}.
+However, our concrete interpretation was computing with all possibles sets of
+values. We need to augment the above lattice to a power set
+$\mathcal{P}(\mathbb{Z})$ using set inclusion as ordering. The complete
+lattice is defined as $(\mathcal{P}(\mathbb{Z}), \subseteq, \bot, \top,
+\sqcup, \sqcap)$ which looks like this:
 \begin{center}
   \begin{tikzpicture}
-    \node (TOP) {$\top$};
-    \node [below right=of TOP] (PLUS) {$+$}
-      edge node {} (TOP);
-    \node [below left=of TOP] (MINUS) {$-$}
-      edge node {} (TOP);
-    \node [below right=of ODD] (BOT) {$\bot$}
-      edge node {} (PLUS)
-      edge node {} (MINUS);
+    \node {$\top$}
+      child { node (DOTS) {$\cdots$} };
+    \node [below=of DOTS,label=left:{$\cdots$},label=right:{$\cdots$}] (N_3) {$\{-1,0,1\}$}
+      edge node {} (DOTS);
+    \node [below=of N_3] (N_2B) {$\{-1,1\}$}
+      edge node {} (N_3);
+    \node [left=of N_2B,label=left:{$\cdots$}] (N_2A) {$\{-1,0\}$}
+      edge node {} (N_3);
+    \node [right=of N_2B,label=right:{$\cdots$}] (N_2C) {$\{0,1\}$}
+      edge node {} (N_3);
+    \node [below=of N_2A,label=left:{$\cdots$}] (N_1A) {$\{-1\}$}
+      edge node {} (N_2A)
+      edge node {} (N_2B);
+    \node [below=of N_2B] (N_1B) {$\{0\}$}
+      edge node {} (N_2A)
+      edge node {} (N_2C);
+    \node [below=of N_2C,label=right:{$\cdots$}] (N_1C) {$\{1\}$}
+      edge node {} (N_2B)
+      edge node {} (N_2C);
+    \node [left=of N_1A] (N_1X) {};
+    \node [right=of N_1C] (N_1Y) {};
+    \node [below=of N_1B] (BOT) {$\bot$}
+%      edge node {} (N_1X)
+      edge node {} (N_1A)
+      edge node {} (N_1B)
+      edge node {} (N_1C)
+%      edge node {} (N_1Y)
+      ;
   \end{tikzpicture}
 \end{center}
 
-\begin{center}
-  \begin{tikzpicture}
-    \node (TOP) {$\top$};
-    \node [below right=of TOP] (PLUS) {$+$}
-      edge node {} (TOP);
-    \node [below=of TOP] (ZERO) {$0$}
-      edge node {} (TOP);
-    \node [below left=of TOP] (MINUS) {$-$}
-      edge node {} (TOP);
-    \node [below right=of ODD] (BOT) {$\bot$}
-      edge node {} (PLUS)
-      edge node {} (ZERO)
-      edge node {} (MINUS);
-  \end{tikzpicture}
-\end{center}
 
-
+\begin{dfn}[Galois connection]
+Let $(L_1, \leq_1)$ and $(L_2, \leq_2)$ be posets. $(\alpha, \gamma)$ is a
+Galois connection between $L_1$ and $L_2$ if and only if $\alpha \in L_1
+\rightarrow L_2, \gamma \in L_2 \rightarrow L_1$ and $\forall x \in L_1,
+\forall y \in L_2 , \alpha(x) \leq_2 y \Leftrightarrow x \leq_1 \gamma(y)$.
+\end{dfn}
 %In fact, abstract interpretation is well defined also when we have as a base
 %only a semi-lattice, i.e. a lattice with only one bound for any two elements,
 %supremum in particular.
@@ -350,8 +470,6 @@ lattice above.
 and $f$ is a transform function that changes abstract states according to
 instructions in some code.
 \end{dfn}
-
-$\gamma$ $\alpha$
 
 
 \subsection{Symbolic Execution}\label{sec:se}
