@@ -6,14 +6,14 @@ code analysis referred to later in the text. To be able to do that, we will
 first describe the techniques proper.
 
 \paragraph{Static Analysis} Under the term of static analysis we understand
-analyzing code without directly executing it on a processor. I.e. to perform
+analyzing code without directly executing it on a processor. I.e.~to perform
 exactly the opposite of dynamic analysis or testing where a program is
 executed and either automatically fed by some input in some form or tested
 manually by testers. This has the nice side-effect that the implementation
 need not be finished when we want to analyze it statically. So the static
-analysis not as limited as the dynamic one, it can be used whenever we want in
-the development cycle. Static analysis is thus used in several fields of the
-computer science. \emph{Optimizing compilers} can eliminate unused code,
+analysis is not as limited as the dynamic one, it can be used whenever we want
+in the development cycle. Static analysis is thus used in several fields of
+the computer science. \emph{Optimizing compilers} can eliminate unused code,
 propagate constants where variables would have to be left otherwise, or remove
 implicitly added runtime out-of-bounds checks from the code if it knows the
 bounds (as it happens in Java). \emph{Debuggers} can limit themselves only to
@@ -28,7 +28,9 @@ defined e.g.~by Cousot's framework, as we will see later, we are able to
 decide whether it is sound, complete and whether it terminates. Without those
 properties, optimizing compilers would generate invalid code for example.
 
-the most ready/useful\todo{XXX}
+%the most ready/useful\todo{XXX}
+
+% XXX do we want a picture specification+program -> analyzer -> diagnosis
 
 \section{Pattern Matching}\label{sec:pattern_matching}
 The simplest automatic analysis we can think of is to find some predefined
@@ -40,7 +42,7 @@ comment their code with comments similar to ``/ 0 happened here''.  But there
 of course exist more robust techniques based on pattern matching. They, in
 some way, parse the code (which also removes comments like the above) and do
 pattern matching on some internal structure~\cite{findbugs}. If we recall the
-abstract syntax tree from Figure~\ref{fig:parsing_process}~(d), we can design
+abstract syntax tree from Figure~\ref{fig:parsing_structs}~(a), we can design
 a checker which would match AST subtrees. Then to match division by zero
 errors, we simply try to find a subtree in an AST like: \\
 \begin{center}
@@ -94,8 +96,8 @@ information we can decide whether some variable was set already at the point
 it is used. If it is not, we should report about an uninitialized access. Let
 us demonstrate that on the following example. There, the reaching definition
 set at line~\ref{lst:reach_use} is a set of the two labels
-$\{\ref{lst:reach_def1}, \ref{lst:reach_def2} \}$, where we define \texttt{a}.
-Note that line~\ref{lst:reach_def0} does not belong there because \texttt{a}
+$\{\ref{lst:reach_def1}, \ref{lst:reach_def2} \}$, where we define \code{a}.
+Note that line~\ref{lst:reach_def0} does not belong there because \code{a}
 was re-set later on all paths to line~\ref{lst:reach_use}.
 \begin{center}
 \begin{tabular}{c}
@@ -183,14 +185,14 @@ soundness.  \emph{Abstract interpretation} is a technique that has a history
 stretching back to the 1970s. Back then, it was described by Cousot\&Cousot in
 \cite{cousot}. It is designed to allow users of the formalism to decide
 whether their analysis is correct, if it terminates, to formulate more
-precision levels of an analysis consistently and more as we will see later.
-With this formalism, we can also interpret data-flow analyses as abstract
-interpretations, see~\cite{ai_intro} for examples.
+precision levels of an analysis consistently and more.  With this formalism,
+we can also interpret data-flow analyses as abstract interpretations, as was
+shown in~\cite{ai_intro}.
 
 As the name of the analysis suggests, there is an abstraction of how values
 are handled in an analysed program. Let us show this on a demonstrative
 example. Consider a program in Figure~\ref{fig:lst_ai_intro} and an analysis
-that should decide whether \texttt{i} is positive at the end (let us ignore
+that should decide whether \code{i} is positive at the end (let us ignore
 overflows at this moment).
 
 \begin{figure}[htb]
@@ -212,61 +214,52 @@ void fun(int x)
 
 First, consider an ``abstraction'' that abstracts the code in no way, i.e.~we
 take the concrete evaluation. There are only two lines in the code that store
-something to \texttt{i}: lines~\ref{lst:ai_intro_set1} and
-\ref{lst:ai_intro_set2}. The former simply sets \texttt{i} to \texttt{3}, so
-we just remember that. The latter, increases \texttt{i} repeatedly, so we have
-to remember that \texttt{i} can be anything from $\{6,12,\ldots\}$ there. As
-we can see we would need infinite time and memory to store all possible values
-from all possible runs of the program (to later decide oddness of the
-numbers).
-
-On the other hand, if we only remember abstract information such as ``this
-number is positive/negative'', and define how the arithmetic multiplication
-behaves on those, we need to store only a single value. In particular, we know
-that the arithmetic multiplication in this case is defined as in
-Table~\ref{tab:multiplication}. At the moment, limit yourself only to the
-first three columns and rows.
+something to \code{i}: lines~\ref{lst:ai_intro_set1} and
+\ref{lst:ai_intro_set2}. The former simply sets \code{i} to \code{3}, so
+we just remember that. The latter, increases \code{i} repeatedly, so we have
+to remember that \code{i} can be anything from $\{6,12,24,\dots\}$ there. To
+be able to decide if a variable is positive or negative when analyzing the
+program concretely, we would need infinite time and memory to store all
+possible values from all possible runs. Nonetheless, if we only remember
+abstract information such as ``this number is positive/negative'', and define
+how arithmetic operations behave on those, we need to store only a
+single value.  In particular, we know that the arithmetic multiplication in
+this case is defined as is shown in Table~\ref{tab:multiplication}.
+%At the moment, limit yourself only to the first three columns and rows.
 \begin{table}[htb]
 \begin{center}
-\begin{tabular}{|c||c|c||c|c|} \hline
-$\ast$   & negative & positive & unset   & unknown \\ \hline \hline
-negative & positive & negative & unknown & unknown \\ \hline
-positive & negative & positive & unknown & unknown \\ \hline \hline
-unset    & unknown  & unknown  & unknown & unknown \\ \hline
-unknown  & unknown  & unknown  & unknown & unknown \\ \hline
+\begin{tabular}{|c||c|c|}\hline %|c|c|} \hline
+$\ast$   & negative & positive \\ \hline \hline %& unset   & unknown \\ \hline \hline
+negative & positive & negative \\ \hline %& unknown & unknown \\ \hline
+positive & negative & positive \\ \hline %& unknown & unknown \\ \hline \hline
+%unset    & unknown  & unknown  & unknown & unknown \\ \hline
+%unknown  & unknown  & unknown  & unknown & unknown \\ \hline
 \end{tabular}
 \end{center}
-  \caption{Behaviour of the arithmetic addition on odd and even numbers.}
+  \caption{Behaviour of the arithmetic multiplication on positive and negative
+  numbers.}
   \label{tab:multiplication}
 \end{table}
 
 Let us continue with our example of Figure~\ref{fig:lst_ai_intro}. The first
-set to \texttt{i} happens on line~\ref{lst:ai_intro_set1}. \texttt{3} is
-abstracted as \textit{positive} there, so \texttt{i} is set to
-\textit{positive} there too.  Another set happens on line
-~\ref{lst:ai_intro_set2} where we multiply \texttt{i} by \texttt{2}.
-\texttt{2} is abstracted as \textit{positive} and since we know \texttt{i} is
-\textit{positive} at this point, the multiplication results, according to
-Table~\ref{tab:multiplication} in \texttt{i} being still \textit{positive}.
-We see, that in this simple program, we only need to remember that values of
-constants and variables in this program is one of \textit{negative},
-\textit{positive}, or possibly \textit{unset}. Note that \textit{unset} is
-mostly referred to as $\bot$. However when we consider a condition like:
-\begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}[language=C]
-if (condition)
-  i = -1;
-else
-  i = 1;
-\end{lstlisting}
-\end{tabular}
-\end{center}
-what would be the abstract value of \texttt{i} after joining the two branches?
-The same as in the data-flow analysis case, we have a kind of join operator
-which can in this case say \texttt{i} is \textit{unknown}, usually referred to
-as $\top$. So in fact, when we are computing the abstract interpretation of a
-program, we consider full Table~\ref{tab:multiplication}.
+set to \code{i} happens on line~\ref{lst:ai_intro_set1}. There, \code{3} is
+abstracted as \textit{positive}, so \code{i} is set to \textit{positive} there
+too.  Another set happens on line~\ref{lst:ai_intro_set2} where we multiply
+\code{i} by \code{2}.  \code{2} is abstracted as \textit{positive} and since
+we know \code{i} is \textit{positive} at this point, the multiplication
+results, according to Table~\ref{tab:multiplication} in \code{i} being still
+\textit{positive}. Note that in this simple program, the only values we need
+to remember are one of \textit{negative}, \textit{positive}, or possibly
+\textit{unset} in case no store was processed yet. \textit{unset} is mostly
+referred to as $\bot$. Further, let us change the body of the loop to be
+\code{i *= -2}. What would be the abstract value of \code{i} after joining
+the two branches?  The same as in the data-flow analysis case, we have a kind
+of join operator which can in this case say \code{i} is \textit{unknown}.
+\textit{unknown} is usually referred to as $\top$. So in fact, when we are
+computing the abstract interpretation of a program, the
+Table~\ref{tab:multiplication} is extended to contain also $\bot$ and $\top$.
+Multiplication of $\bot$ and any other value from the table results in that
+value. For $\top$, join usually returns $\top$.
 
 Before we can start deeper explanation of the abstract interpretation we have
 to first define \emph{lattice}, which the abstract interpretation is built
@@ -328,14 +321,15 @@ of functions $(\alpha, \gamma)$ that convert concrete values to the abstract
 ones ($\alpha$) and vice versa ($\gamma$).  We will focus on this aspect more
 precisely later, first, let us show some examples of lattices.
 
-We were considering positive/negative analysis. To represent values in that
-abstraction, we naturally define the complete lattice.  \textit{Positive}
-($\oplus$) is incomparable to \textit{negative} ($\ominus$) as switching from
-one to the other when joining branches would be pointless. $\bot$ is less than
-both since we start with \textit{unset} values and want to go upper when any
-of the values is set.  Finally, $\top$ is greater than both to catch the case
-of \textit{unknown} when branches bring different values. The pair of
-functions to convert from/to this abstraction is easily conceivable:
+We were considering a positive/negative analysis. To represent values in that
+abstraction, we naturally define the complete lattice as follows.
+\textit{Positive} ($\oplus$) is incomparable to \textit{negative} ($\ominus$)
+as switching from one to the other would be pointless when joining branches.
+$\bot$ is less than both since we start with \textit{unset} values and want to
+go upper when any of the values is set.  Finally, $\top$ is greater than both
+to catch the case of \textit{unknown} when branches bring different values.
+The pair of functions to convert from/to this abstraction is easily
+conceivable:
 \begin{align*}
 \alpha(x) & = 
 \begin{cases}
@@ -349,9 +343,9 @@ functions to convert from/to this abstraction is easily conceivable:
 \end{cases} \\
 \end{align*}
 
-A Hasse diagram for such a lattice would look like follows:
-
+\begin{figure}[tb]
 \begin{center}
+\begin{tabular}{cc}
   \begin{tikzpicture}
     \node (TOP) {$\top$};
     \node [below right=of TOP] (PLUS) {$\oplus$}
@@ -361,17 +355,7 @@ A Hasse diagram for such a lattice would look like follows:
     \node [below right=of MINUS] (BOT) {$\bot$}
       edge node {} (PLUS)
       edge node {} (MINUS);
-  \end{tikzpicture}
-\end{center}
-
-We may want a more precise abstraction represented by the lattice below.
-There, we also remember whether the value of a variable is 0.  This can become
-useful if we have a multiplication or division in the code.  For
-multiplication, we can propagate the zero constant, for division, we can tell
-whether we are dividing by zero for example. Extending $(\alpha, \gamma)$ from
-the previous example is straightforward in this case.
-
-\begin{center}
+  \end{tikzpicture} &
   \begin{tikzpicture}
     \node (TOP) {$\top$};
     \node [below right=of TOP] (PLUS) {$\oplus$}
@@ -384,12 +368,24 @@ the previous example is straightforward in this case.
       edge node {} (PLUS)
       edge node {} (ZERO)
       edge node {} (MINUS);
-  \end{tikzpicture}
+  \end{tikzpicture} \\
+  (a) & (b)
+\end{tabular}
 \end{center}
+\label{fig:posneg}
+\caption{Positive/negative lattice (a) without zero, and (b) with zero.}
+\end{figure}
 
-We were also working with concrete ``abstraction'' at the beginning of this
-section. First, let us have a look at a lattice of an abstraction where we
-remember only a single value of a variable:
+A Hasse diagram for such a lattice would look like in
+Figure~\ref{fig:posneg}~(a).  But we may want a more precise abstraction
+represented by the lattice in Figure~\ref{fig:posneg}~(b).  There, we also
+remember whether the value of a variable is 0.  This can become useful if we
+have a multiplication or division in the code.  For multiplication, we can
+propagate the zero constant, for division, we can tell whether we are dividing
+by zero for example.  Extending $(\alpha, \gamma)$ from the previous example
+is straightforward in this case.
+
+\begin{figure}[tb]
 \begin{center}
   \begin{tikzpicture}
     \node {$\top$}
@@ -414,12 +410,11 @@ remember only a single value of a variable:
       edge node {} (N_8);
   \end{tikzpicture}
 \end{center}
-Naturally, joining branches where values are different gives \textit{unknown}.
-However, our concrete interpretation was computing with all possibles sets of
-values. We need to augment the above lattice to a power set
-$\mathcal{P}(\mathbb{Z})$ using set inclusion as ordering. The complete
-lattice is defined as $(\mathcal{P}(\mathbb{Z}), \subseteq, \bot, \top,
-\sqcup, \sqcap)$ which looks like this:
+\label{fig:lat_concrete}
+\caption{Lattice for a single concrete value.}
+\end{figure}
+
+\begin{figure}[tb]
 \begin{center}
   \begin{tikzpicture}
     \node (TOP) {$\top$};
@@ -450,36 +445,63 @@ lattice is defined as $(\mathcal{P}(\mathbb{Z}), \subseteq, \bot, \top,
       edge node {} (N_1C);
   \end{tikzpicture}
 \end{center}
+\label{fig:lat_concrete_set}
+\caption{Lattice for a set of concrete values.}
+\end{figure}
+
+We were also working with concrete ``abstraction'' at the beginning of this
+section. First, let us have a look at a lattice of an abstraction where we
+remember only a single value of a variable. Such a lattice is depicted in
+Figure~\ref{fig:lat_concrete}.  Naturally, joining branches where values are
+different gives \textit{unknown}.  However, our concrete interpretation was
+computing with all possibles sets of values. We need to augment the above
+lattice to a power set $\mathcal{P}(\mathbb{Z})$ using set inclusion as
+ordering. The complete lattice is defined as $(\mathcal{P}(\mathbb{Z}),
+\subseteq, \bot, \top, \sqcup, \sqcap)$ and as a Hasse diagram it looks like
+in Figure~\ref{fig:lat_concrete_set}.
 
 There is a difference to be spotted between these two. Although they both
 contain an infinite number of elements, the latter lattice has an infinite
-height. This is exactly the source of the need of inifinite time and memory
-for this analysis for some programs as we will see below.
+height. This is exactly the source of the need of infinite time and memory
+for this analysis when analyzing particular programs as we will see below.
 
-
+Finally, let us define the abstract interpretation using Galois connection,
+the same as in~\cite{cousot_galois}.
 
 \begin{dfn}[Galois connection]
-Let $(L_1, \leq_1)$ and $(L_2, \leq_2)$ be posets. $(\alpha, \gamma)$ is a
-Galois connection between $L_1$ and $L_2$ if and only if $\alpha \in L_1
-\rightarrow L_2, \gamma \in L_2 \rightarrow L_1$ and $\forall x \in L_1,
-\forall y \in L_2 , \alpha(x) \leq_2 y \Leftrightarrow x \leq_1 \gamma(y)$.
+Let $(L_c,\,\leq_c)$ and $(L_a,\,\leq_a)$ be partially ordered sets.
+$(\alpha,\,\gamma)$ is a \emph{Galois connection} $L_c
+\aigal L_a$ between $L_c$ and $L_a$ if
+and only if $\alpha \in L_c \rightarrow L_a$, $\gamma \in L_a \rightarrow L_c$
+and
+\begin{center}
+$\forall x \in L_c,\,\forall y \in L_a,\,\alpha(x) \leq_a y\,
+\Leftrightarrow\,x \leq_c \gamma(y)$.
+\end{center}
 \end{dfn}
+
+% \break somewhere
+Further, we denote $(L_c,\,\leq_c,\,\bot_c,\,\top_c,\,\sqcup_c,\,\sqcap_c)$ the
+\emph{concrete lattice} and $(L_a,\,\leq_a,\,\bot_a,\,\top_a,\,\sqcup_a,\,
+\sqcap_a)$ the \emph{abstract lattice}. $\alpha$ and $\gamma$ are
+\emph{abstraction} and \emph{concretization} functions. Both has to be
+\emph{monotone} for Galois connection to be well-defined, cf.~\cite{cousot1}.
+
+\begin{dfn}[Abstract interpretation]
+A tuple $(L_a,\, \bot_a,\, F_a)$ is an \emph{abstract interpretation} of
+$(L_c,\, \bot_c,\, F_c)$, written $(L_c,\, \bot_c,\, F_c) \aigal (L_a,\,
+\bot_a,\, F_a)$, if and only if $L_c \aigal L_a,\, \alpha(\bot_c) \leq_a
+\bot_a$ and $\stackrel{\rightarrow}{\alpha}(F_c) \leq_a F_a$.
+\end{dfn}
+
+
+A progress of the abstract interpretation in~\cite{cousot_progress}
 
 %In fact, abstract interpretation is well defined also when we have as a base
 %only a semi-lattice, i.e.~a lattice with only one bound for any two elements,
 %supremum in particular.
 
-As the abstract interpretation 
-
 fixpoint for lattices~\cite{tarski}
-
-\begin{dfn}[Abstract Interpretation] is a tuple $\mathcal{A}=(A, \leq,
-\sqsubseteq, \bot, \top, f)$, where $A$ is a semi-lattice $(A, \leq,
-\sqsubseteq, \bot, \top)$ of the abstract values (abstract domain)
-and $f$ is a transform function that changes abstract states according to
-instructions in some code.
-\end{dfn}
-
 
 \section{Symbolic Execution}\label{sec:se}
 Another analysis this thesis deals with is \emph{symbolic execution}. Instead
@@ -558,15 +580,17 @@ not depicted in the figure.
 
 
 \section{Slicing}\label{sec:slicing}
-Slicing was first described in~\cite{slicing}. It is a technique to eliminate
-unneeded lines of code from a program. This is always computed with respect to
-some code location and variables which we are interested in at that place.
-Only the code that can affect the variables there is left in the program. This
-is for example useful for debugging purposes to understand how values are
-propagated to a variable. The location and variables are called \emph{slicing
-criteria}.
+Slicing was first described in~\cite{slicing_phd}. It is a technique to
+eliminate unneeded lines of code from a program. This is always computed with
+respect to some code location and variables which we are interested in at that
+place.  Only the code that can affect the variables there is left in the
+program. This is for example useful for debugging purposes to understand how
+values are propagated to a variable. The location and variables are called
+\emph{slicing criteria}.
 
 Theory about slicing XXX \ldots
+
+\cite{slicing, slicing1, slicing2}
 
 The main two branches of slicing are \emph{dynamic} and \emph{static}. The
 former considers one concrete input when computing the slice and may
@@ -634,9 +658,9 @@ to~\cite{bmc_survey} about bounded model checking.
 For languages using pointers like C, it is important to know where these
 pointers point to. Consider the global integer variable and an integer pointer
 as are in the code depicted in Figure~\ref{fig:lst_ptsto}. Without knowing
-that \texttt{p} can point-to and actually changes \texttt{x} we would conclude
-that \texttt{fun} always returns 0. But it returns whatever it gets on the
-input as a parameter \texttt{a}. For that purpose algorithms known as
+that \code{p} can point-to and actually changes \code{x} we would conclude
+that \code{fun} always returns 0. But it returns whatever it gets on the
+input as a parameter \code{a}. For that purpose algorithms known as
 \emph{Points-to analysis} (sometimes referred as \emph{Pointer analysis})
 exist. 
 
@@ -669,7 +693,7 @@ analyses are often parametrized by another sensitivity: sensitivity for
 structure fields.
 
 \paragraph{Field-sensitivity} In languages allowing structured constructs, like
-\texttt{struct} in C, we have two options: to consider each of the member
+\code{struct} in C, we have two options: to consider each of the member
 of such an object or ignore them. Obviously ignoring that information leads to
 faster analysis, however imprecisions occur. The imprecisions are two-fold:
 each member itself can be a pointer and should have its own points-to set, and
@@ -677,10 +701,10 @@ knowing exactly to which member of a structure a pointer points-to is indeed
 useful information. On the other hand, when we want more precise analysis,
 there are two steps, with different precision. First, \emph{field-based
 sensitivity} have only one global information about structure members, per
-each member name. So when we have two totally different structures \texttt{a}
-and \texttt{b} containing a member \texttt{void *x}, this analysis considers
-them to be the same and updates \texttt{x}'s points-to set any time
-\texttt{a.x} or \texttt{b.x} is set to point to a new object. The other
+each member name. So when we have two totally different structures \code{a}
+and \code{b} containing a member \code{void *x}, this analysis considers
+them to be the same and updates \code{x}'s points-to set any time
+\code{a.x} or \code{b.x} is set to point to a new object. The other
 analysis, the true \emph{field-sensitive} one, properly handles members of
 structures in natural sense, but for a higher computation price, of course.
 
