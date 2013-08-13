@@ -223,125 +223,159 @@ program concretely, we would need infinite time and memory to store all
 possible values from all possible runs. Nonetheless, if we only remember
 abstract information such as ``this number is positive/negative'', and define
 how arithmetic operations behave on those, we need to store only a
-single value.  In particular, we know that the arithmetic multiplication in
-this case is defined as is shown in Table~\ref{tab:multiplication}.
-%At the moment, limit yourself only to the first three columns and rows.
-\begin{table}[htb]
-\begin{center}
-\begin{tabular}{|c||c|c|}\hline %|c|c|} \hline
-$\ast$   & negative & positive \\ \hline \hline %& unset   & unknown \\ \hline \hline
-negative & positive & negative \\ \hline %& unknown & unknown \\ \hline
-positive & negative & positive \\ \hline %& unknown & unknown \\ \hline \hline
-%unset    & unknown  & unknown  & unknown & unknown \\ \hline
-%unknown  & unknown  & unknown  & unknown & unknown \\ \hline
-\end{tabular}
-\end{center}
-  \caption{Behaviour of the arithmetic multiplication on positive and negative
-  numbers.}
-  \label{tab:multiplication}
-\end{table}
+single value.
 
-Let us continue with our example of Figure~\ref{fig:lst_ai_intro}. The first
-set to \code{i} happens on line~\ref{lst:ai_intro_set1}. There, \code{3} is
-abstracted as \textit{positive}, so \code{i} is set to \textit{positive} there
-too.  Another set happens on line~\ref{lst:ai_intro_set2} where we multiply
-\code{i} by \code{2}.  \code{2} is abstracted as \textit{positive} and since
-we know \code{i} is \textit{positive} at this point, the multiplication
-results, according to Table~\ref{tab:multiplication} in \code{i} being still
-\textit{positive}. Note that in this simple program, the only values we need
-to remember are one of \textit{negative}, \textit{positive}, or possibly
-\textit{unset} in case no store was processed yet. \textit{unset} is mostly
-referred to as $\bot$. Further, let us change the body of the loop to be
-\code{i *= -2}. What would be the abstract value of \code{i} after joining
-the two branches?  The same as in the data-flow analysis case, we have a kind
-of join operator which can in this case say \code{i} is \textit{unknown}.
-\textit{unknown} is usually referred to as $\top$. So in fact, when we are
-computing the abstract interpretation of a program, the
-Table~\ref{tab:multiplication} is extended to contain also $\bot$ and $\top$.
-Multiplication of $\bot$ and any other value from the table results in that
-value. For $\top$, join usually returns $\top$.
-
-Before we can start deeper explanation of the abstract interpretation we have
-to first define \emph{lattice}, which the abstract interpretation is built
-upon. Since lattices are based on \emph{partially ordered sets}, we will first
-define those and then we will show some examples of lattices depicted as Hasse
-diagrams. Finally we will define \emph{Galois connection} which is the final
-step needed before we define the abstract interpretation.
-
-\begin{dfn}[Partially ordered set]
-A partially ordered set $(L, \leq)$, denoted also as \emph{poset}, is a set
-$L$ accompanied with a relation $\leq$, where:
-\begin{enumerate}
-\item $\leq$ is reflexive: $\forall a \in L, a \leq a$.
-\item $\leq$ is transitive: $\forall a,b,c \in L, \text{ if } a \leq b \text{
-and } b \leq c \text{ then } a \leq c$.
-\item $\leq$ is antisymmetric: $\forall a,b \in L, \text{ if } a \leq b
-\text{ and } b \leq a \text{ then } a = b$.
-\end{enumerate}
-\end{dfn}
-
-\begin{dfn}[Poset bounds]
-We also define these four terms with respect to partially ordered sets:
-\begin{itemize}
-\item $a \in L$ is an \emph{upper bound} of $X \subseteq L$ if and only if
-$\forall a' \in X, a' \leq a$.
-\item $a \in L$ is a \emph{lower bound} of $X \subseteq L$ if and only if
-$\forall a' \in X, a \leq a'$.
-\item $a \in L$ is the \emph{least upper bound} (supremum) of $X \subseteq L$
-if and only if $\forall a' \in X, a' \leq a \text{ and } \forall a'' \in L,
-\text{ if } \forall a' \in X, a' \leq a'' \text{ then } a \leq
-a''$.
-\item Similarly for the \emph{greatest lower bound} (infimum).
-\end{itemize}
-\end{dfn}
-Note that supremum and infimum do not necessarily exist. But if they do, they
-are unique.
-
-\begin{dfn}[Lattice]
-A \emph{lattice} $(L,\,\leq,\,\sqcup.\,\sqcap)$ is a partially ordered set
-$(L,\,\leq)$ where arbitrary two elements $a$ and $b$ have a supremum $a
-\sqcup b$ and an infimum $a \sqcap b$.
-\end{dfn}
-
-\begin{dfn}[Complete lattice]
-A \emph{complete lattice} $(L,\leq,\bot,\top,\sqcup,\,\sqcap)$ is a
-lattice $(L,\,\leq,\,\sqcup.\,\sqcap)$ such that every set $X \subseteq L$ has
-a least upper bound $\sqcup X$ and a greatest lower bound $\sqcap X$. Namely,
-$L$ has a least element $\bot = \sqcup \emptyset$ and a greatest element $\top
-= \sqcap L$.
-\end{dfn}
-
-In the abstract interpretation, complete lattices are used to represent both
-concrete and abstract values.  Lattices gives us the possibility to use its
-operators when we are interpreting a program. For example, when a branching
-occurs, the join operator needed when joining the branches simply takes the
-values present on the outputs of both branches and performs lattice join
-($\sqcup$) of the values in that lattice. Of course, we have to define a pair
-of functions $(\alpha, \gamma)$ that convert concrete values to the abstract
-ones ($\alpha$) and vice versa ($\gamma$).  We will focus on this aspect more
-precisely later, first, let us show some examples of lattices.
-
-We were considering a positive/negative analysis. To represent values in that
-abstraction, we naturally define the complete lattice as follows.
-\textit{Positive} ($\oplus$) is incomparable to \textit{negative} ($\ominus$)
-as switching from one to the other would be pointless when joining branches.
-$\bot$ is less than both since we start with \textit{unset} values and want to
-go upper when any of the values is set.  Finally, $\top$ is greater than both
-to catch the case of \textit{unknown} when branches bring different values.
-The pair of functions to convert from/to this abstraction is easily
-conceivable:
+\begin{figure}[tb]
 \begin{align*}
 \alpha(x) & = 
-\begin{cases}
-\ominus & x < 0 \\
-\oplus & \text{otherwise}
-\end{cases} \\
+  \begin{cases}
+  \ominus & x < 0 \\
+  \oplus & \text{otherwise}
+  \end{cases} \\
 \gamma(x) & =
-\begin{cases}
-\mathbb{Z}_0^+ & x = \oplus \\
-\mathbb{Z}^-   & \text{otherwise}
-\end{cases} \\
+  \begin{cases}
+  \mathbb{Z}_0^+ & x = \oplus \\
+  \mathbb{Z}^-   & \text{otherwise}
+  \end{cases} \\
 \end{align*}
+\caption{Abstraction and concretization functions defined for
+positive/negative analysis.}
+\label{fig:ai_alpha_omega}
+\end{figure}
+
+\begin{figure}[tb]
+\begin{center}
+    \begin{tikzpicture}[circle, thick, <-, >=stealth', minimum size=2mm, inner sep=0pt]
+      \node [fill=black] (A0) {};
+      \node [fill=black, right=4cm of A0] (A1) {}
+        edge node [label=above:$F_a$] {} (A0);
+      \node [fill=black, below=2cm of A0] (C0) {}
+        edge node [label=left:$\gamma$] {} (A0);
+      \node [fill=black, right=3.5cm of C0] (C1) {}
+        edge node [label=above:$F_c$] {} (C0);
+      \node [fill=black, above=10mm of C1] (A2) {}
+        edge node [label=right:$\alpha$] {} (C1);
+      \node [rotate=65,below=5mm of A1,yshift=5.5mm] {$\leq_a$ };
+    \end{tikzpicture}
+\end{center}
+\caption{Computation of abstract transform function.}
+\label{fig:ai_square}
+\end{figure}
+
+To work with the abstract values, we define two functions: \emph{abstraction}
+denoted $\alpha$ and \emph{concretization} denoted $\gamma$, both accepting
+one parameter.  $\alpha$ returns an abstract value corresponding to the
+concrete value on input and $\gamma$ does the opposite.  In
+Figure~\ref{fig:ai_alpha_omega}, we provide a definition of the two functions
+to work for our positive/negative analysis, where $\oplus$ is used to denote
+the positive abstract value and $\ominus$ for negative. Further, the same as
+for the data-flow analysis, during the abstract interpretation, we compute a
+fixed point. The fixed point is computed to stabilise the abstract values at
+each statement and often it starts with values set to $\bot$. The values are
+changed by a transform function that changes the state according to the effect
+of a statement. We have two possibilities to define the transform function as
+can be seen in Figure~\ref{fig:ai_square}. We can simply define a transform
+function for abstract values $F_a$ to obtain a new abstract state
+corresponding to the effect of a statement applied to the original state. The
+other option for more complex statements, is to first jump back to the
+concrete values, perform the transformation on the concrete values using a
+concrete transform function $F_c$ and switch back to the abstract values.
+$F_a$ is then defined as $F_a = \alpha \circ F_c \circ \gamma$. Per definition
+(\cite{cousot}), the resulting abstract value must be less than or equal to
+the one computed by a direct $F_a$.
+
+\begin{table}[tb]
+\begin{center}
+\begin{tabular}{|c||c|c|}\hline
+$\ast$    & $\ominus$ & $\oplus$  \\ \hline \hline
+$\ominus$ & $\oplus$  & $\ominus$ \\ \hline
+$\oplus$  & $\ominus$ & $\oplus$  \\ \hline
+\end{tabular}
+%\begin{tabular}{|c||c|c|}\hline
+%$+$       & $\ominus$ & $\oplus$ \\ \hline \hline
+%$\ominus$ & $\ominus$ & $\top$   \\ \hline
+%$\oplus$  & $\top$    & $\oplus$ \\ \hline
+%\end{tabular}
+\end{center}
+  \caption{Behaviour of arithmetic multiplication in the abstract
+  transformation function on negative ($\ominus$) and positive ($\oplus$)
+  abstract values.}
+  \label{tab:ai_multiplication}
+\end{table}
+
+We know how to define the arithmetic multiplication in this case precisely on
+the abstract level as is shown in Table~\ref{tab:ai_multiplication}. With
+these definitions, we can continue interpreting our example of
+Figure~\ref{fig:lst_ai_intro}. The first set to \code{i} happens on
+line~\ref{lst:ai_intro_set1}. There, \code{3} is abstracted as $\oplus$, so
+\code{i} is set to $\oplus$ there too.  Another set happens on
+line~\ref{lst:ai_intro_set2} where we multiply \code{i} by \code{2}. \code{2}
+is abstracted as $\oplus$ and since we know \code{i} is $\oplus$ at this
+point, the multiplication results, according to
+Table~\ref{tab:ai_multiplication} in \code{i} being still $\oplus$. Note that
+for this simple analysis, the only values we need to remember are one of
+$\ominus$, $\oplus$, or possibly \textit{unset} in case no store was processed
+yet. \textit{unset} is mostly referred to as $\bot$. Further, if the body of
+the loop is changed to be \code{i *= -2}, what would be the abstract value of
+\code{i} after joining $\oplus$ from odd iterations with $\ominus$ from even
+iterations? The same as in the data-flow analysis case, we have a kind of join
+operator which can in this case say \code{i} is \textit{unknown}. Note that
+\textit{unknown} is usually referred to as $\top$.  So in fact, when we are
+computing a real abstract interpretation of a program, the behaviour tables
+(Table~\ref{tab:ai_multiplication}) are extended to contain also $\bot$ and
+$\top$. Obviously, multiplication of $\bot$ and any other value $x$ from the
+table results in $x$ as the first initialization happened. For $\top$, the
+join operator usually returns $\top$ for two reasons. First, the
+transformation function shall be monotone (\cite{cousot} and \cite[p.
+348--349]{kleene}). Second, hopping from \textit{unknown} back to some of the
+``known'' values would break soundness of the analysis.
+
+\begin{table}[tb]
+\begin{center}
+\begin{tabular}{|l|c|c|c|c|} \hline
+\diagbox{Code}{Iteration}
+                  & 0      & 1         & 2        & 3 \\ \hline
+\code{i = 3;}     & $\bot$ & $\oplus$  & $\oplus$ & $\oplus$    \\ \hline
+\code{while (x)}  & $\bot$ & $\oplus$  & $\top$   & $\top$      \\ \hline
+~~\code{i *= -2;} & $\bot$ & $\ominus$ & $\top$   & $\top$      \\ \hline
+\code{return i;}  & $\bot$ & $\top$    & $\top$   & $\top$      \\ \hline
+\end{tabular}
+\end{center}
+\caption{Computation of the abstract interpretation on an example from
+Figure~\ref{fig:lst_ai_intro} for variable \code{i}.}
+\label{tab:ai_computation}
+\end{table}
+
+Now, let us demonstrate the interpretation of the code of
+Figure~\ref{fig:lst_ai_intro} with the modified while-loop body which
+multiplies \code{i} by \code{-2}. The computation of a fixed point is depicted
+in Table~\ref{tab:ai_computation} as it goes over time until a fixed point is
+reached in the third iteration. The result is rather imprecise, we cannot make
+any assumption about \code{i} when it is returned from the function. The
+abstraction was apparently too coarse and the interpretation does not help
+much.
+
+We are still missing a formalism to represent the values and design a monotone
+function over the values effectively. In the abstract interpretation this is
+solved by using complete lattices~\cite{lattice1,lattice2}. They are used to
+represent both concrete and abstract values.  Lattices gives us the
+possibility to use its operators when we are interpreting a program.  For
+example, when a branching occurs, the join operator needed when joining the
+branches simply takes the values present on the outputs of both branches and
+performs lattice join ($\sqcup$) of the values in that lattice. Of course,
+since there are two complete lattices, one for concrete, one for abstract
+values, $\alpha$ and $\gamma$ are used. In fact the pair $(\alpha,\, \gamma)$
+forms a \emph{Galois connection}~\cite{cousot_galois} between the lattices.
+Now, let us formally define a complete lattice and show some examples of
+lattices.
+
+\begin{dfn}[Complete lattice]
+A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
+a partially ordered set $(L,\, \leq)$ where every set $X \subseteq L$ has a
+least upper bound (supremum) $\sqcup X$ and a greatest lower bound (infimum)
+$\sqcap X$. Namely, $L$ has a least element $\bot = \sqcup \emptyset$ and a
+greatest element $\top = \sqcap L$.
+\end{dfn}
 
 \begin{figure}[tb]
 \begin{center}
@@ -376,7 +410,14 @@ conceivable:
 \caption{Positive/negative lattice (a) without zero, and (b) with zero.}
 \end{figure}
 
-A Hasse diagram for such a lattice would look like in
+We were working so far with a positive/negative analysis. To represent values
+in that abstraction as a complete lattice, we naturally define the lattice as
+follows.  $\oplus$ is incomparable to $\ominus$ as switching from one to the
+other would be pointless in our case when joining branches.  $\bot$ is less
+than both since we start with \textit{unset} values and want to go upper in
+the lattice when any of the values is set.  Finally, $\top$ is greater than
+both to catch the case of \textit{unknown} when branches bring different
+values.  A Hasse diagram for such a lattice would look like in
 Figure~\ref{fig:posneg}~(a).  But we may want a more precise abstraction
 represented by the lattice in Figure~\ref{fig:posneg}~(b).  There, we also
 remember whether the value of a variable is 0.  This can become useful if we
@@ -465,35 +506,10 @@ contain an infinite number of elements, the latter lattice has an infinite
 height. This is exactly the source of the need of infinite time and memory
 for this analysis when analyzing particular programs as we will see below.
 
-Finally, let us define the abstract interpretation using Galois connection,
-the same as in~\cite{cousot_galois}.
-
-\begin{dfn}[Galois connection]
-Let $(L_c,\,\leq_c)$ and $(L_a,\,\leq_a)$ be partially ordered sets.
-$(\alpha,\,\gamma)$ is a \emph{Galois connection} $L_c
-\aigal L_a$ between $L_c$ and $L_a$ if
-and only if $\alpha \in L_c \rightarrow L_a$, $\gamma \in L_a \rightarrow L_c$
-and
-\begin{center}
-$\forall x \in L_c,\,\forall y \in L_a,\,\alpha(x) \leq_a y\,
-\Leftrightarrow\,x \leq_c \gamma(y)$.
-\end{center}
-\end{dfn}
-
 % \break somewhere
 Further, we denote $(L_c,\,\leq_c,\,\bot_c,\,\top_c,\,\sqcup_c,\,\sqcap_c)$ the
 \emph{concrete lattice} and $(L_a,\,\leq_a,\,\bot_a,\,\top_a,\,\sqcup_a,\,
-\sqcap_a)$ the \emph{abstract lattice}. $\alpha$ and $\gamma$ are
-\emph{abstraction} and \emph{concretization} functions. Both has to be
-\emph{monotone} for Galois connection to be well-defined, cf.~\cite{cousot1}.
-
-\begin{dfn}[Abstract interpretation]
-A tuple $(L_a,\, \bot_a,\, F_a)$ is an \emph{abstract interpretation} of
-$(L_c,\, \bot_c,\, F_c)$, written $(L_c,\, \bot_c,\, F_c) \aigal (L_a,\,
-\bot_a,\, F_a)$, if and only if $L_c \aigal L_a,\, \alpha(\bot_c) \leq_a
-\bot_a$ and $\stackrel{\rightarrow}{\alpha}(F_c) \leq_a F_a$.
-\end{dfn}
-
+\sqcap_a)$ the \emph{abstract lattice}.
 
 A progress of the abstract interpretation in~\cite{cousot_progress}
 
