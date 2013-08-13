@@ -350,24 +350,27 @@ Now, let us demonstrate the interpretation of the code of
 Figure~\ref{fig:lst_ai_intro} with the modified while-loop body which
 multiplies \code{i} by \code{-2}. The computation of a fixed point is depicted
 in Table~\ref{tab:ai_computation} as it goes over time until a fixed point is
-reached in the third iteration. The result is rather imprecise, we cannot make
-any assumption about \code{i} when it is returned from the function. The
-abstraction was apparently too coarse and the interpretation does not help
-much.
+reached in the third iteration. We see that the result is rather imprecise, we
+cannot make any assumption about \code{i} when it is returned from the
+function. The abstraction was apparently too coarse and the interpretation
+does not help much.
 
 We are still missing a formalism to represent the values and design a monotone
-function over the values effectively. In the abstract interpretation this is
+function over the values effectively.  In the abstract interpretation this is
 solved by using complete lattices~\cite{lattice1,lattice2}. They are used to
-represent both concrete and abstract values.  Lattices gives us the
-possibility to use its operators when we are interpreting a program.  For
-example, when a branching occurs, the join operator needed when joining the
-branches simply takes the values present on the outputs of both branches and
-performs lattice join ($\sqcup$) of the values in that lattice. Of course,
-since there are two complete lattices, one for concrete, one for abstract
-values, $\alpha$ and $\gamma$ are used. In fact the pair $(\alpha,\, \gamma)$
-forms a \emph{Galois connection}~\cite{cousot_galois} between the lattices.
-Now, let us formally define a complete lattice and show some examples of
-lattices.
+represent both concrete and abstract values and they give us the possibility
+to use them as a basis effectively. Thanks to work presented
+in~\cite{tarski}, we can compute fixed points of monotone functions working on
+lattices. Further, lattice operators can be used when we are interpreting a
+program.  For example, when a branching occurs, the join operator needed when
+joining the branches simply takes the values present on the outputs of both
+branches and performs lattice join ($\sqcup$) of the values in that lattice.
+Since an abstract interpretation works on two complete lattices, one for
+concrete, one for abstract values, $\alpha$ and $\gamma$ are used to move from
+one to the other.  In fact the pair $(\alpha,\, \gamma)$ forms a \emph{Galois
+connection}~\cite{cousot_galois} between the lattices and so Galois
+connection can be used as a tool for designing abstractions.  Now, let us
+formally define a complete lattice and show some examples of lattices.
 
 \begin{dfn}[Complete lattice]
 A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
@@ -415,10 +418,10 @@ in that abstraction as a complete lattice, we naturally define the lattice as
 follows.  $\oplus$ is incomparable to $\ominus$ as switching from one to the
 other would be pointless in our case when joining branches.  $\bot$ is less
 than both since we start with \textit{unset} values and want to go upper in
-the lattice when any of the values is set.  Finally, $\top$ is greater than
-both to catch the case of \textit{unknown} when branches bring different
-values.  A Hasse diagram for such a lattice would look like in
-Figure~\ref{fig:posneg}~(a).  But we may want a more precise abstraction
+the lattice when any of the abstract values is set.  Finally, $\top$ is
+greater than both to catch the case of \textit{unknown} when branches bring
+different values.  A Hasse diagram for such a lattice is the one of
+Figure~\ref{fig:posneg}~(a). We may want a more precise abstraction
 represented by the lattice in Figure~\ref{fig:posneg}~(b).  There, we also
 remember whether the value of a variable is 0.  This can become useful if we
 have a multiplication or division in the code.  For multiplication, we can
@@ -492,32 +495,58 @@ is straightforward in this case.
 
 We were also working with concrete ``abstraction'' at the beginning of this
 section. First, let us have a look at a lattice of an abstraction where we
-remember only a single value of a variable. Such a lattice is depicted in
-Figure~\ref{fig:lat_concrete}.  Naturally, joining branches where values are
-different gives \textit{unknown}.  However, our concrete interpretation was
-computing with all possibles sets of values. We need to augment the above
-lattice to a power set $\mathcal{P}(\mathbb{Z})$ using set inclusion as
-ordering. The complete lattice is defined as $(\mathcal{P}(\mathbb{Z}),
-\subseteq, \bot, \top, \sqcup, \sqcap)$ and as a Hasse diagram it looks like
-in Figure~\ref{fig:lat_concrete_set}.
+remember only a single value of a variable. This is useful for analyses like
+constant propagation as we can propagate only a single value. Such a lattice
+is depicted in Figure~\ref{fig:lat_concrete}.  Naturally, joining branches
+where values are different gives \textit{unknown}.  However, our concrete
+interpretation was computing with all possibles sets of values. We need to
+augment the above lattice to a power set $\mathcal{P}(\mathbb{Z})$ using a set
+inclusion as the order. The complete lattice is defined as
+$(\mathcal{P}(\mathbb{Z}),\, \subseteq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$,
+where $\bot=\emptyset$, $\top=\mathbb{Z}$, $\sqcup=\cup$, and $\sqcap=\cap$. A
+part of a Hasse diagram is demonstrated in Figure~\ref{fig:lat_concrete_set}.
 
 There is a difference to be spotted between these two. Although they both
-contain an infinite number of elements, the latter lattice has an infinite
-height. This is exactly the source of the need of infinite time and memory
-for this analysis when analyzing particular programs as we will see below.
-
-% \break somewhere
-Further, we denote $(L_c,\,\leq_c,\,\bot_c,\,\top_c,\,\sqcup_c,\,\sqcap_c)$ the
-\emph{concrete lattice} and $(L_a,\,\leq_a,\,\bot_a,\,\top_a,\,\sqcup_a,\,
-\sqcap_a)$ the \emph{abstract lattice}.
-
-A progress of the abstract interpretation in~\cite{cousot_progress}
-
-%In fact, abstract interpretation is well defined also when we have as a base
-%only a semi-lattice, i.e.~a lattice with only one bound for any two elements,
-%supremum in particular.
-
-fixpoint for lattices~\cite{tarski}
+contain an infinite number of elements, the latter lattice has infinite
+height. This is exactly the source of the need of infinite time and memory for
+this interpretation when analyzing particular programs with loops. The
+Kleene's sequence is not necessarily finite there, so the computation of a
+fixed point may not finish. There is a mechanism suggested in~\cite{cousot} to
+overcome the problem. It is a \emph{widening} operator $\triangledown: L_a
+\times L_a \rightarrow L_a$ defined such that:
+\begin{itemize}
+\item $\forall x,y \in L_a,\, x \leq_a x \triangledown y$ and $y \leq_a x
+\triangledown y$, and
+\item the sequence $x_0 = \bot$, $x_1 = F_a(x_0)$, \dots, $x_{n+1}=x_n
+\triangledown y_n$ for some $y_n \in L_a$ is not strictly increasing. 
+\end{itemize}
+That informally means, that the sequence is sped up by widening, so that it
+converges eventually. For the example with powerset lattice, we can define the
+widening operator to limit the number of iteration to some constant and wide
+the set to $\top$ if it reaches the limit. The opposite of the widening
+operator is \emph{narrowing} operator $\vartriangle: L_a \times L_a
+\rightarrow L_a$ and is defined similarly as:
+\begin{itemize}
+\item $\forall x,y \in L_a,\, x \leq_a y \Rightarrow x \leq_a x \vartriangle y
+\leq_a y$, and
+\item the sequence $x_0 = \bot$, $x_1 = x_0 \vartriangle y_0$, \dots,
+$x_{n+1}=x_n \vartriangle y_n$ for some $y_0,\dots,y_n \in L_a$ is not
+strictly decreasing. 
+\end{itemize}
+Narrowing can help to make the abstract values more precise. When our widening
+operator returned $\top$, we can narrow it back to some abstract value which
+we know will never cause an increase. This is not so straightforward for
+number interpretation, but see~\cite{ai_widening, cousot_galois} where the
+operators are demonstrated on intervals and described in more detail. Aside
+from intervals, octagons, elipses, polyhedra and others are used as abstract
+values for numbers~\cite{ai_octagons, ai_polyhedra, astree}. Abstraction
+can be also combined to communicate with each other and improve thus
+accuracy~\cite{ai_product, astree, clousot} (or any other aspect of the
+analysis). Strings can be abstracted too~\cite{ai_strings1, ai_strings2}.
+Further reading on the abstract interpretation is in~\cite{cousot_progress},
+where is described the progress in the area of the abstract
+interpretation over 25 years. A not so usual use of the abstract
+interpretation can be found in~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.
 
 \section{Symbolic Execution}\label{sec:se}
 Another analysis this thesis deals with is \emph{symbolic execution}. Instead
