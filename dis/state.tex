@@ -535,81 +535,151 @@ strictly decreasing.
 \end{itemize}
 Narrowing can help to make the abstract values more precise. When our widening
 operator returned $\top$, we can narrow it back to some abstract value which
-we know will never cause an increase. This is not so straightforward for
-number interpretation, but see~\cite{ai_widening, cousot_galois} where the
-operators are demonstrated on intervals and described in more detail. Aside
-from intervals, octagons, elipses, polyhedra and others are used as abstract
-values for numbers~\cite{ai_octagons, ai_polyhedra, astree}. Abstraction
-can be also combined to communicate with each other and improve thus
-accuracy~\cite{ai_product, astree, clousot} (or any other aspect of the
-analysis). Strings can be abstracted too~\cite{ai_strings1, ai_strings2}.
-Further reading on the abstract interpretation is in~\cite{cousot_progress},
-where is described the progress in the area of the abstract
-interpretation over 25 years. A not so usual use of the abstract
+we know will never cause an increase. This is not so conceivable for number
+interpretation, but see~\cite{ai_widening, cousot_galois} where the operators
+are demonstrated on intervals and described in more detail.
+
+Intervals are not the only shapes to represent abstract values of numbers.
+Octagons, elipses, polyhedra and other shapes are used too~\cite{ai_octagons,
+ai_polyhedra, astree}. Several abstractions can be also combined to
+communicate with each other and improve thus accuracy or any other aspect of
+the analysis~\cite{ai_product, astree, clousot}. Strings~\cite{ai_strings1,
+ai_strings2} and foating point numbers~\cite{ai_float1} can be abstracted
+too.  Further reading on the abstract interpretation is
+in~\cite{cousot_progress}, where is described the progress in the area of the
+abstract interpretation over 25 years. A not so usual use of the abstract
 interpretation can be found in~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.
 
 \section{Symbolic Execution}\label{sec:se}
-Another analysis this thesis deals with is \emph{symbolic execution}. Instead
-of trying to analyze a program zillion times with concrete, initialized, data,
-symbolic execution represents program inputs by symbolic values. The program
-is then executed and program expressions are manipulated including the
-symbolic values. \code{a = read()} no longer means we have to .\todo{XXX}
+In the previous chapter we described the abstract interpretation which is a
+framework for fast, but many times imprecise analyses. As a result we often
+get a pile of false positives on the output of an abstract analyzer. There
+also exist techniques which cannot formally generate false positives, but are
+often slower than abstract interpreters. One of such techniques is the
+\emph{symbolic execution}. The technique was introduced in 1970's and
+described by several authors concurrently~\cite{se_king, se_select,
+se_dissect, se_clarke}. The symbolic execution represents program inputs by
+symbolic values instead of trying to analyze a program many times with
+concrete, initialized, data. The program is then executed and program
+expressions are manipulated including the symbolic values. Let us demonstrate
+this on an example of Figure~\ref{fig:se_example}. The example is two-fold.
 
-\cite{king}, \klee~\cite{klee} and clones. 
-Theory about SE; extended to heap~\cite{se_heap}; generalized
-in~\cite{se_gener}; for libs~\cite{se_libs}
+First, there is a read from the user. How long it would take to exercise the
+program to get to the true branch of the \code{if}s with dynamic testing?
+With \code{int} being usual 32 bits, there is only one successful attempt out
+of $2^{32}$ overall. Of course, with a static analyzer based on the data-flow
+analysis or abstract interpretation, those true branches would be analyzed
+quite quickly.  This brings us to the second point nonetheless. Many complete
+analyzers generate a report about division by zero possible at
+line~\ref{line:se_ex_div}. This is indeed a false positive because \code{b} is
+set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
+\code{0x12345678}. The source of the false positive is that the analyzers do
+not often remember conditions on branching. Some of them do a post processing
+on reports to eliminate such reports as we will see in
+Chapter~\ref{sec:stanse}.
 
-Path explosion: \cite{pex_ddse},\cite{G07},\cite{partial_loop},\cite{SPmCS09}.
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}
+int fun(void) {
+  int a = read(); (*@\label{line:se_ex_sset}@*)
+  int b = 0;
 
-\begin{figure}[!htb]
-  \begin{tabular}{ccc}
-  TBD & TBD & TBD
-%    \hspace{-4ex}\input{fig_linSrch} &
-%    \hspace{-4.5ex}\input{fig_linSrchSET} &
-%    \hspace{-1.5ex}\input{fig_linSrchCSET}
+  if (a == 0x12345678) (*@\label{line:se_ex_if1}@*)
+    b = 1; (*@\label{line:se_ex_set}@*)
+
+  if (a == 0x12345678) (*@\label{line:se_ex_if2}@*)
+    a = 10 / b; (*@\label{line:se_ex_div}@*)
+
+  return a;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+  \caption{Example to demonstrate the symbolic execution.}
+  \label{fig:se_example}
+\end{figure}
+
+The symbolic execution tackles this problem. All inputs from the user are
+replaced by \emph{symbols}. For a variable \code{a}, we denote the symbol
+corresponding to \code{a} as $\sym{a}$. Such symbols are allowed to be
+assigned to variables like constants and other expressions. In our example, we
+would have \code{int a = }~$\sym{a}$\code{;}. Obviously we have to teach the
+symbolic executor to deal with symbols in arithmetic operations and branching
+statements. In the first place, we need to have a storage. Symbolic executors
+contain a \emph{symbolic memory} $\theta$ which assigns to each variable its
+current symbolic value. So after the line~\ref{line:se_ex_sset}, $\theta(a) =
+\sym{a}$. To be precise in execution of the code, the executor also has to
+remember the branches which it chose to jump to at branching points. This is
+stored in a \emph{path condition} $\varphi$. It is a first-order
+formula~\cite{fol} representing a necessary and sufficient condition over
+symbols to drive the execution along the currently executed path to the
+actually evaluated point. $\varphi$ is set initially to $\true$ and is
+evaluated and potentially updated at every branch. This happens on
+lines~\ref{line:se_ex_if1} and~\ref{line:se_ex_if2} in our example. On
+line~\ref{line:se_ex_if1}, we check, whether $\varphi$ implies validity of the
+condition instantiated by the current state of $\theta$. More concretely, the
+executor checks whether either of the following two implications hold (at most
+one~\cite{se_king}):
+\begin{align}
+\varphi & \rightarrow \theta(a) = 0x12345678 \label{equ:se_fi} \\
+\varphi & \rightarrow \theta(a) \neq 0x12345678 \label{equ:se_se}
+\end{align}
+There are three possibilities that can happen:
+\begin{description}
+\item[Implication \ref{equ:se_fi} is valid] The executor simply continues
+execution by jumping directly to the \emph{true} branch.
+\item[Implication \ref{equ:se_se} is valid] The executor simply continues
+execution by jumping directly to the \emph{false} branch.
+\item[Neither is valid] This means the executor has no concrete idea about the
+values to prove validity. So to retain soundness, it has to fork the execution
+of the whole program to explore both branches. In that case, the path
+condition $\varphi$ has to be augmented in the respective branches. For the
+true branch, $\varphi \wedge \theta(a) = 0x12345678$ is a new path condition,
+for the other branch $\varphi \wedge \theta(a) \neq 0x12345678$.
+\end{description}
+In our example, on line~\ref{line:se_ex_if1} neither is valid, as
+$\theta(a)=\sym{a}$ which cannot prove validity of $\theta(a) = 0x12345678$.
+
+The only remaining piece of information needed to perform the symbolic
+execution is the program location which is currently evaluated by the
+executor.  Then we define the \emph{program state} as a triple $(l,\,
+\theta,\, \varphi)$, where $l$ is the current program location in a control
+flow graph.
+
+%no longer means we have to try all the possible values \code{read()} might
+%return from a user.
+
+extended to heap~\cite{se_heap}; generalized in~\cite{se_gener}; for
+libs~\cite{se_libs}; finding bugs in aircraft control, nuclear power
+in~\cite{se_critical}; generating tests~\cite{se_generate_test1,
+se_generate_test2, se_generate_test3, se_generate_test4, se_generate_test5,
+exe, klee}; symbolic debugging~\cite{se_king}; partial
+correctness~\cite{se_corr1, se_corr2}; reverse eng~\cite{se_reverse};
+specializing software\cite{se_spec}; Path explosion~\cite{pex_ddse, G07,
+partial_loop, SPmCS09}; executor~\cite{se_el1}; review~\cite{se_review88,
+se_30years}; generating disks~\cite{exe_fs}; limited tree depth~\cite{ucklee};
+how output depends on input~\cite{se_output1}
+
+% SADAT and IVS is missing
+
+\begin{figure}[htb]
+\begin{center}
+  \begin{tabular}{cc}
+    \hspace{-4ex}\input{fig_linSrch} &
+    \hspace{-4.5ex}\input{fig_linSrchSET} \\
+    (a) & (b) \\
   \end{tabular}
-  \caption{(a) A flowgraph \texttt{linSrch(A,n,x)}. (b) Classic symbolic
-    execution tree of \texttt{linSrch}. (c) Compact symbolic execution tree
-    of \texttt{linSrch}.}
+\end{center}
+  \caption{(a) A control flow graph of \code{linSrch(A, n, x)}. (b) Symbolic
+    execution tree of \code{linSrch}.}
   \label{fig:linSrch}
 \end{figure}
 
-Symbolic execution runs a program over \emph{symbols} representing arbitrary
-input values. For each input variable $\code{v}$, we denote a symbol passed
-to it as $\sym{v}$. A \emph{program state} is a triple $(l,\theta,\varphi)$
-consisting of a current program location $l$ in the flowgraph, a
-\emph{symbolic memory} $\theta$, and a \emph{path condition}
-$\varphi$. $\theta$ assigns to each program variable its current symbolic
-value, i.e.~an expression over the symbols. For example, if the first
-instruction of a program is the assignment \texttt{i:=2*n+x}, then
-$\theta(\code{i})=2\sym{n}+\sym{x}$ after its execution. The path condition
-$\varphi$ is a quantifier-free first order logic formula representing a
-necessary and sufficient condition on symbols to drive the execution along
-the currently executed path. $\varphi$ is initially $\true$ and it can be
-updated at program branchings. For example, in a location with two out-edges
-labelled by \texttt{x>n+5} and \texttt{x<=n+5}, we instantiate the
-conditions with use of the current $\theta$ and we check whether the current
-path condition $\varphi$ implies their validity. Namely, we ask for validity
-of implications $\varphi \rightarrow \theta(\code{x}) > \theta(\code{n}) + 5$
-and $\varphi \rightarrow \theta(\code{x}) \leq \theta(\code{n}) + 5$.
-%\[
-%\varphi\implies(\theta(\code{x})>\theta(\code{n})+5)
-%~~~~~~~\textrm{and}~~~~~~~
-%\varphi\implies(\theta(\code{x})\le\theta(\code{n})+5).
-%\] 
-If the first implication is valid, the symbolic execution continues along
-the first branch. If the second implication is valid, the symbolic execution
-continues along the second branch. If none of them is valid, it means that
-we can follow either of the two branches.  Hence, the symbolic execution
-forks in order to execute both branches.  In this case, we update the path
-condition on the first branch to $\varphi \wedge \theta(\code{x}) >
-\theta(\code{n}) + 5$ and the one on the second branch to $\varphi \wedge
-\theta(\code{x}) \leq \theta(\code{n}) + 5$. Note that the whole program state
-is forked into two states in this case.
-
 Due to the forks, symbolic execution is traditionally represented by a tree
-called \emph{classic symbolic execution tree}. Nodes of the tree are
-labelled by program states computed during the execution.
+called \emph{symbolic execution tree}. Nodes of the tree are labelled by
+program states computed during the execution.
 % \todo{For brevity of notation, we identify nodes with program states
 % labelling them.}
 Edges of the tree correspond to transitions between program states labelling
