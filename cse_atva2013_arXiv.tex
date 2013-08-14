@@ -982,9 +982,9 @@ whether the iteration is feasible. If we cannot prove its feasibility, we
 stop the template computation and return \textbf{null}.\footnote{It is
   possible that the iteration is feasible and the chosen SMT solver failed
   to prove it. However, as parametric path conditions of the resulting
-  template are derived from $\varphi$, it is highly probable that any
-  application of the template in compact symbolic execution would lead to
-  failures of the SMT solver. Such a template is useless.}  Otherwise, we
+  template are derived from $\varphi$, it is highly probable that
+  applications of the template in compact symbolic execution would also lead
+  to failures of the SMT solver. Such a template is useless.}  Otherwise, we
 get a symbolic state $(e,\theta,\varphi)$, whose elements $\theta$ and
 $\varphi$ form a basis for the computation of $\theta_*\prm{\kappa}$ and
 $\varphi_*\prm{\kappa}$.
@@ -1315,19 +1315,14 @@ benchmarks have reachable target locations, while the last three do not. For
 these three benchmarks, all the execution paths must be explored to give an
 answer.
 
-Experimental results %of both compact and classic symbolic executions
+Experimental results of both compact and classic symbolic executions
 % on the benchmarks
-are presented in Table~\ref{tab:Expriments}. The high numbers of (often
-infeasible) cycles are due to our translation from LLVM (see
-Appendix~\ref{sec:ManyDetected} for more details).
+are presented in Table~\ref{tab:Expriments}. The high numbers of cycles are
+due to our translation from LLVM (see Appendix~\ref{sec:ManyDetected} for
+more details). The discrepancy between the numbers of detected cycles and
+computed templates is mainly due to infeasability of many cycles (see
+line~\ref{alg:template:satCheck1} of Algorithm~\ref{alg:template}).
 
-
-%
-% The discrepancy between the
-% numbers of detected cycles and computed templates is mainly due to
-% infeasability of many cycles (see line~\ref{alg:template:satCheck1} of
-% Algorithm~\ref{alg:template}).
-%
  We want to highlight the
 following observations. First, classic symbolic execution was faster
 only for benchmarks \texttt{Hello} and \texttt{decode\_packets}. Second, the
@@ -1561,7 +1556,7 @@ condition for reaching a given target location in a given program. In other
 words, the result of the analysis is a first order logic formula. In the
 current paper, we focus on a fast exploration of as many execution paths as
 possible. The technique produces a compact symbolic execution tree. Note
-that, we do not require any target location, since we do not focus on a
+that we do not require any target location, since we do not focus on a
 program location reachability here. Nevertheless, to achieve our goal, we
 adopted a part of a technical stuff introduced in~\cite{ST12}. Namely, lines
 \ref{alg:template:memoryBegin}--\ref{alg:template:repeatEnd} of
@@ -1570,7 +1565,6 @@ iterated memory, which is in~\cite{ST12} an over-approximation of the memory
 content after several iterations in a program loop. In the current
 technique, the memory content must always be absolutely precise. Moreover,
 here we analyse flowgraph cycles while~\cite{ST12} summarises program loops.
-
 
 % only parts of program loops, which is not the case for~\cite{ST12}.
 
@@ -1676,9 +1670,193 @@ failures of SMT queries.
 \bibliographystyle{plain}
 \bibliography{cse_atva2013}
 
+\newpage
 \appendix
-\clearpage
 
+%{{{ Program Loops and Cycles
+
+\section{Cycles and Program Loops}
+\label{sec:LoopsCycles}
+
+We illustrate the difference between cycles formally defined in
+Definition~\ref{def:Part} and loop constructs of programming languages using
+two short examples. The examples are instances of two common loop
+structures: Figure~\ref{fig:cse:LoopsCycles1} shows a loop with an internal
+branching and Figure~\ref{fig:cse:LoopsCycles2} presents a code with two
+nested program loops. According to our definition of a cycle, the core of a
+cycle is a single cyclic path in the graph sense (satisfying some additional
+conditions). The flowgraph of Figure~\ref{fig:cse:LoopsCycles1} contains
+four cycles while the flowgraph of Figure~\ref{fig:cse:LoopsCycles2} has
+even seven cycles. Cores of these cycles are listed in captions of the
+figures. One can immediately see that there is no one-to-one correspondence
+between loops in a source code and cycles in the flowgraphs.
+
+\begin{figure}[hb]
+  \begin{center}
+    \begin{tabular}{ccc}
+      \begin{tabular}[b]{l}
+        \texttt{~\vdots}\\
+        \texttt{a=0;}\\
+        \texttt{for (i=0; i<n; ++i)}\\
+        \texttt{~~~~if (*)}\\
+        \texttt{~~~~~~~~a=a+1;}\\
+        \texttt{~~~~else}\\
+        \texttt{~~~~~~~~a=a+2;}\\
+        \texttt{~\vdots}\\[5ex]
+        ~
+      \end{tabular}
+      & ~~~~~ &
+      \begin{tabular}[b]{c}
+%        \includegraphics[width=2.5cm]{fig_cse_icmp_rep}
+%        \centering
+        \tikzstyle{loc} = [circle,thick,draw,minimum size=6mm] %,inner sep=1pt]
+        \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+        \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+        \begin{tikzpicture}[node distance=1.1cm]   
+          \node [] (0) {\vdots};
+          \node [loc] (a) [below of=0,yshift=-4mm] {$a$}
+            edge [pre] node [label=right:
+            \begin{tabular}{l}
+              \texttt{a:=0}\\\texttt{i:=0}
+            \end{tabular}] {} (0);
+          \node [loc] (b) [below of=a,yshift=-1mm] {$b$}
+            edge [pre] node [label=right:\texttt{i<n}] {} (a);
+          \node [loc] (c) [below of=b,xshift=-10mm] {$c$}
+            edge [pre] node [label=above:\texttt{*}] {} (b);
+          \node [loc] (d) [below of=b,xshift=10mm] {$d$}
+            edge [pre] node [label=above:~\texttt{!*}] {} (b);
+          \node [loc] (e) [below of=c,xshift=10mm] {$e$}
+            edge [pre] node [label=left:\texttt{a:=a+1}] {} (c)
+            edge [pre] node [label=right:\texttt{a:=a+2}] {} (d)
+            edge [post,out=180,in=180,looseness=2.5]
+              % node [label=right:\texttt{i:=i+1}] {} (a);
+              node [overlay,near start,below] {\texttt{i:=i+1}~~~~~~~~~~} (a);
+           \node [] (00) [below of=a,xshift=20mm] {\vdots~~}
+            edge [pre,in=0,out=120,looseness=0.8] node [label=right:~~\texttt{i>=n}] {} (a);
+        \end{tikzpicture}
+      \end{tabular}
+    \end{tabular}
+  \end{center}
+  \caption{A source code and a flowgraph of a single program loop with an
+    internal branching. The symbol \texttt{*} represents any branching
+    condition. The flowgraph has four independent cycles with cores
+    \textit{abcea}, \textit{abdea}, \textit{eabce}, and \textit{eabde}.}
+  \label{fig:cse:LoopsCycles1}
+\end{figure}
+
+\begin{figure}[!htb]
+  \begin{center}
+    \begin{tabular}{cc}
+      \begin{tabular}[b]{l}
+        \texttt{~\vdots}\\
+        \texttt{for(i=1; i<n; ++i)}\\
+        \texttt{~~for(j=i; j>0 \&\& A[j-1]>A[j]; --j)}\\
+        \texttt{~~~~swap(A[j-1],A[j]);}\\
+        \texttt{~\vdots}\\[23.3ex]
+        ~
+      \end{tabular}
+      \begin{tabular}[b]{c}
+        \tikzstyle{loc} = [circle,thick,draw,minimum size=6mm] %,inner sep=1pt]
+        \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+        \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
+        \begin{tikzpicture}[node distance=1.1cm]
+          % \node [] (0) {\vdots};
+          % \node [loc] (a) [below of=0] {$a$}
+          %   edge [pre] node [label=right:\texttt{i:=1}] {} (0);
+          % \node [loc] (b) [below of=a,xshift=-18mm] {$b$}
+          %   edge [pre,in=180,out=60,looseness=0.8] node [label=above:\texttt{i<n}] {} (a);
+          % \node [loc] (c) [below of=b,yshift=-5mm] {$c$}
+          %   edge [pre] node [label=right:\texttt{j>0}] {} (b);
+          % \node [loc] (d) [below of=a,yshift=-8mm] {$d$}
+          %   edge [pre,in=0,out=120] node [label=above:\texttt{j<=0}] {} (b)
+          %   edge [pre,in=0,out=240] node [label=below:~~~~~\texttt{A[j-1]<=A[j]}] {} (c)
+          %   edge [post] node [label=right:\texttt{i:=i+1}] {} (a);
+          % \node [loc] (e) [below of=c] {$e$}
+          %   edge [pre] node [label=left:\texttt{A[j-1]>A[j]}] {} (c);
+          % \node [loc] (f) [below of=e] {$f$}
+          %   edge [pre] node [label=left:\texttt{a:=a+1}] {} (e)        
+          %   edge [post,out=180,in=180,looseness=1.7,overlay]
+          %     node [overlay,near end,above] {\texttt{j:=j-1}~~~~~~~} (b);
+          %  \node [] (00) [below of=a,xshift=18mm,overlay] {\vdots~~}
+          %   edge [pre,in=0,out=120,looseness=0.8] node
+          %   [label=above:~~\texttt{i>=n}] {} (a);
+          \node [] (0) {\vdots};
+          \node [loc] (a) [below of=0] {$a$}
+            edge [pre] node [label=right:\texttt{i:=1}] {} (0);
+          \node [loc] (b) [below of=a] {$b$}
+            edge [pre] node [label=left:\texttt{i<n}] {} (a);          
+          \node [loc] (c) [below of=b] {$c$}
+            edge [pre] node [label=left:\texttt{j:=i}] {} (b);
+          \node [loc] (d) [below of=c,yshift=3mm,xshift=18mm] {$d$}
+            edge [pre,in=0,out=120] node [label=above:\texttt{j<=0}~~~~~] {} (c)
+            edge [post,out=90, in=330] node [label=right:\texttt{i:=i+1}] {} (a);
+          \node [loc] (e) [below of=c,yshift=-5mm] {$e$}
+            edge [pre] node [label=left:\texttt{j>0}] {} (c)
+            edge [post,out=0,in=240] node [label=below:~~~~~~~\texttt{A[j-1]<=A[j]}] {} (d);
+          \node [loc] (f) [below of=e] {$f$}
+            edge [pre] node [label=left:\texttt{A[j-1]>A[j]}] {} (e);
+          \node [loc] (g) [below of=f] {$g$}
+            edge [pre] node [label=right:\texttt{swap(A[j-1],A[j])}] {} (f)        
+            edge [post,out=180,in=180,looseness=1.8,overlay]
+              node [overlay,near start,below] {\texttt{j:=j-1}~~~~~~~~~~} (c);
+           \node [] (00) [below of=a,xshift=32mm] {\vdots~~}
+            edge [pre,in=0,out=120,looseness=0.8] node
+            [label=above:~~\texttt{i>=n}] {} (a);
+        \end{tikzpicture}
+      \end{tabular}
+    \end{tabular}
+  \end{center}
+  \caption{A source code and a flowgraph of two nested program loops
+    (insertion sort). The flowgraph has seven independent cycles with cores
+    \textit{abcda}, \textit{abceda}, \textit{cdabc}, \textit{cedabc},
+    \textit{cefgc}, \textit{dabcd}, and \textit{dabced}.}
+  \label{fig:cse:LoopsCycles2}
+\end{figure}
+
+%%%%% STAREJ obrazek s chybama v (d), kreslenej "rukou"
+% \begin{figure}[!htb]
+% \begin{center}
+% \begin{tabular}{ccc}
+% \begin{tabular}{l}
+% \texttt{a=0;}\\
+% \texttt{for (i=0; i<n; ++i)}\\
+% \texttt{~~~~if (*)}\\
+% \texttt{~~~~~~~~a=a+1;}\\
+% \texttt{~~~~else}\\
+% \texttt{~~~~~~~~a=a+2;}\\
+% \end{tabular}
+% & ~~~~~~~~~ &
+% \begin{tabular}{l}
+% \texttt{for(i=1; i<n; ++i)}\\
+% \texttt{~~for(j=i; j>0 \&\& A[j-1]>A[j]; --j)}\\
+% \texttt{~~~~swap(A[j-1],A[j]);}\\
+% \end{tabular}
+% \\ \\
+% (a) & & (b)
+% \\ \\
+% \begin{tabular}{c}
+% \includegraphics[width=4cm]{fig_cse_loopscycles_intbranch}
+% \end{tabular}
+% & &
+% \begin{tabular}{c}
+% \includegraphics[width=4.5cm]{fig_cse_loopscycles_nested}
+% \end{tabular}
+% \\
+% (c) & & (d)
+% \end{tabular}
+% \end{center}
+% \caption{\marek{(a) A single program loop with internal branching. The symbol
+% $*$ represents any branching condition. (b) Two nested program loops
+% (insertion sort). (c) A flowgraph corresponding to (a) with four
+% independent cycles with cores \textit{abcea}, \textit{abdea},
+% \textit{eabce}, and \textit{eabde}. (d) A flowgraph corresponding to
+% (b) with seven independent cycles with cores \textit{abda},
+% \textit{abcda}, \textit{bdab}, \textit{bcdab}, \textit{bcefb},
+% \textit{dabd}, and \textit{dabcd}.}}
+% \label{fig:cse:LoopsCycles}
+% \end{figure}
+
+%}}}
 %{{{ Proofs
 
 \section{Proofs of Theorems}
@@ -2125,86 +2303,21 @@ Therefore, $w \in W$.
 \end{proof}
 
 %}}}
-%{{{ Program Loops and Cycles
-
-\section{Program Loops and Cycles}
-\label{sec:LoopsCycles}
-
-\marek{
-In this section we want to emphasise the difference between loop
-constructs of programming languages and cycles formally defined in
-Definition~\ref{def:Part}. In particular, we show on two examples that
-the terms like ``branching inside a loop" or ``loop nesting", which
-are commonly used for description of loops written in some programming
-language, have no meaning for cycles as defined in this paper. The
-reason is that the core of a cycle from Definition~\ref{def:Part} is a
-single cyclic path in the graph sense. Let us consider C programs depicted
-in Figure~\ref{fig:cse:LoopsCycles} (a) and (b) and the corresponding
-flowgraphs depicted in Figure~\ref{fig:cse:LoopsCycles} (c) and (d)
-respectively.}
-
-\begin{figure}[!htb]
-\begin{center}
-\begin{tabular}{ccc}
-\begin{tabular}{l}
-\texttt{a=0;}\\
-\texttt{for (i=0; i<n; ++i)}\\
-\texttt{~~~~if (*)}\\
-\texttt{~~~~~~~~a=a+1;}\\
-\texttt{~~~~else}\\
-\texttt{~~~~~~~~a=a+2;}\\
-\end{tabular}
-& ~~~~~~~~~ &
-\begin{tabular}{l}
-\texttt{for(i=1; i<n; ++i)}\\
-\texttt{~~for(j=i; j>0 \&\& A[j-1]>A[j]; --j)}\\
-\texttt{~~~~swap(A[j-1],A[j]);}\\
-\end{tabular}
-\\ \\
-(a) & & (b)
-\\ \\
-\begin{tabular}{c}
-\includegraphics[width=4cm]{fig_cse_loopscycles_intbranch}
-\end{tabular}
-& &
-\begin{tabular}{c}
-\includegraphics[width=4.5cm]{fig_cse_loopscycles_nested}
-\end{tabular}
-\\
-(c) & & (d)
-\end{tabular}
-\end{center}
-\caption{\marek{(a) A single program loop with internal branching. The symbol
-$*$ represents any branching condition. (b) Two nested program loops
-(insertion sort). (c) A flowgraph corresponding to (a) with four
-independent cycles with cores \textit{abcea}, \textit{abdea},
-\textit{eabce}, and \textit{eabde}. (d) A flowgraph corresponding to
-(b) with seven independent cycles with cores \textit{abda},
-\textit{abcda}, \textit{bdab}, \textit{bcdab}, \textit{bcefb},
-\textit{dabd}, and \textit{dabcd}.}}
-\label{fig:cse:LoopsCycles}
-\end{figure}
-
-\marek{
-We can immediately see that cycles in both flowgraphs are identified 
-independently to others and exactly the same way. Namely, they are
-identified without being concerned about layout of the related program
-loops.}
-
-%}}}
 %{{{ Experiments: Many Non-Executable Cycles Detected
 
-\section{Experiments: Many Non-Executable Cycles Detected}
+\section{Many Cycles in Experimental Results}
 \label{sec:ManyDetected}
 
-\marek{
-Before we analyse a benchmark program we first translate it into the
-LLVM byte code and then we translate the byte code into flowgraphs.
-LLVM has an instruction \texttt{icmp} to evaluate equality or inequality
-predicates. For example, the line of LLVM code depicted in
-Figure~\ref{fig:cse:icmp_rep}(a) assigns to \texttt{c} a result of the
-comparison \texttt{a != 0}. We translate this instruction into a
-flowgraph as is depicted in Figure~\ref{fig:cse:icmp_rep}(b).}
+Table~\ref{tab:Expriments} presenting experimental results shows
+surprisingly high numbers of cycles detected in benchmarks comparing to low
+numbers of computed templates. This discrepancy can be easily explained.
+Our experimental tool first translates a given source code into the LLVM
+byte code and the byte code is then translated into flowgraphs.  LLVM has an
+instruction \texttt{icmp} to evaluate equality or inequality predicates. For
+example, the line of LLVM code depicted in Figure~\ref{fig:cse:icmp_rep}
+assigns the result of the comparison \texttt{a != 0} to \texttt{c}. This
+instruction is translated into a flowgraph depicted also in
+Figure~\ref{fig:cse:icmp_rep}.
 
 \begin{figure}[!htb]
   \begin{center}
@@ -2230,23 +2343,33 @@ flowgraph as is depicted in Figure~\ref{fig:cse:icmp_rep}(b).}
             edge [pre] node [label=right:\texttt{c:=0}~~\,\,] {} (3);
         \end{tikzpicture}
       \end{tabular}
-      \\[10ex]
-      (a) & & (b)
     \end{tabular}
   \end{center}
-  \caption{\marek{Translation of the LLVM instruction (a) into the
-      corresponding flowgraph representation (b).}}
+  \caption{A LLVM instruction \texttt{icmp} and its flowgraph representation.}
   \label{fig:cse:icmp_rep}
 \end{figure}
 
-\marek{
-Therefore, if there are \texttt{icmp} instructions in loops of LLVM
-byte code, then we detect exponentially many cycles in the resulting
-flowgraph representation compared to a number of cycles in the source
-LLVM byte code. Moreover, only few of all possible combinations of
-executions through branchings introduced by \texttt{icmp} instructions
-are possible. Thus only few of all detected cycles are symbolically
-executable.}
+As shown in Appendix~\ref{sec:LoopsCycles}, branching structures inside
+program loops lead to a high number of cycles in flowgraphs. Hence, if there
+are \texttt{icmp} instructions in loops of LLVM byte code, then we detect
+many more cycles in the resulting flowgraph compared to a number of loops in
+the LLVM byte code. More precisely, the number of cycles is exponential in
+the number of \texttt{icmp} instructions inside a program loop. \todo{Je to
+  pravda, ze jich je exponencialne? V zakladnim pripade ano, ale lze to rict
+  takto obecne?}
+
+However, only a few of the detected cycles are feasible in practice.
+\marek{Chceme tu rozpatlavat duvody? Ve zdrojaku je jedna zakomentovana
+  veta, ale ta toho vic nakousne nez dorekne. Chtelo by to pak dalsi
+  obrazek. Marku, ty bys to mohl v disertacce vysvetlit i s dalsim obrazkem,
+  ne?}
+% (\texttt{icmp} instructions typically correspond to (in)equality checks and
+% they are often followed by conditional jumps depending on the \texttt{icmp}
+% results).
+As templates are computed only for (provably) feasible cycles (see
+line~\ref{alg:template:satCheck1} of Algorithm~\ref{alg:template}), we
+usually get a relatively low number of templates.
+\todo{Zkontrolujte prosim, jestli je ten posledni odstavec dobre.}
 
 %}}}
 
