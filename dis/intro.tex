@@ -61,7 +61,7 @@ error is reported, it is guaranteed to be genuine. Dynamic testing cannot
 generate \emph{false positives}, i.e.~reports that are not real, reports about
 errors that are theoretically found in the code, but in practice they do not
 exist, only the analyzer is imprecise. Mostly because the analyzer ignores
-context in some sort. Nevertheless, there are no false positives reported in
+context in some sort. Nonetheless, there are no false positives reported in
 dynamic testing thanks to running the code in real-time with real data (if we
 look aside from broken hardware misdemeanour).
 
@@ -131,24 +131,35 @@ in a specified language.  In this thesis we aim at mapping and investigation
 of current techniques used for code analysis and their application on real,
 large software projects.
 
-There exist hundreds of projects of that size fitting our needs in this case.
-At the first glance it could look like we should specifically aim at kernels
-of operating systems, because it may seem like a crash of a user space
-application causes only pain to a user. But think about a vulnerability in
-a random web browser or database system (which consist of millions lines of
-code too). It could indeed lead to stolen user's personal data or even money
-from their bank accounts. Of course there is a call for techniques to possibly
-eliminate all errors the programs contain. We should not only consider kernels
-of operating systems, but also user space programs in this respect.
+There exist hundreds of software projects of the large size which we could
+consider for our purposes. We can divide them roughly into two categories,
+depending on the level their code runs as they are usually several possible
+privilege levels~\cite[p. 21--23]{os_concepts}.  Kernels of the operating
+systems often run at the level with no limitations, i.e.~in the \emph{kernel
+mode}.  There, the kernel can touch any memory in a machine and can also
+change other possible resources the kernel is able to reach. User space
+programs on the other hand tend to be restricted, i.e.~they run in the
+\emph{user mode}. There, a process cannot change any system resource or memory
+of others, if not explicitly allowed to, e.g.~by shared
+memory~\cite[p. 124--126]{os_concepts} or special system calls~\cite[p.
+62--73]{os_concepts}.  In particular, the privilege levels have effects on
+crashes. A crash of the kernel means the machine cease production any new
+actions, whereas a crash of a user space application causes mostly only pain
+to a user.  So at the first glance it looks like we should specifically aim at
+kernels of operating systems. But think about a vulnerability in a random web
+browser or database system (which consist of millions lines of code too). It
+could indeed lead to stolen user's personal data or even money from their bank
+accounts. Of course there is a call for techniques to possibly eliminate all
+errors the programs contain.
 
 On the other hand operating system kernels should generally be error-free more
 than the others, because even a minor error would allow an arbitrary attacker
 to obtain administrator privileges on a machine running such a vulnerable
-system or crash it. For such a \emph{denial of service}~\cite{dos} (DoS)
-caused by a crash it sometimes suffices to write a ``killer'' string to a
+system, or simply crash it. For a \emph{denial of service} (DoS)~\cite{dos}
+caused by a crash, it sometimes suffices to write a ``killer'' string to a
 special file locally or even send a packet with a specific structure over the
 network. Note the attacker can do it remotely from a place thousands miles far
-away.  Examples of such errors are in~\cite{exploit_vmsplice,
+away.  Instances of such errors are in~\cite{exploit_vmsplice,
 exploit_proto_ops, exploit_userns} or \cite[p. 256]{hacking}, and more to be
 found in the National Vulnerability Database~\cite{nvd}. If the attacker
 succeeds beyond crashing a machine and is able to get a login there, they are
@@ -156,51 +167,64 @@ very close to stealing whatever data they want from that machine since it is
 much easier to gain an administrator shell when logged on as a casual user
 already.  Sometimes simply because remote administrator logins are not
 allowed. And yet it is often easier to gain an access to other machines in the
-same subnetwork than attacking same machines from the outside as there are
-usually no managed firewalls for the traffic flowing among computers inside
-the subnetwork.
+same subnetwork than attacking them from the outside. One of the reasons is
+that there are usually no managed firewalls for the traffic flowing among
+computers inside the subnetwork~\cite{insider_attack}.
 
-When we are aiming at the operating system kernels, we can choose from many.
-We can think of BSDs (NetBSD, FreeBSD, OpenBSD, \ldots), GNU Hurd, GNU Mach,
-Linux, Mac OS, Minix, NetWare, OS/2, Sun OS, Solaris, Windows, and many
-others which are or were not so spread. Nevertheless, we have to limit
-ourselves to those, which are freely available, preferably with their source
-code inclusive, which are used widely and which have considerably large source
-code base. The Linux kernel fits our requirements in particular, because it is
-a large open-source project running on zillion machines over the world and its
-safety is very important.
+The arguments stated above persuaded us to aim at operating system kernels.
+But we can choose from many. There are kernels of BSDs (NetBSD, FreeBSD,
+OpenBSD, \dots), GNU Hurd, GNU Mach, Linux, Mac OS, Minix, NetWare, OS/2, Sun
+OS, Solaris, Windows, and many others. Nonetheless, we limited ourselves to
+the Linux kernel. The main reasons are that the kernel:
+\begin{itemize}
+\item is an open source,
+\item is a large code base consisting of more than fifteen millions lines of
+code (version 3.10),
+\item is developed so fast that each version released every 2--3 months
+contains over 700 0000 changed lines of code which are across more than eleven
+thousand files in average (changes done for all releases between 3.5 and
+3.10), and
+\item is used widely, reportedly on 42\,\% of consumer computing
+devices in 2012~\cite{linux_42_percent}.
+\end{itemize}
+Aside from the aspects of large projects stated above, the Linux kernel has
+another positive aspect like it is self-contained code.
 
 \section{Background}
-This section is devoted to introduce the reader into the terms we use
-throughout the thesis. First, since every implemented analysis has some
-properties, we describe the interesting ones. They are usually looked at when
-deciding which of the available implementations to choose for a project.
-Second, there is a small introduction to code parsing as we deal with source
-codes in this thesis and we indeed need to parse them.
+This section introduces the reader into the terms we use throughout the
+thesis.  Since every implemented analysis has some properties, we describe the
+properties which we consider important. Such properties are usually looked at
+when deciding which of the available implementations to choose for a newly
+developed program, a static analyzer in particular.  There is also a small
+introduction to code parsing as we deal with source codes in this thesis and
+they need to be parsed into internal structures.
 
-\subsubsection{Formal Parameters}\label{sec:formal_params}
-Usually, an important parameter for users of an analysis is to know whether
-the output of the analysis makes some sense or if there will be any output in
-finite time at all. We often consider three terms with respect to this:
-\emph{soundness} (sometimes called \emph{correctness}), \emph{termination} and
-\emph{completeness}.
-\begin{itemize}
-\item Soundness: When an analysis is sound, whatever it reports, it conforms
-to the definition of the algorithm, nothing more than that is reported. Many
-analyses do not fulfil this criterion. For example to overcome the Halting
-problem, they compute an over-approximation such that they put in the output
-even items non-conforming to the original definition. This means unsound
-analyses indeed produce false positives.
-\item Termination: Usually we want an analysis to terminate in some finite
+\subsection*{Theoretical Properties}\label{sec:theor_props}
+Usually, the most important aspect for users of an analyzer is to know whether
+the produced output of the analyzer makes some sense according to what is
+expected, i.e.~if the results are \emph{correct} (sometimes called
+\emph{sound}). Next, we usually care whether all possible errors are reported,
+i.e.~whether the output is \emph{complete}. And perhaps if there will be any
+output in finite time at all, if the analyzer will \emph{terminate}. Below, we
+describe the three terms in examples.\todo{XXX}
+
+\begin{description}
+\item[Soundness] When an analyzer is sound, whatever it reports, it conforms
+to the definition of the implemented algorithm, nothing more than that is
+reported. Many analyses do not fulfil this criterion. For example to overcome
+the Halting problem, they compute an over-approximation such that they put in
+the output even items non-conforming to the original definition. This means
+unsound analyses indeed produce false positives.
+\item[Termination] Usually we want an analysis to terminate in some finite
 time to have the results and work with them. However we may also want a fully
 sound and complete analysis to formally prove a program, but that may not
 terminate of course (c.f. Halting problem again).
-\item Completeness: Mostly we want the analyses to produce everything fitting
+\item[Completeness] Mostly we want the analyses to produce everything fitting
 the criteria. And maybe more than that if it is inevitable (for the price of
 unsoundness). If the analysis reports at least the bare minimum it
 should, it is complete. In other words, incomplete analyses produce false
 negatives.
-\end{itemize}
+\end{description}
 
 Since these three are orthogonal we cannot want all from one analysis, as it
 would be in contradiction of the Halting problem proof. So it is very common
@@ -528,7 +552,7 @@ derived from the abstract syntax tree. We can derive symbol tables, type
 definitions, perform semantic analysis to verify more than syntactic rules
 etc.
 
-It is not easy to write a correct lexer and parser by hand. Nevertheless some
+It is not easy to write a correct lexer and parser by hand. Nonetheless some
 projects tend to do so. \texttt{gcc} C compiler is one example of this. Over
 the years the parsing part stabilized and was optimized to be fast. However
 there also exist tools that help to generate lexers and parsers automatically.
