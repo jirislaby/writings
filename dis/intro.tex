@@ -206,25 +206,47 @@ expected, i.e.~if the results are \emph{correct} (sometimes called
 \emph{sound}). Next, we usually care whether all possible errors are reported,
 i.e.~whether the output is \emph{complete}. And perhaps if there will be any
 output in finite time at all, if the analyzer will \emph{terminate}. Below, we
-describe the three terms in examples.\todo{XXX}
+describe the three terms and provide examples for better understanding in
+Figure~\ref{fig:theor_props}.
 
 \begin{description}
-\item[Soundness] When an analyzer is sound, whatever it reports, it conforms
-to the definition of the implemented algorithm, nothing more than that is
-reported. Many analyses do not fulfil this criterion. For example to overcome
+\item[Soundness] When an analyzer is sound, whatever it reports is not out of
+bounds of the defined problem.
+
+nothing more than that is
+reported. Many analyses do not fulfil this criterion.
+
+For example to overcome
 the Halting problem, they compute an over-approximation such that they put in
 the output even items non-conforming to the original definition. This means
 unsound analyses indeed produce false positives.
-\item[Termination] Usually we want an analysis to terminate in some finite
-time to have the results and work with them. However we may also want a fully
-sound and complete analysis to formally prove a program, but that may not
-terminate of course (c.f. Halting problem again).
 \item[Completeness] Mostly we want the analyses to produce everything fitting
 the criteria. And maybe more than that if it is inevitable (for the price of
 unsoundness). If the analysis reports at least the bare minimum it
 should, it is complete. In other words, incomplete analyses produce false
 negatives.
+\item[Termination] This is only a theoretical property as computers are
+finite machines thanks to their bounded memory. So in fact, every analyzer
+which tries to analyze some code will finish its computation on the finite
+state space in finite time, i.e.~it will always terminate. In theory, there
+exist analyzers that will not terminate in general (c.f.~Halting problem).
 \end{description}
+
+\begin{figure}[tb]
+\begin{center}
+\begin{tabular}{|l|c|c|c|} \hline
+\multirow{2}{*}{Code} & \multicolumn{3}{c|}{Analysis} \\ \cline{2-4}
+                 & Sound       & Complete & Both \\ \hline
+\code{a = 1;}    & 1           & 1        & 1    \\ \hline
+\code{if (x)}    & 1           & 1        & 1    \\ \hline
+~~\code{a = 2;}  & 2           & 2        & 2    \\ \hline
+\code{return a;} & $\emptyset$ & 1, 2     & $(x = 0 \Rightarrow 1) \vee (x
+					\neq 0 \Rightarrow 2)$  \\ \hline
+\end{tabular}
+\end{center}
+    \caption{Example to demonstrate theoretical properties of algorithms.}
+  \label{fig:theor_props}
+\end{figure}
 
 Since these three are orthogonal we cannot want all from one analysis, as it
 would be in contradiction of the Halting problem proof. So it is very common
