@@ -206,37 +206,39 @@ expected, i.e.~if the results are \emph{correct} (sometimes called
 \emph{sound}). Next, we usually care whether all possible errors are reported,
 i.e.~whether the output is \emph{complete}. And perhaps if there will be any
 output in finite time at all, if the analyzer will \emph{terminate}. Below, we
-describe the three terms and provide examples for better understanding in
-Figure~\ref{fig:theor_props}.
+describe the three terms and provide examples of soundness and completeness
+for better understanding in Figure~\ref{fig:theor_props}.
 
 \begin{description}
 \item[Soundness] When an analyzer is sound, whatever it reports is not out of
-bounds of the defined problem.
-
-nothing more than that is
-reported. Many analyses do not fulfil this criterion.
-
-For example to overcome
-the Halting problem, they compute an over-approximation such that they put in
+bounds of the defined problem. I.e.~if we have an analyzer and want it to tell
+us which values are definitely in a variable at some point, it has to
+enumerate only those which are really set there. No over-approximation is
+allowed. Many analyses do not fulfil this criterion. For example to speed up
+the analysis, they compute an over-approximation such that they put in
 the output even items non-conforming to the original definition. This means
-unsound analyses indeed produce false positives.
-\item[Completeness] Mostly we want the analyses to produce everything fitting
-the criteria. And maybe more than that if it is inevitable (for the price of
-unsoundness). If the analysis reports at least the bare minimum it
-should, it is complete. In other words, incomplete analyses produce false
-negatives.
+unsound analyses may produce false positives.
+\item[Completeness] Complete analyzers have to report at least what they are
+expected to. I.e.~if we have the same analyzer above which reports values
+set to a variable, it needs not necessarily report only those, it can compute
+some over-approximation and report more, if it is inevitable. Of course this
+is for the price of unsoundness. Set in other words, incomplete analyses may
+produce false negatives, i.e.~results which do not fit to the defined
+behaviour of the analyzer.
 \item[Termination] This is only a theoretical property as computers are
 finite machines thanks to their bounded memory. So in fact, every analyzer
 which tries to analyze some code will finish its computation on the finite
-state space in finite time, i.e.~it will always terminate. In theory, there
-exist analyzers that will not terminate in general (c.f.~Halting problem).
+state space in finite time. So it will always terminate. Only theoretically,
+there exist analyzers that will not terminate in general (c.f.~the Halting
+problem).
 \end{description}
 
 \begin{figure}[tb]
 \begin{center}
 \begin{tabular}{|l|c|c|c|} \hline
-\multirow{2}{*}{Code} & \multicolumn{3}{c|}{Analysis} \\ \cline{2-4}
-                 & Sound       & Complete & Both \\ \hline
+\multicolumn{1}{|c|}{\multirow{2}{*}{Code}} &
+		\multicolumn{3}{c|}{Value Analysis of \code{a}} \\ \cline{2-4}
+                 & Sound       & Complete & Sound and Complete \\ \hline
 \code{a = 1;}    & 1           & 1        & 1    \\ \hline
 \code{if (x)}    & 1           & 1        & 1    \\ \hline
 ~~\code{a = 2;}  & 2           & 2        & 2    \\ \hline
@@ -244,17 +246,22 @@ exist analyzers that will not terminate in general (c.f.~Halting problem).
 					\neq 0 \Rightarrow 2)$  \\ \hline
 \end{tabular}
 \end{center}
-    \caption{Example to demonstrate theoretical properties of algorithms.}
+    \caption{Example to demonstrate soundness and completeness of analyzers.}
   \label{fig:theor_props}
 \end{figure}
 
-Since these three are orthogonal we cannot want all from one analysis, as it
-would be in contradiction of the Halting problem proof. So it is very common
-to implement analyses that only terminate and are complete, i.e.~unsound. They
-report everything which is possibly an error, but sometimes, we have to await
-false-positives. Some analyses are not even complete. They are often
-incomplete to reduce false positives stemming from the unsoundness character,
-for the price of potentially hiding errors, i.e.~adding false-negatives.
+In an ideal world, we would have sound and complete analyzers. They would
+return only results without false positives and false negatives. But
+computation time of such analyzers tend to be high as well as memory
+consumption. This stems from the need of too much precise computation and
+precise results which would have to be stored somewhere. So it is very common
+to implement analyses that are only complete, but unsound. They report
+everything which is possibly an error, but sometimes, we have to await
+false positives. There also exist analyzers which are only sound, but
+incomplete, or the third option: analyzers that are neither sound, nor
+complete. The latter may help in reducing both false positives and false
+negatives for the price of potentially hiding errors, i.e.~adding
+false negatives.
 
 \subsubsection{Sensitivity of Analyses}\label{sec:sensitivity}
 Another interesting property of analyses is how are the analyses handling
