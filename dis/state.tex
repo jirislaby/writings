@@ -758,13 +758,14 @@ performance of individual solvers vary, complex queries are not easy to answer
 for any solver.  So it usually takes a long time for solvers before they
 answer such queries. Second, the symbolic execution suffers from the
 \emph{path explosion problem}, i.e.~an exponential growth of paths that need
-to be explored. Every branching in the code potentially multiplies the
-possible number of paths through the program by two. The larger program, the
-exponentially larger symbolic execution tree to be explored yet. In fact the
-tree can be also infinite, e.g.~when analyzing infinite loops. Hence, for
-real-world programs, the symbolic execution is barely usable without
-incorporating other techniques to reduce the count of explored paths. Some
-tools try to tackle this issue by traversing more paths at once to
+to be explored. Every branching and in the code potentially multiplies the
+possible number of paths through the program by two. It is even worse for
+loops, where the symbolic execution tree can become huge. So the larger
+program, the exponentially larger symbolic execution tree to be explored yet.
+In fact the tree can be also infinite, e.g.~when analyzing infinite loops.
+Hence, for real-world programs, the symbolic execution is barely usable
+without incorporating other techniques to reduce the count of explored paths.
+Some tools try to tackle this issue by traversing more paths at once to
 substantially reduce the size of the execution tree~\cite{cse_atva}. Others,
 like in~\cite{pex_ddse, G07}, compose symbolic executions from several
 functions using summaries which results in an inter-procedural analysis. This
@@ -778,6 +779,43 @@ loops~\cite{partial_loop}.
 
 %no longer means we have to try all the possible values \code{read()} might
 %return from a user.
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+void fun(int x, int y) {
+  if (x == hash(y))
+    assert(false);
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Concolic execution example.} \label{fig:lst_dart}
+\end{figure}
+
+Many modern tools combine the symbolic execution with dynamic (concrete)
+analysis. This combination of analyses is called \emph{concolic
+execution}. Tools implementing concolic execution achieve better scalability
+and higher coverage of analyzed code~\cite{dart, active_props, cute, exe,
+pex_ddse}.  Programs are run dynamically first with random input.  While a
+program is running, path conditions are stored along the executed path
+directed by the radnom input. When the dynamic run finishes, the symbolic
+execution is then run. It is given a new constrains on the input. The
+constraints are built using solver by negating some pieces of the path
+condition collected from the dynamic run. The symbolic run generates new input
+this way. The program is ran with these inputs again which can cover more
+paths than the first dynamic run.  This process repeats until all paths i nthe
+program are covered or the analyzer is terminated. Let us consider the example
+of Figure~\ref{fig:lst_dart}.  Suppose that it is hard to compute an inversion
+of the \code{hash} function.  It may take ages till proper values for \code{x}
+and \code{y} are generated to trigger the assertion. But using concolic
+execution, the first random input can be \code{3} for \code{x} and \code{4}
+for \code{y}. Suppose $hash(4)=235$, during the dynamic execution, we obtain
+$x=3 \wedge hash(y)=235$ as a path condition.  Now, the solver can easily
+generate a new input by fixing \code{y} to \code{4} and setting \code{x} to
+\code{235}.  With the next dynamic execution, the \code{assert} will be
+trigerred.
 
 Despite, King originally introduced the symbolic execution for symbolic
 debugging~\cite{se_king}, the symbolic execution is now widely used for
@@ -796,9 +834,9 @@ inputs~\cite{se_output1}.  The symbolic execution was used to find bugs in
 aircraft control and nuclear power systems~\cite{se_critical}, or filesystems
 by generating malicious disks~\cite{exe_fs}. Even though, some do not
 explicitly mention the symbolic execution, they in fact implement it, to find
-errors in memory management~\cite{prefix} for example. There are also
+errors in memory management~\cite{prefix} for example.  There are also
 overviews where is a summarization of some techniques of the
-above~\cite{se_review88, se_30years}.
+above~\cite{se_review88, se_review09, se_review13}.
 
 %executor~\cite{se_el1}
 
@@ -810,14 +848,68 @@ above~\cite{se_review88, se_30years}.
 
 
 
-\section{Slicing}\label{sec:slicing}
-Slicing was first described in~\cite{slicing_phd}. It is a technique to
-eliminate unneeded lines of code from a program. This is always computed with
-respect to some code location and variables which we are interested in at that
-place.  Only the code that can affect the variables there is left in the
-program. This is for example useful for debugging purposes to understand how
-values are propagated to a variable. The location and variables are called
-\emph{slicing criteria}.
+\section{Program Slicing}\label{sec:slicing}
+As was described in the previous section, the symbolic execution is prone to
+slowness when analyzing programs with loops or many branchings. We described
+some techniques how to cope with this problem in that section too. But in case
+we are interested only whether some code location in a program is reachable,
+another approach can be used in an analyzer. The analyzer can simply remove
+all the code which does not affect the flow to that code location in any way.
+This is exactly a task that can be performed by \emph{program slicing}. This
+is a techniques that was first described in 1981 by Weiser
+in~\cite{slicing_phd}. 
+
+At the beginning it gets the code and one or more code locations called
+\emph{slicing criteria}. It then slices the code with respect to the criteria
+and leaves only the code that really affects the criteria. That way, symbolic
+executor do not need to execute every path that is in the code, only those
+relevant to some code locations (occurrences of bugs). Of course, the slicing
+is not limited to the symbolic execution only, it is a general technique.
+
+Slicing may bring a considerable speed-up in the last phase of the
+algorithm, where we execute the program symbolically.
+
+When slicing a program we first need to specify what behaviour we want to
+preserve. We do so by assigning a \emph{slicing criteria} to particular lines
+of the program.  Slicing criterion at a given
+program line specifies a set of variables whose values at that line must be
+equal in both original and sliced program for each input data passed to both
+programs. Having slicing criteria set, we slice functions independently. Let
+us consider a function with slicing criteria. We assign a set of
+\emph{relevant variables} to each line of the functions. A variable is
+relevant, if its value has an impact (direct or indirect) to a value of a
+variable in some slicing criterion. Sets of relevant variables of the sliced
+function are initially empty, except those of lines with slicing criteria
+(these sets contain variables from their slicing criteria). Then, according
+to semantics of program commands we propagate relevance of variables between
+program lines and we insert discovered relevant variables into related sets.
+We apply the propagation until sets do not increase their size. From the
+content of the sets we can safely say, which program lines has no impact to
+the slicing criteria and we therefore remove those lines from the body of the
+function. Interprocedural slicing is about exchanging slicing criteria
+between functions through call sites. When we are done slicing individual
+functions, we have computed relevant variables at call sites and also at the
+entry locations (lines) to the functions. So, we propagate the criteria
+between called and calling functions. Then we slice the functions
+independently again. We repeat this process until no \emph{new} slicing
+criterion is passed between functions.
+
+The input of the slicing algorithm is a program to be sliced and a so-called
+\emph{slicing criteria}. A slicing criterion is a pair of a program location
+and a set of program variables. The slicing algorithm removes program
+statements that do not affect any slicing criterion. More precisely, for
+each input data passed to both original and sliced programs, values of the
+variable set of each slicing criterion at the corresponding location are
+always equal in both programs. Our analysis is interested only in states of
+the instrumented automata, especially in locations corresponding to errors.
+Hence, the slicing criterion is a pair of a location preceding an
+\texttt{assert} statement in \texttt{smFire} function and the set of all
+variables representing current states of the corresponding state machines. The
+slicing criteria then comprises all such pairs.
+
+
+It can be used for debugging purposes to understand how values are propagated
+to a variable.
 
 Theory about slicing XXX \ldots
 
