@@ -208,7 +208,7 @@ void fun(int x)
 \end{lstlisting}
 \end{tabular}
 \end{center}
-\caption{Code used for demonstration of abstract interpretation}
+\caption{Code used for demonstration of abstract interpretation.}
 \label{fig:lst_ai_intro}
 \end{figure}
 
@@ -815,28 +815,33 @@ for \code{y}. Suppose $hash(4)=235$, during the dynamic execution, we obtain
 $x=3 \wedge hash(y)=235$ as a path condition.  Now, the solver can easily
 generate a new input by fixing \code{y} to \code{4} and setting \code{x} to
 \code{235}.  With the next dynamic execution, the \code{assert} will be
-trigerred.
+trigerred. \textsc{Check 'n' Crash}~\cite{check_crash} does the opposite:
+first it runs coarse symbolic execution to find a suspicious location in code,
+then the tool generates a test and runs the program dynamically to verify the
+test case.
 
-Despite, King originally introduced the symbolic execution for symbolic
-debugging~\cite{se_king}, the symbolic execution is now widely used for
-generating unit tests which cover many paths in the
-code~\cite{se_generate_test1, se_generate_test2, se_generate_test3,
-se_generate_test4, se_generate_test5, exe, klee}.
-\cite{se_generate_test2} uses the symbolic execution also for re-writing
-program internal variables as functions of the input values and then
-generates tests using constraint-solving. The symbolic execution is usable as
-a partial correctness prover~\cite{se_corr1, se_corr2}, as a reverse
-engineering engine~\cite{se_reverse}, or for refactoring software to a more
-specialized one~\cite{se_spec}, The symbolic execution can be extended to
-handle heap~\cite{se_heap, se_gener}, summarize effects of
-libraries~\cite{se_libs}, or to extract dependencies of outputs on
-inputs~\cite{se_output1}.  The symbolic execution was used to find bugs in
-aircraft control and nuclear power systems~\cite{se_critical}, or filesystems
-by generating malicious disks~\cite{exe_fs}. Even though, some do not
-explicitly mention the symbolic execution, they in fact implement it, to find
-errors in memory management~\cite{prefix} for example.  There are also
-overviews where is a summarization of some techniques of the
-above~\cite{se_review88, se_review09, se_review13}.
+Despite, King originally introduced the symbolic execution for
+symbolic\todo{mam tady rozepsat ty techniky vic do detailu?}
+debugging~\cite{se_king}, the symbolic execution is currently widely used for
+generating unit tests which cover more paths in code than tests written
+manually~\cite{se_generate_test1, se_generate_test2, se_generate_test3,
+se_generate_test4, se_generate_test5, exe, klee}. Offutt and
+Seaman~\cite{se_generate_test2} use the symbolic execution also for re-writing
+program internal variables as functions of the input values and then generates
+tests using constraint-solving. The symbolic execution is usable as a partial
+correctness prover~\cite{se_corr1, se_corr2}, as a reverse engineering
+engine~\cite{se_reverse}, or for refactoring software to a one which is more
+specialized~\cite{se_spec}, The symbolic execution can be extended to handle
+heap~\cite{se_heap, se_gener}, summarize effects of libraries~\cite{se_libs},
+or to extract dependencies of outputs on inputs~\cite{se_output1}.  The
+symbolic execution was used to find bugs in aircraft control and nuclear power
+systems~\cite{se_critical} or filesystems by generating malicious
+disks~\cite{exe_fs}. Even though, some do not explicitly mention the symbolic
+execution, they in fact implement it, to find errors in memory
+management~\cite{prefix} for example.  There are also overviews where is a
+summarization of some techniques we mention above~\cite{se_review88,
+se_review09, se_review13}. We use the symbolic execution in our tool described
+in Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
 
 %executor~\cite{se_el1}
 
@@ -852,78 +857,123 @@ above~\cite{se_review88, se_review09, se_review13}.
 As was described in the previous section, the symbolic execution is prone to
 slowness when analyzing programs with loops or many branchings. We described
 some techniques how to cope with this problem in that section too. But in case
-we are interested only whether some code location in a program is reachable,
-another approach can be used in an analyzer. The analyzer can simply remove
-all the code which does not affect the flow to that code location in any way.
-This is exactly a task that can be performed by \emph{program slicing}. This
-is a techniques that was first described in 1981 by Weiser
-in~\cite{slicing_phd}. 
+we are interested only whether some code locations in a program are reachable,
+another approach can be used in an analyzer to help the symbolic execution.
+The analyzer can simply remove all the code which does not affect the flow to
+those code locations in any way.  This is exactly a task that can be performed
+by \emph{program slicing}. This is a technique that was described by Weiser in
+1979~\cite{slicing_phd}. As the slicing leaves only the code that really
+affects particular code locations, the slicing may bring a considerable
+speed-up to techniques working with code in general, not only to the symbolic
+execution.  That way, analyzers do not need to evaluate every path that is in
+the code, only those relevant to some code locations, e.g.\ lines with
+potential bugs.
 
-At the beginning it gets the code and one or more code locations called
-\emph{slicing criteria}. It then slices the code with respect to the criteria
-and leaves only the code that really affects the criteria. That way, symbolic
-executor do not need to execute every path that is in the code, only those
-relevant to some code locations (occurrences of bugs). Of course, the slicing
-is not limited to the symbolic execution only, it is a general technique.
+\newcommand{\newsym}[1]{\ensuremath\triangleright #1 \triangleleft}
 
-Slicing may bring a considerable speed-up in the last phase of the
-algorithm, where we execute the program symbolically.
+When we want to slice a program we have to specify what behaviour we want to
+preserve in the program first. In the slicing, this is performed by defining
+\emph{slicing criteria}. These are chosen lines of the program accompanied
+with variables we are interested in at those lines. Note there is no
+limitation on the variables like whether they are set or used on those lines.
+Such defined criteria ensure that values of variables at those lines must be
+equal in both original and sliced program for any execution. We can slightly
+loosen the requirement of ``any path'' to specified execution paths as we will
+see later nonetheless.  According to the original
+algorithm~\cite{slicing_phd}, when a slicer is given the slicing criteria, it
+processes functions in a program independently as follows. The slicer starts
+with some function and assigns a set of \emph{relevant variables} to each line
+of the function. Relevant variables sets are filled initially by variables
+from slicing criteria when the line has assigned some criteria or the sets are
+left empty otherwise.  Further, according to the semantics of program
+commands, slicers propagate relevant variables among function lines and insert
+discovered relevant variables into sets on corresponding lines:
+\begin{itemize}
+\item All relevant variables from a successive line are copied to the current
+line's set except for those which are set on the current line. This is a
+simple information \emph{propagation}.
+\item If the current line sets some variable which is relevant at a successive
+line, the slicer adds all variables which the current line references.
+I.e.\ the slicer performs computation of \emph{direct dependency}.
+\item If the current line is a branching (or loop head) and some line in the
+branch (or loop body) sets a relevant variable, the slicer adds all referenced
+variables to the current line's relevant set. This is \emph{indirect
+dependency} and serves the purpose of leaving in place branches and loops
+which indirectly affect slicing criteria.
+\end{itemize}
+The slicers continue evaluation the function repeatedly until the sets stop
+increasing in size, i.e.\ a fixed point is reached.  From the content of the
+sets and the program semantics we can safely claim, which program lines have
+no impact on the initial slicing criteria. Those are exactly the lines, where
+intersection between variables that are set on that line and relevant
+variables on the same line is empty. We can remove those lines from the body
+of the function. Let us demonstrate the computation on the example of
+Figure~\ref{fig:lst_ai_intro}. Suppose we want to slice the program according
+to line 5 and variable \code{i} there. The computation of relevant sets
+denoted as $R_{5,i}$ is demonstrated in Table~\ref{fig:tab_slicing}. We stamp
+newly added variables in the concrete iteration of relevant sets computation
+by $\newsym{~}$ in the table. We also note the rule which applied to add the
+variable: the variables are marked with one of C, P, D, I in superscript. It
+means their source is slicing criteria (C), propagation rule (P), or direct
+(D) and indirect (I) dependency.
 
-When slicing a program we first need to specify what behaviour we want to
-preserve. We do so by assigning a \emph{slicing criteria} to particular lines
-of the program.  Slicing criterion at a given
-program line specifies a set of variables whose values at that line must be
-equal in both original and sliced program for each input data passed to both
-programs. Having slicing criteria set, we slice functions independently. Let
-us consider a function with slicing criteria. We assign a set of
-\emph{relevant variables} to each line of the functions. A variable is
-relevant, if its value has an impact (direct or indirect) to a value of a
-variable in some slicing criterion. Sets of relevant variables of the sliced
-function are initially empty, except those of lines with slicing criteria
-(these sets contain variables from their slicing criteria). Then, according
-to semantics of program commands we propagate relevance of variables between
-program lines and we insert discovered relevant variables into related sets.
-We apply the propagation until sets do not increase their size. From the
-content of the sets we can safely say, which program lines has no impact to
-the slicing criteria and we therefore remove those lines from the body of the
-function. Interprocedural slicing is about exchanging slicing criteria
-between functions through call sites. When we are done slicing individual
-functions, we have computed relevant variables at call sites and also at the
-entry locations (lines) to the functions. So, we propagate the criteria
-between called and calling functions. Then we slice the functions
-independently again. We repeat this process until no \emph{new} slicing
-criterion is passed between functions.
+\begin{table}[htb]
+\begin{center}
+\begin{tabular}{|l||c|c||c|c|c|} \hline
+\multirow{2}{*}{\textbf{Code}} &
+  \multicolumn{2}{c||}{\textbf{Variables}} &
+  \multicolumn{3}{c|}{\textbf{Relevant Sets}} \\ \cline{2-6}
+& \textbf{Set} & \textbf{Read} &
+  $R_{(5,i)}^0$ & $R_{(5,i)}^1$ & $R_{(5,i)}^2$ \\ \hline\hline
+1:~\lstinline$void fun(int x) {$
+		      &         &         &		       & 		    & $\{\newsym{x_P}\}$     \\ \hline
+2:~~~\code{i = 3;}    & $\{i\}$ &         &		       & $\{\newsym{i_P}\}$ & $\{i_P,\newsym{x_P}\}$ \\ \hline
+3:~~~\code{while (x)} &         & $\{x\}$ &		       & $\{\newsym{i_P}\}$ & $\{i_P,\newsym{x_I}\}$ \\ \hline
+4:~~~~~\code{i *= 2;} & $\{i\}$ & $\{i\}$ &                    & $\{\newsym{i_D}\}$ & $\{i_D\}$		     \\ \hline
+5:~~~\code{return i;} &         & $\{i\}$ & $\{\newsym{i_C}\}$ & $\{i_C\}$          & $\{i_C\}$		     \\ \hline
+6:~\lstinline$}$      &&&&& \\ \hline
+\end{tabular}
+\end{center}
+\caption{Program slicing of example in Figure~\ref{fig:lst_ai_intro}.}
+\label{fig:tab_slicing}
+\end{table}
 
-The input of the slicing algorithm is a program to be sliced and a so-called
-\emph{slicing criteria}. A slicing criterion is a pair of a program location
-and a set of program variables. The slicing algorithm removes program
-statements that do not affect any slicing criterion. More precisely, for
-each input data passed to both original and sliced programs, values of the
-variable set of each slicing criterion at the corresponding location are
-always equal in both programs. Our analysis is interested only in states of
-the instrumented automata, especially in locations corresponding to errors.
-Hence, the slicing criterion is a pair of a location preceding an
-\texttt{assert} statement in \texttt{smFire} function and the set of all
-variables representing current states of the corresponding state machines. The
-slicing criteria then comprises all such pairs.
+The process described above is only context-insensitive. To extend the slicer
+to be context-sensitive, we have to change the slicer to pass the relevant
+variables among functions. That is down to a called function at every call
+instruction and back up from the called function. As relevant variables
+propagate from the bottom up, the slicer has to pass the variables from a call
+site to return points of the called function and when the slicer propagates
+the variables through the whole function to the beginning, they are
+transferred back to the call instruction. The same as above, the process
+repeats until a fixed point is reached.
 
+The slicing can be divided to two categories: \emph{static} and
+\emph{dynamic}. The former considers, as we defined above, all paths of the
+program and ensures the slice is correct whatever input it gets. Dynamic
+slicing on the other hand limits the slice only to a particular input or
+inputs. This allows for more removed code, i.e.\ smaller slice, but at the
+price of the restriction on input.
 
-It can be used for debugging purposes to understand how values are propagated
-to a variable.
+XXX
 
-Theory about slicing XXX \ldots
+More details about slicing and its variations and uses can be seen in various
+surveys and reviews~\cite{slic_overview95, slic_overview12}.
 
-\cite{slicing, slicing1, slicing2}
+Apart from bug-finding, the slicing can be used for
+debugging~\cite{slicing_debugging}. It can be used to understand how values
+are propagated to a variable.
 
-The main two branches of slicing are \emph{dynamic} and \emph{static}. The
-former considers one concrete input when computing the slice and may
-potentially result in more sliced code. Static slicing on the other hand
-computes the slice generally, with no input restrictions. More details about
-slicing and its variations and uses can be seen in section~\ref{sec:fmics}
-and in~\cite{slicing_survey}, of course.
+\cite{slicing, slicing1}
 
+\textsc{Sante}~\cite{slic_sante} -- slicing for speeding up a Technique
+Combining Static and Dynamic Analysis;
 
-\section{Model Checking} \todo{Honzo, toto prosim precti, jestli neblabolim.}
+The same as the symbolic execution, we use slicing extensively to reduce code
+that is symbolically executer by our tool. See Chapters~\ref{sec:fmics}
+and~\ref{sec:svcomp}.
+
+\section{Model Checking}
 This is a bit different technique from static analysis we are dealing in this
 thesis with. It does not check the program proper, but instead tries to prove
 some properties on a model of the program. The model is represented by some
