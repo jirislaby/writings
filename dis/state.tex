@@ -574,7 +574,7 @@ analyzers generate a report about division by zero possible at
 line~\ref{line:se_ex_div}. This is indeed a false positive because \code{b} is
 set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
 \code{0x12345678}. The source of the false positive is that the analyzers do
-not often remember conditions on branching. Some of them do a post processing
+not often remember conditions on branchings. Some of them do a post processing
 on reports to eliminate such reports as we will see in
 Chapter~\ref{sec:stanse}.
 
@@ -639,10 +639,10 @@ condition $\varphi$ has to be augmented in the respective branches. For the
 true branch, $\varphi \wedge \theta(a) = 0x12345678$ is a new path condition,
 for the other branch $\varphi \wedge \theta(a) \neq 0x12345678$.
 \end{description}
-In our example, on line~\ref{line:se_ex_if1} neither is valid, as
+In our example, on line~\ref{line:se_ex_if1} neither implication is valid, as
 $\theta(a)=\sym{a}$ which cannot prove validity of $\theta(a) = 0x12345678$.
-The situation is different on line~\ref{line:se_ex_if2} nonetheless. There,
-we can get into two states, by the two previous forked executions. In one, the
+The situation is different on line~\ref{line:se_ex_if2} nonetheless. There, we
+can get into two states, by the two previous forked executions. In one, the
 path condition contains $\theta(a) = 0x12345678$ and symbolic memory is
 holding \code{1} for \code{b}. In the other $\theta(a) \neq 0x12345678$ and
 $\theta(b) = 0$. From the first one, the executor can induce
@@ -1085,34 +1085,71 @@ pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
 to~\cite{bmc_survey} about bounded model checking.
 
 \section{Tools}\label{sec:soa_tools}
-There are many successful tools based on static analysis.
-Unfortunately it is not really known
+There are many successful tools based on static analysis. Unfortunately for
+some of them, especially the industrial one, it is not really known what
+technique they are based on. We will describe them in a separate paragraph.
+The rest of the tools is categorized according to the technique used. Even
+though some of them are combination of more. In this overview we mostly limit
+ourselves to analyzers of C code.
 
-PC Lint FlexeLint PolySpace (approximate upper limit is 50kkloc) CodePro
-Analytix PREfix/PREfast Astree CodeSonar
+\subsection*{Pattern Matching}
+\textsc{Coccinelle}~\cite{coccinelle} \textsc{FindBugs}~\cite{findbugs}
 
-Coverity Prevent (xgcc), Extend (metal)
+\subsection*{Data-flow Analyzers}
+As we slightly mentioned in the introduction, compilers contain data-flow
+analysis and generate warnings or errors when they find some suspicious code.
+One of the most known known data-flow analyzers was
+\textsc{Lint}~\cite{lint}. It resulted in some clones like \textsc{Splint}.
+These
 
-\url{http://spinroot.com/static/}
-\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
-\url{http://samate.nist.gov/index.php/Source_Code_Security_Analyzers.html}
-\url{http://web.archive.org/web/20050405224446/http://www.programming-x.com/programming/analyzer.html}
-
-Cousots laid down the foundation for others. It slowly stopped being
-extensively used, but it attracted attention again in 2000. It was thanks to
-the work of Engler et al. on a meta compilation based technique described
-in~\cite{metacomp}. There, program developers specify properties of the system
-in \textsc{Metal}~\cite{metal} language, compile it into an internal
-representation and the tool applies the specification on all executable paths
-in a particular function. Violation of the specification on a path is then
+\subsection*{Abstract Interpreters}
+Engler et al. brought the abstract interpretation to the attention in 2000 by
+a technique based on meta compilation~\cite{metacomp}. There, program
+developers specify properties of the checked system in \textsc{Metal}
+language~\cite{metal}, compile it into an internal representation and the tool
+applies the specification on all executable paths in a particular function.
+Violation of the specification on a path is then
 reported as an error. The compiler used for \textsc{Metal} compilation is a
 modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
 redefines \textsc{gcc}'s internal code representation, data types and applies
 the analysis on a such modified structure. Programming languages supported by
 \textsc{xgcc} are C and C++.
 
-\section{Checking the Linux Kernel}
+CodePro
+Analytix PREfix/PREfast Astree CodeSonar
+
+\subsection*{Industrial Tools}
+Only a little information is known about industrial tools. It is due to
+secrets the companies hold to not let their competitors know. But we at least
+try to summarize the tools and what their providers make available about them.
+All the tools below are capable to handle C, some of them C++ and other
+languages like C\# or Java.
+
+The data-flow analyzer \textsc{Lint} was an inspiration for Gimpel's
+\textsc{PC Lint/FlexeLint}~\cite{pclint} and Cleanscape's
+\textsc{LintPlus}~\cite{lintplus}. The same as their predecessor, they aim at
+finding suspicious code constructs. MathWorks
+\textsc{PolySpace}~\cite{polyspace} was one of the first abstract interpreters
+capable of handling large code. But according to the authors, the tool's upper
+limit is approximately 50 thousand lines of code that can be analyzed. The
+tool was inspired by the crash of Ariane~5 (see introduction).  \textsc{xgcc}
+was a predecessor of Coverity's \textsc{Prevent}~\cite{coverity}, and
+\textsc{Metal} for Coverity's \textsc{Extend}. \textsc{Prevent} is run
+regularly to check the Linux kernel and the results are provided to kernel
+developers.  KlocWork's \textsc{Insight}~\cite{klocwork} and GrammaTech's
+\textsc{Codesonar}~\cite{codesonar} are specialized to finding security and
+reliability issues. \textsc{Insigth} was originally intended as an optimizer
+for C code.
+
+%\url{http://spinroot.com/static/}
+%\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
+%\url{http://samate.nist.gov/index.php/Source_Code_Security_Analyzers.html}
+%\url{http://web.archive.org/web/20050405224446/http://www.programming-x.com/programming/analyzer.html}
+
+\subsection{Checking the Linux Kernel}
 Projects/software used for checking the Linux kernel.
+
+checkpatch
 
 \stan~\cite{stanse}, projects like LDV (ISPRAS), Coverity~\cite{coverity},
 \textsc{Cppcheck}~\cite{cppcheck}, \clang~\cite{clang}, \sparse~\cite{sparse}
