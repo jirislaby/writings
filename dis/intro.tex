@@ -263,7 +263,7 @@ complete. The latter may help in reducing both false positives and false
 negatives for the price of potentially hiding errors, i.e.~adding
 false negatives.
 
-\subsubsection{Sensitivity of Analyses}\label{sec:sensitivity}
+\subsection*{Sensitivity of Analyses}\label{sec:sensitivity}
 Another interesting property of analyses is how are the analyses handling
 separate commands and functions present in some code. Consider the example in
 Figure~\ref{fig:lst_sens} and also consider an analysis that is watching
@@ -321,7 +321,7 @@ value due to the assignment on line~\ref{lst:sens_xa} (the analysis has to
 assume \code{a} can contain whatever value to be complete).
 \end{itemize}
 
-\subsubsection{Types of Analyses}\label{sec:types_anal}
+\subsection*{Types of Analyses}\label{sec:types_anal}
 Analyses are also divided into sets of what information they provide. There
 are two properties in this category presented below. More on those are in
 section~\ref{sec:data-flow}
@@ -347,7 +347,7 @@ On the other hand to see at each line which variables are already set to any
 value, we need to propagate the information forwards.
 \end{itemize}
 
-\subsubsection{Other Views}
+\subsection*{Other Views}
 Of course the list above is not complete. There are many other categorizations
 we do not list in here. In short, we can mention white-box versus black-box
 where the algorithm either knows the internals of the checked projects or not.
@@ -369,7 +369,7 @@ we may still want to look where we can speed the implementation up. This is
 often with operating system kernels where their behaviour has to be
 transparent and as fast as possible, its effects to become invisible at best.
 
-\subsubsection{Code Parsing}
+\subsection*{Code Parsing}
 While we presented the terms above directly on programming languages
 nicely readable by people, analyses are performed on an abstraction level
 better understandable by computers and conveniently operated by analyzer
@@ -600,6 +600,72 @@ antlr~\cite{antlr4}. Flex and Bison~\cite{flex_bison} are used to generate LR
 parsers. This introduction does not pretend to be complete as we do not need
 more information for the purposes of this thesis; more on parsers can be
 learnt from~\cite{dragon,muchnick}.
+
+\subsection*{Pointer Analysis}
+For languages using pointers like C, it is important to know where these
+pointers point to. Consider the global integer variable and an integer pointer
+as are in the code depicted in Figure~\ref{fig:lst_ptsto}. Without knowing
+that \code{p} can point to and actually changes \code{x}, we would conclude
+that \code{fun} always returns 0. But it returns whatever it gets on the
+input as a parameter \code{a}. For that purpose, algorithms known as
+\emph{pointer analyses} exist.  There are two basic approaches to pointer
+analysis used nowadays. They are either based on equalities~\cite{steensgaard}
+or subsets~\cite{andersen} of the sets of possible pointer targets. While
+the former makes the sets of targets equal, the latter only copies the
+members. In general, this makes subset-based analyses more precise, but a
+little bit slower.
+
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=C]
+int fun(int a) {
+  static int x;
+  int *p = &x;
+  *p = a;
+  return x;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Pointer analysis demonstrative example.} \label{fig:lst_ptsto}
+\end{figure}
+
+The \emph{alias} or sometimes \emph{points-to analysis}~\cite{alias_anal} is a
+bit different to the pointer analysis in what it is able to tell about
+pointers.  The alias analysis can only conclude that two pointers either point
+to the same location or not. It cannot report the set of possible targets.
+This is sometimes sufficient and for example the compiler framework \llvm as
+of 3.1 provides its optimization passes only with the alias analysis. Precise
+alias analysis is an undecidable problem, often a \emph{may-alias}
+over-approximation or \emph{must-alias} under-approximation is computed
+instead. Another view to pointers suggests the \emph{shape
+analysis}~\cite{ptr_shape}.  It is an analysis of dynamically created
+structures like lists. It is able to recognize operations like list creation
+and give this information to the analyzer. It can be used for finding memory
+leaks or tell whether the list is created properly in the first place.
+
+\paragraph{Field-sensitivity} In languages allowing structured constructs, like
+\code{struct} in C, we can either consider each of the member of such an
+object when computing the pointer sets or ignore the members. Obviously
+ignoring that information leads to a faster analysis, imprecisions occur
+nonetheless. The imprecisions are two-fold:
+\begin{enumerate}
+\item Each member can be itself a pointer and can have its own pointer target
+set. Storing this information only per each structure in field-insensitive
+sense introduces a big imprecision.
+\item Knowing exactly to which member of a structure a pointer points is
+indeed useful information.
+\end{enumerate}
+The implementation is possible in two ways, depending on the demanded
+precision. First, \emph{field-based} sensitivity have only one
+global information about structure members, per each member name. So when we
+have two totally different structures \code{a} and \code{b} containing a
+member \code{void *x}, this analysis considers them to be the same and updates
+\code{x}'s points-to set any time \code{a.x} or \code{b.x} is set to point to
+a new object. The other analysis, the true \emph{field-sensitive} one,
+properly handles members of structures in the natural sense, but for a higher
+computation price, of course.
 
 \section{Specifics of Large Projects}
 In an ideal world, every code checking tool should be capable to parse and

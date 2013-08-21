@@ -1084,68 +1084,6 @@ As this thesis does not deal with this type of analysis, curious readers are
 pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
 to~\cite{bmc_survey} about bounded model checking.
 
-\section{Points-to Analysis}
-For languages using pointers like C, it is important to know where these
-pointers point to. Consider the global integer variable and an integer pointer
-as are in the code depicted in Figure~\ref{fig:lst_ptsto}. Without knowing
-that \code{p} can point-to and actually changes \code{x} we would conclude
-that \code{fun} always returns 0. But it returns whatever it gets on the
-input as a parameter \code{a}. For that purpose algorithms known as
-\emph{Points-to analysis} (sometimes referred as \emph{Pointer analysis})
-exist.
-
-\begin{figure}[htb]
-\begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}[language=C]
-int fun(int a) {
-  static int x;
-  int *p = &x;
-  *p = a;
-  return x;
-}
-\end{lstlisting}
-\end{tabular}
-\end{center}
-\caption{Points-to demonstrative example} \label{fig:lst_ptsto}
-\end{figure}
-
-\emph{Alias analysis} is a bit different to points-to analysis in what is able
-to tell about pointers. Alias analysis can only conclude that two pointers
-either point to the same location or not. It cannot report the set of possible
-targets. This is sometimes sufficient and for example \llvm as of 3.1 provides
-its optimization passes only with alias analysis. This was a problem for
-us\todo{XXX}
-
-The same as for other analyses, points-to analysis have always one of  the
-properties described in each point of section~\ref{sec:sensitivity}. Points-to
-analyses are often parametrized by another sensitivity: sensitivity for
-structure fields.
-
-\paragraph{Field-sensitivity} In languages allowing structured constructs, like
-\code{struct} in C, we have two options: to consider each of the member
-of such an object or ignore them. Obviously ignoring that information leads to
-faster analysis, however imprecisions occur. The imprecisions are two-fold:
-each member itself can be a pointer and should have its own points-to set, and
-knowing exactly to which member of a structure a pointer points-to is indeed
-useful information. On the other hand, when we want more precise analysis,
-there are two steps, with different precision. First, \emph{field-based
-sensitivity} have only one global information about structure members, per
-each member name. So when we have two totally different structures \code{a}
-and \code{b} containing a member \code{void *x}, this analysis considers
-them to be the same and updates \code{x}'s points-to set any time
-\code{a.x} or \code{b.x} is set to point to a new object. The other
-analysis, the true \emph{field-sensitive} one, properly handles members of
-structures in natural sense, but for a higher computation price, of course.
-
-\begin{verbatim}
-(call, 1) -> {  }
-(%1, -1) -> { (call, 0) }
-\end{verbatim}
-
-There are many different known approaches to pointer analysis, differing in
-speed and accuracy.
-
 \section{Tools}\label{sec:soa_tools}
 There are many successful tools based on static analysis.
 Unfortunately it is not really known
