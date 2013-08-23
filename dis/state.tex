@@ -843,12 +843,6 @@ summarization of some techniques we mention above~\cite{se_review88,
 se_review09, se_review13}. We use the symbolic execution in our tool described
 in Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
 
-%executor~\cite{se_el1}
-
-%\textsc{PREfix}~\cite{prefix} -- does not mention SE, but finds errors in
-%memory management (incomplete), used on large projects. ``selects
-%a representative sample of achievable paths to simulate''.
-
 % SADAT and IVS are missing
 
 
@@ -1073,16 +1067,26 @@ Due to path explosion problem and slow computers in the past, its use was
 limited rather to check small reactive systems in industry like processors or
 automotive control systems. Later, there appeared both less and more
 successful tools to check large software projects. For example model checker
-\textsc{Blast}~\cite{blast} failed due to inability to reason about pointers
-in the Linux kernel drivers~\cite{blast_kernel}. On the other hand Microsoft
-started adopting their model checker \textsc{SLAM} and driver
-verifier~\cite{sdv} for checking Windows drivers and they apparently succeeded
-as they require every driver to be checked by this toolkit with predefined
-temporal rules before it is accepted.
+\textsc{Blast}~\cite{blast} failed first due to inability to reason about
+pointers in the Linux kernel drivers~\cite{blast_kernel}. Later, it was shown,
+that \textsc{Blast} needs an instrumented code and then works better.  So it
+is currently successfully used in the Linux Driver Verification
+toolkit~\cite{ldv} to verify Linux device drivers.  Similarly, Microsoft
+started adopting their model checker \textsc{SLAM} in the driver verifier
+\textsc{SDV}~\cite{sdv} for checking Windows drivers and they apparently
+succeeded as they require every driver to be checked by this toolkit with
+predefined temporal rules. There are over 160 rules which are checked before a
+driver is accepted by Microsoft. \textsc{SDV} is a proprietary software with
+rules tailored to Windows drivers. Therefore it cannot be used for checking
+open source projects. So Clarke et al.~\cite{cbmc} adapted Microsoft's
+approach in \textsc{CBMC} and defined at least seven rules to check Linux
+kernel drivers. \textsc{DDverify} verifier~\cite{ddverify} was used for
+automated verification of the Linux kernel drivers.
 
-As this thesis does not deal with this type of analysis, curious readers are
-pointed to~\cite{mc_survey} and~\cite{mc_book} about model checking and
-to~\cite{bmc_survey} about bounded model checking.
+As this thesis does not deal with model checking, curious readers are pointed
+to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model checking.
+There is also a survey about bounded model checking~\cite{bmc_survey}
+available.
 
 \section{Tools}\label{sec:soa_tools}
 There are many successful tools based on static analysis. Unfortunately for
@@ -1093,14 +1097,44 @@ though some of them are combination of more. In this overview we mostly limit
 ourselves to analyzers of C code.
 
 \subsection*{Pattern Matching}
-\textsc{Coccinelle}~\cite{coccinelle} \textsc{FindBugs}~\cite{findbugs}
+We already mentioned the tools like \textsc{grep} which are used by developers
+to find diverse errant behaviour. Nonetheless, there are much more
+sophisticated tools.  One of the most known tools based on pattern matching is
+\textsc{FindBugs}~\cite{findbugs}. Despite it is intended to find errors in
+Java programs, we mention it here, because it became very popular. This
+happened thanks to the ease of use, hundreds of error types it can find,
+scalability and precision. It is able to prioritize the reports according to
+their weight so that it usually puts real errors on the top of the list in
+favor of false reports.
+
+\textsc{Coccinelle}~\cite{coccinelle} is another pattern matcher, better to
+write a semantic patcher. It uses a special language SmPL for specifying a
+semantic patch that allows for matching against a control flow graph nodes and
+changing them arbitrarily. The graph is then converted back to the source
+code.  \textsc{Coccinelle} was used originally to modify code to use newer
+interfaces like replacing two calls to \code{kmalloc} and \code{memset}
+functions by a single call to \code{kzalloc} which does the same as the two
+together.  Since it is able to match the control flow graph, it can be used
+for error pattern matching too, of course. As an example, we can pick missing
+checks for allocation: matching an allocation call which is not followed by an
+\code{if} checking the return value can be replaced to be the allocation plus
+an added check.
 
 \subsection*{Data-flow Analyzers}
 As we slightly mentioned in the introduction, compilers contain data-flow
 analysis and generate warnings or errors when they find some suspicious code.
-One of the most known known data-flow analyzers was
-\textsc{Lint}~\cite{lint}. It resulted in some clones like \textsc{Splint}.
-These
+When compilers were still not so evolved, other analyzers were used to fulfill
+this role. One of the most known known data-flow analyzers at that time was
+\textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
+zero, constant conditions which always evaluate either to true or false, or
+use of uninitialized variables. Later, \textsc{Lint} resulted in some clones
+like \textsc{LCLint} which was later renamed to \textsc{Splint}.
+\textsc{LCLint} was augmented to catch errors like buffer overflows and it
+also manages to work with code annotations. So the users can enable more
+checks if they annotate the checked code, otherwise false positive rate is
+unbearable.  Nonetheless \textsc{Splint} is not developed for more than a
+decade due to obvious reasons: the errors it reports are reported by modern
+compilers nowadays.
 
 \subsection*{Abstract Interpreters}
 Engler et al. brought the abstract interpretation to the attention in 2000 by
@@ -1115,41 +1149,106 @@ redefines \textsc{gcc}'s internal code representation, data types and applies
 the analysis on a such modified structure. Programming languages supported by
 \textsc{xgcc} are C and C++.
 
-CodePro
-Analytix PREfix/PREfast Astree CodeSonar
+\subsection*{Symbolic Executors}
+
+\cite{dart} \cite{exe} \cite{klee} \cite{ucklee} \cite{cute}
+
+%EL1~\cite{se_el1}
 
 \subsection*{Industrial Tools}
 Only a little information is known about industrial tools. It is due to
-secrets the companies hold to not let their competitors know. But we at least
-try to summarize the tools and what their providers make available about them.
+secrets the companies hold to not let their competitors know. What can be
+found in the reference materials, the tools often use combination of the
+techniques we have already described. They work on the top of various pattern
+matching, data-flow analyses, and some maybe use the abstract interpretation.
+Even though the internals are not known exactly, we at least try to summarize
+the tools and the little about what their providers make available about them.
 All the tools below are capable to handle C, some of them C++ and other
 languages like C\# or Java.
 
 The data-flow analyzer \textsc{Lint} was an inspiration for Gimpel's
 \textsc{PC Lint/FlexeLint}~\cite{pclint} and Cleanscape's
 \textsc{LintPlus}~\cite{lintplus}. The same as their predecessor, they aim at
-finding suspicious code constructs. MathWorks
+finding suspicious code constructs. MathWorks'
 \textsc{PolySpace}~\cite{polyspace} was one of the first abstract interpreters
-capable of handling large code. But according to the authors, the tool's upper
-limit is approximately 50 thousand lines of code that can be analyzed. The
-tool was inspired by the crash of Ariane~5 (see introduction).  \textsc{xgcc}
-was a predecessor of Coverity's \textsc{Prevent}~\cite{coverity}, and
-\textsc{Metal} for Coverity's \textsc{Extend}. \textsc{Prevent} is run
-regularly to check the Linux kernel and the results are provided to kernel
-developers.  KlocWork's \textsc{Insight}~\cite{klocwork} and GrammaTech's
-\textsc{Codesonar}~\cite{codesonar} are specialized to finding security and
-reliability issues. \textsc{Insigth} was originally intended as an optimizer
+capable of handling real code. But according to the authors, the tool's upper
+limit is still approximately 50 thousand lines of code that can be analyzed.
+The tool was inspired by the crash of Ariane~5 (see introduction). Another
+abstract interpreter which can handle large scale programs is AbsInt's
+\textsc{Astree}~\cite{astree}. It is sound and can be also tuned to produce no
+false positives. \textsc{Astree} also combines several abstractions to
+perform more accurate analysis~\cite{astree_combine}.
+
+\textsc{xgcc} was a predecessor of Coverity's
+\textsc{Prevent}~\cite{coverity}, and \textsc{Metal} for Coverity's
+\textsc{Extend}. \textsc{Prevent} is run regularly to check the Linux kernel
+and the results are provided to kernel developers.  KlocWork's
+\textsc{Insight}~\cite{klocwork} and GrammaTech's
+\textsc{CodeSonar}~\cite{codesonar} are specialized to finding security and
+reliability issues. \textsc{Insight} was originally intended as an optimizer
 for C code.
+
+Microsoft developed many tools based on symbolic execution.
+Even though \textsc{PREfix}~\cite{prefix} explicitly does not mention it uses
+the symbolic execution, it is used there to find errors in memory management
+for example. \textsc{PREfix} has no problems analyzing large projects.
+\textsc{Pex}~\cite{pex} is a symbolic executor intended for checking .NET web
+applications. They developed also a fuzz tester \textsc{SAGE}~\cite{sage}. It
+is a symbolic executor working directly on the x86 assembly code. It is
+therefore able to work also with libraries whose source code was not made
+public.  \textsc{YOGI}~\cite{yogi} is a tool which combines symbolic execution
+with dynamic execution. It was experimentally used to replace
+\textsc{SLAM}~\cite{slam_decade} in SDV~\cite{sdv} with comparable better
+results. Microsoft also released \textsc{PREfast}, a tool that contains a set
+of rules that a code should fulfill and with a use of annotations, it checks
+code against the rules. Its main use is to disallows developers to commit
+changes that contain certain class of bugs.
 
 %\url{http://spinroot.com/static/}
 %\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
 %\url{http://samate.nist.gov/index.php/Source_Code_Security_Analyzers.html}
 %\url{http://web.archive.org/web/20050405224446/http://www.programming-x.com/programming/analyzer.html}
 
-\subsection{Checking the Linux Kernel}
-Projects/software used for checking the Linux kernel.
+Aspect: Detecting Bugs with Abstract Dependences
 
-checkpatch
+\subsection{Summary of the Linux Kernel Checkers}
+Some of the tools above can analyze kernels or only drivers of operating
+systems. In this sections we specifically sum those which are capable to
+handle the Linux kernel.
 
-\stan~\cite{stanse}, projects like LDV (ISPRAS), Coverity~\cite{coverity},
-\textsc{Cppcheck}~\cite{cppcheck}, \clang~\cite{clang}, \sparse~\cite{sparse}
+One of the basic ones is based on pattern matching
+and every developer should use it before sending patches to the kernel. It is
+named obviously after what it is intended to do as
+\textsc{checkpatch}~\cite{checkpatch}. It only checks for patterns like if
+somebody introduces a whitespace to the code or if the code is properly
+indented. Some better analysis can be performed by a semantic parser called
+\sparse~\cite{sparse}. It is still a tool working with some sort of patterns
+matched against the parse tree.  It was written by the founder of the kernel
+and is tailored exclusively to the kernel as the checks have only a little
+sense elsewhere.  The checks include basic intra-procedural checks for proper
+locking, use of zero instead of \code{NULL}, or extended type checking using
+the annotated code in the kernel. Yet another pattern matcher is Dan
+Carpenter's source matcher \textsc{Smatch}~\cite{smatch}. Formerly, it was a
+set of Perl programming languages scripts. They were later turned into C code
+and \sparse parser was used for transforming sources.
+
+memory errors and named
+
+Verifications around the Linux kernel~\cite{kernel_verif}
+
+These four tool, are extensively used by developers and errors reported by
+them are getting fixed~\cite{linux_faults}.
+
+\stan~\cite{stanse}, projects like LDV~\cite{ldv} (ISPRAS),
+Coverity~\cite{coverity}, \textsc{Cppcheck}~\cite{cppcheck},
+\clang~\cite{clang}
+
+%Coverity static analysis tool [28], which searches for com- mon errors and
+%inefficiencies such as the existence of dead code, null pointer dereference,
+%use before test, buffer overrun, resource leak, unsafe use of returned values,
+%type and allocation size mismatch, uninitialized values read and use after
+%free. These rules were adapted for Linux kernel so that standard library
+%functions are replaced by kernel API functions. For example, resource leak is
+%described for different kernel resources like pci pool, usb urb etc. In the
+%view of confidential nature of the tool it remains unclear how much far it can
+%be extended for new verification rules.
