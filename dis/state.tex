@@ -1029,63 +1029,72 @@ This is a bit different technique from static analysis we are dealing in this
 thesis with. It does not check the program proper, but instead tries to prove
 some properties on a model of the program. The model is represented by some
 finite state machine and the properties are a specified behaviour which has to
-be satisfied in time. For example a property can be ,,This message has to come
+be satisfied in time. For example a property can be ``This message has to come
 as a reply in the future.'' Properties are described by logic formulas,
 usually in the temporal logic like LTL or CTL (see more about temporal logics
-in~\cite{temporal}). Correctness of the system is then established, if every
-run of the system corresponds to a particular formula. If it does not for some
-case, a counterexample consisting of system states is generated. Obviously,
-even if no counterexample is generated, the system still might not be correct
-in case its model or properties checked are incorrect.
+in {\O}hrstr{\o}m and Hasle's book~\cite{temporal}). Correctness of the system
+is then established, if every run of the system corresponds to a particular
+formula. If it does not for some case, a counterexample consisting of system
+states is generated. Obviously, even if no counterexample is generated, the
+system still might not be correct in case its model or checked properties are
+incorrect. And yet, according to Ball et al.\ developing a thorough and
+precise model may take years~\cite{mc_years}.
 
-These technique was spread even after introduction of \emph{symbolic model
-checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets of
-states by boolean functions. For example if we have two 1-bit wide variables
+The model checking was spread even after introduction of the \emph{symbolic
+model checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets
+of states by boolean functions. For example if we have two 1-bit variables
 \texttt{a} and \texttt{b} and their values are always the same (1 and 1 or 0
 and 0 pairwise), we can represent it by a formula \texttt{a} $\Leftrightarrow$
 \texttt{b} instead of storing all the values. The formulas can be represented
 in a space-saving way by \emph{Reduced Ordered Binary Decision
-Diagrams}~\cite{bdd} (ROBDD or simply BDD) were introduced to represent the
-set of states. Despite the exponential complexity still persists (due to path
-explosion problem), BDDs helped to limit the memory use a lot. Both symbolic
-model checking and BDDs allowed more complex systems to be checked on the same
-hardware (cf.~\cite{mc_symbolic1} again).
+Diagrams}~\cite{bdd} (ROBDD or simply BDD).  Despite the exponential
+complexity still persists (due to the path explosion problem), BDDs helped to
+limit the memory use a lot.  Both the symbolic model checking and BDDs allowed
+more complex systems to be checked on the same hardware
+(cf.~\cite{mc_symbolic1} again).
 
-In parallel to BDDs-based model checking, \emph{bounded model checking}
+In parallel to the BDDs-based model checking, \emph{bounded model checking}
 exists. Instead of exploring the whole state space of the system model, there
 is a predefined constant \textit{k} which determines the maximum length of
-execution to be explored. If it explores all these \textit{k}-prefixes, either
-\textit{k} is incremented and the checking continues, or the model checker is
-stopped. It can have two reasons: the user set the top bound for \textit{k}
-(the analysis is of course incomplete in that case), or the execution is
-infeasible, because it runs out of resources. Model checking and bounded model
-checking are orthogonal techniques, it was shown in~\cite{bmc_survey} that
-both of them reason about different class of properties. (Although there can
-be an intersection.)
+execution to be explored. If a bounded model checker explores all these
+\textit{k}-prefixes, either \textit{k} is incremented and the checking
+continues, or the model checker is stopped. It can have two reasons: the user
+set the top bound for \textit{k} (the analysis is of course incomplete in that
+case), or the execution is infeasible, because it runs out of resources. Model
+checking and bounded model checking are orthogonal techniques, it was shown
+in~\cite{bmc_survey} that both of them reason about different class of
+properties. (Nonetheless there can be an intersection.)
 
-Due to path explosion problem and slow computers in the past, its use was
-limited rather to check small reactive systems in industry like processors or
-automotive control systems. Later, there appeared both less and more
-successful tools to check large software projects. For example model checker
-\textsc{Blast}~\cite{blast} failed first due to inability to reason about
-pointers in the Linux kernel drivers~\cite{blast_kernel}. Later, it was shown,
-that \textsc{Blast} needs an instrumented code and then works better.  So it
-is currently successfully used in the Linux Driver Verification
-toolkit~\cite{ldv} to verify Linux device drivers.  Similarly, Microsoft
-started adopting their model checker \textsc{SLAM} in the driver verifier
-\textsc{SDV}~\cite{sdv} for checking Windows drivers and they apparently
+Due to the path explosion problem and relatively slow computers in the past,
+use of the model checking was limited rather to check small reactive systems
+in industry like manufacturers of processors and automotive control systems.
+Later, there started appearing more successful tools to check large software
+projects. For example model checker \textsc{Blast}~\cite{blast} failed first
+due to inability to reason about pointers in the Linux kernel
+drivers~\cite{blast_kernel}. It was shown later, that \textsc{Blast} needs an
+instrumented code and then works significantly better.  So it is currently
+successfully used in the Linux Driver Verification toolkit~\cite{ldv} to
+verify Linux device drivers. \textsc{Blast} was also extended to handle
+concurrent data accesses~\cite{blast_concur}.  \textsc{Spin}~\cite{spin} is
+aware of concurrent data accesses too. So \textsc{Spin} checked a model of the
+Linux common filesystem layer~\cite{spin_vfs}. Similarly, Microsoft started
+adopting their model checker \textsc{Slam}~\cite{slam_cav, slam_popl,
+slam_decade} and \textsc{Slam 2}~\cite{slam2} in their driver verifier
+\textsc{Sdv}~\cite{sdv} for checking Windows drivers. They apparently
 succeeded as they require every driver to be checked by this toolkit with
-predefined temporal rules. There are over 160 rules which are checked before a
-driver is accepted by Microsoft. \textsc{SDV} is a proprietary software with
-rules tailored to Windows drivers. Therefore it cannot be used for checking
-open source projects. So Clarke et al.~\cite{cbmc} adapted Microsoft's
-approach using \textsc{CBMC} model checker and defined at least seven rules to
-check Linux kernel drivers. The rules were later extended by Post and
-K\"{u}chlin~\cite{slicx}. \textsc{DDverify} verifier~\cite{ddverify} and
-\textsc{Saturn}~\cite{saturn} were used for automated verification of the
-Linux kernel drivers. \textsc{Undertaker}~\cite{undertaker} is a model checker
-for the Linux kernel configuration system. It serves the purpose of validating
-dependencies in the \texttt{Kconfig} configuration files.
+over 160 predefined temporal rules before the driver is accepted by Microsoft.
+\textsc{Sdv} is a proprietary software with rules tailored to Windows drivers.
+Therefore it cannot be used for checking open source projects. So Clarke et
+al.~\cite{cbmc} adapted Microsoft's approach using \textsc{CBMC} model checker
+and defined at least seven rules to check Linux kernel drivers. The rules were
+later extended by Post and K\"{u}chlin~\cite{slicx}. \textsc{DDverify}
+verifier~\cite{ddverify} and \textsc{Saturn}~\cite{saturn} were used for
+automated verification of the Linux kernel drivers.
+\textsc{Undertaker}~\cite{undertaker} is a model checker for the Linux kernel
+configuration system. It serves the purpose of validating dependencies in the
+\texttt{Kconfig} configuration files. There exist also successful tools for
+modelling and verifying Java programs like
+\textsc{PathFinder}~\cite{pathfinder}.
 
 As this thesis does not deal with model checking, curious readers are pointed
 to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model checking.
@@ -1132,13 +1141,17 @@ this role. One of the most known known data-flow analyzers at that time was
 \textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
 zero, constant conditions which always evaluate either to true or false, or
 use of uninitialized variables. Later, \textsc{Lint} resulted in some clones
-like \textsc{LCLint} which was later renamed to \textsc{Splint}.
+like \textsc{LCLint}~\cite{lclint} which was later renamed to \textsc{Splint}.
 \textsc{LCLint} was augmented to catch errors like buffer overflows and it
 also manages to work with code annotations. So the users can enable more
 checks if they annotate the checked code, otherwise false positive rate is
 unbearable.  Nonetheless \textsc{Splint} is not developed for more than a
-decade due to obvious reasons: the errors it reports are reported by modern
-compilers nowadays.
+decade due to obvious reasons: the most errors it reports are reported by
+modern compilers nowadays. There exist also analyzers that are not so powerful
+to handle large code bases or require high user intervention to annotate the
+checked code. As an example we give \textsc{Aspect}~\cite{aspect} which
+compares a program specification of input-output behaviour provided by a user
+to data-flow models extracted from the code.
 
 \subsection*{Abstract Interpreters}
 Engler et al. brought the abstract interpretation to the attention in 2000 by
@@ -1155,7 +1168,46 @@ the analysis on a such modified structure. Programming languages supported by
 
 \subsection*{Symbolic Executors}
 
-\cite{dart} \cite{exe} \cite{klee} \cite{ucklee} \cite{cute}
+klee -- file system model to simulate a filesystem without really involving
+it.
+
+\cite{klee} \cite{ucklee} \textsc{PathFinder}~\cite{pathfinder_se}
+\cite{crest}
+
+DDT~\cite{ddt}
+
+CodeSurfer/x86 platform ?
+
+\paragraph{Concolic}
+\textsc{Cute}~\cite{cute} \textsc{Dart}~\cite{dart} \textsc{Exe}~\cite{exe}
+\textsc{Bitscope}~\cite{bitscope}
+
+None of the above support automatic bi-directional conversion across the
+boundary of the symbolic and concrete execution.
+
+\textsc{S${}^2$e}~\cite{s2e} brought two novelties to the concolic execution.
+First, \emph{selective symbolic execution} to solve the problem of path
+explosion in libraries. As we are mainly interested only in some parts of
+libraries, the symbolic execution does not fork and only the execution is
+forked at branches when it gets back to our code from the library. Note this
+is somewhat similar to the barrier slicing. Second, it is a true concolic
+execution because it runs the \textsc{Klee} symbolic executor and a modified
+\textsc{Qemu} virtual machine in parallel. Those two communicate with each
+other and exchange information.  Converters in both directions from x86 code
+to \llvm have to be in place of course. \textsc{S${}^2$e} was used to to find
+errors in Windows network drivers, and allegedly for the first time to employ
+the symbolic execution for performance analysis. A very similar, but less
+generic framework is \textsc{BitBlaze}~\cite{bitblaze}. It analyses binary
+files and creates reduced instruction set intermediate code. This code is
+executed symbolically. Concurrently, the analyzed program is executed
+dynamically by a component that is capable of monitoring and binary
+instrumentation. These two are glued together by a third component that
+ensures communication between them. One of unusual uses is generating exploits
+by a comparison of unpatched and patched versions.  \textsc{BitBlaze} was used
+for checking HTTP and NTP protocol servers~\cite{bitblaze_net}. Another trye
+concolic executor is \textsc{Sjpf}~\cite{sjpf}, but it does not track
+constraints when switching from symbolic execution to concrete.
+
 
 %EL1~\cite{se_el1}
 
@@ -1179,8 +1231,8 @@ capable of handling real code. But according to the authors, the tool's upper
 limit is still approximately 50 thousand lines of code that can be analyzed.
 The tool was inspired by the crash of Ariane~5 (see introduction). Another
 abstract interpreter which can handle large scale programs is AbsInt's
-\textsc{Astree}~\cite{astree}. It is sound and can be also tuned to produce no
-false positives. \textsc{Astree} also combines several abstractions to
+\textsc{Astree}~\cite{astree}. It can be tuned to be sound, i.e.\ to produce
+no false positives.  \textsc{Astree} also combines several abstractions to
 perform more accurate analysis~\cite{astree_combine}.
 
 \textsc{xgcc} was a predecessor of Coverity's
@@ -1190,30 +1242,32 @@ and the results are provided to kernel developers.  KlocWork's
 \textsc{Insight}~\cite{klocwork} and GrammaTech's
 \textsc{CodeSonar}~\cite{codesonar} are specialized to finding security and
 reliability issues. \textsc{Insight} was originally intended as an optimizer
-for C code.
+for C code. IBM's \textsc{Apollo}~\cite{apollo} aims at checking web
+applications, \textsc{PHP} scripts more precisely.
 
 Microsoft developed many tools based on symbolic execution.
 Even though \textsc{PREfix}~\cite{prefix} explicitly does not mention it uses
 the symbolic execution, it is used there to find errors in memory management
 for example. \textsc{PREfix} has no problems analyzing large projects.
-\textsc{Pex}~\cite{pex} is a symbolic executor intended for checking .NET web
-applications. They developed also a fuzz tester \textsc{SAGE}~\cite{sage}. It
-is a symbolic executor working directly on the x86 assembly code. It is
-therefore able to work also with libraries whose source code was not made
-public.  \textsc{YOGI}~\cite{yogi} is a tool which combines symbolic execution
-with dynamic execution. It was experimentally used to replace
-\textsc{SLAM}~\cite{slam_decade} in SDV~\cite{sdv} with comparable better
-results. Microsoft also released \textsc{PREfast}, a tool that contains a set
-of rules that a code should fulfill and with a use of annotations, it checks
-code against the rules. Its main use is to disallows developers to commit
-changes that contain certain class of bugs.
+Similarly use as IBM's \textsc{Apollo} has \textsc{Pex}~\cite{pex}. It is a
+symbolic executor intended for checking .NET web applications. They developed
+also a fuzz tester \textsc{SAGE}~\cite{sage}. It is a symbolic executor
+working directly on the x86 assembly code. It is therefore able to work also
+with libraries whose source code was not made public.
+\textsc{YOGI}~\cite{yogi} is a tool which combines symbolic execution with
+dynamic execution. It was experimentally used to replace
+\textsc{SLAM}~\cite{slam_decade} in \textsc{Sdv}~\cite{sdv} with comparable
+better results. Microsoft also released \textsc{PREfast}, a tool that contains
+a set of rules that a code should fulfill and with a use of annotations, it
+checks code against the rules. Its main use is to disallows developers to
+commit changes that contain certain classes of errors.
+
+symbolic pathfinder
 
 %\url{http://spinroot.com/static/}
 %\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
 %\url{http://samate.nist.gov/index.php/Source_Code_Security_Analyzers.html}
 %\url{http://web.archive.org/web/20050405224446/http://www.programming-x.com/programming/analyzer.html}
-
-Aspect: Detecting Bugs with Abstract Dependences
 
 \subsection{Summary of the Linux Kernel Checkers}
 Some of the tools above can analyze kernels or only drivers of operating
@@ -1248,6 +1302,10 @@ Verifications around the Linux kernel~\cite{kernel_verif}
 \stan~\cite{stanse}, projects like LDV~\cite{ldv} (ISPRAS),
 Coverity~\cite{coverity}, \textsc{Cppcheck}~\cite{cppcheck},
 \clang~\cite{clang}
+
+Symbolic Execution for Software Testing in Practice –
+Preliminary Assessment
+
 
 %Coverity static analysis tool [28], which searches for com- mon errors and
 %inefficiencies such as the existence of dead code, null pointer dereference,
