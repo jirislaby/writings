@@ -1154,21 +1154,25 @@ compares a program specification of input-output behaviour provided by a user
 to data-flow models extracted from the code.
 
 \subsection*{Abstract Interpreters}
-Engler et al. brought the abstract interpretation to the attention in 2000 by
+Engler et al.\ brought the abstract interpretation to the attention in 2000 by
 a technique based on meta compilation~\cite{metacomp}. There, program
 developers specify properties of the checked system in \textsc{Metal}
 language~\cite{metal}, compile it into an internal representation and the tool
 applies the specification on all executable paths in a particular function.
-Violation of the specification on a path is then
-reported as an error. The compiler used for \textsc{Metal} compilation is a
-modified GNU C compiler (\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It
-redefines \textsc{gcc}'s internal code representation, data types and applies
-the analysis on a such modified structure. Programming languages supported by
-\textsc{xgcc} are C and C++.
+Violation of the specification on a path is then reported as an error. The
+compiler used for \textsc{Metal} compilation is a modified GNU C compiler
+(\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It redefines \textsc{gcc}'s
+internal code representation, data types and applies the analysis on a such
+modified structure. Programming languages supported by \textsc{xgcc} are C and
+C++. On the similar base is built \stan~\cite{stanse} which is written in
+Java and have only a parser for C.
 
 \subsection*{Symbolic Executors}
 
-\textsc{PathFinder}~\cite{pathfinder_se}
+\textsc{PathFinder-SE}~\cite{pathfinder_se} is an extension to the model
+checker \textsc{PathFinder} which enables the model checker to perform the
+symbolic execution.  They further improved the tool to handle e.g.\ concurrent
+programs, heap structures and data.
 
 \textsc{IntScope}~\cite{intscope} decompiles x86 binaries to an intermediate
 representation form and runs the symbolic execution to find integer overflows.
@@ -1338,8 +1342,8 @@ Some of the tools above can analyze kernels or only drivers of operating
 systems. In this sections we specifically sum those which are capable to
 handle the Linux kernel.
 
-One of the basic ones is based on pattern matching
-and every developer should use it before sending patches to the kernel. It is
+One of the basic ones is based on the pattern matching and every developer
+is supposed to use it before sending patches to the kernel maintainers. It is
 named obviously after what it is intended to do as
 \textsc{checkpatch}~\cite{checkpatch}. It only checks for patterns like if
 somebody introduces a whitespace to the code or if the code is properly
@@ -1354,25 +1358,33 @@ Carpenter's source matcher \textsc{Smatch}~\cite{smatch}. Formerly, it was a
 set of Perl programming languages scripts. They were later turned into C code
 and \sparse was used as a base. \textsc{Smatch} added many more checks
 regarding the Linux kernel like doing direct memory accesses on a stack or
-passing incorrect arguments to picked functions.  These four tools are
-extensively used by the kernel developers and errors reported are getting
-fixed constantly~\cite{linux_faults}.
+passing incorrect arguments to picked functions. Even though Coverity's
+\textsc{Prevent} is an industrial tool, it is constantly checking the kernel
+and reports are made available. The reports are of diverse kinds like dead
+code, null pointer dereferences, use before test and so on. Many of them are
+getting fixed. These four tools are extensively used by the kernel developers
+and errors reported are getting fixed constantly~\cite{linux_faults}.
+
+There are also tools that can be used, but are not used that massively by so
+many developers. These include \clang~\cite{clang} and
+\textsc{Cppcheck}~\cite{cppcheck}. \clang is a C/C++ compiler from the \llvm
+toolkit and contains also a static checker framework. There are also checkers
+that can find errors in memory handling, locking, or pointer operations. But
+mostly the results are imprecise and contain many false reports.
+
+Historically, \textsc{xgcc} was used to find errors in the
+kernel~\cite{metal_kernel}, mainly for errors like if there are proper checks
+of untrusted data coming from the network or an user to the kernel. It found
+over one hundred of such errors. As \stan~\cite{stanse} is a tool based on a
+similar technique, it was used the same way and found over one hundred another
+errors.
+
+%Verifications around the Linux kernel~\cite{kernel_verif}
+
+There are also projects based on model checking which are successful to check
+the Linux kernel. \textsc{Ldv}~\cite{ldv} is one of those. The same as
+\textsc{Prevent}'s reports, \textsc{Ldv}'s reports are sent to the subsystem
+maintainers so that they can look at them and fix them.
 
 %\textsc{Herodotos}~\cite{herodotos} compares several version of checked
 %software and is able track errors how are they propagated over time.
-
-Verifications around the Linux kernel~\cite{kernel_verif}
-
-\stan~\cite{stanse}, projects like LDV~\cite{ldv} (ISPRAS),
-Coverity~\cite{coverity}, \textsc{Cppcheck}~\cite{cppcheck},
-\clang~\cite{clang}
-
-%Coverity static analysis tool [28], which searches for com- mon errors and
-%inefficiencies such as the existence of dead code, null pointer dereference,
-%use before test, buffer overrun, resource leak, unsafe use of returned values,
-%type and allocation size mismatch, uninitialized values read and use after
-%free. These rules were adapted for Linux kernel so that standard library
-%functions are replaced by kernel API functions. For example, resource leak is
-%described for different kernel resources like pci pool, usb urb etc. In the
-%view of confidential nature of the tool it remains unclear how much far it can
-%be extended for new verification rules.
