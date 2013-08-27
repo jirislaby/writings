@@ -1168,46 +1168,110 @@ the analysis on a such modified structure. Programming languages supported by
 
 \subsection*{Symbolic Executors}
 
-klee -- file system model to simulate a filesystem without really involving
-it.
+\textsc{PathFinder}~\cite{pathfinder_se}
 
-\cite{klee} \cite{ucklee} \textsc{PathFinder}~\cite{pathfinder_se}
-\cite{crest}
+\textsc{IntScope}~\cite{intscope} decompiles x86 binaries to an intermediate
+representation form and runs the symbolic execution to find integer overflows.
 
-DDT~\cite{ddt}
+\paragraph{Concolic Executors}
+\textsc{PathCrawler}~\cite{pathcrawler} was the first executor to combine
+symbolic and dynamic execution. It does not use concrete values in the
+symbolic execution to simplify complex constraints nonetheless. This was first
+performed only by \textsc{Dart}~\cite{dart}.  The primary goal is to execute
+\emph{all}, or at least as much as possible feasible program paths, in a
+systematic way. It starts dynamically with random input and symbolically
+tracks branching conditions.  The symbolic execution and a solver is then used
+to change the input so that it traverses another paths when executed
+dynamically again. This happens until the code is covered fully or an user
+stops the process.  \textsc{Dart} can propagate concrete values from the
+dynamic runs to the symbolic run when the solver is incapable to reason about
+some values.  \textsc{Dart} gives up the symbolic execution and switches to
+standard random testing when pointer constrains are used. This was improved in
+another executor \textsc{Cute}~\cite{cute}. It handles pointers better and is
+able to analyze concurrent programs. So except it generates the inputs
+systematically, it also makes diverse schedule plans of individually spawn
+threads.  \textsc{Cute} cannot still handle symbolic offsets of pointers.
 
-CodeSurfer/x86 platform ?
+\paragraph{Egt and Derivatives}
+At the same time as \textsc{Dart} and \textsc{Cute} emerged, Cadar et al.\
+came up with \textsc{Egt}~\cite{egt} for generating test cases from symbolic
+inputs.  \textsc{Egt} was a predecessor of \textsc{Exe}~\cite{exe} which
+finally introduced a precise handling of pointers with symbolic offsets.
+\textsc{Exe} was later completely redesigned and the new tool
+\textsc{Klee}~\cite{klee} set to execute the \llvm code. \textsc{Klee}
+optimizes solver queries, has better search heuristics, and other improvements
+like a file system model to simulate a filesystem without really involving it.
+This allowed for an analysis of \textsc{Coreutils}, the basic set of utilities
+most Linux users work with and to actually find errors there.  \textsc{Klee}
+was used also for checking a tool equivalence. It took two implementations of
+the same and symbolically compared the results. Several deviations from the
+standard behaviour were found that way. This was later improved more in
+\textsc{UC-Klee}~\cite{ucklee}. First, it compares memory contents of both
+implementations. Second, it makes the memory symbolic when accessed
+(on-demand). Third, it checks that both implementations behave the same with
+respect to error conditions like division by zero. \textsc{Klee} and
+\textsc{UC-Klee} are put into concolic executors since it allows to invoke
+library functions dynamically.
 
-\paragraph{Concolic}
-\textsc{Cute}~\cite{cute} \textsc{Dart}~\cite{dart} \textsc{Exe}~\cite{exe}
-\textsc{Bitscope}~\cite{bitscope}
+Since any of the concolic execution tools is prone to selected strategy that
+decides which states are explored next, they were studied and compared in
+\textsc{Crest}~\cite{crest}.  It is a tool very close to \textsc{Cute} in what
+it performs, except it is freely available, source codes inclusive.
+
+Instead of generating only a single input, \textsc{Sage}~\cite{sage} defines
+the term \emph{generational search} to generate as many inputs as possible at
+once. This is unimportant for cases, where the whole state space is
+explored. Nonetheless, this is not the case as real programs cannot be covered
+fully. So generating more input often helps more coverage. The same as above,
+it records branching conditions from the first dynamic run, negates all of
+them one by one and asks a solver for a solution.  For each positive reply the
+solver gives, \textsc{Sage} generates a separate input. The whole tool does
+not use any intermediate language, it symbolically executes directly the x86
+binary code. So it can be used also in cases where source code is not known.
+The whole approach in \textsc{Sage} is called \emph{automated whitebox fuzz
+testing}. \textsc{SmartFuzz}~\cite{smartfuzz} works very similarly, but the
+set of errors the tool aims at is limited only to integer errors.
+\textsc{SmartFuzz} captures signed/unsigned conversions for example. The
+generated inputs are filtered, so more eager heuristics that allow more inputs
+generation are allowed.
 
 None of the above support automatic bi-directional conversion across the
-boundary of the symbolic and concrete execution.
-
-\textsc{S${}^2$e}~\cite{s2e} brought two novelties to the concolic execution.
-First, \emph{selective symbolic execution} to solve the problem of path
-explosion in libraries. As we are mainly interested only in some parts of
-libraries, the symbolic execution does not fork and only the execution is
-forked at branches when it gets back to our code from the library. Note this
-is somewhat similar to the barrier slicing. Second, it is a true concolic
-execution because it runs the \textsc{Klee} symbolic executor and a modified
-\textsc{Qemu} virtual machine in parallel. Those two communicate with each
-other and exchange information.  Converters in both directions from x86 code
-to \llvm have to be in place of course. \textsc{S${}^2$e} was used to to find
-errors in Windows network drivers, and allegedly for the first time to employ
-the symbolic execution for performance analysis. A very similar, but less
-generic framework is \textsc{BitBlaze}~\cite{bitblaze}. It analyses binary
-files and creates reduced instruction set intermediate code. This code is
-executed symbolically. Concurrently, the analyzed program is executed
-dynamically by a component that is capable of monitoring and binary
-instrumentation. These two are glued together by a third component that
-ensures communication between them. One of unusual uses is generating exploits
-by a comparison of unpatched and patched versions.  \textsc{BitBlaze} was used
-for checking HTTP and NTP protocol servers~\cite{bitblaze_net}. Another trye
-concolic executor is \textsc{Sjpf}~\cite{sjpf}, but it does not track
-constraints when switching from symbolic execution to concrete.
-
+boundary of the symbolic and concrete execution. This was one of the two
+novelties in \textsc{S${}^2$e}~\cite{s2e}: \emph{selective symbolic
+execution}. It was published by some of the authors earlier to solve the
+problem of path explosion in libraries and system calls~\cite{se_selective}.
+As we are mainly interested only in some parts of libraries, the symbolic
+execution does not fork and only the execution is forked at branches when it
+gets back to our code from the library. Note this is somewhat similar to the
+barrier slicing. The second novelty is a true concolic execution because it
+runs the \textsc{Klee} symbolic executor and a modified \textsc{Qemu} virtual
+machine in parallel. Those two communicate with each other and exchange
+information, especially the symbolic state is updated from the dynamic
+execution and concrete values instantiated from the symbolic run whenever
+needed. Converters in both directions from x86 code to \llvm have to be in
+place to have both executions running. \textsc{S${}^2$e} was used to to find
+errors in Windows network drivers, and allegedly it was the first one to
+employ the symbolic execution for performance analysis too.
+\textsc{S${}^2$e}'s parallel engined works on the top of \textsc{Ddt${}^+$},
+which is a reimplementation of a closed source tool \textsc{Ddt}~\cite{ddt}. A
+very similar to \textsc{S${}^2$e}, but less generic framework is
+\textsc{BitBlaze}~\cite{bitblaze}. It analyses binary files and creates
+intermediate code with a reduced instruction set. This code is executed
+symbolically.  Concurrently, the analyzed program is executed dynamically by a
+component that is capable of monitoring and binary instrumentation. These two
+are glued together by a third component that ensures communication between
+the first two. One of unusual uses is generating exploits by a comparison of
+unpatched and patched versions.  \textsc{BitBlaze} was used for checking HTTP
+and NTP protocol servers~\cite{bitblaze_net}.
+\textsc{Bitscope}~\cite{bitscope} is built on the same cornerstone as
+\textsc{BitBlaze}, but provides understanding of dependencies between program
+inputs and outputs. Both were used for recognizing malware in software.
+Another true concolic executor is \textsc{Sjpf}~\cite{sjpf} stemming from
+\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference is that it
+symbolically executes the Java bytecode, therefore performing the symbolic
+execution more directly. Nevertheless its downside is that it still does not
+track constraints when switching from symbolic execution to concrete as the
+ones above.
 
 %EL1~\cite{se_el1}
 
@@ -1245,24 +1309,24 @@ reliability issues. \textsc{Insight} was originally intended as an optimizer
 for C code. IBM's \textsc{Apollo}~\cite{apollo} aims at checking web
 applications, \textsc{PHP} scripts more precisely.
 
-Microsoft developed many tools based on symbolic execution.
-Even though \textsc{PREfix}~\cite{prefix} explicitly does not mention it uses
-the symbolic execution, it is used there to find errors in memory management
-for example. \textsc{PREfix} has no problems analyzing large projects.
-Similarly use as IBM's \textsc{Apollo} has \textsc{Pex}~\cite{pex}. It is a
-symbolic executor intended for checking .NET web applications. They developed
-also a fuzz tester \textsc{SAGE}~\cite{sage}. It is a symbolic executor
-working directly on the x86 assembly code. It is therefore able to work also
-with libraries whose source code was not made public.
-\textsc{YOGI}~\cite{yogi} is a tool which combines symbolic execution with
-dynamic execution. It was experimentally used to replace
-\textsc{SLAM}~\cite{slam_decade} in \textsc{Sdv}~\cite{sdv} with comparable
-better results. Microsoft also released \textsc{PREfast}, a tool that contains
-a set of rules that a code should fulfill and with a use of annotations, it
-checks code against the rules. Its main use is to disallows developers to
-commit changes that contain certain classes of errors.
-
-symbolic pathfinder
+Microsoft developed many tools based on the symbolic execution.  Even though
+\textsc{PREfix}~\cite{prefix} explicitly does not mention it, it is used there
+to find errors in memory management for example. \textsc{PREfix} has no
+problems analyzing large projects thanks to computation of function summaries,
+but needs user intervention to model library functions. This was improved in
+\textsc{Archer} of Xie et al.~\cite{archer}. A similar use as IBM's
+\textsc{Apollo} above has \textsc{Pex}~\cite{pex}. It is a symbolic executor
+intended for checking .NET web applications. They developed also a fuzz tester
+\textsc{SAGE}~\cite{sage}.  It is a symbolic executor working directly on the
+x86 assembly code. It is therefore able to work also with libraries whose
+source code was not made public.  \textsc{YOGI}~\cite{yogi} is a tool which
+combines symbolic execution with dynamic execution. It was experimentally used
+to replace \textsc{SLAM}~\cite{slam_decade} in \textsc{Sdv}~\cite{sdv} with
+comparable better results. Microsoft also released \textsc{PREfast}, a tool
+that contains a set of rules that a code should fulfill and with a use of
+annotations, it checks code against the rules. Its main use is to disallows
+developers to commit changes that contain certain classes of errors such as
+inter-procedural integer overflows.
 
 %\url{http://spinroot.com/static/}
 %\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
@@ -1302,10 +1366,6 @@ Verifications around the Linux kernel~\cite{kernel_verif}
 \stan~\cite{stanse}, projects like LDV~\cite{ldv} (ISPRAS),
 Coverity~\cite{coverity}, \textsc{Cppcheck}~\cite{cppcheck},
 \clang~\cite{clang}
-
-Symbolic Execution for Software Testing in Practice –
-Preliminary Assessment
-
 
 %Coverity static analysis tool [28], which searches for com- mon errors and
 %inefficiencies such as the existence of dead code, null pointer dereference,
