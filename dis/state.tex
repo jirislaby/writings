@@ -90,9 +90,80 @@ can be replaced by the allocation with the check.
 
 \section{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
-information about possible values set in variables at specified points in
-code. This is usually computed by stabilizing sets of equations, usually by
-computing a fixed point of the equations:
+information about possible values of variables at specified points in code. We
+usually analyze each program line separately to see what are the effects of
+the line and then put this information to a transfer equation of what holds
+before and after the execution of the line. Next, we stabilize this set of of
+equations, usually by computing a fixed point of the equations. Such computed
+analysis can be utilized for various code optimizations or code analysis.
+
+Let us demonstrate data-flow analysis on an example and then generalize that
+approach. We chose one of the basic data-flow analyses: \emph{reaching
+definitions}~\cite[Section 9.2.4]{dragon}. At some point $p$ in code, we are
+interested in all assignments where some variable $\var{a}$ was set and was
+not re-set during the control flow to point $p$. This lets us reason about
+many questions like whether a variable was set already at the point it is used
+or if we should report an uninitialized access. We will show the analysis on
+the code of Figure~\ref{fig:state_df_code}.
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}
+a = 1; (*@ \label{lst:reach_def0} @*)
+if (x)
+  a = 3; (*@ \label{lst:reach_def1} @*)
+else
+  a = 4; (*@ \label{lst:reach_def2} @*)
+b = a; (*@ \label{lst:reach_use} @*)
+\end{lstlisting}
+\end{tabular}
+\end{center}
+    \caption{Data-flow analysis code example.}
+  \label{fig:state_df_code}
+\end{figure}
+In sum, the reaching definition set at line~\ref{lst:reach_use} is a set of
+the two labels $\{\ref{lst:reach_def1}, \ref{lst:reach_def2} \}$, where we
+define \code{a}. Note that line~\ref{lst:reach_def0} does not belong there
+because \code{a} was re-set later on all paths to line~\ref{lst:reach_use}.
+Now we will derive the information algorithmically using data-flow analysis by
+constructing the equations and computing their fixed point. Since we want to
+know all locations in code where a variable is set, the transform
+function will store a set of locations from where some variable are set and
+the set propagates to the point of the transform function. Since we need to
+propagate information about set variables, the transform function will change
+states only on assignment statements. And in a way that it takes the set of
+statements from the previous statement(s), removes all statements that set the
+same variable and adds itself.
+\begin{figure}[htb]
+\begin{alignat*}{6}
+&\text{\code{a = 1;}}&
+  f_1 & = \{1\}     & \,\cup\, && (\emptyset&&\,\setminus\,&& \{1,3,5\}) \\
+&\text{\code{if (x)}}   &
+  f_2 & = \emptyset & \,\cup\, && (f_1      &&\,\setminus\,&& \emptyset) \\
+&\text{~~\code{a = 3;}}\quad\quad &
+  f_3 & = \{3\}     & \,\cup\, && (f_2      &&\,\setminus\,&& \{1,3,5\}) \\
+&\text{\code{else}} &
+  f_4 & = \emptyset & \,\cup\, && (f_3      &&\,\setminus\,&& \emptyset) \\
+&\text{~~\code{a = 4;}} &
+  f_5 & = \{5\}     & \,\cup\, && (f_2      &&\,\setminus\,&& \{1,3,5\}) \\
+&\text{\code{b = a;}} &
+  f_6 & = \{6\}     & \,\cup\, &\,& (f_3 \cup f_5 &&\,\setminus\,&& \{6\}) \\
+\end{alignat*}
+  \caption{X}
+  \label{fig:state_df_comp}
+\end{figure}
+
+
+
+XXXX
+
+
+
+
+
+
+
+
 
 \begin{dfn}[Fixed point]
 A \emph{fixed point} of a function $f : D \rightarrow D$ is an element $x \in
@@ -119,29 +190,6 @@ Section~\ref{sec:types_anal}), the $in$ set is bound to an incoming or
 outgoing control flow graph edge respectively. Vice versa for the $out$ set.
 These two sets are the result of the analysis before and after applying the
 effect of the statement.
-
-One of the basic data-flow analyses is \emph{reaching definitions}. At some
-point in code, we are interested in all statements where some variable was set
-and was not re-set during the control flow to our point. With this
-information we can decide whether some variable was set already at the point
-it is used. If it is not, we should report about an uninitialized access. Let
-us demonstrate that on the following example. There, the reaching definition
-set at line~\ref{lst:reach_use} is a set of the two labels
-$\{\ref{lst:reach_def1}, \ref{lst:reach_def2} \}$, where we define \code{a}.
-Note that line~\ref{lst:reach_def0} does not belong there because \code{a}
-was re-set later on all paths to line~\ref{lst:reach_use}.
-\begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}[language=C]
-a = 1; (*@ \label{lst:reach_def0} @*)
-if (x)
-  a = 3; (*@ \label{lst:reach_def1} @*)
-else
-  a = 4; (*@ \label{lst:reach_def2} @*)
-b = a; (*@ \label{lst:reach_use} @*)
-\end{lstlisting}
-\end{tabular}
-\end{center}
 
 Formally, let us denote the set of statements as $S$. To compute reaching
 definitions we define join operator as set union ($\bigcup$) and the transfer
