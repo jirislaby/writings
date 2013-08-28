@@ -1,32 +1,37 @@
 % vim: textwidth=78 ai spell spelllang=en filetype=tex sw=2
 
 \chapter{State of the Art}\label{sec:state}
-This section is deserved to description and current state of techniques for
-code analysis referred to later in the text. To be able to do that, we will
-first describe the techniques proper.
+This section is describes the current state of the art of the code analysis.
+We especially describe techniques which are referred to later in the text.  In
+this overview we mostly limit ourselves to analyzers of C code.
 
-\paragraph{Static Analysis} Under the term of static analysis we understand
-analyzing code without directly executing it on a processor. I.e.~to perform
-exactly the opposite of dynamic analysis or testing where a program is
-executed and either automatically fed by some input in some form or tested
-manually by testers. This has the nice side-effect that the implementation
-need not be finished when we want to analyze it statically. So the static
-analysis is not as limited as the dynamic one, it can be used whenever we want
-in the development cycle. Static analysis is thus used in several fields of
-the computer science. \emph{Optimizing compilers} can eliminate unused code,
-propagate constants where variables would have to be left otherwise, or remove
+\paragraph{Static Analysis} In our understanding, the term \emph{static
+analysis} is analyzing code without directly executing it on a processor.
+In other words to perform exactly the opposite of the dynamic analysis where a
+program is executed and either automatically fed by some input in some form or
+tested manually by testers. This approach has the nice side-effect that the
+implementation need not be finished when we want to analyze it statically.  So
+the static analysis is not as limited as the dynamic one, it can be used
+whenever we want in the development cycle. Static analysis is thus used in
+several fields of the computer science.
+\begin{itemize}
+\item \emph{Optimizing compilers} can eliminate unused code, propagate
+constants where variables would have to be left otherwise, or remove
 implicitly added runtime out-of-bounds checks from the code if it knows the
-bounds (as it happens in Java). \emph{Debuggers} can limit themselves only to
-code that is relevant to variables a programmer is interested in, or print
-possible sources of values currently stored in a tracked variable.
-\emph{Program tests} can be generated based on the analysis of a program to
-cover more code paths. And of course static analysis is a prerequisite for
-\emph{static analyzers} to exist in the first place.
+bounds (as it happens in Java).
+\item \emph{Debuggers} can limit themselves only to code that is relevant to
+variables a programmer is interested in, or print possible sources of the
+value currently stored in a tracked variable.
+\item \emph{Program tests} can be generated based on the analysis
+of a program to cover more code paths.
+\item \emph{Static analyzers} can exist in the first place of course.
+\end{itemize}
 
 Moreover if the static analysis is well-defined according to some rules
-defined e.g.~by Cousot's framework, as we will see later, we are able to
-decide whether it is sound, complete and whether it terminates. Without those
-properties, optimizing compilers would generate invalid code for example.
+defined e.g.\ by Cousot's framework~\cite{cousot} described later, we are able
+to decide whether the analysis is sound, complete, and whether it terminates.
+This is useful for example when building an optimizing compiler to prove it
+does not generate invalid code, i.e.\ it is sound.
 
 %the most ready/useful\todo{XXX}
 
@@ -34,28 +39,54 @@ properties, optimizing compilers would generate invalid code for example.
 
 \section{Pattern Matching}\label{sec:pattern_matching}
 The simplest automatic analysis we can think of is to find some predefined
-patterns in code.  We can take an instance of a regular expression pattern
-matcher like \texttt{grep}, give it a pattern ``/ 0'' and see if we did that
-stupid zero division error somewhere in the code. However this primitive
-approach may be a source of false-positives. This happens when developers
-comment their code with comments similar to ``/ 0 happened here''.  But there
-of course exist more robust techniques based on pattern matching. They, in
-some way, parse the code (which also removes comments like the above) and do
-pattern matching on some internal structure~\cite{findbugs}. If we recall the
-abstract syntax tree from Figure~\ref{fig:parsing_structs}~(a), we can design
-a checker which would match AST subtrees. Then to match division by zero
-errors, we simply try to find a subtree in an AST like: \\
+patterns in code of a program.  We can take an instance of a regular
+expression pattern matcher like \texttt{grep}, give it a pattern ``/ 0'' and
+see if we did zero division error somewhere in the code. However this
+primitive approach may be a source of false reports. This happens when
+developers comment their code with comments similar to ``/ 0 happened here''.
+But there of course exist more robust techniques based on pattern matching.
+They, in some way, parse the code (which also removes the problem with the
+comments like the above) and do pattern matching on some internal
+structure. If we recall the abstract syntax tree from
+Figure~\ref{fig:parsing_structs}~(a), we can design a checker which would
+match AST subtrees for instance. Then to match division by zero errors, we
+simply try to find a subtree in an AST like of Figure~\ref{fig:ast_to_match}.
+The left leaf is left intentionally blank to express a wildcard.
+\begin{figure}[h]
 \begin{center}
     \tikzstyle{astn1} = [thick,draw,minimum size=5mm]
     \begin{tikzpicture}[level/.style={sibling distance = 1cm/#1,
     level distance = 1cm}]
       \node [astn1] {\texttt{/}}
-	    child { node [astn1] {\texttt{3}} }
-	    child { node [astn1] {\texttt{b}} }
+	    child { node [astn1] {} }
+	    child { node [astn1] {\code{0}} }
 	  ;
     \end{tikzpicture}
 \end{center}
+    \caption{Subtree of an AST to match for division by zero.}
+  \label{fig:ast_to_match}
+\end{figure}
 
+One of the most known tools based on the pattern matching is
+\textsc{FindBugs}~\cite{findbugs}. Despite it is intended to find errors in
+Java programs, we mention it here, because it became very popular. This
+happened thanks to the ease of use, hundreds of error types it can find,
+scalability and precision. It is able to prioritize the reports according to
+their weight so that it usually puts real errors on the top of the list in
+favor of false reports.
+
+\textsc{Coccinelle}~\cite{coccinelle} is another pattern matcher, better to
+write a semantic patcher. It uses a special language SmPL for declaring a
+semantic patch. It is utilized for matching against control flow graph nodes
+and changing them arbitrarily. The graph is then converted back to source
+code.  \textsc{Coccinelle} is used mainly for modifying code to use newer
+interfaces like replacing two calls to \code{kmalloc} and \code{memset}
+functions by a single call to \code{kzalloc} which does the same as the two
+together.  Since it is able to match the control flow graph, it can be used
+for error pattern matching too~\cite{wysiwib}. As an example, we can pick
+missing checks for allocations: a call to an allocation function with no
+condition to check the return value afterwards. If such a call is found, it
+can be replaced by the allocation with the check.
 
 \section{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
@@ -173,9 +204,39 @@ analyses, the sets are not called $gen$ and $kill$, but the principle is the
 same. Also we can see the tight correspondence between may/must and $join$
 operator and between forwards/backwards and switching of $in$ and $out$ sets.
 This was only an introduction to the data-flow analysis. It is extensively
-used in optimizing compilers and in some static analyzers as will be described
-in section~\ref{sec:soa_tools}. For further reading, use~\cite{dragon,
-muchnick}.
+used in optimizing compilers and in some static analyzers.  For further
+reading, use~\cite{dragon, muchnick}.
+
+\paragraph*{Tools}
+As we slightly mentioned in the introduction, compilers contain data-flow
+analysis and generate warnings or errors when they find some suspicious code.
+When compilers were still not so evolved, other analyzers were used to fulfill
+this role. One of the most known known data-flow analyzers at that time was
+\textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
+zero, constant conditions which always evaluate either to true or false, or
+use of uninitialized variables. Later, \textsc{Lint} resulted in some clones
+like \textsc{LCLint}~\cite{lclint} which was later renamed to \textsc{Splint}.
+\textsc{LCLint} was augmented to catch errors like buffer overflows and it
+also manages to work with code annotations. So the users can enable more
+checks if they annotate the checked code, otherwise false positive rate is
+unbearable.  Nonetheless \textsc{Splint} is not developed for more than a
+decade due to obvious reasons: the most errors it reports are reported by
+modern compilers nowadays. There exist also analyzers that are not so powerful
+to handle large code bases or require high user intervention to annotate the
+checked code. As an example we give \textsc{Aspect}~\cite{aspect} which
+compares a program specification of input-output behaviour provided by a user
+to data-flow models extracted from the code.
+
+\clang is a C/C++ compiler from the \llvm toolkit and contains also a static
+checker framework. There are also checkers that can find errors in memory
+handling, locking, or pointer operations. But mostly the results are imprecise
+and contain many false reports. \textsc{Cppcheck}~\cite{cppcheck} works on the
+same principles and so checks for very similar set of errors. It is a
+stand-alone project nonetheless. But plug-ins for several development
+environments are available, so developers can use while writing their code.
+
+
+
 
 \section{Abstract Interpretation}\label{sec:ai}
 The data-flow analysis is only a limited tool for deciding some properties
@@ -550,6 +611,20 @@ in~\cite{cousot_progress}, where is described the progress in the area of the
 abstract interpretation over 25 years. A not so usual use of the abstract
 interpretation can be found in~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.
 
+\paragraph*{Tools}
+Engler et al.\ brought the abstract interpretation to the attention in 2000 by
+a technique based on meta compilation~\cite{metacomp}. There, program
+developers specify properties of the checked system in \textsc{Metal}
+language~\cite{metal}, compile it into an internal representation and the tool
+applies the specification on all executable paths in a particular function.
+Violation of the specification on a path is then reported as an error. The
+compiler used for \textsc{Metal} compilation is a modified GNU C compiler
+(\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It redefines \textsc{gcc}'s
+internal code representation, data types and applies the analysis on a such
+modified structure. Programming languages supported by \textsc{xgcc} are C and
+C++. On the similar base is built \stan~\cite{stanse} which is written in
+Java and have only a parser for C.
+
 \section{Symbolic Execution}\label{sec:se}
 In the previous chapter we described the abstract interpretation which is a
 framework for fast, but many times imprecise analyses. As a result we often
@@ -820,8 +895,7 @@ first it runs coarse symbolic execution to find a suspicious location in code,
 then the tool generates a test and runs the program dynamically to verify the
 test case.
 
-Despite, King originally introduced the symbolic execution for
-symbolic\todo{mam tady rozepsat ty techniky vic do detailu?}
+Despite King originally introduced the symbolic execution for symbolic
 debugging~\cite{se_king}, the symbolic execution is currently widely used for
 generating unit tests which cover more paths in code than tests written
 manually~\cite{se_generate_test1, se_generate_test2, se_generate_test3,
@@ -844,6 +918,118 @@ se_review09, se_review13}. We use the symbolic execution in our tool described
 in Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
 
 % SADAT and IVS are missing
+
+\paragraph*{Tools}
+
+\textsc{PathFinder-SE}~\cite{pathfinder_se} is an extension to the model
+checker \textsc{PathFinder} which enables the model checker to perform the
+symbolic execution.  They further improved the tool to handle e.g.\ concurrent
+programs, heap structures and data.
+
+\textsc{IntScope}~\cite{intscope} decompiles x86 binaries to an intermediate
+representation form and runs the symbolic execution to find integer overflows.
+
+\paragraph{Concolic Executors}
+\textsc{PathCrawler}~\cite{pathcrawler} was the first executor to combine
+symbolic and dynamic execution. It does not use concrete values in the
+symbolic execution to simplify complex constraints nonetheless. This was first
+performed only by \textsc{Dart}~\cite{dart}.  The primary goal is to execute
+\emph{all}, or at least as much as possible feasible program paths, in a
+systematic way. It starts dynamically with random input and symbolically
+tracks branching conditions.  The symbolic execution and a solver is then used
+to change the input so that it traverses another paths when executed
+dynamically again. This happens until the code is covered fully or an user
+stops the process.  \textsc{Dart} can propagate concrete values from the
+dynamic runs to the symbolic run when the solver is incapable to reason about
+some values.  \textsc{Dart} gives up the symbolic execution and switches to
+standard random testing when pointer constrains are used. This was improved in
+another executor \textsc{Cute}~\cite{cute}. It handles pointers better and is
+able to analyze concurrent programs. So except it generates the inputs
+systematically, it also makes diverse schedule plans of individually spawn
+threads.  \textsc{Cute} cannot still handle symbolic offsets of pointers.
+
+\paragraph{Egt and Derivatives}
+At the same time as \textsc{Dart} and \textsc{Cute} emerged, Cadar et al.\
+came up with \textsc{Egt}~\cite{egt} for generating test cases from symbolic
+inputs.  \textsc{Egt} was a predecessor of \textsc{Exe}~\cite{exe} which
+finally introduced a precise handling of pointers with symbolic offsets.
+\textsc{Exe} was later completely redesigned and the new tool
+\textsc{Klee}~\cite{klee} set to execute the \llvm code. \textsc{Klee}
+optimizes solver queries, has better search heuristics, and other improvements
+like a file system model to simulate a filesystem without really involving it.
+This allowed for an analysis of \textsc{Coreutils}, the basic set of utilities
+most Linux users work with and to actually find errors there.  \textsc{Klee}
+was used also for checking a tool equivalence. It took two implementations of
+the same and symbolically compared the results. Several deviations from the
+standard behaviour were found that way. This was later improved more in
+\textsc{UC-Klee}~\cite{ucklee}. First, it compares memory contents of both
+implementations. Second, it makes the memory symbolic when accessed
+(on-demand). Third, it checks that both implementations behave the same with
+respect to error conditions like division by zero. \textsc{Klee} and
+\textsc{UC-Klee} are put into concolic executors since it allows to invoke
+library functions dynamically.
+
+Since any of the concolic execution tools is prone to selected strategy that
+decides which states are explored next, they were studied and compared in
+\textsc{Crest}~\cite{crest}.  It is a tool very close to \textsc{Cute} in what
+it performs, except it is freely available, source codes inclusive.
+
+Instead of generating only a single input, \textsc{Sage}~\cite{sage} defines
+the term \emph{generational search} to generate as many inputs as possible at
+once. This is unimportant for cases, where the whole state space is
+explored. Nonetheless, this is not the case as real programs cannot be covered
+fully. So generating more input often helps more coverage. The same as above,
+it records branching conditions from the first dynamic run, negates all of
+them one by one and asks a solver for a solution.  For each positive reply the
+solver gives, \textsc{Sage} generates a separate input. The whole tool does
+not use any intermediate language, it symbolically executes directly the x86
+binary code. So it can be used also in cases where source code is not known.
+The whole approach in \textsc{Sage} is called \emph{automated whitebox fuzz
+testing}. \textsc{SmartFuzz}~\cite{smartfuzz} works very similarly, but the
+set of errors the tool aims at is limited only to integer errors.
+\textsc{SmartFuzz} captures signed/unsigned conversions for example. The
+generated inputs are filtered, so more eager heuristics that allow more inputs
+generation are allowed.
+
+None of the above support automatic bi-directional conversion across the
+boundary of the symbolic and concrete execution. This was one of the two
+novelties in \textsc{S${}^2$e}~\cite{s2e}: \emph{selective symbolic
+execution}. It was published by some of the authors earlier to solve the
+problem of path explosion in libraries and system calls~\cite{se_selective}.
+As we are mainly interested only in some parts of libraries, the symbolic
+execution does not fork and only the execution is forked at branches when it
+gets back to our code from the library. Note this is somewhat similar to the
+barrier slicing. The second novelty is a true concolic execution because it
+runs the \textsc{Klee} symbolic executor and a modified \textsc{Qemu} virtual
+machine in parallel. Those two communicate with each other and exchange
+information, especially the symbolic state is updated from the dynamic
+execution and concrete values instantiated from the symbolic run whenever
+needed. Converters in both directions from x86 code to \llvm have to be in
+place to have both executions running. \textsc{S${}^2$e} was used to to find
+errors in Windows network drivers, and allegedly it was the first one to
+employ the symbolic execution for performance analysis too.
+\textsc{S${}^2$e}'s parallel engined works on the top of \textsc{Ddt${}^+$},
+which is a reimplementation of a closed source tool \textsc{Ddt}~\cite{ddt}. A
+very similar to \textsc{S${}^2$e}, but less generic framework is
+\textsc{BitBlaze}~\cite{bitblaze}. It analyses binary files and creates
+intermediate code with a reduced instruction set. This code is executed
+symbolically.  Concurrently, the analyzed program is executed dynamically by a
+component that is capable of monitoring and binary instrumentation. These two
+are glued together by a third component that ensures communication between
+the first two. One of unusual uses is generating exploits by a comparison of
+unpatched and patched versions.  \textsc{BitBlaze} was used for checking HTTP
+and NTP protocol servers~\cite{bitblaze_net}.
+\textsc{Bitscope}~\cite{bitscope} is built on the same cornerstone as
+\textsc{BitBlaze}, but provides understanding of dependencies between program
+inputs and outputs. Both were used for recognizing malware in software.
+Another true concolic executor is \textsc{Sjpf}~\cite{sjpf} stemming from
+\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference is that it
+symbolically executes the Java bytecode, therefore performing the symbolic
+execution more directly. Nevertheless its downside is that it still does not
+track constraints when switching from symbolic execution to concrete as the
+ones above.
+
+%EL1~\cite{se_el1}
 
 
 
@@ -1037,21 +1223,28 @@ is then established, if every run of the system corresponds to a particular
 formula. If it does not for some case, a counterexample consisting of system
 states is generated. Obviously, even if no counterexample is generated, the
 system still might not be correct in case its model or checked properties are
-incorrect. And yet, according to Ball et al.\ developing a thorough and
+incorrect. And yet, according to Ball et al., developing a thorough and
 precise model may take years~\cite{mc_years}.
 
-The model checking was spread even after introduction of the \emph{symbolic
-model checking}~\cite{mc_symbolic1,mc_symbolic2}. It started representing sets
-of states by boolean functions. For example if we have two 1-bit variables
-\texttt{a} and \texttt{b} and their values are always the same (1 and 1 or 0
-and 0 pairwise), we can represent it by a formula \texttt{a} $\Leftrightarrow$
-\texttt{b} instead of storing all the values. The formulas can be represented
-in a space-saving way by \emph{Reduced Ordered Binary Decision
-Diagrams}~\cite{bdd} (ROBDD or simply BDD).  Despite the exponential
-complexity still persists (due to the path explosion problem), BDDs helped to
-limit the memory use a lot.  Both the symbolic model checking and BDDs allowed
-more complex systems to be checked on the same hardware
-(cf.~\cite{mc_symbolic1} again).
+There are two basic approaches to model checkers depending on how the states
+are stored: \emph{explicit} and \emph{symbolic}. Explicit model checkers
+enumerate the states one by one as was implemented e.g.\ in
+\textsc{Divine}~\cite{divine}. Symbolic model
+checking~\cite{mc_symbolic1,mc_symbolic2} started representing sets of states
+by boolean functions. For example if we have two 1-bit variables \code{a} and
+\code{b} and their values are always the same (1 and 1 or 0 and 0 pairwise),
+we can represent it by a formula \code{a} $\Leftrightarrow$ \code{b} instead
+of storing all the values. The formulas can be represented in a space-saving
+way by \emph{Reduced Ordered Binary Decision Diagrams}~\cite{bdd} (ROBDD or
+simply BDD).  Despite the exponential complexity still persists (due to the
+path explosion problem), BDDs helped to limit the memory use a lot.  Both the
+symbolic model checking and BDDs allowed more complex systems to be checked on
+the same hardware (cf.~\cite{mc_symbolic1} again).  Symbolic model checking
+was later improved to defer the path explosion problem more by techniques like
+\textsc{Cegar}~\cite{cegar}. \textsc{Cegar} starts with an abstraction of the
+model and makes it more precise whenever a false counterexample is produced.
+And only in that part of the model which is too abstract. Examples of symbolic
+model checkers are \textsc{NuSmv}~\cite{nusmv} or \textsc{Bebop}~\cite{bebop}.
 
 In parallel to the BDDs-based model checking, \emph{bounded model checking}
 exists. Instead of exploring the whole state space of the system model, there
@@ -1077,12 +1270,15 @@ successfully used in the Linux Driver Verification toolkit~\cite{ldv} to
 verify Linux device drivers. \textsc{Blast} was also extended to handle
 concurrent data accesses~\cite{blast_concur}.  \textsc{Spin}~\cite{spin} is
 aware of concurrent data accesses too. So \textsc{Spin} checked a model of the
-Linux common filesystem layer~\cite{spin_vfs}. Similarly, Microsoft started
-adopting their model checker \textsc{Slam}~\cite{slam_cav, slam_popl,
-slam_decade} and \textsc{Slam 2}~\cite{slam2} in their driver verifier
-\textsc{Sdv}~\cite{sdv} for checking Windows drivers. They apparently
-succeeded as they require every driver to be checked by this toolkit with
-over 160 predefined temporal rules before the driver is accepted by Microsoft.
+Linux common filesystem layer~\cite{spin_vfs}. Earlier, some stand-alone file
+systems which use this layer were checked by Yang et al.\
+too~\cite{mc_kernel_fs}. Other subsystems like the networking stack were
+also checked~\cite{mc_kernel_ip}. Similar to the attempts on the Linux kernel,
+Microsoft started adopting their model checker \textsc{Slam}~\cite{slam_cav,
+slam_popl, slam_decade} and \textsc{Slam 2}~\cite{slam2} in their driver
+verifier \textsc{Sdv}~\cite{sdv} for checking Windows drivers. They apparently
+succeeded as they require every driver to be checked by this toolkit with over
+160 predefined temporal rules before the driver is accepted by Microsoft.
 \textsc{Sdv} is a proprietary software with rules tailored to Windows drivers.
 Therefore it cannot be used for checking open source projects. So Clarke et
 al.~\cite{cbmc} adapted Microsoft's approach using \textsc{CBMC} model checker
@@ -1096,193 +1292,16 @@ configuration system. It serves the purpose of validating dependencies in the
 modelling and verifying Java programs like
 \textsc{PathFinder}~\cite{pathfinder}.
 
-As this thesis does not deal with model checking, curious readers are pointed
-to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model checking.
-There is also a survey about bounded model checking~\cite{bmc_survey}
-available.
+As this thesis does not deal with the model checking, curious readers are
+pointed to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model
+checking.  There is also a survey about bounded model
+checking~\cite{bmc_survey} available.
 
-\section{Tools}\label{sec:soa_tools}
+\section{Industrial Tools}
 There are many successful tools based on static analysis. Unfortunately for
-some of them, especially the industrial one, it is not really known what
-technique they are based on. We will describe them in a separate paragraph.
-The rest of the tools is categorized according to the technique used. Even
-though some of them are combination of more. In this overview we mostly limit
-ourselves to analyzers of C code.
-
-\subsection*{Pattern Matching}
-We already mentioned the tools like \textsc{grep} which are used by developers
-to find diverse errant behaviour. Nonetheless, there are much more
-sophisticated tools.  One of the most known tools based on pattern matching is
-\textsc{FindBugs}~\cite{findbugs}. Despite it is intended to find errors in
-Java programs, we mention it here, because it became very popular. This
-happened thanks to the ease of use, hundreds of error types it can find,
-scalability and precision. It is able to prioritize the reports according to
-their weight so that it usually puts real errors on the top of the list in
-favor of false reports.
-
-\textsc{Coccinelle}~\cite{coccinelle} is another pattern matcher, better to
-write a semantic patcher. It uses a special language SmPL for specifying a
-semantic patch that allows for matching against a control flow graph nodes and
-changing them arbitrarily. The graph is then converted back to the source
-code.  \textsc{Coccinelle} is used mainly for modifying code to use newer
-interfaces like replacing two calls to \code{kmalloc} and \code{memset}
-functions by a single call to \code{kzalloc} which does the same as the two
-together.  Since it is able to match the control flow graph, it can be used
-for error pattern matching too~\cite{wysiwib}. As an example, we can pick
-missing checks for allocations: matching a call to an allocation function not
-followed by an \code{if} to check the return value. If this construct is
-found, it can be replaced to be the allocation plus an added check.
-
-\subsection*{Data-flow Analyzers}
-As we slightly mentioned in the introduction, compilers contain data-flow
-analysis and generate warnings or errors when they find some suspicious code.
-When compilers were still not so evolved, other analyzers were used to fulfill
-this role. One of the most known known data-flow analyzers at that time was
-\textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
-zero, constant conditions which always evaluate either to true or false, or
-use of uninitialized variables. Later, \textsc{Lint} resulted in some clones
-like \textsc{LCLint}~\cite{lclint} which was later renamed to \textsc{Splint}.
-\textsc{LCLint} was augmented to catch errors like buffer overflows and it
-also manages to work with code annotations. So the users can enable more
-checks if they annotate the checked code, otherwise false positive rate is
-unbearable.  Nonetheless \textsc{Splint} is not developed for more than a
-decade due to obvious reasons: the most errors it reports are reported by
-modern compilers nowadays. There exist also analyzers that are not so powerful
-to handle large code bases or require high user intervention to annotate the
-checked code. As an example we give \textsc{Aspect}~\cite{aspect} which
-compares a program specification of input-output behaviour provided by a user
-to data-flow models extracted from the code.
-
-\subsection*{Abstract Interpreters}
-Engler et al.\ brought the abstract interpretation to the attention in 2000 by
-a technique based on meta compilation~\cite{metacomp}. There, program
-developers specify properties of the checked system in \textsc{Metal}
-language~\cite{metal}, compile it into an internal representation and the tool
-applies the specification on all executable paths in a particular function.
-Violation of the specification on a path is then reported as an error. The
-compiler used for \textsc{Metal} compilation is a modified GNU C compiler
-(\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It redefines \textsc{gcc}'s
-internal code representation, data types and applies the analysis on a such
-modified structure. Programming languages supported by \textsc{xgcc} are C and
-C++. On the similar base is built \stan~\cite{stanse} which is written in
-Java and have only a parser for C.
-
-\subsection*{Symbolic Executors}
-
-\textsc{PathFinder-SE}~\cite{pathfinder_se} is an extension to the model
-checker \textsc{PathFinder} which enables the model checker to perform the
-symbolic execution.  They further improved the tool to handle e.g.\ concurrent
-programs, heap structures and data.
-
-\textsc{IntScope}~\cite{intscope} decompiles x86 binaries to an intermediate
-representation form and runs the symbolic execution to find integer overflows.
-
-\paragraph{Concolic Executors}
-\textsc{PathCrawler}~\cite{pathcrawler} was the first executor to combine
-symbolic and dynamic execution. It does not use concrete values in the
-symbolic execution to simplify complex constraints nonetheless. This was first
-performed only by \textsc{Dart}~\cite{dart}.  The primary goal is to execute
-\emph{all}, or at least as much as possible feasible program paths, in a
-systematic way. It starts dynamically with random input and symbolically
-tracks branching conditions.  The symbolic execution and a solver is then used
-to change the input so that it traverses another paths when executed
-dynamically again. This happens until the code is covered fully or an user
-stops the process.  \textsc{Dart} can propagate concrete values from the
-dynamic runs to the symbolic run when the solver is incapable to reason about
-some values.  \textsc{Dart} gives up the symbolic execution and switches to
-standard random testing when pointer constrains are used. This was improved in
-another executor \textsc{Cute}~\cite{cute}. It handles pointers better and is
-able to analyze concurrent programs. So except it generates the inputs
-systematically, it also makes diverse schedule plans of individually spawn
-threads.  \textsc{Cute} cannot still handle symbolic offsets of pointers.
-
-\paragraph{Egt and Derivatives}
-At the same time as \textsc{Dart} and \textsc{Cute} emerged, Cadar et al.\
-came up with \textsc{Egt}~\cite{egt} for generating test cases from symbolic
-inputs.  \textsc{Egt} was a predecessor of \textsc{Exe}~\cite{exe} which
-finally introduced a precise handling of pointers with symbolic offsets.
-\textsc{Exe} was later completely redesigned and the new tool
-\textsc{Klee}~\cite{klee} set to execute the \llvm code. \textsc{Klee}
-optimizes solver queries, has better search heuristics, and other improvements
-like a file system model to simulate a filesystem without really involving it.
-This allowed for an analysis of \textsc{Coreutils}, the basic set of utilities
-most Linux users work with and to actually find errors there.  \textsc{Klee}
-was used also for checking a tool equivalence. It took two implementations of
-the same and symbolically compared the results. Several deviations from the
-standard behaviour were found that way. This was later improved more in
-\textsc{UC-Klee}~\cite{ucklee}. First, it compares memory contents of both
-implementations. Second, it makes the memory symbolic when accessed
-(on-demand). Third, it checks that both implementations behave the same with
-respect to error conditions like division by zero. \textsc{Klee} and
-\textsc{UC-Klee} are put into concolic executors since it allows to invoke
-library functions dynamically.
-
-Since any of the concolic execution tools is prone to selected strategy that
-decides which states are explored next, they were studied and compared in
-\textsc{Crest}~\cite{crest}.  It is a tool very close to \textsc{Cute} in what
-it performs, except it is freely available, source codes inclusive.
-
-Instead of generating only a single input, \textsc{Sage}~\cite{sage} defines
-the term \emph{generational search} to generate as many inputs as possible at
-once. This is unimportant for cases, where the whole state space is
-explored. Nonetheless, this is not the case as real programs cannot be covered
-fully. So generating more input often helps more coverage. The same as above,
-it records branching conditions from the first dynamic run, negates all of
-them one by one and asks a solver for a solution.  For each positive reply the
-solver gives, \textsc{Sage} generates a separate input. The whole tool does
-not use any intermediate language, it symbolically executes directly the x86
-binary code. So it can be used also in cases where source code is not known.
-The whole approach in \textsc{Sage} is called \emph{automated whitebox fuzz
-testing}. \textsc{SmartFuzz}~\cite{smartfuzz} works very similarly, but the
-set of errors the tool aims at is limited only to integer errors.
-\textsc{SmartFuzz} captures signed/unsigned conversions for example. The
-generated inputs are filtered, so more eager heuristics that allow more inputs
-generation are allowed.
-
-None of the above support automatic bi-directional conversion across the
-boundary of the symbolic and concrete execution. This was one of the two
-novelties in \textsc{S${}^2$e}~\cite{s2e}: \emph{selective symbolic
-execution}. It was published by some of the authors earlier to solve the
-problem of path explosion in libraries and system calls~\cite{se_selective}.
-As we are mainly interested only in some parts of libraries, the symbolic
-execution does not fork and only the execution is forked at branches when it
-gets back to our code from the library. Note this is somewhat similar to the
-barrier slicing. The second novelty is a true concolic execution because it
-runs the \textsc{Klee} symbolic executor and a modified \textsc{Qemu} virtual
-machine in parallel. Those two communicate with each other and exchange
-information, especially the symbolic state is updated from the dynamic
-execution and concrete values instantiated from the symbolic run whenever
-needed. Converters in both directions from x86 code to \llvm have to be in
-place to have both executions running. \textsc{S${}^2$e} was used to to find
-errors in Windows network drivers, and allegedly it was the first one to
-employ the symbolic execution for performance analysis too.
-\textsc{S${}^2$e}'s parallel engined works on the top of \textsc{Ddt${}^+$},
-which is a reimplementation of a closed source tool \textsc{Ddt}~\cite{ddt}. A
-very similar to \textsc{S${}^2$e}, but less generic framework is
-\textsc{BitBlaze}~\cite{bitblaze}. It analyses binary files and creates
-intermediate code with a reduced instruction set. This code is executed
-symbolically.  Concurrently, the analyzed program is executed dynamically by a
-component that is capable of monitoring and binary instrumentation. These two
-are glued together by a third component that ensures communication between
-the first two. One of unusual uses is generating exploits by a comparison of
-unpatched and patched versions.  \textsc{BitBlaze} was used for checking HTTP
-and NTP protocol servers~\cite{bitblaze_net}.
-\textsc{Bitscope}~\cite{bitscope} is built on the same cornerstone as
-\textsc{BitBlaze}, but provides understanding of dependencies between program
-inputs and outputs. Both were used for recognizing malware in software.
-Another true concolic executor is \textsc{Sjpf}~\cite{sjpf} stemming from
-\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference is that it
-symbolically executes the Java bytecode, therefore performing the symbolic
-execution more directly. Nevertheless its downside is that it still does not
-track constraints when switching from symbolic execution to concrete as the
-ones above.
-
-%EL1~\cite{se_el1}
-
-\subsection*{Industrial Tools}
-Only a little information is known about industrial tools. It is due to
-secrets the companies hold to not let their competitors know. What can be
-found in the reference materials, the tools often use combination of the
+some of them, it is not really known what technique they are based on.  It is
+due to secrets the companies hold to not let their competitors know. What can
+be found in the reference materials, the tools often use combination of the
 techniques we have already described. They work on the top of various pattern
 matching, data-flow analyses, and some maybe use the abstract interpretation.
 Even though the internals are not known exactly, we at least try to summarize
@@ -1337,7 +1356,7 @@ inter-procedural integer overflows.
 %\url{http://samate.nist.gov/index.php/Source_Code_Security_Analyzers.html}
 %\url{http://web.archive.org/web/20050405224446/http://www.programming-x.com/programming/analyzer.html}
 
-\subsection{Summary of the Linux Kernel Checkers}
+\section{Summary of the Linux Kernel Checkers}
 Some of the tools above can analyze kernels or only drivers of operating
 systems. In this sections we specifically sum those which are capable to
 handle the Linux kernel.
@@ -1367,19 +1386,12 @@ and errors reported are getting fixed constantly~\cite{linux_faults}.
 
 There are also tools that can be used, but are not used that massively by so
 many developers. These include \clang~\cite{clang} and
-\textsc{Cppcheck}~\cite{cppcheck}. \clang is a C/C++ compiler from the \llvm
-toolkit and contains also a static checker framework. There are also checkers
-that can find errors in memory handling, locking, or pointer operations. But
-mostly the results are imprecise and contain many false reports.
-
-Historically, \textsc{xgcc} was used to find errors in the
-kernel~\cite{metal_kernel}, mainly for errors like if there are proper checks
-of untrusted data coming from the network or an user to the kernel. It found
-over one hundred of such errors. As \stan~\cite{stanse} is a tool based on a
-similar technique, it was used the same way and found over one hundred another
-errors.
-
-%Verifications around the Linux kernel~\cite{kernel_verif}
+\textsc{Cppcheck}~\cite{cppcheck}.  Historically, \textsc{xgcc} was used to
+find errors in the kernel~\cite{metal_kernel}, mainly for errors like if there
+are proper checks of untrusted data coming from the network or an user to the
+kernel. It found over one hundred of such errors. As \stan~\cite{stanse} is a
+tool based on a similar technique, it was used the same way and found over one
+hundred another errors.
 
 There are also projects based on model checking which are successful to check
 the Linux kernel. \textsc{Ldv}~\cite{ldv} is one of those. The same as
@@ -1388,3 +1400,10 @@ maintainers so that they can look at them and fix them.
 
 %\textsc{Herodotos}~\cite{herodotos} compares several version of checked
 %software and is able track errors how are they propagated over time.
+
+\paragraph{On Incompleteness} The survey of the techniques and algorithms is
+by no means intended to be complete. There are still approaches which we have
+not described for some reasons. Be it the obsoleteness of the approaches,
+limited use, or finally the limited scope of this thesis. Should the reader
+ever come over a tool that has to be within this thesis, please contact the
+author to fix the work accordingly.
