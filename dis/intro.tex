@@ -110,47 +110,92 @@ frequency, thus have no chance to check their code on demand.
 
 For those reasons, some groups decided to implement their own, freely
 available, checkers, see e.g.~\cite{stanse, cppcheck, findbugs, smatch,
-sparse}. They vary in precision, speed and of course in the method used for
+sparse}. They vary in precision, speed and of course in the used method for
 finding bugs.  Although developers may use them at any time at their will,
 often they get results with much higher false reports rate than results of a
 commercial tool.
 
 \section{Motivation}
-Although many approaches exist, their implementations are often incomplete in
-some sense. For example, they are not applicable to real software due to high
+In an ideal world, every code checking tool is capable to parse and check any
+project that is out there. Unfortunately, that is not true in the real world.
+The tools are often incomplete in some sense. First, they often cannot even
+read source codes of such large project. This problem stems from the languages
+projects are written in.  Even though there are standards for languages, there
+are many language offshoots that ``evolved'' with respective compilers. Let us
+consider C with the last standard issued in 1999~\cite{ansi_c}. There are many
+deviations from the standard introduced by \textsc{Gcc}~\cite{gcc},
+\textsc{Intel CC}~\cite{intel_cc}, \textsc{MSVC}~\cite{msvc}, and possibly
+others.  Every single of them supports a different superset of the standard.
+Thus it is very hard for analyzers to implement a parser which would be
+universally capable of parsing whichever program with sources in a specified
+language.  Second, the tools are not applicable to real software due to high
 computation time needs (cf.~symbolic execution started being used almost 30
-years after being introduced). Another problem are the languages projects are
-written in. Even though there is a standard for a language, let us consider C
-with the last standard issued in 1999~\cite{ansi_c}, there are many language
-offshoots that ``evolved'' with respective compilers like
-\textsc{Gcc}~\cite{gcc}, \textsc{Intel CC}~\cite{intel_cc}, or
-\textsc{MSVC}~\cite{msvc}.  Every single of them supports a different superset
-of the standard. Thus it is very hard for analyzers to implement a parser
-which would be universally capable of parsing whichever program with sources
-in a specified language.  In this thesis we aim at mapping and investigation
+years after being introduced). Further, the tools need not find any errors in
+large projects.  This happens when the tools, or the projects, are highly
+specialized for example.  In this thesis we aim at mapping and investigation
 of current techniques used for code analysis and their application on real,
 large software projects.
 
-There exist hundreds of software projects of the large size which we could
-consider for our purposes. We can divide them roughly into two categories,
-depending on the level their code runs as they are usually several possible
-privilege levels~\cite[p. 21--23]{os_concepts}.  Kernels of the operating
-systems often run at the level with no limitations, i.e.~in the \emph{kernel
-mode}.  There, the kernel can touch any memory in a machine and can also
-change other possible resources the kernel is able to reach. User space
-programs on the other hand tend to be restricted, i.e.~they run in the
+\subsection{Specifics of Large Projects}
+A compiler support, fast analysis, and a wide range of analyzed properties is
+a must. There are still other open question when it comes to analyzing large
+source base. One of those is where to find all those files which constitute
+the large project.  Should a checker just recursively crawl a specified
+directory and check all sources in there? What if some source file includes
+another one and the inner is not compilable on its own as happens in the Linux
+kernel?  Even if a user would specify the files manually, large projects tend
+to pass special directives to a compiler such as paths where are header files,
+to define some macros on the command line, or to pre-include specific files.
+And since the user of the checking tool need not be a developer of the
+project, writing the options down by hand is infeasible for large projects.
+The checking tools definitely need to \emph{support build systems} and infer
+the files and flags automatically.
+
+When a checking tool infers the options, it knows what to check and how to
+correctly obtain an intermediate code structure from the source code. But this
+is still not the final phase. Information about all these sources barely fits
+into the memory. In other words, when parsing a large project, we have to
+think twice how and which information to store and where. And yet large
+projects use some external library for reusability purposes.  So to have
+complete and self-contained sources for them, these libraries has to be
+analyzed too. And what if they are in a different language, or there are no
+sources available at all? Fortunately there are also large projects that do
+not depend on any other code. These include kernels of operating systems.
+
+The best code practices suggest to split functionality among smaller logical
+pieces for better readability and maintainability. Programmers usually put
+these pieces into separate functions. Nonetheless these pieces alone are not
+useful when checking for errors. They are potential sources of false
+positives.  For example one function can lock a lock, another one unlocks it
+and they are called in a sequence from some other one. When analyzing the two
+which change the lock state alone, we would get false positives. But when the
+three are analyzed together, no false report is reported. This drags in the
+need of inter-procedural variants of analyses used by the checking tools.
+There are many such requirements, inter-procedural analysis is one of those.
+The analyzers have to be as much precise as possible but still reasonably fast
+to finish the analysis still in this century.  And this is indeed a challenge!
+
+\subsection{Picking the Project}
+There exist hundreds of software projects of large size which we could
+consider for our purposes. Let us first divide the projects roughly into two
+categories. According to the design of operating systems there are two basic
+privilege levels applications run in~\cite[p.  21--23]{os_concepts}.  Kernels
+of the operating systems often run at the level with no limitations, i.e.~in
+the \emph{kernel mode}.  There, the kernel can touch any memory in a machine
+and can also change other possible resources the kernel is able to reach. User
+space programs on the other hand tend to be restricted, i.e.~they run in the
 \emph{user mode}. There, a process cannot change any system resource or memory
-of others, if not explicitly allowed to, e.g.~by shared
-memory~\cite[p. 124--126]{os_concepts} or special system calls~\cite[p.
-62--73]{os_concepts}.  In particular, the privilege levels have effects on
-crashes. A crash of the kernel means the machine cease production any new
-actions, whereas a crash of a user space application causes mostly only pain
-to a user.  So at the first glance it looks like we should specifically aim at
-kernels of operating systems. But think about a vulnerability in a random web
-browser or database system (which consist of millions lines of code too). It
-could indeed lead to stolen user's personal data or even money from their bank
-accounts. Of course there is a call for techniques to possibly eliminate all
-errors the programs contain.
+of others, if not explicitly allowed to, e.g.~by shared memory~\cite[p.
+124--126]{os_concepts} or special system calls~\cite[p.  62--73]{os_concepts}.
+In particular, whether some code runs in the kernel or user mode has a direct
+impact on the effect caused by a potential error in the code. A crash of the
+kernel means the machine cease production any new actions, whereas a crash of
+a user space application causes mostly only pain to its user.  So at the first
+glance it looks like we should specifically aim at kernels of operating
+systems. But think about a vulnerability in a random web browser or database
+system (which consist of millions lines of code too). It could indeed lead to
+stolen user's personal data or even money from their bank accounts. The same
+as a problem in the kernel.
 
 On the other hand operating system kernels should generally be error-free more
 than the others, because even a minor error would allow an arbitrary attacker
@@ -158,9 +203,9 @@ to obtain administrator privileges on a machine running such a vulnerable
 system, or simply crash it. For a \emph{denial of service} (DoS)~\cite{dos}
 caused by a crash, it sometimes suffices to write a ``killer'' string to a
 special file locally or even send a packet with a specific structure over the
-network. Note the attacker can do it remotely from a place thousands miles far
-away.  Instances of such errors are in~\cite{exploit_vmsplice,
-exploit_proto_ops, exploit_userns} or \cite[p. 256]{hacking}, and more to be
+network. Note the attacker can do it remotely from a place thousands miles
+away.  Instances of such errors were already reported~\cite{exploit_vmsplice,
+exploit_proto_ops, exploit_userns}\cite[p. 256]{hacking}, and more to be
 found in the National Vulnerability Database~\cite{nvd}. If the attacker
 succeeds beyond crashing a machine and is able to get a login there, they are
 very close to stealing whatever data they want from that machine since it is
@@ -181,14 +226,16 @@ the Linux kernel. The main reasons are that the kernel:
 \item is a large code base consisting of more than fifteen millions lines of
 code (version 3.10),
 \item is developed so fast that each version released every 2--3 months
-contains over 700 0000 changed lines of code which are across more than eleven
-thousand files in average (changes done for all releases between 3.5 and
-3.10), and
+contains over 700'000 changed lines of code which are across more than eleven
+thousand files (averaged for all releases between 3.5 and 3.10), and
 \item is used widely, reportedly on 42\,\% of consumer computing
 devices in 2012~\cite{linux_42_percent}.
 \end{itemize}
 Aside from the aspects of large projects stated above, the Linux kernel has
-another positive aspect like it is self-contained code.
+another positive aspect like it is self-contained code.  And yet there is the
+author of this thesis who is always biased when choosing a project for
+checking. He constantly spends some time by Linux kernel development, so he
+knows the processes and has some considerable knowledge about the code too.
 
 \section{Background}
 This section introduces the reader into the terms we use throughout the
@@ -206,60 +253,49 @@ expected, i.e.~if the results are \emph{correct} (sometimes called
 \emph{sound}). Next, we usually care whether all possible errors are reported,
 i.e.~whether the output is \emph{complete}. And perhaps if there will be any
 output in finite time at all, if the analyzer will \emph{terminate}. Below, we
-describe the three terms and provide examples of soundness and completeness
-for better understanding in Figure~\ref{fig:theor_props}.
+took the definitions over from Cousot et al.\ \cite{soundness} and modified
+them for our needs. Furthermore, we provide examples of soundness and
+completeness in Table~\ref{fig:theor_props} for better understanding.
 
 \begin{description}
-\item[Soundness] When an analyzer is sound, whatever it reports is not out of
-bounds of the defined problem. I.e.~if we have an analyzer and want it to tell
-us which values are definitely in a variable at some point, it has to
-enumerate only those which are really set there. No over-approximation is
-allowed. Many analyses do not fulfil this criterion. For example to speed up
-the analysis, they compute an over-approximation such that they put in
-the output even items non-conforming to the original definition. This means
-unsound analyses may produce false positives.
-
-%A program analyzer is unsound when it can omit to signal an
-%error that can appear at runtime in some execution environment.
-%Unsound analyzers are bug hunters or bug finders aiming at finding
-%some of the bugs in a well-defined class. Their main defect is
-%unreliability, being subject to false negatives thus claiming that
-%they can no longer find any bug while many may be left in the
-%considered class.
-%
-% from Varieties of Static Analyzers: A Comparison with ASTREE
-% also completeness and termination
-\item[Completeness] Complete analyzers have to report at least what they are
-expected to. I.e.~if we have the same analyzer above which reports values
-set to a variable, it needs not necessarily report only those, it can compute
-some over-approximation and report more, if it is inevitable. Of course this
-is for the price of unsoundness. Set in other words, incomplete analyses may
-produce false negatives, i.e.~results which do not fit to the defined
-behaviour of the analyzer.
-\item[Termination] This is only a theoretical property as computers are
-finite machines thanks to their bounded memory. So in fact, every analyzer
-which tries to analyze some code will finish its computation on the finite
-state space in finite time. So it will always terminate. Only theoretically,
-there exist analyzers that will not terminate in general (c.f.~the Halting
-problem).
+\item[Soundness]
+A program analyzer is sound when it can \emph{never} omit to signal an error
+that can appear at runtime in some execution environment. Sound analyzers are
+error eradicators since they find all bugs in a well-defined class (that of
+runtime errors). Unsound analyzers are only error finders aiming at finding
+some of the errors in the well-defined class. Their main defect is
+unreliability, being subject to false negatives thus claiming that they can no
+longer find any error while many may be left in the considered class.
+\item[Completeness]
+A static analyzer is complete when it \emph{never} produces false reports on
+any program. This terminology is justified by the fact that such an analyzer,
+when queried whether or not some true property holds on the program (for
+instance: ``the program never ends with an overflow''), will never issue an
+alarm. Never reporting any alarm, or only a few definite ones, would be
+complete (but useless). So this completeness requirement should be
+understood in the context of soundness.
+\item[Termination]
+Some static analyzers are subject to non termination, running forever until
+exhaustion of resources. This is the case of model checking for
+example~\cite{soundness}.
 \end{description}
 
-\begin{figure}[tb]
+\begin{table}[tb]
 \begin{center}
-\begin{tabular}{|l|c|c|c|} \hline
-\multicolumn{1}{|c|}{\multirow{2}{*}{Code}} &
-		\multicolumn{3}{c|}{Value Analysis of \code{a}} \\ \cline{2-4}
-                 & Sound       & Complete & Sound and Complete \\ \hline
+\begin{tabular}{|l||c|c|c|} \hline
+\multicolumn{1}{|l||}{\multirow{2}{*}{\textbf{Code}}} &
+  \multicolumn{3}{c|}{\textbf{Value Analysis of \code{a}}} \\ \cline{2-4}
+  & \textbf{Sound} & \textbf{Complete} & \textbf{Sound and Complete} \\ \hline\hline
 \code{a = 1;}    & 1           & 1        & 1    \\ \hline
 \code{if (x)}    & 1           & 1        & 1    \\ \hline
 ~~\code{a = 2;}  & 2           & 2        & 2    \\ \hline
-\code{return a;} & $\emptyset$ & 1, 2     & $(x = 0 \Rightarrow 1) \vee (x
-					\neq 0 \Rightarrow 2)$  \\ \hline
+\code{return a;} & $\emptyset$ & 1, 2     & $((x = 0) \Rightarrow 1) \vee ((x
+					\neq 0) \Rightarrow 2)$  \\ \hline
 \end{tabular}
 \end{center}
     \caption{Example to demonstrate soundness and completeness of analyzers.}
   \label{fig:theor_props}
-\end{figure}
+\end{table}
 
 In an ideal world, we would have sound and complete analyzers. They would
 return only results without false positives and false negatives. But
@@ -274,13 +310,11 @@ complete. The latter may help in reducing both false positives and false
 negatives for the price of potentially hiding errors, i.e.~adding
 false negatives.
 
-\subsection*{Sensitivity of Analyses}\label{sec:sensitivity}
-Another interesting property of analyses is how are the analyses handling
-separate commands and functions present in some code. Consider the example in
+\subsection*{Sensitivity of Analyzers}\label{sec:sensitivity}
+Another interesting property of many analyzers is how they are handling
+separate commands and functions present in some code. Consider the example of
 Figure~\ref{fig:lst_sens} and also consider an analysis that is watching
-values stored into variables and is thus able to report this to the user. We
-will use both of them to demonstrate the properties explained below.
-
+values stored into variables and is thus able to report this to the user.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -302,61 +336,67 @@ void fun2(void) {
 \caption{Code used for demonstration of analyses sensitivity}
 \label{fig:lst_sens}
 \end{figure}
-
-Given the example above we are able to describe the following three basic
-properties we usually consider when we are choosing an analysis
-implementation:
+Given the example, we describe the following three basic properties which we
+usually consider when choosing an analyzer:
 \begin{itemize}
-\item One implementation may take into account order of program statements,
-another may completely ignore the line numbers. For our code this would mean
-the analysis will report that possible values in \code{x} at
-line~\ref{lst:sens_ret} is either simply 3 (the last store to \code{x}
-before \code{return} proper), or with considerably less precision any of 1,
-value of \code{a}, or 3 (the analysis does not care about the order, hence
-takes and reports them all).  This is called \emph{flow sensitivity}, or
-\emph{insensitivity} respectively.
+\item When an analyzer analyzes some code, it may take into account the order
+of program statements and remember what is followed by what.  For the code in
+our example this would mean the analyzer will report that the only possible
+value in \code{x} at line~\ref{lst:sens_ret} is simply 3 (the last store to
+\code{x} before \code{return} proper). The other option is to completely
+ignore the order and with considerably less precision report that \code{x} at
+line~\ref{lst:sens_ret} can be any of 1, value of \code{a}, or 3 (the analyzer
+is not aware of what precedes the \code{return}, hence it has to report all
+the sets).  This is called \emph{flow sensitivity} or \emph{insensitivity},
+respectively. We often speak about this property when dealing with one
+particular function.
 
-\item An analysis may or may not remember conditions used for branching. If it
+\item An analyzer may or may not remember conditions used for branching. If it
 does, in our example, \code{x} is then reported to be one of 1, 2, or 3,
 because \code{a} was noted to be 2 before the assignment on
 line~\ref{lst:sens_xa}. In the other case, \code{x} is announced to be 1, 3,
-or whatever value the analysis previously computed \code{a} can be. We have
-just described \emph{path sensitivity}.
+or whatever value the analyzer previously computed \code{a} can be. We have
+just described \emph{path sensitivity}. Obviously, it subsumes flow
+sensitivity.
 
-\item An analysis is called to be \emph{context-sensitive} if it considers
-calling context (call-stack). In other words whether the analysis is inter- or
-only intra-procedural. In our example, a context-sensitive analysis says
-\code{x} can be 1 or 3 since the condition \code{a == 3} is false on
-line~\ref{lst:sens_cond}. The counterpart would say \code{x} can be any
-value due to the assignment on line~\ref{lst:sens_xa} (the analysis has to
-assume \code{a} can contain whatever value to be complete).
+\item An analyzer is called to be \emph{context-sensitive}, or
+\emph{inter-procedural} if it considers a calling context (call-stack).  In
+our example, a context-sensitive analyzer would say \code{x} can be 1 or 3
+since the condition \code{a == 2} is false on line~\ref{lst:sens_cond}. The
+counterpart would say \code{x} can be any value due to the assignment on
+line~\ref{lst:sens_xa} (the analyzer has to assume \code{a} can contain
+whatever value to remain sound).
 \end{itemize}
 
 \subsection*{Types of Analyses}\label{sec:types_anal}
-Analyses are also divided into sets of what information they provide. There
+Analyses are also split into sets of what information they provide. There
 are two properties in this category presented below. More on those are in
-section~\ref{sec:data-flow}
+Section~\ref{sec:data-flow}\todo{really?}.
 
-\begin{itemize}
-\item \emph{May/must:} Sometimes we are interested whether some result given
-by an analysis must hold definitely or may hold sometimes. If we get back to
-the example of Figure~\ref{fig:lst_sens} and an analysis says \code{x}
+\begin{description}
+\item[May/must] Sometimes we are interested whether some result given by an
+analysis must hold definitely or may hold sometimes. If we get back to the
+example of Figure~\ref{fig:lst_sens}, when an analysis says \code{x}
 \emph{must} be a constant at line~\ref{lst:sens_ret}, we can just return that
 constant and eliminate all the preceding code. This would not be possible with
-an answer ``maybe'' given by the \emph{may} analysis. May analysis is useful
-on the other hand for example if we are interested whether a divisor in a
-division may be sometimes zero. In that case we report an error.  Must
-analysis will not necessarily find this bug.
+an answer ``maybe'' given by the \emph{may} analysis. Nonetheless, may
+analysis is useful for example if we are interested whether a divisor in a
+division may be zero sometimes, in which case we would report an error.  Must
+analysis does not necessarily find this bug.
 
-\item \emph{Backward/forward:} for flow-sensitive analyses, the way of
-propagation of the information is important. We may want to know at each line
-of a program what are the variables used further in the code (to see whether
-we need to hold its value still in a register for example). This needs going
-from backwards and propagate this information to the beginning of a function
-where the variable is defined. At each line we can see that information then.
-On the other hand to see at each line which variables are already set to any
-value, we need to propagate the information forwards.
-\end{itemize}
+\item[Backward/forward] For flow-sensitive analyses, the way of propagation of
+the information is important. The complexity of the analyzer usually goes hand
+in hand with the direction used. For example, we may want to know at each line
+of a program what variables are used further in the code (to see whether we
+need to hold their values still in registers for example). This information is
+often propagated backwards from the end to the beginning of a function where
+the variable is defined.  Contrary, to see at each line which variables are
+already set to some value, analyzers usually propagate the information
+forwards.
+\end{description}
+
+\todo{emphasize that this thesis delas with practical aspects of using static
+analyzers}
 
 \subsection*{Other Views}
 Of course the list above is not complete. There are many other categorizations
@@ -364,54 +404,51 @@ we do not list in here. In short, we can mention white-box versus black-box
 where the algorithm either knows the internals of the checked projects or not.
 For black-box, an analyzer just can start finding bugs, but will most likely
 cover less code than with a white-box analyzer that has to find some knowledge
-about the code first. An analogy might be seen in checking a car prior to
-buying. Asking a seller for taking a ride, check whatever we see and check
-whether an output from that is as expected (speedup after pressing the
+about the code first.  An analogy might be seen in checking a engine prior
+buying a car. Asking a seller for taking a ride, check whatever we see and
+check whether an output from that is as expected (speedup after pressing the
 throttle pedal for illustration) is black-box because we are unaware about the
-internals. Asking a technician to inspect the engine of the car and check
-electronic and other systems is white-box, because he has the knowledge about
-the internals. There is a mid-way called grey-box testing. The technique
-requires only an overview of the checked code, not full understanding of what
-is going on in there.
+internals. Asking a technician to inspect the engine of the car is white-box,
+because he has the knowledge about the internals. There is a mid-way called
+grey-box testing. The technique requires only an overview of the checked code,
+but not full understanding of what is going on in there.
 
 Another angle of view might be hunting functional versus performance issues.
 Once a project is working nicely with respect to the demanded functionality,
 we may still want to look where we can speed the implementation up. This is
-often with operating system kernels where their behaviour has to be
-transparent and as fast as possible, its effects to become invisible at best.
+often seen in operating system kernels development as behaviour of a kernel
+has to be transparent and as fast as possible, the effects of the kernel
+should become invisible at best.
 
 \subsection*{Code Parsing}
-While we presented the terms above directly on programming languages
-nicely readable by people, analyses are performed on an abstraction level
-better understandable by computers and conveniently operated by analyzer
-writers. There are several structures used in code analysis and compilation.
-This section will describe the process of creating these structures from the
-human readable format (programming language) and description of the created
-structures proper.
+We presented the terms above directly on text written in programming
+languages. This is a form understandable by people when reading, but it is not
+so easy to work with when writing an analyzer. Analyzers are used to work on
+more convenient structures representing the source code.  There are several
+structures used in code analysis and compilation.  This section will cover the
+process of creating these structures from the human readable format, including
+a description of the created structures proper.
 
-First, to be able to understand text given on input, we must know its rules of
-use. Every character, word or sentence have to have a predefined rule with
-definition of their meaning. In natural languages this is usually written down
-and marked as \emph{grammar} of that language\footnote{Not to be confused with
-formal definition of grammar at the moment.}. The same holds for computer
-programming languages. For each programming language, we have a set of rules,
-where we define allowed characters (usually basic alphabet with parenthesis,
-curly braces, and operating symbols), how words are created (what are
-identifiers, reserved words etc.) and how well-defined sentences look like
-(expressions, statements). This is accompanied with an explanation what each
-sentence mean (semantics). So when we write for example \code{char X;} in C,
-we know we have declared a variable which is capable to hold at least 8 bits
-(an ASCII character in other words).
-
-Each programming language has its more or less formally defined grammar. For
-instance, for C, an ISO standard exists~\cite{ansi_c}, the same as for
-C++~\cite{ansi_cpp}. This is not the case for Java, where the rules are
-defined by the Sun's implementation, so it is a \emph{de facto} standard. Sun
-tried twice to standardize Java, but they withdrew the drafts both
-times~\cite{java_non_std}. Remember that even if a standard exists, there is
-no force to push compiler implementers to adhere to that standard. This is
-seen in the C family and its compilers. What is compilable by GNU's C compiler
-is not necessarily understood by the Intel's compiler for example.
+First, to be able to understand source code on input, we must know how to
+interpret it. For each programming language, we have a set of rules. They
+define allowed \emph{characters} (usually basic alphabet with parenthesis,
+curly braces, and other symbols), how to build words from them and their
+meaning: what are identifiers, reserved words etc. Finally, the rules specify
+how a well-defined sentence looks like, i.e.\ how to build expressions and
+statements, functions and whole files. This is accompanied with an explanation
+what each such block means, that is \emph{semantics}. So when we write for
+example ``\code{char X;}'' in C, we know we have declared a variable which is
+capable to hold at least 8 bits (an ASCII character).  The rules are defined
+for most languages in the form of a \emph{standard}. For instance, for both C
+and C++, ISO standards exist~\cite{ansi_c, ansi_cpp}, whereas for Java, the
+rules are defined by the Sun's implementation. Despite Sun tried to
+standardize Java twice, they withdrew the drafts both
+times~\cite{java_non_std}. So Java is a \emph{de facto} standard defined by
+the Sun's implementation.  Remember that even if a standard exists, there is
+no force to push compiler implementors to adhere to that standard. This is
+seen in the C family and its compilers. What is compilable by GNU's C
+compiler~\cite{gcc} is not necessarily understood by the Intel's
+compiler~\cite{intel_cc} for example.
 
 \begin{figure}[tb]
 \begin{center}
@@ -441,10 +478,18 @@ is not necessarily understood by the Intel's compiler for example.
   \label{fig:parsing_process}
 \end{figure}
 
-\begin{figure}[tb]
+With the rules, we can start writing a translator that reads source code in
+the human readable form on the input and produces some structures on the
+output. Such translators are called \emph{parsers}.  The whole process of
+parsing is depicted in Figure~\ref{fig:parsing_process}.  As we can see, there
+are several stages. We discuss them in further text one by one.  The
+explanation happens on the C programming language, more concretetely on the
+code of Figure~\ref{fig:intro_parsing_codes}~(a).
+
+\begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
-    \begin{tabular}{cp{1em}c}
+    \begin{tabular}{ccc}
     \begin{lstlisting}[language=C]
 void fun(int a)
 { /* comment */
@@ -453,28 +498,45 @@ void fun(int a)
     b = 5;
   a = 3 * b;
 }
-    \end{lstlisting} & &
-    \begin{lstlisting}
+    \end{lstlisting} & & {
+    \begin{lstlisting}[numbers=none]
 key:void id:fun LPAR key:int id:a RPAR
 LCUR
-  key:int id:b SEMIC
-  key:if LPAR id:c RPAR
+  key:int id:b EQ num:0 SEMIC
+  key:if LPAR id:a RPAR
     id:b EQ num:5 SEMIC
   id:a EQ num:3 MULT id:b SEMIC
 RCUR
-    \end{lstlisting} \\
+    \end{lstlisting} } \\
     (a) & & (b)
     \end{tabular}
 \end{tabular}
 \end{center}
-    \caption{(a) code example; (b) tokenized code}
-  \label{fig:parsing_codes}
+    \caption{(a) code example for parsing demonstration; (b) tokenized code.}
+  \label{fig:intro_parsing_codes}
 \end{figure}
 
-\begin{figure}[tb]
+%Some standards also contain a \emph{formal grammar}.
+
+First, the input is read by \emph{lexical analyzer} (lexer) character by
+character. It consults with language rules whether the input is well-formed
+and it starts creating so-called \emph{tokens}. Tokens are character sequences
+that are marked by information whether they are a string, number, reserved
+keyword (\code{int}, \code{const}, \dots), identifier (\code{some_variable}),
+or any other kind defined in the rules. We can see how our example was
+tokenized in Figure~\ref{fig:intro_parsing_codes}~(b).  Keywords, identifiers
+and numbers are prefixed by type, braces and parenthesis are converted to
+special names, the same as for operators.
+
+A list of these tokens is then passed to the input of an \emph{syntactic
+analyzer}. Again, it implements the language rules and looks whether the token
+sequences are correct. In case they are, syntactic analyzers usually build an
+\emph{abstract syntax tree} (AST). All irrelevant information is forgotten
+there (abstracted from the original language) and the rest is stored in a tree
+as is depicted in Figure~\ref{fig:intro_parsing_ast}.
+\begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
-    \begin{tabular}{cc}
     \tikzstyle{astn1} = [thick,draw,minimum size=5mm]
     \tikzstyle{astn2} = [thick,draw,minimum size=5mm,bottom color=black!10,top
     color=black!10]
@@ -486,7 +548,7 @@ RCUR
 	    child { node [astn1] {\texttt{int}} }
 	    child { node [astn1] {\texttt{a}} }
 	  }
-	  child [sibling distance=3.8cm] { node [astn2] {body} 
+	  child [sibling distance=4.5cm] { node [astn2] {body} 
 	    child [sibling distance=2cm] { node [astn2] {decl}
 	      child [sibling distance=1.3cm] { node [astn1] {\texttt{int}} }
 	      child { node [astn2] (L_1) {var}
@@ -514,7 +576,41 @@ RCUR
 	  \node [red,font=\scriptsize,above=-1mm of L_2] {2};
 	  \node [red,font=\scriptsize,above=-1mm of L_3] {3};
 	  \node [red,font=\scriptsize,above=-1mm of L_4] {4};
-    \end{tikzpicture} &
+    \end{tikzpicture}
+\end{tabular}
+\end{center}
+    \caption{Abstract syntax tree of the code of
+    Figure~\ref{fig:intro_parsing_codes}.}
+  \label{fig:intro_parsing_ast}
+\end{figure}
+At this abstract point we have no clue what the original language was.
+Compilers usually have separate modules for different languages, called
+\emph{frontends}. They parse the input and create one pre-defined form of AST
+from all diverse languages.  The rest of the compiler pipeline then can be the
+same for all of the languages and can run the same optimization passes for
+them all.  The tree is held in the compiler through the whole compilation
+process. It is usual that further passes in the pipeline add more information
+to the nodes of this tree. The very common one is a position of the nodes in
+the source code for debugging purposes. Even though ASTs usually hold
+information about the whole parsed input, we omitted for simplicity other
+functions, global variable declarations and other constructs from
+Figure~\ref{fig:intro_parsing_ast}.  There is only a subtree corresponding to
+the function from Figure~\ref{fig:intro_parsing_codes}~(a)
+
+From the AST, we can derive much information about the parsed code. One use is
+to build a \emph{control flow graph} (CFG). CFG of a function is a directed
+graph where nodes contain statements of that function and edges are labeled
+by conditions when coming from branching statements. In a CFG, the \emph{entry
+point} of a function is a successor of a triangle standing on a vertex.  The
+\emph{exit point} (return from a function) is a predecessor of a triangle
+standing on an edge.  A \emph{branch} is a node with more than one successor.
+As an example we have built a CFG of the \code{fun} function in
+Figure~\ref{fig:intro_parsing_cfg}. Nodes of the CFG refer back to the to AST
+with numbers to see where the statements come from (every node or subtree in
+an AST have its rule to create nodes in a CFG).
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
     \tikzstyle{cfg} = [thick,draw,minimum size=5mm]
     \tikzstyle{start} = [regular polygon,regular polygon sides=3,
 	regular polygon rotate=180,cfg]
@@ -534,83 +630,30 @@ RCUR
         edge node {} (L_3);
       \node [target,below=3mm of L_4] {}
         edge node {} (L_4);
-    \end{tikzpicture} \\ (a) & (b)
-    \end{tabular}
+    \end{tikzpicture}
 \end{tabular}
 \end{center}
-    \caption{(a) abstract syntax tree of the code; (b) control flow graph of
-    \code{fun}.}
-  \label{fig:parsing_structs}
+    \caption{Control flow graph of the code of
+    Figure~\ref{fig:intro_parsing_codes}.}
+  \label{fig:intro_parsing_cfg}
 \end{figure}
+Alternatively, for easier explanation of some algorithms, statements can be
+put on edges instead of putting them into nodes.  Control flow graph is not
+the only structure that can be derived from the abstract syntax tree. We can
+derive symbol tables, type definitions, perform semantic analysis to verify
+more than syntactic rules etc.
 
-Having the language grammar (standard at best), we can start writing a
-translators that will read source code in the human readable form on input and
-produce output which is easy to work with by computers/programmers. Such
-translators are called \emph{parsers}. The whole process of parsing is
-depicted in Figure~\ref{fig:parsing_process}.  As we can see there are several
-stages. In further text we will deal with the phases one by one. This will
-happen on the basis of the C programming language.
-
-First, the input is read by \emph{lexical analyzer} (lexer) character by
-character. It consults with language grammar how proper words are formed by
-characters and it starts creating so-called \emph{tokens}. Tokens are
-character sequences that are marked by information whether they are text, a
-number, reserved keyword (\code{int}, \code{const}, \dots), identifier
-(\code{some_variable}), or any other kind defined in the grammar. We can
-see how this was done on our example in Figure~\ref{fig:parsing_codes}~(b).
-Keywords, identifiers and numbers are prefixed by type, braces and parenthesis
-are converted to special names, the same as for operators.
-
-A list of these tokens is then passed to the input of \emph{syntactic
-analyzer} (parser). It investigates the language grammar again and looks
-whether the token sequences are correct. In case they are, parsers usually
-build an \emph{abstract syntax tree} (AST). There, all the irrelevant
-information is forgotten (abstracted from the original language) and the rest
-is stored in a tree as is depicted in Figure~\ref{fig:parsing_structs}~(a). At
-this abstract point we have no clue what the original language was. Compilers
-usually have separate modules for different languages, called
-\emph{frontends}, that parse the input and create one pre-defined form of AST
-from all diverse languages. The rest of the compiler pipeline then can be the
-same for all of them and can run the same optimization for them all. The tree
-is held in the compiler through the whole compilation process. It is usual
-that further passes in the pipeline add more information to the nodes of this
-tree. The very common one is a position of the nodes in the source code for
-the debugging purposes. While ASTs hold information about the whole parsed
-input, in the figure we ignore other functions, global variable declarations
-and so on. There is only a subtree corresponding to our function from the
-example in that figure.
-
-We can see that we can derive any information we need about the program from
-the AST. As an example we have built a \emph{control flow graph} (CFG) of that
-function in Figure~\ref{fig:parsing_structs}~(b). Control flow graph of a
-function is a directed graph where nodes contain statements of that function
-and edges contain conditions on edges coming from branches. We can see the
-control flow of \code{fun} in our example. We also refer back to the to AST
-using numbers to see where the statements come from (every node or subtree in
-an AST have its rule to create nodes in a CFG). The entry point of the
-function is the node with no predecessors, the exit point (return from a
-function) is the node with no successors and a branch is a node with more than
-one successor.  It is not uncommon, for easier explanation of some algorithm,
-to put statements on edges. Control flow graph is not the only structure
-derived from the abstract syntax tree. We can derive symbol tables, type
-definitions, perform semantic analysis to verify more than syntactic rules
-etc.
-
-It is not easy to write a correct lexer and parser by hand. Nonetheless some
-projects tend to do so. \texttt{gcc} C compiler is one example of this. Over
-the years the parsing part stabilized and was optimized to be fast. However
-there also exist tools that help to generate lexers and parsers automatically.
-Programmers just need to write down a formal grammar or otherwise defined
-rules, specify tokens and push the button. The tools convert the formal
-grammar to code that takes the language on input and produces an AST on the
-output. Usually there are arbitrary actions allowed to be added to each node
-and libraries to traverse the tree as a whole. It also depends on the type of
-formal grammar preferred by the programmer.  There are various tools with
-regard to this. For LL(*) grammars, one of the most known tools is
-antlr~\cite{antlr4}. Flex and Bison~\cite{flex_bison} are used to generate LR
-parsers. This introduction does not pretend to be complete as we do not need
-more information for the purposes of this thesis; more on parsers can be
-learnt from~\cite{dragon,muchnick}.
+Even though, it is not easy to write a well-working parser by hand, some
+projects like \texttt{gcc} do so. But there also exist tools that help to
+generate lexical and syntactic analyzers automatically from a specified formal
+grammar.  Depending on the programmer's preference on the type of the grammar,
+there are various tools. For LL(*) grammars~\cite[Chapter 4.4]{dragon}, one of
+the most known tools is \textsc{Antlr}~\cite{antlr4}. \textsc{Flex} and
+\textsc{Bison}~\cite{flex_bison} are used to generate LR parsers~\cite[Chapter
+4.5]{dragon}. This introduction to parsing does not pretend to be complete,
+but we do not need more information for the purposes of this thesis. More
+information on parsers can be learnt from various literature about
+compilers~\cite{dragon, muchnick}.
 
 \subsection*{Pointer Analysis}
 For languages using pointers like C, it is important to know where these
@@ -678,89 +721,47 @@ a new object. The other analysis, the true \emph{field-sensitive} one,
 properly handles members of structures in the natural sense, but for a higher
 computation price, of course.
 
-\section{Specifics of Large Projects}
-In an ideal world, every code checking tool should be capable to parse and
-check any project that is out there. Unfortunately, that is not true in the
-real world. Tools often cannot even read source codes of a project or cannot
-find any error there. This happens when the tools, or the project, are highly
-specialized for example. However when a tool is ready to perform checking
-already, there is still a question: where to find the files to check? Should
-it just recursively crawl a specified directory and check all sources in
-there? But what if some source file includes another one and the inner is not
-compilable on its own as happens in the Linux kernel? There are two answers to
-that question: (a) ask the user to provide a list of files, or (b) add a
-support to the tool for a build system or integrated development environment
-(IDE) which the project is developed in.
-
-Having a list of files is not sufficient. Projects tend to pass special
-directives to a compiler such as paths where are header files, to define some
-macros on the command line, or to pre-include a specific files and so on.
-Again to be able to even parse the sources, we have to ``steal'' this
-information from the build system or ask a user to provide that. At this point
-it starts being infeasible for a large project. A single user, it need not
-even be a developer of the project, may somehow generate the file list, but
-will not definitely know all the flags passed to the compiler. The tools
-definitely need to \emph{support build systems}.
-
-So at this point we know what to check and how to correctly obtain an
-intermediate code structure from the source code. While the code can be
-self-contained so that we have all the information we need for the analysis,
-we have to bear in mind that all this information will barely fit into the
-memory. In other words, when parsing large project we have to think twice how
-and which information to store and where. The size also correlates with speed.
-The analyzer has to be relatively fast to be able to handle thousands files.
-
-The best code practices suggest to split functionality among smaller logical
-pieces for better readability and maintainability. Programmers usually put
-these pieces into separate functions. However these pieces alone are not
-useful when checking for errors. They are potential source of false positives.
-For example one function can lock a lock, another one unlocks it and they are
-called in a sequence from some other one. The two alone would generate a
-false-positive. But when the three are analyzed together, no false alarm is
-reported. This drags in the need of inter-procedural variants of analyses used
-by the checker. All the above are the specifics the tools have to deal with
-somehow so that they are usable on large project. And this is indeed a
-challenge!
-
-\subsubsection{Linux Kernel}
-As we already mentioned earlier, there are many projects we can choose as a
-``large project'' in this thesis. There are three main categories we can think
-of: userspace programs, kernels of operating systems and whole self-standing
-embedded systems. When programmers develop some userspace programs, from the
-first category, they usually use some external libraries or code so that they
-are not reimplementing the wheel. This has one big disadvantage for software
-checking. When we want to have a correct analysis, we have to have an access
-to all of them. Moreover, depending on the analysis used, we may need also
-source codes of the libraries. But often, they are not available. Even if they
-are, they need not be necessarily written in the same language as the project
-we intend to check.
-
-For the ease of analysis, we should choose
-some self-contained code. It call to be bug-free, otherwise exploitable
-
-And yet there is the author of this thesis
-who was biased when choosing a project. He is spending some time by Linux
-kernel development, so he knows the processes and has some considerable
-knowledge about the code too.
-
 \section{The Goals}
-The primary goal of this thesis is to research deployment of static analysis
-on large, critical, software projects. In particular, we aim specifically at
-the Linux kernel in some sections. We considered contemporary approaches used
-for code analysis and tried to apply them to a large code base. Based on the
-results we obtain, we would like to discuss pros and cons of the techniques.
-This will result either in a design of new techniques or improvement of the
-contemporary ones (or both).
+This thesis studies applications of contemporary automatic bug-finding
+techniques to large software projects. It specifically aims at techniques like
+abstract interpretation or symbolic execution. Both of them were designed in
+1970's and were adopted in many tools since then.  The thesis should summarize
+the current state of the art of chosen techniques implemented in code
+analyzers which can handle large code bases.  On the top of the explored state
+of the art, the goal is to develop our techniques which can handle the Linux
+kernel.  There should be only few false alarms resulting from an
+implementation of the techniques.  Another aim is to help others with code
+analyzers development. We want to establish a test-bed with predefined
+categories of errors usually present in code such as the Linux kernel. For
+that purpose a publicly available benchmark should be designed. It should
+contain information about errors and false positives found by several
+bug-finding tools.  There is also a software competition tailored to code
+analyzers. So the goal is to compete with our analyzers.
 
-\paragraph{Thesis Organization}
-In the following section~\ref{sec:state} we deal with description of
-techniques and their current state of the art.  In section~\ref{sec:stanse},
-we discuss abstract interpretation, how we implemented it in our tool and its
-pros and cons. We continue in section \ref{sec:fmics} by an approach to
-eliminate false positive resulting from abstract interpretation analysis.
-Section \ref{sec:clabure} then draws a comparison\todo{really?} of different
-approaches including the two described in preceding sections. Section
-\ref{sec:svcomp} shows successes of a tool described in section
-\ref{sec:fmics} in a software competition. Finally, we conclude with summaries
-of what we have done.
+\section{Thesis Contribution}
+We implemented \stan, a framework for code analysis base prevalently on the
+ideas of the abstract interpretation. Further we improved the false reports
+rate of \stan in \symbio by using a combination of three techniques:
+instrumentation, slicing, and symbolic execution. We used \stan also to create
+a testbed for new code analysis tools \cdb. Finally, we took \symbio and tuned
+it. We used that version on the software competition of code analyzers.
 
+\section{Thesis Organization}
+Chapter~\ref{sec:state} deals with a description of techniques and their
+current state of the art. In Chapter~\ref{sec:stanse}, we discuss the
+abstract interpretation, its implementation in our tool \stan~\cite{stanse}
+and its pros and cons. \stan is a framework for developers who wish to
+implement some analysis. \stan provides many helpers, e.g.\ for traversing and
+checking code. We continue in Chapter~\ref{sec:fmics} by an approach to
+eliminate false positives resulting from the abstract interpretation. This is
+implemented in the tool called \symbio~\cite{symbiotic}. It consists of
+combination of three techniques. First, an instrumentor injects state automata
+into the code that is to be checked. Second, a static slicer removes the code
+irrelevant to the state machines.  Finally, a symbolic executor evaluates the
+code with no false positives on the output.  Chapter~\ref{sec:clabure} then
+implements a database of known errors in large projects like the Linux kernel.
+The database is called \cdb~\cite{claburedb}. Its intended use is evaluation
+of a newly implemented tool. In particular to see how good the reports from
+the tool are.  Chapter~\ref{sec:svcomp} shows results of \symbio in a software
+competition~\cite{symbiotic-svcomp}.  Finally, we conclude with summaries of
+what we have done.

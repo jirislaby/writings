@@ -48,7 +48,7 @@ But there of course exist more robust techniques based on pattern matching.
 They, in some way, parse the code (which also removes the problem with the
 comments like the above) and do pattern matching on some internal
 structure. If we recall the abstract syntax tree from
-Figure~\ref{fig:parsing_structs}~(a), we can design a checker which would
+Figure~\ref{fig:intro_parsing_ast}, we can design a checker which would
 match AST subtrees for instance. Then to match division by zero errors, we
 simply try to find a subtree in an AST like of Figure~\ref{fig:ast_to_match}.
 The left leaf is left intentionally blank to express a wildcard.
@@ -428,10 +428,8 @@ joining the branches simply takes the values present on the outputs of both
 branches and performs lattice join ($\sqcup$) of the values in that lattice.
 Since an abstract interpretation works on two complete lattices, one for
 concrete, one for abstract values, $\alpha$ and $\gamma$ are used to move from
-one to the other.  In fact the pair $(\alpha,\, \gamma)$ forms a \emph{Galois
-connection}~\cite{cousot_galois} between the lattices and so Galois
-connection can be used as a tool for designing abstractions.  Now, let us
-formally define a complete lattice and show some examples of lattices.
+one to the other.  Now, let us formally define a complete lattice and show
+some examples of lattices.
 
 \begin{dfn}[Complete lattice]
 A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
@@ -626,33 +624,18 @@ C++. On the similar base is built \stan~\cite{stanse} which is written in
 Java and have only a parser for C.
 
 \section{Symbolic Execution}\label{sec:se}
-In the previous chapter we described the abstract interpretation which is a
-framework for fast, but many times imprecise analyses. As a result we often
+In the previous section we described the abstract interpretation which is a
+framework for fast, but typically imprecise analyses. As a result we often
 get a pile of false positives on the output of an abstract analyzer. There
 also exist techniques which cannot formally generate false positives, but are
 often slower than abstract interpreters. One of such techniques is the
 \emph{symbolic execution}. The technique was introduced in 1970's and
 described by several authors concurrently~\cite{se_king, se_select,
 se_dissect, se_clarke}. The symbolic execution represents program inputs by
-symbolic values instead of trying to analyze a program many times with
+symbols. Therefore it does not need to analyze the program many times with
 concrete, initialized, data. The program is then executed and program
 expressions are manipulated including the symbolic values. Let us demonstrate
 this on an example of Figure~\ref{fig:se_example}. The example is two-fold.
-
-First, there is a read from the user. How long it would take to exercise the
-program to get to the true branch of the \code{if}s with dynamic testing?
-With \code{int} being usual 32 bits, there is only one successful attempt out
-of $2^{32}$ overall. Of course, with a static analyzer based on the data-flow
-analysis or abstract interpretation, those true branches would be analyzed
-quite quickly.  This brings us to the second point nonetheless. Many complete
-analyzers generate a report about division by zero possible at
-line~\ref{line:se_ex_div}. This is indeed a false positive because \code{b} is
-set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
-\code{0x12345678}. The source of the false positive is that the analyzers do
-not often remember conditions on branchings. Some of them do a post processing
-on reports to eliminate such reports as we will see in
-Chapter~\ref{sec:stanse}.
-
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -676,30 +659,42 @@ int fun(void) {
   \label{fig:se_example}
 \end{figure}
 
+First, there is a read from the user. How long it would take to exercise the
+program to get to the true branch of the \code{if}s with dynamic testing?
+With \code{int} being usual 32 bits, there is only one successful attempt out
+of $2^{32}$ overall. Of course, with a static analyzer based on the data-flow
+analysis or abstract interpretation, those true branches would be analyzed
+quite quickly.  This brings us to the second point nonetheless. Many complete
+analyzers generate a report about division by zero possible at
+line~\ref{line:se_ex_div}. This is indeed a false positive because \code{b} is
+set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
+\code{0x12345678}. The source of the false positive is that the analyzers do
+not often remember conditions on branchings.
+
 The symbolic execution tackles this problem. All inputs from the user are
 replaced by \emph{symbols}. For a variable \code{a}, we denote the symbol
-corresponding to \code{a} as $\sym{a}$. Such symbols are allowed to be
-assigned to variables like constants and other expressions. In our example, we
-would have \code{int a = }~$\sym{a}$\code{;}. Obviously we have to teach the
-symbolic executor to deal with symbols in arithmetic operations and branching
-statements. In the first place, we need to have a storage. Symbolic executors
-contain a \emph{symbolic memory} $\theta$ which assigns to each variable its
-current symbolic value. So after the line~\ref{line:se_ex_sset}, $\theta(a) =
-\sym{a}$. To be precise in execution of the code, the executor also has to
-remember the branches which it chose to jump to at branching points. This is
-stored in a \emph{path condition} $\varphi$. It is a first-order
-formula~\cite{fol} representing a necessary and sufficient condition over
-symbols to drive the execution along the currently executed path to the
-actually evaluated point. $\varphi$ is set initially to $\true$ and is
-evaluated and potentially updated at every branch. This happens on
-lines~\ref{line:se_ex_if1} and~\ref{line:se_ex_if2} in our example. On
-line~\ref{line:se_ex_if1}, we check, whether $\varphi$ implies validity of the
-condition instantiated by the current state of $\theta$. More concretely, the
-executor checks whether either of the following two implications hold (at most
-one~\cite{se_king}):
+corresponding to \code{a} as $\sym{a}$. We allow symbols to be assigned to
+variables similar to constants and other expressions. In our example, the
+assignment on line~\ref{line:se_ex_sset} would become \code{a = }~$\sym{a}$.
+Obviously we have to teach the symbolic executor to deal with symbols in
+arithmetic operations and branching statements. In the first place, we need to
+have a storage. Symbolic executors contain a \emph{symbolic memory} $\theta$
+which assigns to each variable its current symbolic value. So after the
+line~\ref{line:se_ex_sset}, $\theta(\var{a}) = \sym{a}$. To be precise in
+execution of the code, the executor also has to remember the branches which it
+chose to jump to at branching points. This information is stored in a
+\emph{path condition} $\varphi$. It is a first-order formula~\cite{fol}
+representing a necessary and sufficient condition over symbols to drive the
+execution along the currently executed path to the actually evaluated point.
+$\varphi$ is set initially to $\true$ and is evaluated and potentially updated
+at every branch.  This happens on lines~\ref{line:se_ex_if1}
+and~\ref{line:se_ex_if2} in our example. On line~\ref{line:se_ex_if1}, we
+check whether $\varphi$ implies validity of the condition instantiated by the
+current state of $\theta$. More concretely, the executor checks whether either
+of the following two implications hold (at most one~\cite{se_king}):
 \begin{align}
-\varphi & \rightarrow \theta(a) = 0x12345678 \label{equ:se_fi} \\
-\varphi & \rightarrow \theta(a) \neq 0x12345678 \label{equ:se_se}
+\varphi & \rightarrow \left( \theta(\var{a}) = \var{0x12345678} \right) \label{equ:se_fi} \\
+\varphi & \rightarrow \left( \theta(\var{a}) \neq \var{0x12345678} \right) \label{equ:se_se}
 \end{align}
 There are three possibilities that can happen:
 \begin{description}
@@ -711,8 +706,8 @@ execution by jumping directly to the \emph{false} branch.
 values to prove validity. So to retain soundness, it has to fork the execution
 of the whole program to explore both branches. In that case, the path
 condition $\varphi$ has to be augmented in the respective branches. For the
-true branch, $\varphi \wedge \theta(a) = 0x12345678$ is a new path condition,
-for the other branch $\varphi \wedge \theta(a) \neq 0x12345678$.
+true branch, $\varphi \wedge \sym{a} = 0x12345678$ is a new path condition,
+for the other branch $\varphi \wedge \sym{a} \neq 0x12345678$.
 \end{description}
 In our example, on line~\ref{line:se_ex_if1} neither implication is valid, as
 $\theta(a)=\sym{a}$ which cannot prove validity of $\theta(a) = 0x12345678$.
@@ -832,17 +827,17 @@ about validity of formulae like~\ref{equ:se_fi} and \ref{equ:se_se}.  Whereas
 performance of individual solvers vary, complex queries are not easy to answer
 for any solver.  So it usually takes a long time for solvers before they
 answer such queries. Second, the symbolic execution suffers from the
-\emph{path explosion problem}, i.e.~an exponential growth of paths that need
+\emph{path explosion problem}, i.e.\ an exponential growth of paths that need
 to be explored. Every branching and in the code potentially multiplies the
 possible number of paths through the program by two. It is even worse for
 loops, where the symbolic execution tree can become huge. So the larger
 program, the exponentially larger symbolic execution tree to be explored yet.
-In fact the tree can be also infinite, e.g.~when analyzing infinite loops.
+In fact the tree can be also infinite, e.g.\ when analyzing infinite loops.
 Hence, for real-world programs, the symbolic execution is barely usable
 without incorporating other techniques to reduce the count of explored paths.
 Some tools try to tackle this issue by traversing more paths at once to
 substantially reduce the size of the execution tree~\cite{cse_atva}. Others,
-like in~\cite{pex_ddse, G07}, compose symbolic executions from several
+like in~\cite{pex_ddse, G07}, compose symbolic executions of several
 functions using summaries which results in an inter-procedural analysis. This
 approach limits the need of execution to separate functions only. \cite{rwset,
 klee, exe}~are based on recording of already seen behavior and pruning its
@@ -1242,9 +1237,10 @@ symbolic model checking and BDDs allowed more complex systems to be checked on
 the same hardware (cf.~\cite{mc_symbolic1} again).  Symbolic model checking
 was later improved to defer the path explosion problem more by techniques like
 \textsc{Cegar}~\cite{cegar}. \textsc{Cegar} starts with an abstraction of the
-model and makes it more precise whenever a false counterexample is produced.
-And only in that part of the model which is too abstract. Examples of symbolic
-model checkers are \textsc{NuSmv}~\cite{nusmv} or \textsc{Bebop}~\cite{bebop}.
+model and makes it more precise whenever a \emph{spurious} counterexample is
+produced.  And only in that part of the model which is too abstract. Examples
+of symbolic model checkers are \textsc{NuSmv}~\cite{nusmv} or
+\textsc{Bebop}~\cite{bebop}.
 
 In parallel to the BDDs-based model checking, \emph{bounded model checking}
 exists. Instead of exploring the whole state space of the system model, there
@@ -1253,10 +1249,12 @@ execution to be explored. If a bounded model checker explores all these
 \textit{k}-prefixes, either \textit{k} is incremented and the checking
 continues, or the model checker is stopped. It can have two reasons: the user
 set the top bound for \textit{k} (the analysis is of course incomplete in that
-case), or the execution is infeasible, because it runs out of resources. Model
-checking and bounded model checking are orthogonal techniques, it was shown
-in~\cite{bmc_survey} that both of them reason about different class of
-properties. (Nonetheless there can be an intersection.)
+case), or the execution is infeasible, because it runs out of resources. Few
+representatives are \textsc{Esbmc}~\cite{esbmc} and
+\textsc{Llbmc}~\cite{llbmc}. Model checking and bounded model checking are
+orthogonal techniques, it was shown in~\cite{bmc_survey} that both of them
+reason about different class of properties. (Nonetheless there can be an
+intersection.)
 
 Due to the path explosion problem and relatively slow computers in the past,
 use of the model checking was limited rather to check small reactive systems
@@ -1270,25 +1268,27 @@ successfully used in the Linux Driver Verification toolkit~\cite{ldv} to
 verify Linux device drivers. \textsc{Blast} was also extended to handle
 concurrent data accesses~\cite{blast_concur}.  \textsc{Spin}~\cite{spin} is
 aware of concurrent data accesses too. So \textsc{Spin} checked a model of the
-Linux common filesystem layer~\cite{spin_vfs}. Earlier, some stand-alone file
+Linux common filesystem layer~\cite{spin_vfs}. Earlier, some individual file
 systems which use this layer were checked by Yang et al.\
 too~\cite{mc_kernel_fs}. Other subsystems like the networking stack were
-also checked~\cite{mc_kernel_ip}. Similar to the attempts on the Linux kernel,
-Microsoft started adopting their model checker \textsc{Slam}~\cite{slam_cav,
-slam_popl, slam_decade} and \textsc{Slam 2}~\cite{slam2} in their driver
-verifier \textsc{Sdv}~\cite{sdv} for checking Windows drivers. They apparently
-succeeded as they require every driver to be checked by this toolkit with over
-160 predefined temporal rules before the driver is accepted by Microsoft.
-\textsc{Sdv} is a proprietary software with rules tailored to Windows drivers.
-Therefore it cannot be used for checking open source projects. So Clarke et
-al.~\cite{cbmc} adapted Microsoft's approach using \textsc{CBMC} model checker
-and defined at least seven rules to check Linux kernel drivers. The rules were
-later extended by Post and K\"{u}chlin~\cite{slicx}. \textsc{DDverify}
-verifier~\cite{ddverify} and \textsc{Saturn}~\cite{saturn} were used for
-automated verification of the Linux kernel drivers.
-\textsc{Undertaker}~\cite{undertaker} is a model checker for the Linux kernel
-configuration system. It serves the purpose of validating dependencies in the
-\texttt{Kconfig} configuration files. There exist also successful tools for
+also checked~\cite{mc_kernel_ip}.  \textsc{DDverify} verifier~\cite{ddverify}
+and \textsc{Saturn}~\cite{saturn} were used for automated verification of the
+Linux kernel drivers.  \textsc{Undertaker}~\cite{undertaker} is a model
+checker for the Linux kernel configuration system. It validates dependencies
+in the \texttt{Kconfig} configuration files.  There are also model checkers
+aimed specifically at the Linux kernel like \textsc{Predator}~\cite{predator}.
+
+Similar to the attempts on the Linux kernel, Microsoft started adopting their
+model checker \textsc{Slam}~\cite{slam_cav, slam_popl, slam_decade} and
+\textsc{Slam 2}~\cite{slam2} in their driver verifier \textsc{Sdv}~\cite{sdv}
+for checking Windows drivers. They apparently succeeded as they require every
+driver to be checked by this toolkit with over 160 predefined temporal rules
+before the driver is accepted by Microsoft.  \textsc{Sdv} is a proprietary
+software with rules tailored to Windows drivers.  Therefore it cannot be used
+for checking open source projects. So Clarke et al.~\cite{cbmc} adapted
+Microsoft's approach using \textsc{Cbmc} model checker and defined at least
+seven rules to check Linux kernel drivers. The rules were later extended by
+Post and K\"{u}chlin~\cite{slicx}.  There exist also successful tools for
 modelling and verifying Java programs like
 \textsc{PathFinder}~\cite{pathfinder}.
 
@@ -1406,4 +1406,5 @@ by no means intended to be complete. There are still approaches which we have
 not described for some reasons. Be it the obsoleteness of the approaches,
 limited use, or finally the limited scope of this thesis. Should the reader
 ever come over a tool that has to be within this thesis, please contact the
-author to fix the work accordingly.
+author to fix the work accordingly. He is allowed to do so even after the
+thesis is in the peer review process.
