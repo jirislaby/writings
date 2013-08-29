@@ -105,88 +105,84 @@ interested in all assignments where some variable $\var{a}$ was set and was
 not re-set during the control flow to the point $p$. This lets us reason about
 many questions like whether a variable was set already before it is used or if
 we should report an uninitialized access. We will show the analysis on the
-code which is in the first column of Table~\ref{tab:state_df_comp}.
-Intuitively, the reaching definition set on line~\ref{lst:reach_use} is a set
-of three labels $\{\ref{lst:reach_def1}, \ref{lst:reach_def2},
-\ref{lst:reach_use} \}$, where we define \code{a} and \code{b}. Note that
-line~\ref{lst:reach_def0} does not belong there because \code{a} was re-set
-later on both paths to line~\ref{lst:reach_use}.
+code which is in the second column of Table~\ref{tab:state_df_eq}.
+Intuitively, the reaching definition set on line~\ref{lst:state_rd_ref} is a
+set of four labels $\{\ref{lst:state_rd_def1}, \ref{lst:state_rd_def2},
+\ref{lst:state_rd_def3}, \ref{lst:state_rd_def4}\}$, where we define \code{a}
+and \code{b}, because all of them can reach line~\ref{lst:state_rd_ref}.
+%Note that line~\ref{lst:reach_def0} does not belong there because \code{a}
+%was re-set later on both paths to line~\ref{lst:reach_use}.
 
 Now we derive the information algorithmically using the data-flow analysis by
 constructing the equations and computing their fixed point. We can simply hold
 the reaching definitions in the transform equations.  That is, initially at
 the beginning of a function, the first equation holds an empty set. Then the
 equation is gradually transformed according to statements and the definitions
-filled in. Since we need to propagate information about definitions, the
+are filled in. Since we need to propagate information about definitions, the
 transform equation mangles the contents coming from predecessors only on
 assignment statements.  Other equations simply copy data from predecessors.
 On assignments, the equation takes the set of statements from the
 predecessors, removes all statements that set the same variable and adds
 itself. If there are more predecessors, we use set union as we want to know
-definitions from both branches. The transform equations for the example are
-shown in the third column of Table~\ref{tab:state_df_comp}.
+definitions from both branches. The transform equations $f_s$ for each
+statement $s$ in the example are shown in the third column of
+Table~\ref{tab:state_df_eq}.
 \begin{table}[htb]
 \begin{center}
-\begin{tabular}{|r|l||p{0.2em}lp{0.3em}rp{0.3em}r||p{0.2em}l|} \hline
-\textbf{\#} &
+\begin{tabular}{|r|l||p{0.2em}lp{0.3em}r|} \hline
+\textbf{\footnotesize \#} &
   \multicolumn{1}{c||}{\textbf{Code}} &
-  \multicolumn{6}{c||}{\textbf{Transform Equations}} &
-  \multicolumn{2}{c|}{\textbf{Fixed Point}} \\ \hline\hline
-&& $f_0$ & $= \emptyset$ &&&&& $f_0$ & $= \emptyset$ \\ \hline
+  \multicolumn{4}{c|}{\textbf{Transform Equations}} \\ \hline\hline
+&& $f_0$ & $= \emptyset$ && \\ \hline
 
 1 & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
-a = 1; (*@ \label{lst:reach_def0} @*)
+a = 1;(*@ \label{lst:state_rd_def1} @*)
 \end{lstlisting} } &
-$f_1$ & $= \{1\}$ & $\cup$ & $(f_0$ & $\setminus$ & $\{1,3,5\})$ &
-$f_1$ & $= \{1\}$ \\ \hline
+$f_1$ & $= \{1\}$ & $\cup$ & $(f_0 \,\setminus\, \{1,4\})$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
-if (x)
+b = read();(*@ \label{lst:state_rd_def2} @*)
 \end{lstlisting} } &
-$f_2$ & $= \emptyset$ & $\cup$ & $(f_1$ & $\setminus$ & $\emptyset)$ &
-$f_2$ & $=\{1\}$ \\ \hline
+$f_2$ & $= \{2\}$ & $\cup$ & $(f_1 \,\setminus\, \{2,5\})$ \\ \hline
 
-\thelstnumber &
-{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
-  a = 3;(*@ \label{lst:reach_def1} @*)
+\thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+while (b) {
 \end{lstlisting} } &
-$f_3$ & $= \{3\}$ & $\cup$ & $(f_2$ & $\setminus$ & $\{1,3,5\})$ &
-$f_3$ & $= \{3\}$ \\ \hline
+$f_3$ & $= \emptyset$ & $\cup$ & $(f_2 \cup f_6 \,\setminus\, \emptyset)$ \\
+  \hline
 
-\thelstnumber &
-{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
-else
+\thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+  a = a+5;(*@ \label{lst:state_rd_def3} @*)
 \end{lstlisting} } &
-$f_4$ & $= \emptyset$ & $\cup$ & $(f_1$ & $\setminus$ & $\emptyset)$ &
-$f_4$ & $= \{1\}$ \\ \hline
+$f_4$ & $= \{4\}$ & $\cup$ & $(f_3 \,\setminus\, \{1,4\})$ \\ \hline
 
-\thelstnumber &
-{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
-  a = 4;(*@ \label{lst:reach_def2} @*)
+\thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+  b = b-1;(*@ \label{lst:state_rd_def4} @*)
 \end{lstlisting} } &
-$f_5$ & $= \{5\}$ & $\cup$ & $(f_2$ & $\setminus$ & $\{1,3,5\})$ &
-$f_5$ & $= \{5\}$ \\ \hline
+$f_5$ & $= \{5\}$ & $\cup$ & $(f_4 \,\setminus\, \{2,5\})$ \\ \hline
 
-\thelstnumber &
-{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
-b = a; (*@ \label{lst:reach_use} @*)
+\thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+}
 \end{lstlisting} } &
-$f_6$ & $= \{6\}$ & $\cup$ & $(f_3 \cup f_5$ & $\setminus$ & $\{6\})$ &
-$f_6$ & $= \{3,5,6\}$ \\ \hline
+$f_6$ & $= \emptyset$ & $\cup$ & $(f_5 \,\setminus\, \emptyset)$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+use(a);(*@ \label{lst:state_rd_ref} @*)
+\end{lstlisting} } &
+$f_7$ & $= \emptyset$ & $\cup$ & $(f_3 \,\setminus\, \emptyset)$ \\ \hline
+
 \end{tabular}
 \end{center}
   \caption{Reaching definitions data-flow analysis example.}
-  \label{tab:state_df_comp}
+  \label{tab:state_df_eq}
 \end{table}
-$f_s$ is a transform equation for a statement $s$. The equation is in the form
-of $f_s = gen_s \cup (pred_s \setminus kill_s)$. $gen_s$ is a set $\{s\}$ that
-\emph{generates} $s$ if it is an assignment, otherwise $gen_s$ is empty.
-$pred_s$ is an union of $f_{s-1}$ for each predecessor $s-1$.  Finally, if $s$
-is an assignment $\var{x}=\var{y}$, $kill_s$ is a set that \emph{kills} other
-assignments to \code{x}. Otherwise $kill_s$ is empty. Establishing a fixed
-point as defined in Definition~\ref{def:fixpoint} is obvious for these
-particular equations because there is no loop. The result is shown in the last
-column of Table~\ref{tab:state_df_comp}.
+The equation is in the form of $f_s = gen_s \cup (pred_s \setminus kill_s)$.
+$gen_s$ is a set $\{s\}$ that \emph{generates} $s$ if it is an assignment,
+otherwise $gen_s$ is empty.  $pred_s$ is a union of $f_{s-1}$ for each
+predecessor $s-1$.  Finally, if $s$ is an assignment to $\var{x}$, $kill_s$ is
+a set that \emph{kills} other assignments to \code{x}. Otherwise $kill_s$ is
+empty. Establishing a fixed point as defined in Definition~\ref{def:fixpoint}
+is shown in Table~\ref{tab:state_df_fp}.
 
 \begin{dfn}[Fixed point]\label{def:fixpoint}
 A \emph{fixed point} of a function $f : D \rightarrow D$ is an element $x \in
@@ -194,16 +190,42 @@ D$ such that $f(x) = x$. The set $fp(f)$ of fixed points of $f$ is $\{x \in D
 \mid f(x) = x \}$.
 \end{dfn}
 
-More generally, in the data-flow analysis, we have a pair of equations for
-each statement $s$:
+\begin{table}[htb]
+\begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c|} \hline
+\multirow{2}{*}{\textbf{Equation}} &
+  \multicolumn{6}{c|}{\textbf{Fixed Point Iteration}} \\ \cline{2-7}
+& 1 & 2 & 3 & 4 & 5 & 6 \\ \hline\hline
+$f_0$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\emptyset$ &
+  $\emptyset$ \\ \hline
+$f_1$ & $\emptyset$ & $\{1\}$ & $\{1\}$ & $\{1\}$ & $\{1\}$ & $\{1\}$\\ \hline
+$f_2$ & $\emptyset$ & $\{2\}$ & $\{1,2\}$ & $\{1,2\}$ & $\{1,2\}$ &
+  $\{1,2\}$ \\ \hline
+$f_3$ & $\emptyset$ & $\emptyset$ & $\{2\}$ & $\{1,2,5\}$ & $\{1,2,4,5\}$ &
+  $\{1,2,4,5\}$ \\ \hline
+$f_4$ & $\emptyset$ & $\{4\}$ & $\{4\}$ & $\{2,4\}$ & $\{2,4,5\}$ &
+  $\{2,4,5\}$ \\ \hline
+$f_5$ & $\emptyset$ & $\{5\}$ & $\{4,5\}$ & $\{4,5\}$ & $\{4,5\}$ &
+  $\{4,5\}$ \\ \hline
+$f_6$ & $\emptyset$ & $\emptyset$ & $\{5\}$ & $\{4,5\}$ & $\{4,5\}$ &
+  $\{4,5\}$ \\ \hline
+$f_7$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\{2\}$ & $\{1,2,5\}$ &
+  $\{1,2,4,5\}$ \\ \hline
+\end{tabular}
+\end{center}
+  \caption{Reaching definitions fixed point computation.}
+  \label{tab:state_df_fp}
+\end{table}
+
+Now we generalize the approach. In the data-flow analysis, we have a pair of
+equations for each statement $s$ of a program:
 \begin{equation} \label{eq:data_flow}
 \begin{aligned}
 out_s & = trans_s(in_s) \\
 in_s & = join_{p\in pred_s}(out_p)
 \end{aligned}
 \end{equation}
-
-We define a transfer function $trans$ to transform input set $in_s$ of a
+We define a transfer function $trans_s$ to transform input set $in_s$ of a
 statement $s$ to the output set $out_s$ according to the effect of $s$ in a
 particular analysis. The join operator $join$ takes output sets of all
 predecessors and combines it together. It is usually a set intersection or
@@ -211,11 +233,13 @@ union depending whether the analysis is may or must (cf.\
 Section~\ref{sec:types_anal}). Further, whether an analysis is forwards
 or backwards (Section~\ref{sec:types_anal}), the $in$ set is bound to an
 incoming or outgoing control flow graph edge respectively. Analogously for the
-$out$ set.  These two sets are the result of the analysis before and after
-applying the effect of the statement. For the reaching definitions example
-above, we define join operator as a set union ($\bigcup$) and the transfer
-function in this notation to hold statement line numbers as follows ($S$ is
-the set of all statements in the analysed program):
+$out$ set.  These two sets are the \emph{result} of the analysis before and
+after applying the effect of the statement.
+
+For the reaching definitions example above, we define the join operator as a
+set union ($\bigcup$) and the transfer function in this notation to hold
+statement line numbers as follows ($S$ is the set of all statements in the
+analysed program):
 \begin{align*}
 trans_s(in) & = gen_s \cup (in - kill_s) \\
 gen_s & =
@@ -231,12 +255,16 @@ kill_s & =
 \end{cases} \\
 \end{align*}
 
+For the simplicity nature of the data-flow analysis, there are many diverse
+data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest some
+examples of other well-known basic data-flow analyses as they are defined
+according to the forward/backward and may/must criteria.
 \begin{table}[htb]
 \begin{center}
 \begin{tabular}{|c||c|c|} \hline
 \textbf{Analysis}& \textbf{May}& \textbf{Must} \\ \hline\hline
 \multirow{2}{*}{\textbf{Forward}}
-  & Reaching    & Available     \\
+  & Reaching    & Available   \\
   & definitions & expressions \\ \hline
 \multirow{2}{*}{\textbf{Backward}}
   & Live        & Very busy   \\
@@ -247,112 +275,117 @@ kill_s & =
     forward/backward rules.}
   \label{tab:data_flow_examples}
 \end{table}
-
-For the simplicity nature of the data-flow analysis, there are many diverse
-data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest some
-examples of other well-known basic data-flow analyses as they are defined
-according to the forward/backward and may/must criteria. For curious readers,
-they are defined in every superior literature about compilers~\cite{dragon,
-muchnick}. Thanks to the simplicity, the data-flow analysis is also used in
-many tools including checkers.  The very common place of extensive use are
-compilers. Apart from generating code, they generate warnings or errors when
-some suspicious code is found. A good example is \clang~\cite{clang}. It is a
-C/C++ compiler from the \llvm toolkit~\cite{llvm} and contains also a static
-checker framework.  There are checkers for finding errors in memory handling,
-locking, or pointer operations. Nonetheless mostly the results are imprecise
-and contain many false reports.  \textsc{Cppcheck}~\cite{cppcheck} works on
-the same principles so it checks for very similar set of errors.  When
-compilers were still not so evolved, other data-flow analyzers were used to
-fulfill this role. One of the most known analyzers at that time was
-\textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
-zero, constant conditions which always evaluate either to true or false, or
-use of uninitialized variables.  Later, \textsc{Lint} resulted in some clones
-like \textsc{LCLint}~\cite{lclint} which were augmented to catch errors like
-buffer overflows. \textsc{LCLint} was later renamed to \textsc{Splint}.  These
-tools mostly have a support for annotations so more speculative checks can be
-enabled. In that case, the code has to be heavily annotated, otherwise the
-false positive rate is unbearable.  Nonetheless \textsc{Splint} is not
-developed for more than a decade due to obvious reasons: the most errors it
-reports are reported by modern compilers nowadays.  There exist also analyzers
-that are not so powerful to handle large code bases or require high user
-intervention to annotate the checked code. As an example we give
-\textsc{Aspect}~\cite{aspect} which compares a program specification of
-input-output behaviour provided by a user to data-flow models extracted from
-the code. This was only a short introduction to the data-flow analysis, more
-information and many examples are available in the literature~\cite{dragon,
-muchnick}.
+For curious readers, they are defined in every superior literature about
+compilers~\cite{dragon, muchnick}. Thanks to the simplicity, the data-flow
+analysis is also used in many tools including checkers.  The very common place
+of extensive use are compilers. Apart from generating code, they generate
+warnings or errors when some suspicious code is found. A good example is
+\clang~\cite{clang}. It is a C/C++ compiler from the \llvm toolkit~\cite{llvm}
+and contains also a static checker framework.  There are checkers for finding
+errors in memory handling, locking, or pointer operations. Nonetheless mostly
+the results are imprecise and contain many false reports.
+\textsc{Cppcheck}~\cite{cppcheck} works on the same principles so it checks
+for very similar set of errors.  When compilers were still not so evolved,
+other data-flow analyzers were used to fulfill this role. One of the most
+known analyzers at that time was \textsc{Lint}~\cite{lint}. It was capable of
+finding errors like division by zero, constant conditions which always
+evaluate either to true or false, or use of uninitialized variables.  Later,
+\textsc{Lint} resulted in some clones like \textsc{LCLint}~\cite{lclint} which
+were augmented to catch errors like buffer overflows. \textsc{LCLint} was
+later renamed to \textsc{Splint}.  These tools mostly have a support for
+annotations so more speculative checks can be enabled. In that case, the code
+has to be heavily annotated, otherwise the false positive rate is unbearable.
+Nonetheless \textsc{Splint} is not developed for more than a decade due to
+obvious reasons: the most errors it reports are reported by modern compilers
+nowadays.  There exist also analyzers that are not so powerful to handle large
+code bases or require high user intervention to annotate the checked code. As
+an example we give \textsc{Aspect}~\cite{aspect} which compares a program
+specification of input-output behaviour provided by a user to data-flow models
+extracted from the code. This was only a short introduction to the data-flow
+analysis, more information and many examples are available in the
+literature~\cite{dragon, muchnick}.
 
 
 
-\section{Abstract Interpretation}\label{sec:ai}
-The data-flow analysis is only a limited tool for deciding some properties
-about the analysis. There was a call to formalize the process which would
-for example allow for convenient proofs of algorithms' correctness and
-soundness.  \emph{Abstract interpretation} is a technique that has a history
-stretching back to the 1970s. Back then, it was described by Cousot\&Cousot in
-\cite{cousot}. It is designed to allow users of the formalism to decide
-whether their analysis is correct, if it terminates, to formulate more
-precision levels of an analysis consistently and more.  With this formalism,
-we can also interpret data-flow analyses as abstract interpretations, as was
-shown in~\cite{ai_intro}.
+\section{Abstract Interpretation}\label{sec:ai}\todo{transfer vs
+transformation vs transfer function. Fight!}
+The data-flow analysis is only a limited tool. It only collects information
+about data and how they propagate through the control flow of a program.
+Therefore it is not as useful for designing more complex analyses which are
+usual for code checking. There was a call to formalize the process for a
+convenient design of more complex analyses. Cousots' work on this topic
+stretches back to the 1970s. Back then, they described a framework called
+\emph{abstract interpretation}~\cite{cousot}. It is designed to allow users of
+the formalism to easily design an analysis, decide whether it is correct and
+sound, to formulate more precision levels of the analysis consistently and
+more.  The formalism was designed in a way that we can also interpret analyses
+like data-flow as an abstract interpretation~\cite{ai_intro}.
 
-As the name of the analysis suggests, there is an abstraction of how values
-are handled in an analysed program. Let us show this on a demonstrative
-example. Consider a program in Figure~\ref{fig:lst_ai_intro} and an analysis
-that should decide whether \code{i} is positive at the end (let us ignore
-overflows at this moment).
+As the name of the analysis suggests, the data domains used in analyzed code
+are replaced by abstract ones. The abstract domain is a \emph{complete
+lattice}~\cite{lattice1,lattice2} as defined in
+Definition~\ref{def:colattice}. Since the program works on a new (abstract)
+domain, we have to provide a new semantics of the program over the domain.
+There are no limits, the semantics can be arbitrary. We define a
+\emph{monotone function} for all instructions in the analyzed code to
+transform the program states over the instructions.  Thanks to the work of
+Tarski~\cite{tarski} and Kleene~\cite[Pages 348--349]{kleene}, we can always
+compute fixed points of monotone functions which transform states over
+lattices.  Further, using lattices is effective. Their operators join and meet
+can be used when an analyzer is interpreting a program.  For example, when a
+branching
+occurs, the branch join operator simply takes the values present on the
+outputs of both branches and performs the lattice join ($\sqcup$).
 
+\begin{dfn}[Complete lattice]\label{def:colattice}
+A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
+a partially ordered set $(L,\, \leq)$ where every set $X \subseteq L$ has a
+least upper bound (supremum) $\sqcup X$ and a greatest lower bound (infimum)
+$\sqcap X$. In particular, $L$ has a least element $\bot = \sqcup \emptyset$
+and a greatest element $\top = \sqcap L$.
+\end{dfn}
+
+Let us demonstrate the abstract interpretation on an example the same as the
+data-flow analysis and then generalize it again. We take the same example as
+is in Table~\ref{tab:state_df_eq} and reachable definitions analysis again.
+First, we have to define the abstract set which the abstract interpretation
+works with.  Since the analysis works with lines where is an assignment and
+there can be more reachable definitions assigned to a single line, the complete
+lattice will consists of a powerset of all assignments in the program:
+$A=\{1,2,4,5\}$.  The abstract domain is therefore lattice $L_a =
+(\mathcal{P}(A),\, \subseteq,\, \emptyset,\, A,\, \cap,\, \cup)$. Now we would
+have to define the transform function over the lattice. But it is the same as
+in Table~\ref{tab:state_df_eq}. So computing the least fixed point is the same
+as is shown in Table~\ref{tab:state_df_fp} too.
+
+As we see, the abstract interpretation is defined by the complete lattice,
+and a transform function. Formally, it is a tuple $I=\langle L,\, \circ,\,
+\leq,\, \top,\, \bot,\, F\rangle$, where $(L,\, \leq,\, \bot,\, \top,\,
+\sqcup,\, \sqcap)$ is a complete lattice, $\circ$ is either supremum
+($\sqcup$) or infimum ($\sqcap$) operator, and $F$ is a monotone function
+defining the interpretation on a program. The definition can be loosened to
+require only a semi-lattice, as we need only one operator.
+
+It is not yet obvious how to define the transform function of a program. We
+can define a transform function $F_a$ working directly on the abstract domain.
+It obtains a new abstract state corresponding to the effect of a statement
+applied to the original state. The same as we showed in the example, this is
+usually defined on an intuitive level as a composition of simple
+transformations performed on single statements of a program. For complex
+analyses it need not be easy to design such $F_a$, so there is also another
+option.  First, we define two functions: \emph{abstraction} denoted $\alpha$
+and \emph{concretization} denoted $\gamma$, both accepting one parameter.
+$\alpha$ returns an abstract value corresponding to the concrete value on
+input and $\gamma$ does the opposite. Now, we can jump back to the concrete
+values, perform the transformation on the concrete values using a concrete
+transform function $F_c$ and switch back to the abstract values.  $F_a$ is
+then defined as $F_a = \alpha \circ F_c \circ \gamma$. To retain soundness of
+the analysis, the resulting abstract value must be less than or equal to the
+one computed by a direct $F_a$. We depict these two options in
+Figure~\ref{fig:state_ai_square}.
 \begin{figure}[htb]
 \begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}[language=C]
-void fun(int x)
-  i = 3; (*@ \label{lst:ai_intro_set1} @*)
-  while (x)
-    i *= 2; (*@ \label{lst:ai_intro_set2} @*)
-  return i;
-}
-\end{lstlisting}
-\end{tabular}
-\end{center}
-\caption{Code used for demonstration of abstract interpretation.}
-\label{fig:lst_ai_intro}
-\end{figure}
-
-First, consider an ``abstraction'' that abstracts the code in no way, i.e.~we
-take the concrete evaluation. There are only two lines in the code that store
-something to \code{i}: lines~\ref{lst:ai_intro_set1} and
-\ref{lst:ai_intro_set2}. The former simply sets \code{i} to \code{3}, so
-we just remember that. The latter, increases \code{i} repeatedly, so we have
-to remember that \code{i} can be anything from $\{6,12,24,\dots\}$ there. To
-be able to decide if a variable is positive or negative when analyzing the
-program concretely, we would need infinite time and memory to store all
-possible values from all possible runs. Nonetheless, if we only remember
-abstract information such as ``this number is positive/negative'', and define
-how arithmetic operations behave on those, we need to store only a
-single value.
-
-\begin{figure}[tb]
-\begin{align*}
-\alpha(x) & =
-  \begin{cases}
-  \ominus & x < 0 \\
-  \oplus & \text{otherwise}
-  \end{cases} \\
-\gamma(x) & =
-  \begin{cases}
-  \mathbb{Z}_0^+ & x = \oplus \\
-  \mathbb{Z}^-   & \text{otherwise}
-  \end{cases} \\
-\end{align*}
-\caption{Abstraction and concretization functions defined for
-positive/negative analysis.}
-\label{fig:ai_alpha_omega}
-\end{figure}
-
-\begin{figure}[tb]
-\begin{center}
-    \begin{tikzpicture}[circle, thick, <-, >=stealth', minimum size=2mm, inner sep=0pt]
+    \begin{tikzpicture}[circle, <-, >=stealth', minimum size=2mm, inner sep=0pt]
       \node [fill=black] (A0) {};
       \node [fill=black, right=4cm of A0] (A1) {}
         edge node [label=above:$F_a$] {} (A0);
@@ -362,193 +395,31 @@ positive/negative analysis.}
         edge node [label=above:$F_c$] {} (C0);
       \node [fill=black, above=10mm of C1] (A2) {}
         edge node [label=right:$\alpha$] {} (C1);
-      \node [rotate=65,below=5mm of A1,yshift=5.5mm] {$\leq_a$ };
+      \node [rotate=65,below=5mm of A1,yshift=5.5mm] {$\leq$ };
     \end{tikzpicture}
 \end{center}
 \caption{Computation of abstract transform function.}
-\label{fig:ai_square}
+\label{fig:state_ai_square}
 \end{figure}
 
-To work with the abstract values, we define two functions: \emph{abstraction}
-denoted $\alpha$ and \emph{concretization} denoted $\gamma$, both accepting
-one parameter.  $\alpha$ returns an abstract value corresponding to the
-concrete value on input and $\gamma$ does the opposite.  In
-Figure~\ref{fig:ai_alpha_omega}, we provide a definition of the two functions
-to work for our positive/negative analysis, where $\oplus$ is used to denote
-the positive abstract value and $\ominus$ for negative. Further, the same as
-for the data-flow analysis, during the abstract interpretation, we compute a
-fixed point. The fixed point is computed to stabilise the abstract values at
-each statement and often it starts with values set to $\bot$. The values are
-changed by a transform function that changes the state according to the effect
-of a statement. We have two possibilities to define the transform function as
-can be seen in Figure~\ref{fig:ai_square}. We can simply define a transform
-function for abstract values $F_a$ to obtain a new abstract state
-corresponding to the effect of a statement applied to the original state. The
-other option for more complex statements, is to first jump back to the
-concrete values, perform the transformation on the concrete values using a
-concrete transform function $F_c$ and switch back to the abstract values.
-$F_a$ is then defined as $F_a = \alpha \circ F_c \circ \gamma$. Per definition
-(\cite{cousot}), the resulting abstract value must be less than or equal to
-the one computed by a direct $F_a$.
-
-\begin{table}[tb]
-\begin{center}
-\begin{tabular}{|c||c|c|}\hline
-$\ast$    & $\ominus$ & $\oplus$  \\ \hline \hline
-$\ominus$ & $\oplus$  & $\ominus$ \\ \hline
-$\oplus$  & $\ominus$ & $\oplus$  \\ \hline
-\end{tabular}
-%\begin{tabular}{|c||c|c|}\hline
-%$+$       & $\ominus$ & $\oplus$ \\ \hline \hline
-%$\ominus$ & $\ominus$ & $\top$   \\ \hline
-%$\oplus$  & $\top$    & $\oplus$ \\ \hline
-%\end{tabular}
-\end{center}
-  \caption{Behaviour of arithmetic multiplication in the abstract
-  transformation function on negative ($\ominus$) and positive ($\oplus$)
-  abstract values.}
-  \label{tab:ai_multiplication}
-\end{table}
-
-We know how to define the arithmetic multiplication in this case precisely on
-the abstract level as is shown in Table~\ref{tab:ai_multiplication}. With
-these definitions, we can continue interpreting our example of
-Figure~\ref{fig:lst_ai_intro}. The first set to \code{i} happens on
-line~\ref{lst:ai_intro_set1}. There, \code{3} is abstracted as $\oplus$, so
-\code{i} is set to $\oplus$ there too.  Another set happens on
-line~\ref{lst:ai_intro_set2} where we multiply \code{i} by \code{2}. \code{2}
-is abstracted as $\oplus$ and since we know \code{i} is $\oplus$ at this
-point, the multiplication results, according to
-Table~\ref{tab:ai_multiplication} in \code{i} being still $\oplus$. Note that
-for this simple analysis, the only values we need to remember are one of
-$\ominus$, $\oplus$, or possibly \textit{unset} in case no store was processed
-yet. \textit{unset} is mostly referred to as $\bot$. Further, if the body of
-the loop is changed to be \code{i *= -2}, what would be the abstract value of
-\code{i} after joining $\oplus$ from odd iterations with $\ominus$ from even
-iterations? The same as in the data-flow analysis case, we have a kind of join
-operator which can in this case say \code{i} is \textit{unknown}. Note that
-\textit{unknown} is usually referred to as $\top$.  So in fact, when we are
-computing a real abstract interpretation of a program, the behaviour tables
-(Table~\ref{tab:ai_multiplication}) are extended to contain also $\bot$ and
-$\top$. Obviously, multiplication of $\bot$ and any other value $x$ from the
-table results in $x$ as the first initialization happened. For $\top$, the
-join operator usually returns $\top$ for two reasons. First, the
-transformation function shall be monotone (\cite{cousot} and \cite[p.
-348--349]{kleene}). Second, hopping from \textit{unknown} back to some of the
-``known'' values would break soundness of the analysis.
-
-\begin{table}[tb]
-\begin{center}
-\begin{tabular}{|l|c|c|c|c|} \hline
-\diagbox{Code}{Iteration}
-                  & 0      & 1         & 2        & 3 \\ \hline
-\code{i = 3;}     & $\bot$ & $\oplus$  & $\oplus$ & $\oplus$    \\ \hline
-\code{while (x)}  & $\bot$ & $\oplus$  & $\top$   & $\top$      \\ \hline
-~~\code{i *= -2;} & $\bot$ & $\ominus$ & $\top$   & $\top$      \\ \hline
-\code{return i;}  & $\bot$ & $\top$    & $\top$   & $\top$      \\ \hline
-\end{tabular}
-\end{center}
-\caption{Computation of the abstract interpretation on an example from
-Figure~\ref{fig:lst_ai_intro} for variable \code{i}.}
-\label{tab:ai_computation}
-\end{table}
-
-Now, let us demonstrate the interpretation of the code of
-Figure~\ref{fig:lst_ai_intro} with the modified while-loop body which
-multiplies \code{i} by \code{-2}. The computation of a fixed point is depicted
-in Table~\ref{tab:ai_computation} as it goes over time until a fixed point is
-reached in the third iteration. We see that the result is rather imprecise, we
-cannot make any assumption about \code{i} when it is returned from the
-function. The abstraction was apparently too coarse and the interpretation
-does not help much.
-
-We are still missing a formalism to represent the values and design a monotone
-function over the values effectively.  In the abstract interpretation this is
-solved by using complete lattices~\cite{lattice1,lattice2}. They are used to
-represent both concrete and abstract values and they give us the possibility
-to use them as a basis effectively. Thanks to work presented
-in~\cite{tarski}, we can compute fixed points of monotone functions working on
-lattices. Further, lattice operators can be used when we are interpreting a
-program.  For example, when a branching occurs, the join operator needed when
-joining the branches simply takes the values present on the outputs of both
-branches and performs lattice join ($\sqcup$) of the values in that lattice.
-Since an abstract interpretation works on two complete lattices, one for
-concrete, one for abstract values, $\alpha$ and $\gamma$ are used to move from
-one to the other.  Now, let us formally define a complete lattice and show
-some examples of lattices.
-
-\begin{dfn}[Complete lattice]
-A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
-a partially ordered set $(L,\, \leq)$ where every set $X \subseteq L$ has a
-least upper bound (supremum) $\sqcup X$ and a greatest lower bound (infimum)
-$\sqcap X$. Namely, $L$ has a least element $\bot = \sqcup \emptyset$ and a
-greatest element $\top = \sqcap L$.
-\end{dfn}
-
+Now consider two lattices in Figures~\ref{fig:state_lat_concrete}
+and~\ref{fig:state_lat_int}.
 \begin{figure}[tb]
 \begin{center}
-\begin{tabular}{cc}
-  \begin{tikzpicture}
-    \node (TOP) {$\top$};
-    \node [below right=of TOP] (PLUS) {$\oplus$}
-      edge node {} (TOP);
-    \node [below left=of TOP] (MINUS) {$\ominus$}
-      edge node {} (TOP);
-    \node [below right=of MINUS] (BOT) {$\bot$}
-      edge node {} (PLUS)
-      edge node {} (MINUS);
-  \end{tikzpicture} &
-  \begin{tikzpicture}
-    \node (TOP) {$\top$};
-    \node [below right=of TOP] (PLUS) {$\oplus$}
-      edge node {} (TOP);
-    \node [below=of TOP] (ZERO) {$0$}
-      edge node {} (TOP);
-    \node [below left=of TOP] (MINUS) {$\ominus$}
-      edge node {} (TOP);
-    \node [below=of ZERO] (BOT) {$\bot$}
-      edge node {} (PLUS)
-      edge node {} (ZERO)
-      edge node {} (MINUS);
-  \end{tikzpicture} \\
-  (a) & (b)
-\end{tabular}
-\end{center}
-\label{fig:posneg}
-\caption{Positive/negative lattice (a) without zero, and (b) with zero.}
-\end{figure}
-
-We were working so far with a positive/negative analysis. To represent values
-in that abstraction as a complete lattice, we naturally define the lattice as
-follows.  $\oplus$ is incomparable to $\ominus$ as switching from one to the
-other would be pointless in our case when joining branches.  $\bot$ is less
-than both since we start with \textit{unset} values and want to go upper in
-the lattice when any of the abstract values is set.  Finally, $\top$ is
-greater than both to catch the case of \textit{unknown} when branches bring
-different values.  A Hasse diagram for such a lattice is the one of
-Figure~\ref{fig:posneg}~(a). We may want a more precise abstraction
-represented by the lattice in Figure~\ref{fig:posneg}~(b).  There, we also
-remember whether the value of a variable is 0.  This can become useful if we
-have a multiplication or division in the code.  For multiplication, we can
-propagate the zero constant, for division, we can tell whether we are dividing
-by zero for example.  Extending $(\alpha, \gamma)$ from the previous example
-is straightforward in this case.
-
-\begin{figure}[tb]
-\begin{center}
-  \begin{tikzpicture}
+  \tikzstyle{invisible} = [minimum size=12mm]
+  \begin{tikzpicture}[sibling distance=12mm]
     \node {$\top$}
-      child { node (N_1) {$\cdots$} }
       child { node (N_2) {$-3$} }
       child { node (N_3) {$-2$} }
       child { node (N_4) {$-1$} }
       child { node (ZERO) {$0$} }
       child { node (N_5) {$1$} }
       child { node (N_6) {$2$} }
-      child { node (N_7) {$3$} }
-      child { node (N_8) {$\cdots$} };
+      child { node (N_7) {$3$} };
+    \node [invisible,left=of N_2] (N_1) {};
+    \node [invisible,right=of N_7] (N_8) {};
     \node [below=of ZERO] {$\bot$}
-      edge node {} (N_1)
+      edge[dashed] node {} (N_1)
       edge node {} (N_2)
       edge node {} (N_3)
       edge node {} (N_4)
@@ -556,93 +427,124 @@ is straightforward in this case.
       edge node {} (N_5)
       edge node {} (N_6)
       edge node {} (N_7)
-      edge node {} (N_8);
+      edge[dashed] node {} (N_8);
   \end{tikzpicture}
 \end{center}
-\label{fig:lat_concrete}
+\label{fig:state_lat_concrete}
 \caption{Lattice for a single concrete value.}
 \end{figure}
-
 \begin{figure}[tb]
 \begin{center}
+  \tikzstyle{invisible} = [minimum size=6mm]
   \begin{tikzpicture}
-    \node (TOP) {$\top$};
-    \node [below=5mm of TOP] (DOTS) {$\cdots$}
-      edge node {} (TOP);
-    \node [below=5mm of DOTS,label=left:{$\cdots$},label=right:{$\cdots$}] (N_3) {$\{-1,0,1\}$}
-      edge node {} (DOTS);
-    \node [below=of N_3] (N_2B) {$\{-1,1\}$}
-      edge node {} (N_3);
-    \node [left=of N_2B,label=left:{$\cdots$}] (N_2A) {$\{-1,0\}$}
-      edge node {} (N_3);
-    \node [right=of N_2B,label=right:{$\cdots$}] (N_2C) {$\{0,1\}$}
-      edge node {} (N_3);
-    \node [below=of N_2A,label=left:{$\cdots$}] (N_1A) {$\{-1\}$}
+    \node[invisible] (N_6X) at (-1,0) {};
+    \node[invisible] (N_6Y) at (1,0) {};
+
+    \node (N_5) at (0,-1) {$[-2,2]$}
+      edge[dashed] node {} (N_6X)
+      edge[dashed] node {} (N_6Y);
+
+    \node[invisible] (N_5X) at (-2,-1) {};
+    \node[invisible] (N_5Y) at (2,-1) {};
+
+    \node (N_4A) at (-1,-2) {$[-2,1]$}
+      edge node {} (N_5)
+      edge[dashed] node {} (N_5X);
+    \node (N_4B) at (1,-2) {$[-1,2]$}
+      edge node {} (N_5)
+      edge[dashed] node {} (N_5Y);
+
+    \node[invisible] (N_4X) at (-3,-2) {};
+    \node[invisible] (N_4Y) at (3,-2) {};
+
+    \node (N_3A) at (-2,-3) {$[-2,0]$}
+      edge node {} (N_4A)
+      edge[dashed] node {} (N_4X);
+    \node (N_3B) at (0,-3) {$[-1,1]$}
+      edge node {} (N_4A)
+      edge node {} (N_4B);
+    \node (N_3C) at (2,-3) {$[0,2]$}
+      edge node {} (N_4B)
+      edge[dashed] node {} (N_4Y);
+
+    \node[invisible] (N_3X) at (-4,-3) {};
+    \node[invisible] (N_3Y) at (4,-3) {};
+
+    \node (N_2A) at (-3,-4) {$[-2,-1]$}
+      edge node {} (N_3A)
+      edge[dashed] node {} (N_3X);
+    \node (N_2B) at (-1,-4) {$[-1,0]$}
+      edge node {} (N_3A)
+      edge node {} (N_3B);
+    \node (N_2C) at (1,-4) {$[0,1]$}
+      edge node {} (N_3B)
+      edge node {} (N_3C);
+    \node (N_2D) at (3,-4) {$[1,2]$}
+      edge node {} (N_3C)
+      edge[dashed] node {} (N_3Y);
+
+    \node[invisible] (N_2X) at (-5,-4) {};
+    \node[invisible] (N_2Y) at (5,-4) {};
+
+    \node (N_1A) at (-4,-5) {$[-2,-2]$}
+      edge node {} (N_2A)
+      edge[dashed] node {} (N_2X);
+    \node (N_1B) at (-2,-5) {$[-1,1]$}
       edge node {} (N_2A)
       edge node {} (N_2B);
-    \node [below=of N_2B] (N_1B) {$\{0\}$}
-      edge node {} (N_2A)
-      edge node {} (N_2C);
-    \node [below=of N_2C,label=right:{$\cdots$}] (N_1C) {$\{1\}$}
+    \node (N_1C) at (0,-5) {$[0,0]$}
       edge node {} (N_2B)
       edge node {} (N_2C);
-    \node [left=of N_1A] (N_1X) {};
-    \node [right=of N_1C] (N_1Y) {};
-    \node [below=of N_1B] (BOT) {$\bot$}
+    \node (N_1D) at (2,-5) {$[1,1]$}
+      edge node {} (N_2C)
+      edge node {} (N_2D);
+    \node (N_1E) at (4,-5) {$[2,2]$}
+      edge node {} (N_2D)
+      edge[dashed] node {} (N_2Y);
+
+    \node [invisible,left=of N_1A] (N_1X) {};
+    \node [invisible,right=of N_1E] (N_1Y) {};
+
+    \node (BOT) at (0,-7) {$\bot$}
+      edge[dashed] node {} (N_1X)
       edge node {} (N_1A)
       edge node {} (N_1B)
-      edge node {} (N_1C);
+      edge node {} (N_1C)
+      edge node {} (N_1D)
+      edge node {} (N_1E)
+      edge[dashed] node {} (N_1Y);
   \end{tikzpicture}
 \end{center}
-\label{fig:lat_concrete_set}
-\caption{Lattice for a set of concrete values.}
+\label{fig:state_lat_int}
+\caption{Lattice for intervals.}
 \end{figure}
+Both are used for abstracting numbers in programs. One is capable to remember
+only a single value of a variable and is therefore useful for analyses like
+constant propagation~\cite[Chapter 9.4]{dragon}. The other lattice uses
+intervals to remember possible bounds of some variable's value.  This is very
+useful domain especially when analyzing bounded loops. When indices, and
+probably other variables in the body of the loop are bounded, we can run some
+optimizations like loop unrolling~\cite[page 735]{dragon}.
 
-We were also working with concrete ``abstraction'' at the beginning of this
-section. First, let us have a look at a lattice of an abstraction where we
-remember only a single value of a variable. This is useful for analyses like
-constant propagation as we can propagate only a single value. Such a lattice
-is depicted in Figure~\ref{fig:lat_concrete}.  Naturally, joining branches
-where values are different gives \textit{unknown}.  However, our concrete
-interpretation was computing with all possibles sets of values. We need to
-augment the above lattice to a power set $\mathcal{P}(\mathbb{Z})$ using a set
-inclusion as the order. The complete lattice is defined as
-$(\mathcal{P}(\mathbb{Z}),\, \subseteq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$,
-where $\bot=\emptyset$, $\top=\mathbb{Z}$, $\sqcup=\cup$, and $\sqcap=\cap$. A
-part of a Hasse diagram is demonstrated in Figure~\ref{fig:lat_concrete_set}.
-
-There is a difference to be spotted between these two. Although they both
-contain an infinite number of elements, the latter lattice has infinite
-height. This is exactly the source of the need of infinite time and memory for
-this interpretation when analyzing particular programs with loops. The
-Kleene's sequence is not necessarily finite there, so the computation of a
-fixed point may not finish. There is a mechanism suggested in~\cite{cousot} to
-overcome the problem. It is a \emph{widening} operator $\triangledown: L_a
-\times L_a \rightarrow L_a$ defined such that:
-\begin{itemize}
-\item $\forall x,y \in L_a,\, x \leq_a x \triangledown y$ and $y \leq_a x
-\triangledown y$, and
-\item the sequence $x_0 = \bot$, $x_1 = F_a(x_0)$, \dots, $x_{n+1}=x_n
-\triangledown y_n$ for some $y_n \in L_a$ is not strictly increasing.
-\end{itemize}
-That informally means, that the sequence is sped up by widening, so that it
-converges eventually. For the example with powerset lattice, we can define the
-widening operator to limit the number of iteration to some constant and wide
-the set to $\top$ if it reaches the limit. The opposite of the widening
-operator is \emph{narrowing} operator $\vartriangle: L_a \times L_a
-\rightarrow L_a$ and is defined similarly as:
-\begin{itemize}
-\item $\forall x,y \in L_a,\, x \leq_a y \Rightarrow x \leq_a x \vartriangle y
-\leq_a y$, and
-\item the sequence $x_0 = \bot$, $x_1 = x_0 \vartriangle y_0$, \dots,
-$x_{n+1}=x_n \vartriangle y_n$ for some $y_0,\dots,y_n \in L_a$ is not
-strictly decreasing.
-\end{itemize}
-Narrowing can help to make the abstract values more precise. When our widening
-operator returned $\top$, we can narrow it back to some abstract value which
-we know will never cause an increase. This is not so conceivable for number
-interpretation, but see~\cite{ai_widening, cousot_galois} where the operators
-are demonstrated on intervals and described in more detail.
+There is a difference to be spotted between these two lattices. Although they
+both contain an infinite number of elements (in theory), the latter lattice
+has infinite height.  The Kleene's sequence is not necessarily finite there,
+so the computation of a fixed point may not finish. There is a mechanism
+suggested by Cousots~\cite{cousot} to overcome the problem. It is a
+\emph{widening} operator $\triangledown$. Informally, the sequence is sped up
+by widening, so that it converges eventually.  Imagine we have an intervals
+lattice and an infinite loop where we increment a variable that was initially
+set to zero. The infinite sequence of intervals computed for that variable
+would be: $[0, 0],\, [0,1],\, \dots,\, [0,\infty]$. We can define the widening
+operator to set one of the interval bounds to infinity after some time to
+force the sequence finite: $[0, 0],\, [0,1],\, [0,\infty]$. The opposite of
+the widening operator is a \emph{narrowing} operator $\vartriangle$. The
+narrowing can help to make the abstract values more precise. When our widening
+operator put an $\infty$ in an interval, we can narrow it back to some
+abstract value which we know will never cause an increase. This is of course
+not possible for our simple loop, but the reader is pointed to Cortesi and
+Zanioli~\cite{ai_widening} or Cousots~\cite{cousot_galois} who demonstrate
+widening and narrowing on more concise examples.
 
 Intervals are not the only shapes to represent abstract values of numbers.
 Octagons, elipses, polyhedra and other shapes are used too~\cite{ai_octagons,
@@ -650,24 +552,22 @@ ai_polyhedra, astree}. Several abstractions can be also combined to
 communicate with each other and improve thus accuracy or any other aspect of
 the analysis~\cite{ai_product, astree, clousot}. Strings~\cite{ai_strings1,
 ai_strings2} and foating point numbers~\cite{ai_float1} can be abstracted
-too.  Further reading on the abstract interpretation is
-in~\cite{cousot_progress}, where is described the progress in the area of the
+too.  Further reading on the abstract interpretation is in an
+overview~\cite{cousot_progress}, where is the progress in the area of the
 abstract interpretation over 25 years. A not so usual use of the abstract
-interpretation can be found in~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.
-
-\paragraph*{Tools}
+interpretation can be found too~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.
 Engler et al.\ brought the abstract interpretation to the attention in 2000 by
 a technique based on meta compilation~\cite{metacomp}. There, program
 developers specify properties of the checked system in \textsc{Metal}
 language~\cite{metal}, compile it into an internal representation and the tool
 applies the specification on all executable paths in a particular function.
-Violation of the specification on a path is then reported as an error. The
-compiler used for \textsc{Metal} compilation is a modified GNU C compiler
-(\textsc{gcc}) 3.1.1 called \textsc{xgcc}. It redefines \textsc{gcc}'s
-internal code representation, data types and applies the analysis on a such
-modified structure. Programming languages supported by \textsc{xgcc} are C and
-C++. On the similar base is built \stan~\cite{stanse} which is written in
-Java and have only a parser for C.
+Violation of the specification on a path is then reported as an error.  On the
+similar base is built \stan~\cite{stanse} which is discussed in
+Chapter~\ref{sec:stanse}.
+
+
+
+
 
 \section{Symbolic Execution}\label{sec:se}
 In the previous section we described the abstract interpretation which is a
@@ -748,24 +648,26 @@ There are three possibilities that can happen:
 execution by jumping directly to the \emph{true} branch.
 \item[Implication \ref{equ:se_se} is valid] The executor simply continues
 execution by jumping directly to the \emph{false} branch.
-\item[Neither is valid] This means the executor has no concrete idea about the
-values to prove validity. So to retain soundness, it has to fork the execution
+\item[Neither is valid] This means that both branches are possible, depending
+on the symbolic input.  So to retain soundness, it has to fork the execution
 of the whole program to explore both branches. In that case, the path
 condition $\varphi$ has to be augmented in the respective branches. For the
-true branch, $\varphi \wedge \sym{a} = 0x12345678$ is a new path condition,
-for the other branch $\varphi \wedge \sym{a} \neq 0x12345678$.
+true branch, $\varphi \wedge \sym{a} = \var{0x12345678}$ is a new path
+condition, for the other branch $\varphi \wedge \sym{a} \neq
+\var{0x12345678}$.
 \end{description}
 In our example, on line~\ref{line:se_ex_if1} neither implication is valid, as
-$\theta(a)=\sym{a}$ which cannot prove validity of $\theta(a) = 0x12345678$.
-The situation is different on line~\ref{line:se_ex_if2} nonetheless. There, we
-can get into two states, by the two previous forked executions. In one, the
-path condition contains $\theta(a) = 0x12345678$ and symbolic memory is
-holding \code{1} for \code{b}. In the other $\theta(a) \neq 0x12345678$ and
-$\theta(b) = 0$. From the first one, the executor can induce
-Implication~\ref{equ:se_fi}, so it continues by jumping into the true branch.
-And since $\theta(b) = 1$, no division by zero can happen. Similarly for the
-second fork: the executor jumps to the false branch of the \code{if}, i.e.~it
-skips the \code{if} completely.
+$\theta(a)=\sym{a}$ which cannot prove validity of $\theta(a) =
+\var{0x12345678}$.  The situation is different on line~\ref{line:se_ex_if2}
+nonetheless. There, we can get into two states, by the two previous forked
+executions. In one, the path condition contains $\theta(\var{a}) =
+\var{0x12345678}$ and symbolic memory is holding \code{1} for \code{b}. In the
+other $\theta(\var{a}) \neq \var{0x12345678}$ and $\theta(\var{b}) = 0$. From
+the first one, the executor can induce Implication~\ref{equ:se_fi}, so it
+continues by jumping into the true branch.  And since $\theta(\var{b}) = 1$,
+no division by zero can happen.  Similarly for the second fork: the executor
+jumps to the false branch of the \code{if}, i.e.~it skips the \code{if}
+completely.
 
 \begin{figure}[htb]
 \begin{center}
