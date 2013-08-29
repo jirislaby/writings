@@ -94,85 +94,108 @@ information about possible values of variables at specified points in code. We
 usually analyze each program line separately to see what are the effects of
 the line and then put this information to a transfer equation of what holds
 before and after the execution of the line. Next, we stabilize this set of of
-equations, usually by computing a fixed point of the equations. Such computed
-analysis can be utilized for various code optimizations or code analysis.
+equations, usually by computing the least fixed point of the equations. Such
+computed analysis can be utilized for various code optimizations or code
+analysis.
 
 Let us demonstrate data-flow analysis on an example and then generalize that
 approach. We chose one of the basic data-flow analyses: \emph{reaching
 definitions}~\cite[Section 9.2.4]{dragon}. At some point $p$ in code, we are
 interested in all assignments where some variable $\var{a}$ was set and was
-not re-set during the control flow to point $p$. This lets us reason about
-many questions like whether a variable was set already at the point it is used
-or if we should report an uninitialized access. We will show the analysis on
-the code of Figure~\ref{fig:state_df_code}.
-\begin{figure}[htb]
+not re-set during the control flow to the point $p$. This lets us reason about
+many questions like whether a variable was set already before it is used or if
+we should report an uninitialized access. We will show the analysis on the
+code which is in the first column of Table~\ref{tab:state_df_comp}.
+Intuitively, the reaching definition set on line~\ref{lst:reach_use} is a set
+of three labels $\{\ref{lst:reach_def1}, \ref{lst:reach_def2},
+\ref{lst:reach_use} \}$, where we define \code{a} and \code{b}. Note that
+line~\ref{lst:reach_def0} does not belong there because \code{a} was re-set
+later on both paths to line~\ref{lst:reach_use}.
+
+Now we derive the information algorithmically using the data-flow analysis by
+constructing the equations and computing their fixed point. We can simply hold
+the reaching definitions in the transform equations.  That is, initially at
+the beginning of a function, the first equation holds an empty set. Then the
+equation is gradually transformed according to statements and the definitions
+filled in. Since we need to propagate information about definitions, the
+transform equation mangles the contents coming from predecessors only on
+assignment statements.  Other equations simply copy data from predecessors.
+On assignments, the equation takes the set of statements from the
+predecessors, removes all statements that set the same variable and adds
+itself. If there are more predecessors, we use set union as we want to know
+definitions from both branches. The transform equations for the example are
+shown in the third column of Table~\ref{tab:state_df_comp}.
+\begin{table}[htb]
 \begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}
+\begin{tabular}{|r|l||p{0.2em}lp{0.3em}rp{0.3em}r||p{0.2em}l|} \hline
+\textbf{\#} &
+  \multicolumn{1}{c||}{\textbf{Code}} &
+  \multicolumn{6}{c||}{\textbf{Transform Equations}} &
+  \multicolumn{2}{c|}{\textbf{Fixed Point}} \\ \hline\hline
+&& $f_0$ & $= \emptyset$ &&&&& $f_0$ & $= \emptyset$ \\ \hline
+
+1 & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
 a = 1; (*@ \label{lst:reach_def0} @*)
+\end{lstlisting} } &
+$f_1$ & $= \{1\}$ & $\cup$ & $(f_0$ & $\setminus$ & $\{1,3,5\})$ &
+$f_1$ & $= \{1\}$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
 if (x)
-  a = 3; (*@ \label{lst:reach_def1} @*)
+\end{lstlisting} } &
+$f_2$ & $= \emptyset$ & $\cup$ & $(f_1$ & $\setminus$ & $\emptyset)$ &
+$f_2$ & $=\{1\}$ \\ \hline
+
+\thelstnumber &
+{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+  a = 3;(*@ \label{lst:reach_def1} @*)
+\end{lstlisting} } &
+$f_3$ & $= \{3\}$ & $\cup$ & $(f_2$ & $\setminus$ & $\{1,3,5\})$ &
+$f_3$ & $= \{3\}$ \\ \hline
+
+\thelstnumber &
+{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
 else
-  a = 4; (*@ \label{lst:reach_def2} @*)
+\end{lstlisting} } &
+$f_4$ & $= \emptyset$ & $\cup$ & $(f_1$ & $\setminus$ & $\emptyset)$ &
+$f_4$ & $= \{1\}$ \\ \hline
+
+\thelstnumber &
+{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
+  a = 4;(*@ \label{lst:reach_def2} @*)
+\end{lstlisting} } &
+$f_5$ & $= \{5\}$ & $\cup$ & $(f_2$ & $\setminus$ & $\{1,3,5\})$ &
+$f_5$ & $= \{5\}$ \\ \hline
+
+\thelstnumber &
+{\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
 b = a; (*@ \label{lst:reach_use} @*)
-\end{lstlisting}
+\end{lstlisting} } &
+$f_6$ & $= \{6\}$ & $\cup$ & $(f_3 \cup f_5$ & $\setminus$ & $\{6\})$ &
+$f_6$ & $= \{3,5,6\}$ \\ \hline
 \end{tabular}
 \end{center}
-    \caption{Data-flow analysis code example.}
-  \label{fig:state_df_code}
-\end{figure}
-In sum, the reaching definition set at line~\ref{lst:reach_use} is a set of
-the two labels $\{\ref{lst:reach_def1}, \ref{lst:reach_def2} \}$, where we
-define \code{a}. Note that line~\ref{lst:reach_def0} does not belong there
-because \code{a} was re-set later on all paths to line~\ref{lst:reach_use}.
-Now we will derive the information algorithmically using data-flow analysis by
-constructing the equations and computing their fixed point. Since we want to
-know all locations in code where a variable is set, the transform
-function will store a set of locations from where some variable are set and
-the set propagates to the point of the transform function. Since we need to
-propagate information about set variables, the transform function will change
-states only on assignment statements. And in a way that it takes the set of
-statements from the previous statement(s), removes all statements that set the
-same variable and adds itself.
-\begin{figure}[htb]
-\begin{alignat*}{6}
-&\text{\code{a = 1;}}&
-  f_1 & = \{1\}     & \,\cup\, && (\emptyset&&\,\setminus\,&& \{1,3,5\}) \\
-&\text{\code{if (x)}}   &
-  f_2 & = \emptyset & \,\cup\, && (f_1      &&\,\setminus\,&& \emptyset) \\
-&\text{~~\code{a = 3;}}\quad\quad &
-  f_3 & = \{3\}     & \,\cup\, && (f_2      &&\,\setminus\,&& \{1,3,5\}) \\
-&\text{\code{else}} &
-  f_4 & = \emptyset & \,\cup\, && (f_3      &&\,\setminus\,&& \emptyset) \\
-&\text{~~\code{a = 4;}} &
-  f_5 & = \{5\}     & \,\cup\, && (f_2      &&\,\setminus\,&& \{1,3,5\}) \\
-&\text{\code{b = a;}} &
-  f_6 & = \{6\}     & \,\cup\, &\,& (f_3 \cup f_5 &&\,\setminus\,&& \{6\}) \\
-\end{alignat*}
-  \caption{X}
-  \label{fig:state_df_comp}
-\end{figure}
+  \caption{Reaching definitions data-flow analysis example.}
+  \label{tab:state_df_comp}
+\end{table}
+$f_s$ is a transform equation for a statement $s$. The equation is in the form
+of $f_s = gen_s \cup (pred_s \setminus kill_s)$. $gen_s$ is a set $\{s\}$ that
+\emph{generates} $s$ if it is an assignment, otherwise $gen_s$ is empty.
+$pred_s$ is an union of $f_{s-1}$ for each predecessor $s-1$.  Finally, if $s$
+is an assignment $\var{x}=\var{y}$, $kill_s$ is a set that \emph{kills} other
+assignments to \code{x}. Otherwise $kill_s$ is empty. Establishing a fixed
+point as defined in Definition~\ref{def:fixpoint} is obvious for these
+particular equations because there is no loop. The result is shown in the last
+column of Table~\ref{tab:state_df_comp}.
 
-
-
-XXXX
-
-
-
-
-
-
-
-
-
-\begin{dfn}[Fixed point]
+\begin{dfn}[Fixed point]\label{def:fixpoint}
 A \emph{fixed point} of a function $f : D \rightarrow D$ is an element $x \in
 D$ such that $f(x) = x$. The set $fp(f)$ of fixed points of $f$ is $\{x \in D
 \mid f(x) = x \}$.
 \end{dfn}
 
-In the data-flow analysis, we have a pair of equations for each statement $s$:
-
+More generally, in the data-flow analysis, we have a pair of equations for
+each statement $s$:
 \begin{equation} \label{eq:data_flow}
 \begin{aligned}
 out_s & = trans_s(in_s) \\
@@ -180,20 +203,19 @@ in_s & = join_{p\in pred_s}(out_p)
 \end{aligned}
 \end{equation}
 
-We define transfer function $trans$ to transform input set $in_s$ of a
+We define a transfer function $trans$ to transform input set $in_s$ of a
 statement $s$ to the output set $out_s$ according to the effect of $s$ in a
 particular analysis. The join operator $join$ takes output sets of all
-predecessors and combines it together. It is usually set intersection or
-union depending whether the analysis is to be may or must. And depending
-whether an analysis is forwards or backwards (cf.
-Section~\ref{sec:types_anal}), the $in$ set is bound to an incoming or
-outgoing control flow graph edge respectively. Vice versa for the $out$ set.
-These two sets are the result of the analysis before and after applying the
-effect of the statement.
-
-Formally, let us denote the set of statements as $S$. To compute reaching
-definitions we define join operator as set union ($\bigcup$) and the transfer
-function as follows:
+predecessors and combines it together. It is usually a set intersection or
+union depending whether the analysis is may or must (cf.\
+Section~\ref{sec:types_anal}). Further, whether an analysis is forwards
+or backwards (Section~\ref{sec:types_anal}), the $in$ set is bound to an
+incoming or outgoing control flow graph edge respectively. Analogously for the
+$out$ set.  These two sets are the result of the analysis before and after
+applying the effect of the statement. For the reaching definitions example
+above, we define join operator as a set union ($\bigcup$) and the transfer
+function in this notation to hold statement line numbers as follows ($S$ is
+the set of all statements in the analysed program):
 \begin{align*}
 trans_s(in) & = gen_s \cup (in - kill_s) \\
 gen_s & =
@@ -203,86 +225,62 @@ gen_s & =
 \end{cases} \\
 kill_s & =
 \begin{cases}
-\{x \in S \mid \text{$x$ is $a = b$} \wedge x \neq s \} & \text{$s$ is an
-assignment $a = c$} \\
+\{x \in S \mid x \text{ assigns to \code{a}} \} & s \text{ assigns to
+\code{a}} \\
 \emptyset & \text{otherwise}
 \end{cases} \\
 \end{align*}
-In other words we generate a statement when a variable is set there and we
-kill all other assignment statements which set the very same variable at any
-other point.  Finally, we compute a fixpoint of the
-equations~\ref{eq:data_flow} to have reaching definitions on each entry and
-exit of a statement ($in_s$, $out_s$).
 
-\begin{figure}[tb]
+\begin{table}[htb]
 \begin{center}
-\begin{tabular}{c}
-\begin{tabular}{|c|c|c|} \hline
-         &      May    & Must        \\ \hline
-Forward  & Reaching    & Available   \\
-analysis & definitions & expressions \\ \hline
-Backward & Live        & Very busy   \\
-analysis & variables   & expressions \\ \hline
-\end{tabular} \\ (a) \\[2ex]
-
-\begin{tabular}{|l|c|c|c|c|c|c|} \hline
-Analysis        & M/M  & F/B & $join$    & R & $gen$          & $kill$ \\ \hline
-Reaching defs.  & May  & F   & $\bigcup$ & N & Set variables  & Other assigns \\
-\hline
-Available expr. & Must & F   & $\bigcap$ & N & Computed expr. & Other expr. \\
-\hline
-Live variables  & May  & B   & $\bigcup$ & Y & Used variables & Set
-variables \\ \hline
-Very busy expr. & Must & B   & $\bigcap$ & Y & None           & All expr. \\
-\hline
-\end{tabular} \\ (b)
+\begin{tabular}{|c||c|c|} \hline
+\textbf{Analysis}& \textbf{May}& \textbf{Must} \\ \hline\hline
+\multirow{2}{*}{\textbf{Forward}}
+  & Reaching    & Available     \\
+  & definitions & expressions \\ \hline
+\multirow{2}{*}{\textbf{Backward}}
+  & Live        & Very busy   \\
+  & variables   & expressions \\ \hline
 \end{tabular}
 \end{center}
     \caption{Examples of data-flow analyses according to may/must and
-    forward/backward rules: (a) split according to may/must and
-    backward/forward rules; (b) summarization of properties of the analyses.
-    F/B means forwards/backwards, S denotes whether $in$ and $out$ sets are
-    switched.}
-  \label{fig:data_flow_examples}
-\end{figure}
+    forward/backward rules.}
+  \label{tab:data_flow_examples}
+\end{table}
 
-In Figure~\ref{fig:data_flow_examples}, we show examples of basic analyses of
-a different kind and how they are (informally) defined. Note that in some
-analyses, the sets are not called $gen$ and $kill$, but the principle is the
-same. Also we can see the tight correspondence between may/must and $join$
-operator and between forwards/backwards and switching of $in$ and $out$ sets.
-This was only an introduction to the data-flow analysis. It is extensively
-used in optimizing compilers and in some static analyzers.  For further
-reading, use~\cite{dragon, muchnick}.
-
-\paragraph*{Tools}
-As we slightly mentioned in the introduction, compilers contain data-flow
-analysis and generate warnings or errors when they find some suspicious code.
-When compilers were still not so evolved, other analyzers were used to fulfill
-this role. One of the most known known data-flow analyzers at that time was
+For the simplicity nature of the data-flow analysis, there are many diverse
+data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest some
+examples of other well-known basic data-flow analyses as they are defined
+according to the forward/backward and may/must criteria. For curious readers,
+they are defined in every superior literature about compilers~\cite{dragon,
+muchnick}. Thanks to the simplicity, the data-flow analysis is also used in
+many tools including checkers.  The very common place of extensive use are
+compilers. Apart from generating code, they generate warnings or errors when
+some suspicious code is found. A good example is \clang~\cite{clang}. It is a
+C/C++ compiler from the \llvm toolkit~\cite{llvm} and contains also a static
+checker framework.  There are checkers for finding errors in memory handling,
+locking, or pointer operations. Nonetheless mostly the results are imprecise
+and contain many false reports.  \textsc{Cppcheck}~\cite{cppcheck} works on
+the same principles so it checks for very similar set of errors.  When
+compilers were still not so evolved, other data-flow analyzers were used to
+fulfill this role. One of the most known analyzers at that time was
 \textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
 zero, constant conditions which always evaluate either to true or false, or
-use of uninitialized variables. Later, \textsc{Lint} resulted in some clones
-like \textsc{LCLint}~\cite{lclint} which was later renamed to \textsc{Splint}.
-\textsc{LCLint} was augmented to catch errors like buffer overflows and it
-also manages to work with code annotations. So the users can enable more
-checks if they annotate the checked code, otherwise false positive rate is
-unbearable.  Nonetheless \textsc{Splint} is not developed for more than a
-decade due to obvious reasons: the most errors it reports are reported by
-modern compilers nowadays. There exist also analyzers that are not so powerful
-to handle large code bases or require high user intervention to annotate the
-checked code. As an example we give \textsc{Aspect}~\cite{aspect} which
-compares a program specification of input-output behaviour provided by a user
-to data-flow models extracted from the code.
-
-\clang is a C/C++ compiler from the \llvm toolkit and contains also a static
-checker framework. There are also checkers that can find errors in memory
-handling, locking, or pointer operations. But mostly the results are imprecise
-and contain many false reports. \textsc{Cppcheck}~\cite{cppcheck} works on the
-same principles and so checks for very similar set of errors. It is a
-stand-alone project nonetheless. But plug-ins for several development
-environments are available, so developers can use while writing their code.
-
+use of uninitialized variables.  Later, \textsc{Lint} resulted in some clones
+like \textsc{LCLint}~\cite{lclint} which were augmented to catch errors like
+buffer overflows. \textsc{LCLint} was later renamed to \textsc{Splint}.  These
+tools mostly have a support for annotations so more speculative checks can be
+enabled. In that case, the code has to be heavily annotated, otherwise the
+false positive rate is unbearable.  Nonetheless \textsc{Splint} is not
+developed for more than a decade due to obvious reasons: the most errors it
+reports are reported by modern compilers nowadays.  There exist also analyzers
+that are not so powerful to handle large code bases or require high user
+intervention to annotate the checked code. As an example we give
+\textsc{Aspect}~\cite{aspect} which compares a program specification of
+input-output behaviour provided by a user to data-flow models extracted from
+the code. This was only a short introduction to the data-flow analysis, more
+information and many examples are available in the literature~\cite{dragon,
+muchnick}.
 
 
 
