@@ -550,44 +550,54 @@ Intervals are not the only shapes to represent abstract values of numbers.
 Octagons, elipses, polyhedra and other shapes are used too~\cite{ai_octagons,
 ai_polyhedra, astree}. Several abstractions can be also combined to
 communicate with each other and improve thus accuracy or any other aspect of
-the analysis~\cite{ai_product, astree, clousot}. Strings~\cite{ai_strings1,
-ai_strings2} and foating point numbers~\cite{ai_float1} can be abstracted
-too.  Further reading on the abstract interpretation is in an
-overview~\cite{cousot_progress}, where is the progress in the area of the
-abstract interpretation over 25 years. A not so usual use of the abstract
-interpretation can be found too~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.
-Engler et al.\ brought the abstract interpretation to the attention in 2000 by
-a technique based on meta compilation~\cite{metacomp}. There, program
-developers specify properties of the checked system in \textsc{Metal}
-language~\cite{metal}, compile it into an internal representation and the tool
-applies the specification on all executable paths in a particular function.
-Violation of the specification on a path is then reported as an error.  On the
-similar base is built \stan~\cite{stanse} which is discussed in
-Chapter~\ref{sec:stanse}.
+the analysis~\cite{ai_product}. This was utilized in tools like
+\textsc{Astree}~\cite{astree} and \textsc{Clousot}~\cite{clousot}.
+Strings~\cite{ai_strings1, ai_strings2} and foating point
+numbers~\cite{ai_float1} can be abstracted too.  Further reading on the
+abstract interpretation is in an overview~\cite{cousot_progress}, where is the
+progress in the area of the abstract interpretation over 25 years. A not so
+usual use of the abstract interpretation can be found too~\cite{ai_unusual1,
+ai_unusual2, ai_unusual3}.  Engler et al.\ brought the abstract interpretation
+to the attention in 2000 by a technique based on meta
+compilation~\cite{metacomp}. There, program developers specify properties of
+the checked system in \textsc{Metal} language~\cite{metal}, compile it into an
+internal representation and the tool applies the specification on all
+executable paths in a particular function.  Violation of the specification on
+a path is then reported as an error.  On the similar base is built
+\stan~\cite{stanse} which is discussed in Chapter~\ref{sec:stanse}. It is
+uncertain, whether some industrial tool adopts the abstract interpretation
+too, see the discussion in Section~\ref{sec:industrial}.
 
+The correctness and soundness (cf.\ Section~\ref{sec:theor_props}) of an
+analyzer based on the abstract interpretation is very prone to selection of
+the abstract domain. While many employed abstractions are sound (produce all
+possible errors), they are not so often complete (false positive rate is
+high). For example, this was demonstrated on several abstractions of numbers
+which we discussed above~\cite{ai_octagons}.
 
 
 
 
 \section{Symbolic Execution}\label{sec:se}
 In the previous section we described the abstract interpretation which is a
-framework for fast, but typically imprecise analyses. As a result we often
-get a pile of false positives on the output of an abstract analyzer. There
-also exist techniques which cannot formally generate false positives, but are
-often slower than abstract interpreters. One of such techniques is the
-\emph{symbolic execution}. The technique was introduced in 1970's and
-described by several authors concurrently~\cite{se_king, se_select,
-se_dissect, se_clarke}. The symbolic execution represents program inputs by
-symbols. Therefore it does not need to analyze the program many times with
-concrete, initialized, data. The program is then executed and program
-expressions are manipulated including the symbolic values. Let us demonstrate
-this on an example of Figure~\ref{fig:se_example}. The example is two-fold.
+framework for fast, but typically imprecise analyses. As a result of
+incomplete abstract analyzers, we often get a pile of false positives on their
+output.  There also exist techniques which cannot formally generate false
+positives, but are often slower than abstract interpreters or sometimes even
+unsound.  One of such techniques is the \emph{symbolic execution}. The
+technique was introduced in 1970's and described by several authors
+concurrently~\cite{se_king, se_select, se_dissect, se_clarke}. The symbolic
+execution represents program inputs by symbols. Therefore it does not need to
+analyze the program many times with concrete, initialized, data. The program
+is then executed and program expressions are manipulated including the
+symbolic values. Let us demonstrate this on an example of
+Figure~\ref{fig:se_example}. The example is two-fold.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
 \begin{lstlisting}
 int fun(void) {
-  int a = read(); (*@\label{line:se_ex_sset}@*)
+  int a = read() + 1; (*@\label{line:se_ex_sset}@*)
   int b = 0;
 
   if (a == 0x12345678) (*@\label{line:se_ex_if1}@*)
@@ -621,13 +631,15 @@ The symbolic execution tackles this problem. All inputs from the user are
 replaced by \emph{symbols}. For a variable \code{a}, we denote the symbol
 corresponding to \code{a} as $\sym{a}$. We allow symbols to be assigned to
 variables similar to constants and other expressions. In our example, the
-assignment on line~\ref{line:se_ex_sset} would become \code{a = }~$\sym{a}$.
+assignment on line~\ref{line:se_ex_sset} would set $\sym{a}+1$ to \code{a}.
 Obviously we have to teach the symbolic executor to deal with symbols in
-arithmetic operations and branching statements. In the first place, we need to
-have a storage. Symbolic executors contain a \emph{symbolic memory} $\theta$
-which assigns to each variable its current symbolic value. So after the
-line~\ref{line:se_ex_sset}, $\theta(\var{a}) = \sym{a}$. To be precise in
-execution of the code, the executor also has to remember the branches which it
+arithmetic operations and branching statements.  In the first place, the
+symbolic executor needs to remember the currently evaluated program location
+$l$ in a control flow graph.  Next, we need a storage. Symbolic executors
+contain a \emph{symbolic memory} $\theta$ which assigns to each variable its
+current symbolic value. So after evaluating the statement on
+line~\ref{line:se_ex_sset}, $\theta(\var{a}) = \sym{a}+1$. To be precise in
+the execution of code, the executor also has to remember the branches which it
 chose to jump to at branching points. This information is stored in a
 \emph{path condition} $\varphi$. It is a first-order formula~\cite{fol}
 representing a necessary and sufficient condition over symbols to drive the
@@ -649,26 +661,35 @@ execution by jumping directly to the \emph{true} branch.
 \item[Implication \ref{equ:se_se} is valid] The executor simply continues
 execution by jumping directly to the \emph{false} branch.
 \item[Neither is valid] This means that both branches are possible, depending
-on the symbolic input.  So to retain soundness, it has to fork the execution
-of the whole program to explore both branches. In that case, the path
-condition $\varphi$ has to be augmented in the respective branches. For the
-true branch, $\varphi \wedge \sym{a} = \var{0x12345678}$ is a new path
-condition, for the other branch $\varphi \wedge \sym{a} \neq
-\var{0x12345678}$.
+on the symbolic input.  So to retain soundness, the symbolic executor has to
+fork the execution of the whole program to explore both branches. In that
+case, the path condition $\varphi$ has to be augmented in the respective
+branches. For the true branch, $\varphi \wedge (\sym{a}+\var{1} =
+\var{0x12345678})$ is a new path condition, for the other branch $\varphi
+\wedge (\sym{a}+\var{1} \neq \var{0x12345678})$.
 \end{description}
 In our example, on line~\ref{line:se_ex_if1} neither implication is valid, as
-$\theta(a)=\sym{a}$ which cannot prove validity of $\theta(a) =
-\var{0x12345678}$.  The situation is different on line~\ref{line:se_ex_if2}
-nonetheless. There, we can get into two states, by the two previous forked
-executions. In one, the path condition contains $\theta(\var{a}) =
-\var{0x12345678}$ and symbolic memory is holding \code{1} for \code{b}. In the
-other $\theta(\var{a}) \neq \var{0x12345678}$ and $\theta(\var{b}) = 0$. From
-the first one, the executor can induce Implication~\ref{equ:se_fi}, so it
-continues by jumping into the true branch.  And since $\theta(\var{b}) = 1$,
-no division by zero can happen.  Similarly for the second fork: the executor
-jumps to the false branch of the \code{if}, i.e.~it skips the \code{if}
-completely.
+$\theta(\var{a})=\sym{a}+1$ cannot prove validity of $\theta(\var{a}) =
+\var{0x12345678}$. So the execution forks.  The situation is different on
+line~\ref{line:se_ex_if2} nonetheless. There, we can get into two states, by
+the two previous forked executions. In one, the path condition contains
+$\theta(\var{a}) = \var{0x12345678}$ and symbolic memory is holding \code{1}
+for \code{b}. In the other $\theta(\var{a}) \neq \var{0x12345678}$ and
+$\theta(\var{b}) = 0$. From the first one, the executor can induce
+Implication~\ref{equ:se_fi}, so it continues by jumping into the true branch.
+And since $\theta(\var{b}) = 1$, no division by zero can happen.  Similarly
+for the second fork: the executor jumps to the false branch of the \code{if},
+i.e.~it skips the \code{if} completely. Note that this is one of the very
+cases where other types of analyses like the abstract interpretation produce
+false positives.
 
+The three information above constitute the \emph{program state}. It is a
+triple $(l,\, \theta,\, \varphi)$.  The executor works with these triples when
+executing a program and updates the members accordingly as described above.
+Due to the forks, the execution of a program is usually depicted as a
+\emph{symbolic execution tree}. Nodes of the tree are labeled by program
+states computed during the execution.  Edges of the tree correspond to
+transitions between program states labeling their end nodes.
 \begin{figure}[htb]
 \begin{center}
   \begin{tabular}{cc}
@@ -746,27 +767,17 @@ completely.
   function.}
   \label{fig:se_intro}
 \end{figure}
-
-The only remaining piece of information needed to perform the symbolic
-execution is the program location which is currently evaluated by the
-executor.  Then we define the \emph{program state} as a triple $(l,\,
-\theta,\, \varphi)$, where $l$ is the current program location in a control
-flow graph. The executor works with these triples when executing a program
-and updates the members as described above. The execution is usually depicted
-as a \emph{symbolic execution tree} due to the forks. Nodes of the tree are
-labeled by program states computed during the execution.  Edges of the tree
-correspond to transitions between program states labeling their end nodes.
-For demonstration, we have a control flow graph of the function from
-Figure~\ref{fig:lst_ai_intro} in Figure~\ref{fig:se_intro}~(a). A symbolic
-execution tree of the control flow graph is depicted in
-Figure~\ref{fig:se_intro}~(b).  For readability of figures, nodes are not
-labeled by full program states, but only by the current location in the
-control flow graph. In addition, we label branching edges by instances of the
-corresponding branching conditions in the flow graph. These labels allow us to
-reconstruct the path condition for each node in the tree: it is the
-conjunction of labels of all edges along the path from the root to the
-particular node. Note that contents of symbolic memories are not depicted in
-the figure.
+For demonstration, we use the data-flow example from the second column of
+Table~\ref{tab:state_df_eq}. A control flow graph of the example is in
+Figure~\ref{fig:se_intro}~(a).  A symbolic execution tree of the control flow
+graph is depicted in Figure~\ref{fig:se_intro}~(b).  For readability of
+figures, nodes are not labeled by full program states, but only by the current
+location in the control flow graph. In addition, we label branching edges by
+instances of the corresponding branching conditions in the flow graph. These
+labels allow us to reconstruct the path condition for each node in the tree:
+it is the conjunction of labels of all edges along the path from the root to
+the particular node. Note that contents of symbolic memories are not depicted
+in the figure.
 
 We have not discussed performance of the symbolic execution yet. There are
 two main sources of potential performance bottlenecks. First, symbolic
@@ -1245,7 +1256,7 @@ pointed to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model
 checking.  There is also a survey about bounded model
 checking~\cite{bmc_survey} available.
 
-\section{Industrial Tools}
+\section{Industrial Tools}\label{sec:industrial}
 There are many successful tools based on static analysis. Unfortunately for
 some of them, it is not really known what technique they are based on.  It is
 due to secrets the companies hold to not let their competitors know. What can
