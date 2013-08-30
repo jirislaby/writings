@@ -991,107 +991,138 @@ Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
 
 \section{Program Slicing}\label{sec:slicing}
 As was described in the previous section, the symbolic execution is prone to
-slowness when analyzing programs with loops or many branchings. We described
-some techniques how to cope with this problem in that section too. But in case
-we are interested only whether some code locations in a program are reachable,
-another approach can be used in an analyzer to help the symbolic execution.
-The analyzer can simply remove all the code which does not affect the flow to
-those code locations in any way.  This is exactly a task that can be performed
-by \emph{program slicing}. This is a technique that was described by Weiser in
-his PhD thesis in 1979~\cite{slicing_phd} and later also
-published~\cite{slicing}. As the slicing leaves only the code that really
-affects particular code locations, the slicing may bring a considerable
-speed-up to techniques working with code in general, not only to the symbolic
-execution.  That way, analyzers do not need to evaluate every path that is in
-the code, only those relevant to some code locations, e.g.\ lines with
-potential bugs.
+slowness when analyzes programs with loops or many branchings. We mentioned
+some techniques to cope with this problem in that section too, but have not
+enumerated them all of course. There is another approach that can be used in
+an analyzer to help the symbolic execution. The requirement is to have a set
+of code locations, e.g.\ lines with potential bugs. In that case, the analyzer
+can simply remove all the code which does not affect the flow to those code
+locations in any way and the analyzer can evaluate only the relevant part.
+This is exactly a task that can be performed by \emph{program slicing}.  This
+is a technique that was described by Weiser in his PhD thesis in
+1979~\cite{slicing_phd} and later also published as an article~\cite{slicing}.
+As the slicing leaves only the code that really affects particular code
+locations, the slicing may bring a considerable speed-up to techniques working
+with code in general, not only to the symbolic execution.
 
-\newcommand{\newsym}[1]{\ensuremath\triangleright #1 \triangleleft}
+\newcommand{\newsym}[1]{\ensuremath\boldsymbol{\mathsf{#1}}}
 
 When we want to slice a program we have to specify what behaviour we want to
 preserve in the program first. In the slicing, this is performed by defining
 \emph{slicing criteria}. These are chosen lines of the program accompanied
-with variables we are interested in at those lines. Note there is no
+with variables we are interested in at those lines. Note that there is no
 limitation on the variables like whether they are set or used on those lines.
 Such defined criteria ensure that values of variables at those lines must be
 equal in both original and sliced program for any execution. We can slightly
-loosen the requirement of ``any path'' to specified execution paths as we will
-see later nonetheless.  According to the original
-algorithm~\cite{slicing_phd}, when a slicer is given the slicing criteria, it
-processes functions in a program independently as follows. The slicer starts
-with some function and assigns a set of \emph{relevant variables} to each line
-of the function. Relevant variables sets are filled initially by variables
-from slicing criteria when the line has assigned some criteria or the sets are
-left empty otherwise.  Further, according to the semantics of program
-commands, slicers propagate relevant variables among function lines and insert
-discovered relevant variables into sets on corresponding lines:
+loosen the requirement of ``any execution'' to ``a specified execution'' as we
+will see later nonetheless.  Thereafter, when a slicer is given the slicing
+criteria, it processes functions in a program independently, in an
+intra-procedural way. The slicer starts with some function and assigns a set
+of \emph{relevant variables} to each line of the function. For lines, where
+are some slicing criteria, relevant variables are filled by variables from the
+criteria. Otherwise the relevant sets are left empty.  Further, according to
+the semantics of program commands, the slicer propagates relevant variables
+among function lines and inserts discovered variables into relevant sets on
+corresponding lines. This happens as follows:
 \begin{itemize}
 \item All relevant variables from a successive line are copied to the current
 line's set except for those which are set on the current line. This is a
 simple information \emph{propagation}.
-\item If the current line sets some variable which is relevant at a successive
-line, the slicer adds all variables which the current line references.
-I.e.\ the slicer performs computation of \emph{direct dependency}.
-\item If the current line is a branching (or loop head) and some line in the
-branch (or loop body) sets a relevant variable, the slicer adds all referenced
-variables to the current line's relevant set. This is \emph{indirect
-dependency} and serves the purpose of leaving in place branches and loops
-which indirectly affect slicing criteria.
+\item If the current line sets some variable which is relevant on the next
+line, the slicer adds all variables which the current line references.  I.e.\
+the slicer performs computation of a \emph{direct dependency}.
+\item If the current line is a branching node (or loop head) and some line in
+the branch (or loop body) sets a relevant variable, the slicer adds all
+variables referenced by the current line to the current line's relevant set.
+This is \emph{indirect dependency} and serves the purpose of leaving in place
+branches and loops which indirectly affect slicing criteria.
 \end{itemize}
-The slicers continue evaluation the function repeatedly until the sets stop
-increasing in size, i.e.\ a fixed point is reached.  From the content of the
-sets and the program semantics we can safely claim, which program lines have
-no impact on the initial slicing criteria. Those are exactly the lines, where
-intersection between variables that are set on that line and relevant
-variables on the same line is empty. Slicers also have to leave lines with
-branches or loop heads that affect some unsliced lines from the previous
-sentence. The rest can be removed from the body of the function. Let us
-demonstrate the computation on the example of Figure~\ref{fig:lst_ai_intro}.
-Suppose we want to slice the program according to line 5 and variable \code{i}
-there. The computation of relevant sets denoted as $R_{5,i}$ is demonstrated
-in Table~\ref{fig:tab_slicing}. We stamp newly added variables in the concrete
-iteration of relevant sets computation by $\newsym{~}$ in the table. We also
-note the rule which applied to add the variable: the variables are marked with
-one of C, P, D, I in superscript. It means their source is slicing criteria
-(C), propagation rule (P), or direct (D) and indirect (I) dependency. The
-result of the slicing is that we cannot slice anything from the program,
-because \code{i} on line~5 depends on all lines, including the function
-parameter \code{int x} on line~1.
-
+The slicer continues the evaluation of the function statements repeatedly
+until the sets stop increasing in size, i.e.\ a fixed point is reached.  From
+the content of the sets and the program semantics we can safely claim, which
+program lines have no impact on the initial slicing criteria.
+Those are exactly the lines, where intersection between variables that are set
+on that line and relevant variables on the \emph{successive} line(s) is empty.
+Slicers also have to leave lines with branches or loop heads that affect some
+unsliced lines from the previous sentence. The rest can be removed from the
+body of the function.  Let us demonstrate the computation on the example of
+Table~\ref{tab:state_df_eq}.  Suppose we want to slice the program according
+to line~\ref{lst:state_sl_crit} and variable \code{a} there. The computation of
+relevant sets denoted as $R_{7,a}$ is demonstrated in
+Table~\ref{tab:state_slicing}.
+\newcommand{\eset}{$\emptyset$}
 \begin{table}[htb]
 \begin{center}
-\begin{tabular}{|l||c|c||c|c|c|} \hline
-\multirow{2}{*}{\textbf{Code}} &
+\begin{tabular}{|r|l||c|c||c|c|c|} \hline
+\multirow{2}{*}{\textbf{\footnotesize \#}} &
+  \multicolumn{1}{c||}{\multirow{2}{*}{\textbf{Code}}} &
   \multicolumn{2}{c||}{\textbf{Variables}} &
-  \multicolumn{3}{c|}{\textbf{Relevant Sets}} \\ \cline{2-6}
-& \textbf{Set} & \textbf{Read} &
-  $R_{(5,i)}^0$ & $R_{(5,i)}^1$ & $R_{(5,i)}^2$ \\ \hline\hline
-1:~\lstinline$void fun(int x) {$
-		      &         &         &		       & 		    & $\{\newsym{x_P}\}$     \\ \hline
-2:~~~\code{i = 3;}    & $\{i\}$ &         &		       & $\{\newsym{i_P}\}$ & $\{i_P,\newsym{x_P}\}$ \\ \hline
-3:~~~\code{while (x)} &         & $\{x\}$ &		       & $\{\newsym{i_P}\}$ & $\{i_P,\newsym{x_I}\}$ \\ \hline
-4:~~~~~\code{i *= 2;} & $\{i\}$ & $\{i\}$ &                    & $\{\newsym{i_D}\}$ & $\{i_D\}$		     \\ \hline
-5:~~~\code{return i;} &         & $\{i\}$ & $\{\newsym{i_C}\}$ & $\{i_C\}$          & $\{i_C\}$		     \\ \hline
-6:~\lstinline$}$      &&&&& \\ \hline
+  \multicolumn{3}{c|}{\textbf{Fixed Point Iteration}} \\ \cline{3-7}
+&& \textbf{Set} & \textbf{Read} & 0 & 1 & 2 \\ \hline\hline
+
+1 & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+a = 1;
+\end{lstlisting} } & $\{\var{a}\}$ & \eset   & \eset & \eset   & \eset \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+b = read();
+\end{lstlisting} } & $\{\var{b}\}$ & \eset   & \eset &
+  $\{\newsym{a_{P}}\}$ & $\{\var{a_P}\}$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+while (b) {
+\end{lstlisting} } & \eset   & $\{\var{b}\}$ & \eset &
+  $\{\newsym{a_{P}}\}$ & $\{\var{a_P},\newsym{b_I}\}$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+  a = a+5;
+\end{lstlisting} } & $\{\var{a}\}$ & $\{\var{a}\}$ & \eset &
+  $\{\newsym{a_{D}}\}$ & $\{\var{a_D},\newsym{b_P}\}$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+  b = b-1;
+\end{lstlisting} } & $\{\var{b}\}$ & $\{\var{b}\}$ & \eset &
+  $\{\newsym{a_P}\}$   & $\{\var{a_P},\newsym{b_P}\}$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+}
+\end{lstlisting} } & \eset   & \eset         & \eset &
+  $\{\newsym{a_P}\}$   & $\{\var{a_P},\newsym{b_P}\}$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_sl_comp,numbers=none,frame=none]
+use(a);(*@ \label{lst:state_sl_crit} @*)
+\end{lstlisting} } & \eset   & $\{\var{a}\}$ & $\{\newsym{a_C}\}$ &
+  $\{\var{a_C}\}$  & $\{\var{a_C}\}$ \\ \hline
+
 \end{tabular}
 \end{center}
-\caption{Program slicing of example in Figure~\ref{fig:lst_ai_intro}.}
-\label{fig:tab_slicing}
+\caption{Program slicing of example in Table~\ref{tab:state_df_eq}. The fixed
+point computation is sped up.}
+\label{tab:state_slicing}
 \end{table}
+Note that the particular iterations of the fixed point calculation are sped up
+a little. We allow the propagation rule to apply many times in one column for
+the presentation purposes. Also, we make newly added relevant variables in an
+iteration bold.  We note the rule which applied to add the variable too: the
+variables are marked with one of \var{C}, \var{P}, \var{D}, \var{I} in
+subscript. It means their source is slicing criteria (\var{C}), propagation
+rule (\var{P}), or direct (\var{D}) and indirect (\var{I}) dependency. The
+result of the slicing is that we cannot slice anything from the program,
+because \code{a} on line~\ref{lst:state_sl_crit} depends on all lines. As we
+can see, the intersection of relevant and set variables is never empty.
 
-The process described above is only intra-procedural. To extend the slicer
-to be inter-procedural, we have to change the slicer to pass the relevant
-variables among functions. That is down to a called function at every call
-instruction and back up from the called function. As relevant variables
-propagate from the bottom up, the slicer has to pass the variables from a call
-site to return points of the called function and when the slicer is done with
-propagation of the variables through the whole function to its beginning, the
-variables are transferred back to the call instruction. Of course the slicer
-has to take care of actual with formal parameters binding and of the
-relationship between return value and the variable the result is stored into.
-The same as above, the process repeats until a fixed point is reached.
-Inter-procedural slicers were discussed by Horwitz et al. and
-Gallagher~\cite{slic_inter1, slic_inter2}.
+To extend the slicer to be inter-procedural, we have to change the slicer to
+pass the relevant variables among functions: down to a called function at
+every call instruction and back up from the called function. As relevant
+variables propagate from the bottom up, the slicer has to pass the variables
+from a call site to return points of the called function and when the slicer
+is done with the transfer of the variables through the whole function to its
+beginning, the variables are transferred back to the call instruction. Of
+course the slicer has to take care of actual with formal parameters binding
+and of the relationship between return value and the variable where the result
+is stored into.  The same as above, the process repeats until a fixed point is
+reached.  Inter-procedural slicers were discussed by Horwitz et
+al.~\cite{slic_inter1} and Gallagher~\cite{slic_inter2}.
 
 Originally, there were only slicers implementing the technique as described
 above. These are \emph{static} slicers and they slice such that any possible
@@ -1099,26 +1130,26 @@ input to a program is handled the same as in the original code. But slicing
 is often used for debugging purposes~\cite{slicing_debugging} and there, we
 are usually interested in a value of some particular variable only when some
 specific input was passed to the program.  Imagine we have a bug in the
-program and know what was passed on input. We also know that a variable
+program and know what was passed on the input. We also know that a variable
 printed on the output has an invalid value. The slicer can be therefore
-limited to this input, in particular, the input need not trigger visiting all
+limited to this input. In particular, the input need not trigger visiting all
 bodies of branches or loops, so this allows for much more code removal than
 static slicing.  This approach is called \emph{dynamic}
 slicing~\cite{slicing_dyn}. Note the slicer has to look at conditions and
 track a path condition and this is usually slow. So this obviously results in
 a drawback: computing a dynamic slice is more computationally expensive than
-computing static slices. Since control flow graphs are used to compute slices,
-there appeared techniques to overcome the problem by pruning of the control
-flow graphs. They can significantly decrease the computation
-time~\cite{slic_prunecfg1, slic_prunecfg2}, but the result is less precise.
-\emph{Hybrid} slicing tries to tackle this problem by combining the dynamic
-slicing with dynamic runs.  Using breakpoints, slicers record which code
-locations are visited with which input and compute the dynamic slice
-according to the locations.  It is both faster and less space consuming than
-the dynamic slicing.  The dynamic slicing can be improved such that it
-works with more than one input~\cite{slic_quasi, slic_union}, which can be
-generalized as describing input as constraints~\cite{slic_constraint,
-slic_constraint_bw}.
+computing static slices. Since control flow graphs are used to compute slices
+(not lines like in the original algorithm), there appeared techniques to
+overcome the problem by pruning of the control flow graphs. They can
+significantly decrease the computation time~\cite{slic_prunecfg1,
+slic_prunecfg2}, but the result is less precise.  \emph{Hybrid} slicing tries
+to tackle this problem by combining the dynamic slicing with dynamic runs.
+Using breakpoints, slicers record which code locations are visited with which
+input and compute the dynamic slice according to the locations.  It is both
+faster and less space consuming than the dynamic slicing.  The dynamic slicing
+can be improved such that it works with more than one input~\cite{slic_quasi,
+slic_union}, which can be generalized as describing input as
+constraints~\cite{slic_constraint, slic_constraint_bw}.
 
 There is also an orthogonal method to the static slicing.  We may be
 interested in all program statements which \emph{are affected} by some
@@ -1128,9 +1159,9 @@ slicing~\cite{slic_forw} and is used for dead code removal for example. The
 forward and backward slicing can be generalized as
 \emph{chopping}~\cite{slic_chopping}. The chopping requires two distinct sets
 of slicing criteria: one about what a variable affects (forward slicing), the
-other about what is affected by that variable (backward slicing). The slicing
-can be abstracted a bit more~\cite{slic_abstract}, such that it can answer
-which values in a variable affect statements in the slicing criterion.
+other about what affects that variable (backward slicing). The slicing can be
+abstracted a bit more~\cite{slic_abstract}, such that it can answer what
+values in a variable affect statements from the slicing criteria.
 
 When taking over and reusing a library, a programmer can reduce the library
 code size using slicers. Programmers just need to specify the parts of the
@@ -1140,31 +1171,30 @@ by some guessed criteria helps recognition tools to find patterns and reverse
 engineer the code. Further, some variables like temporaries or iterators are
 unwanted in slices when debugging. They can be disabled to appear in the
 slice~\cite{slic_stop}. Similar is the \emph{barrier}
-slicing~\cite{slic_barrier} which wants us to define a set of statements that
-should be ignored by a slicer. This is done transitively, no further
-statements starting at the barrier are put into the slice. So barriers are
-often at interfaces of massively used, and therefore likely error-free,
-libraries.  The slicing can be used also for finding bugs using \emph{dicing}:
-two slices are compared, where one has to be a correct slice (a variable has a
-good value) and one incorrect (a variable has a bad value). Intersection of
-the slices are lines of code which are likely correct. The bug is in the
-others of the incorrect slice. Slicers can work also on the semantic level, to
-not preserve syntax, but leave semantics with respect to
-criteria~\cite{slic_amorphous}. Slicers can reason about paths in a
-program~\cite{slic_path} such as ``why this statement on this path is not
-executed?'' Finally, the slicing can be used for model checking~\cite{slic_mc}
-and for concurrent programs too~\cite{slic_concur} and the slicing can be used
-for model checking~\cite{slic_mc}.  More details about slicing and its
-variations and uses can be seen in various surveys and
-reviews~\cite{slic_overview95, slic_overview96, slic_overview98,
+slicing~\cite{slic_barrier}. Barriers are statements which should be ignored
+by a slicer including their successors.  So barriers are often at interfaces
+of massively used, and therefore likely error-free libraries.  The slicing can
+be also used for finding errors using \emph{dicing}. We have to know two
+locations in code. On one location, there is a variable which has a correct
+value. On the other there is a variable with a wrong value. We slice the code
+separately with those two variables and locations as criteria and the slices
+are compared. Intersection of the slices are lines of code which are likely
+correct. The error has to be in the rest of the incorrect slice. Slicers can
+work also on the semantic level, to not preserve syntax, but leave semantics
+with respect to criteria~\cite{slic_amorphous}. The slicing can reason about
+some paths in a program~\cite{slic_path} such as why a statement on a
+particular path is not executed? Finally, the slicing can be used for proving
+correctness~\cite{slic_mc} and for concurrent programs too~\cite{slic_concur}.
+More details about slicing and its variations and uses can be seen in various
+surveys and reviews~\cite{slic_overview95, slic_overview96, slic_overview98,
 slic_overview01a, slic_overview01b, slic_overview05, slic_overview12}.
 
 %\textsc{Sante}~\cite{slic_sante} -- slicing for speeding up a Technique
 %Combining Static and Dynamic Analysis;
 
-The same as the symbolic execution, we use slicing extensively to reduce code
-size of the code that is symbolically executed by our tool. See
-Chapters~\ref{sec:fmics} and~\ref{sec:svcomp} for more information.
+We use slicing extensively to reduce code size of the code that is
+symbolically executed by our tool. See Chapters~\ref{sec:fmics}
+and~\ref{sec:svcomp} for more information.
 
 \section{Model Checking}
 This is a bit different technique from static analysis we are dealing in this
