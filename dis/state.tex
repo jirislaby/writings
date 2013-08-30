@@ -688,156 +688,166 @@ executing a program and updates the members accordingly as described above.
 Due to the forks, the execution of a program is usually depicted as a
 \emph{symbolic execution tree}. Nodes of the tree are labeled by program
 states computed during the execution.  Edges of the tree correspond to
-transitions between program states labeling their end nodes.
+transitions between program states labeling their end nodes.  For
+demonstration, we use the code from the data-flow example as was in the second
+column of Table~\ref{tab:state_df_eq}. A control flow graph of the example is
+shown in Figure~\ref{fig:state_se_cfg}.
 \begin{figure}[htb]
 \begin{center}
-  \begin{tabular}{cc}
     \pgfdeclarelayer{background}
     \pgfsetlayers{background,main}
-    \begin{tikzpicture}[<-,>=stealth',node distance=5mm]
+    \begin{tikzpicture}[<-,>=stealth',node distance=5mm,font=\small]
       \node [cfg_start] (S) {};
-      \node [cfg] (L_1) [label=right:\red{1},below=3mm of S] {\code{i = 3}}
+      \node [cfg] (ASS1) [label=right:\red{1},below=3mm of S] {\code{a = 1}}
 	edge node {} (S);
-      \node [cfg] (L_2) [label=right:\red{2},below=of L_1] {\code{x}}
-	edge node {} (L_1);
-      \node [cfg] (L_3) [label=left:\red{3},below left=of L_2] {\code{i *= 2}}
-	edge [bend left=20] node [label=above left:\code{x}] {} (L_2)
-	edge [->,bend right=40] node {} (L_2);
-      \node [cfg] (L_4) [label=right:\red{4},below right=of L_2] {\code{a=3*b}}
-	edge node [label=above right:\code{!x}] {} (L_2);
-      \node [cfg_end,below=3mm of L_4] {}
-	edge node {} (L_4);
+      \node [cfg] (ASS2) [label=right:\red{2},below=of ASS1] {\code{b = read()}}
+	edge node {} (ASS1);
+      \node [cfg] (LOOPH) [label=right:\red{3},below=of ASS2] {\code{b}}
+	edge node {} (ASS2);
+      \node [cfg] (ASS3) [label=right:\red{4},below=8mm of LOOPH,xshift=-3mm]
+        {\code{a = a + 5}}
+	edge [bend right=10] node [label=right:\code{b}] {} (LOOPH);
+      \node [cfg] (ASS4) [label=left:\red{5},below left=of ASS3]
+        {\code{b = b - 1}}
+	edge [bend right=25] node {} (ASS3)
+	edge [->,bend left=40] node {} (LOOPH);
+      \node [cfg] (USE) [label=right:\red{6},right=8mm of ASS3]
+	{\code{use(a)}}
+	edge [bend right=15] node [label=above right:\code{!b}] {} (LOOPH);
+      \node [cfg_end,below=3mm of USE] {}
+	edge node {} (USE);
 
       \begin{pgfonlayer}{background}
-	\node[fill=blue!20,inner sep=0pt,rotate=30,ellipse,fit=(L_2) (L_3)] {};
+	\node[fill=blue!20, inner sep=-1pt, rotate=35, xshift=-2mm,
+	  yshift=-4mm, ellipse, fit=(LOOPH) (ASS3) (ASS4)] {};
       \end{pgfonlayer}
 
-    \end{tikzpicture} &
-
+    \end{tikzpicture}
+\end{center}
+  \caption{A control flow graph of code from Table~\ref{tab:state_df_eq}. The
+  loop is highlighted.}
+  \label{fig:state_se_cfg}
+\end{figure}
+A symbolic execution tree of the control flow graph is depicted in
+Figure~\ref{fig:state_se_tree}.
+\begin{figure}[htb]
+\begin{center}
     \tikzstyle{loc} = [thick,draw,minimum size=5mm]
     \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
+    \tikzstyle{symmem}=[draw, loosely dashed, rectangle, inner sep=8pt,
+      rounded corners=12pt]
+    \tikzstyle{symlink}=[-, dashed, in=-110, out=0]
+    \tikzstyle{pathcond}=[symmem, densely dotted]
+    \tikzstyle{pathlink}=[symlink, densely dotted]
     \pgfdeclarelayer{background}
     \pgfsetlayers{background,main}
-    \begin{tikzpicture}[->,>=stealth',circle,node distance=0.6cm,font=\small]
+    \begin{tikzpicture}[->, >=stealth', circle, node distance=5mm, font=\small]
       \node [cfg_start] (S) {}
         child { node [loc,below=4mm of S] (L_1) {\red{1}}
-	  child { node [loc,below=of L_1] (L_2) {\red{2}}
+	  child { node [loc, below=of L_1] (L_2) {\red{2}}
 	    child { node [loc,below=of L_2] (L_3) {\red{3}}
-	      child { node [loc,below=of L_3] (L_4) {\red{2}}
-		child { node [loc,below=of L_4] (L_5) {\red{3}}
-		  child { node [inner sep=0pt] (L_6) {$\vdots$} }
-		  edge from parent node[left] {\code{x}}
+	      child { node [loc,below=of L_3] (L_4) {\red{4}}
+		child { node [loc,below=of L_4] (L_5) {\red{5}}
+		  child { node [loc,below=of L_5] (L_6) {\red{3}}
+		    child { node [loc,below=of L_6]
+			   (L_7) {\red{4}}
+		      child { node [inner sep=0pt, below=of L_7] (L_8) {$\vdots$} }
+		      edge from parent node[left] {$\sym{b}-\var{1} \neq \var{0}$}
+		    }
+		    child { node [loc,right=of L_7] (F_2) {\red{6}}
+		      child { node [cfg_end,below=4mm of F_2] {} }
+		      edge from parent node[right,yshift=2mm] {$\sym{b}-1=0$}
+		    }
+		  }
 		}
-		child { node [loc,right=of L_5] (F_2) {\red{4}}
-		  child { node [cfg_end,below=4mm of F_2] {} }
-		  edge from parent node[above right] {\code{!x}}
-		}
+		edge from parent node[left] {$\sym{b} \neq \var{0}$}
 	      }
-	      edge from parent node[left] {\code{x}}
-	    }
-	    child { node [loc,right=of L_3] (F_1) {\red{4}}
-	      child { node [cfg_end,below=4mm of F_1] {} }
-	      edge from parent node[above right] {\code{!x}}
+	      child { node [loc,right=of L_4] (F_1) {\red{6}}
+		child { node [cfg_end,below=4mm of F_1] {} }
+		edge from parent node[right,yshift=2mm] {$\sym{b}=0$}
+	      }
 	    }
 	  }
 	};
 
+      \node [symmem, left=2cm of L_2] (MEM1) {
+        \begin{tabular}{rl}
+	  $\theta(\var{a})=$ & $\var{1}$ \\
+	  $\theta(\var{b})=$ & $\sym{b}$ \\
+        \end{tabular}
+      } edge [symlink] node {} (L_2);
+
+      \node [symmem, left=1.5cm of L_5] (MEM2) {
+        \begin{tabular}{rl}
+	  $\theta(\var{a})=$ & $\var{6}$ \\
+	  $\theta(\var{b})=$ & $\sym{b} - 1$ \\
+        \end{tabular}
+      } edge [symlink] node {} (L_5);
+
+      \node [pathcond, yshift=4mm, left=15mm of L_4] (PC1) {
+	$\varphi:\,\sym{b}\neq\var{0}$
+      } edge [pathlink, in=180, out=0] node {} (L_4);
+
+      \node [pathcond, yshift=-4mm, right=5mm of F_1] (PC2) {
+	$\varphi:\,\sym{b}=\var{0}$
+      } edge [pathlink, in=0, out=180] node {} (F_1);
+
+      \node [pathcond, yshift=-4mm, left=5mm of L_7] (PC3) {
+	$\varphi:\,(\sym{b} \neq \var{0}) \wedge (\sym{b}-\var{1} \neq \var{0})$
+      } edge [pathlink, in=180, out=0] node {} (L_7);
+
+      \node [pathcond, yshift=-4mm, right=5mm of F_2] (PC4) {
+	$\varphi:\,(\sym{b} \neq \var{0}) \wedge (\sym{b}-\var{1} = \var{0})$
+      } edge [pathlink, in=0, out=180] node {} (F_2);
+
       \begin{pgfonlayer}{background}
 	\node[fill=blue!20, rounded corners=12pt, rectangle, inner sep=4pt,
-		fit=(L_2) (L_3) (L_4) (L_5) (L_6)] {};
+		fit=(L_3) (L_4) (L_5) (L_6) (L_7) (L_8)] {};
       \end{pgfonlayer}
 
-    \end{tikzpicture} \\
-
-    (a) & (b) \\
-  \end{tabular}
+    \end{tikzpicture}
 \end{center}
-  \caption{(a) A control flow graph of code from
-  Figure~\ref{fig:lst_ai_intro}. (b) Symbolic execution tree of that
-  function.}
-  \label{fig:se_intro}
+  \caption{A symbolic execution tree of the control flow graph of
+  Figure~\ref{fig:state_se_cfg}. The loop remained highlighted. Selected nodes
+  are depicted along with the symbolic memory (dashed) and path conditions
+  (dotted).}
+  \label{fig:state_se_tree}
 \end{figure}
-For demonstration, we use the data-flow example from the second column of
-Table~\ref{tab:state_df_eq}. A control flow graph of the example is in
-Figure~\ref{fig:se_intro}~(a).  A symbolic execution tree of the control flow
-graph is depicted in Figure~\ref{fig:se_intro}~(b).  For readability of
-figures, nodes are not labeled by full program states, but only by the current
-location in the control flow graph. In addition, we label branching edges by
-instances of the corresponding branching conditions in the flow graph. These
-labels allow us to reconstruct the path condition for each node in the tree:
-it is the conjunction of labels of all edges along the path from the root to
-the particular node. Note that contents of symbolic memories are not depicted
-in the figure.
+For readability of figures, nodes are not labeled by full program states, but
+only by numbers representing the current location in the control flow graph.
+In addition, we label
+branching edges by instances of the corresponding branching conditions in the
+flow graph. These labels allow us to reconstruct the path condition for each
+node in the tree: it is the conjunction of labels of all edges along the path
+from the root to the particular node. We present them on selected nodes in the
+picture as well as the contents of the symbolic memory.
 
 We have not discussed performance of the symbolic execution yet. There are
 two main sources of potential performance bottlenecks. First, symbolic
 executors use \emph{Satisfiability Modulo Theory} solvers~\cite{smt} to reason
 about validity of formulae like~\ref{equ:se_fi} and \ref{equ:se_se}.  Whereas
 performance of individual solvers vary, complex queries are not easy to answer
-for any solver.  So it usually takes a long time for solvers before they
-answer such queries. Second, the symbolic execution suffers from the
-\emph{path explosion problem}, i.e.\ an exponential growth of paths that need
-to be explored. Every branching and in the code potentially multiplies the
-possible number of paths through the program by two. It is even worse for
-loops, where the symbolic execution tree can become huge. So the larger
-program, the exponentially larger symbolic execution tree to be explored yet.
-In fact the tree can be also infinite, e.g.\ when analyzing infinite loops.
-Hence, for real-world programs, the symbolic execution is barely usable
-without incorporating other techniques to reduce the count of explored paths.
-Some tools try to tackle this issue by traversing more paths at once to
-substantially reduce the size of the execution tree~\cite{cse_atva}. Others,
-like in~\cite{pex_ddse, G07}, compose symbolic executions of several
-functions using summaries which results in an inter-procedural analysis. This
-approach limits the need of execution to separate functions only. \cite{rwset,
-klee, exe}~are based on recording of already seen behavior and pruning its
-repetition. Tools also limit the tree depth by a hard-coded constant, to
-obtain finite tree for the price of incompleteness~\cite{ucklee, se_limited1}.
-Some works aim at guessing of the number of loops needed to reach some target
-location to help analyzing large programs with many nested
-loops~\cite{partial_loop}.
-
-%no longer means we have to try all the possible values \code{read()} might
-%return from a user.
-
-\begin{figure}[htb]
-\begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}[language=C]
-void fun(int x, int y) {
-  if (x == hash(y))
-    assert(false);
-}
-\end{lstlisting}
-\end{tabular}
-\end{center}
-\caption{Concolic execution example.} \label{fig:lst_dart}
-\end{figure}
-
-Many modern tools combine the symbolic execution with dynamic (concrete)
-analysis. This combination of analyses is called \emph{concolic
-execution}. Tools implementing concolic execution achieve better scalability
-and higher coverage of analyzed code~\cite{dart, active_props, cute, exe,
-pex_ddse}.  Programs are run dynamically first with random input.  While a
-program is running, path conditions are stored along the executed path
-directed by the radnom input. When the dynamic run finishes, the symbolic
-execution is then run. It is given a new constrains on the input. The
-constraints are built using solver by negating some pieces of the path
-condition collected from the dynamic run. The symbolic run generates new input
-this way. The program is ran with these inputs again which can cover more
-paths than the first dynamic run.  This process repeats until all paths i nthe
-program are covered or the analyzer is terminated. Let us consider the example
-of Figure~\ref{fig:lst_dart}.  Suppose that it is hard to compute an inversion
-of the \code{hash} function.  It may take ages till proper values for \code{x}
-and \code{y} are generated to trigger the assertion. But using concolic
-execution, the first random input can be \code{3} for \code{x} and \code{4}
-for \code{y}. Suppose $hash(4)=235$, during the dynamic execution, we obtain
-$x=3 \wedge hash(y)=235$ as a path condition.  Now, the solver can easily
-generate a new input by fixing \code{y} to \code{4} and setting \code{x} to
-\code{235}.  With the next dynamic execution, the \code{assert} will be
-trigerred. \textsc{Check 'n' Crash}~\cite{check_crash} does the opposite:
-first it runs coarse symbolic execution to find a suspicious location in code,
-then the tool generates a test and runs the program dynamically to verify the
-test case.
+for any solver. So it usually takes a long time for solvers before they
+answer such queries. And worse, some queries can be also out of decidable
+theories.  Second, the symbolic execution suffers from the \emph{path
+explosion problem}, i.e.\ an exponential growth of paths that need to be
+explored. Every branching in the code potentially multiplies the possible
+number of paths through the program by two. It is even worse for loops, where
+the symbolic execution tree can become huge or infinite, e.g.\ when analyzing
+loops.  Hence, for real-world programs, the symbolic execution is barely
+usable without incorporating other techniques to reduce the count of explored
+paths.  Some tools try to tackle this issue by traversing more paths at once
+to substantially reduce the size of the execution tree~\cite{cse_atva}.
+Others~\cite{pex_ddse, G07}, compose symbolic executions of several functions
+using summaries which results in an inter-procedural analysis. This
+approach limits the need of execution to separate functions only.
+\textsc{Exe}~\cite{exe}, \textsc{Klee}~\cite{klee}, and
+\textsc{RWset}~\cite{rwset} are based on recording of already seen behavior
+and pruning its repetition. Tools like Girgis'~\cite{se_limited} and
+\textsc{UC-Klee}~\cite{ucklee} also limit the tree depth by a hard-coded
+constant, to obtain finite tree for the price of unsoundness.  Some works aim
+at guessing the number of loops needed to reach some target location to help
+analyzing large programs with many nested loops~\cite{partial_loop}.
 
 Despite King originally introduced the symbolic execution for symbolic
 debugging~\cite{se_king}, the symbolic execution is currently widely used for
@@ -845,92 +855,88 @@ generating unit tests which cover more paths in code than tests written
 manually~\cite{se_generate_test1, se_generate_test2, se_generate_test3,
 se_generate_test4, se_generate_test5, exe, klee}. Offutt and
 Seaman~\cite{se_generate_test2} use the symbolic execution also for re-writing
-program internal variables as functions of the input values and then generates
+program internal variables as functions of the input values and then generate
 tests using constraint-solving. The symbolic execution is usable as a partial
 correctness prover~\cite{se_corr1, se_corr2}, as a reverse engineering
 engine~\cite{se_reverse}, or for refactoring software to a one which is more
-specialized~\cite{se_spec}, The symbolic execution can be extended to handle
-heap~\cite{se_heap, se_gener}, summarize effects of libraries~\cite{se_libs},
-or to extract dependencies of outputs on inputs~\cite{se_output1}.  The
-symbolic execution was used to find bugs in aircraft control and nuclear power
-systems~\cite{se_critical} or filesystems by generating malicious
-disks~\cite{exe_fs}. Even though, some do not explicitly mention the symbolic
-execution, they in fact implement it, to find errors in memory
-management~\cite{prefix} for example.  There are also overviews where is a
-summarization of some techniques we mention above~\cite{se_review88,
-se_review09, se_review13}. We use the symbolic execution in our tool described
-in Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
-
-% SADAT and IVS are missing
-
-\paragraph*{Tools}
-
+specialized~\cite{se_spec}, It can be extended to handle heap~\cite{se_heap,
+se_gener}, summarize effects of libraries~\cite{se_libs}, or to extract
+dependencies of outputs on inputs~\cite{se_output1}. It was used to find bugs
+in aircraft control and nuclear power systems~\cite{se_critical} or
+filesystems by generating malicious disks~\cite{exe_fs}. Even though, some do
+not explicitly mention the symbolic execution, they in fact implement it, to
+find errors in memory management~\cite{prefix} for example.
 \textsc{PathFinder-SE}~\cite{pathfinder_se} is an extension to the model
 checker \textsc{PathFinder} which enables the model checker to perform the
 symbolic execution.  They further improved the tool to handle e.g.\ concurrent
-programs, heap structures and data.
+programs, heap structures and data.  \textsc{IntScope}~\cite{intscope}
+decompiles x86 binaries to an intermediate representation form and runs the
+symbolic execution to find integer overflows.
+%
+%\cite{active_props}
 
-\textsc{IntScope}~\cite{intscope} decompiles x86 binaries to an intermediate
-representation form and runs the symbolic execution to find integer overflows.
+\subsection{Concolic Execution}
+Many modern tools combine the symbolic execution with dynamic (concrete)
+analysis. This combination of analyses is called \emph{concolic
+execution}. Tools implementing concolic execution achieve better scalability
+and higher coverage of analyzed code.  \textsc{PathCrawler}~\cite{pathcrawler}
+was the first executor to combine symbolic and dynamic execution. It does not
+use concrete values in the symbolic execution to simplify complex constraints
+nonetheless. This was first performed only by \textsc{Dart}~\cite{dart}.  The
+primary goal is to execute \emph{all}, or at least as much as possible
+feasible program paths, in a systematic way. It starts dynamically with random
+input and symbolically tracks branching conditions.  The symbolic execution
+and a solver is then used to change the input so that it traverses another
+paths when executed dynamically again. This happens until the code is covered
+fully or an user stops the process.  \textsc{Dart} can propagate concrete
+values from the dynamic runs to the symbolic run when the solver is incapable
+to reason about some values. Especially, when pointer constrains are used,
+\textsc{Dart} gives up the symbolic execution and switches to standard random
+testing. This was improved in another executor \textsc{Cute}~\cite{cute}. It
+handles pointers better and is able to analyze concurrent programs. So except
+it generates the inputs systematically, it also makes diverse schedule plans
+of individually spawn threads.  \textsc{Cute} cannot still handle symbolic
+offsets of pointers. Very close tool to \textsc{Cute} is
+\textsc{Crest}~\cite{crest}, except it is freely available, source
+codes inclusive. Since every concolic execution tool is prone to selected
+strategy that decides which states are explored next, the authors studied and
+compared the strategies too.
 
-\paragraph{Concolic Executors}
-\textsc{PathCrawler}~\cite{pathcrawler} was the first executor to combine
-symbolic and dynamic execution. It does not use concrete values in the
-symbolic execution to simplify complex constraints nonetheless. This was first
-performed only by \textsc{Dart}~\cite{dart}.  The primary goal is to execute
-\emph{all}, or at least as much as possible feasible program paths, in a
-systematic way. It starts dynamically with random input and symbolically
-tracks branching conditions.  The symbolic execution and a solver is then used
-to change the input so that it traverses another paths when executed
-dynamically again. This happens until the code is covered fully or an user
-stops the process.  \textsc{Dart} can propagate concrete values from the
-dynamic runs to the symbolic run when the solver is incapable to reason about
-some values.  \textsc{Dart} gives up the symbolic execution and switches to
-standard random testing when pointer constrains are used. This was improved in
-another executor \textsc{Cute}~\cite{cute}. It handles pointers better and is
-able to analyze concurrent programs. So except it generates the inputs
-systematically, it also makes diverse schedule plans of individually spawn
-threads.  \textsc{Cute} cannot still handle symbolic offsets of pointers.
-
-\paragraph{Egt and Derivatives}
+\paragraph{\textsc{Exe} and Derivatives}
 At the same time as \textsc{Dart} and \textsc{Cute} emerged, Cadar et al.\
 came up with \textsc{Egt}~\cite{egt} for generating test cases from symbolic
 inputs.  \textsc{Egt} was a predecessor of \textsc{Exe}~\cite{exe} which
 finally introduced a precise handling of pointers with symbolic offsets.
 \textsc{Exe} was later completely redesigned and the new tool
-\textsc{Klee}~\cite{klee} set to execute the \llvm code. \textsc{Klee}
+\textsc{Klee}~\cite{klee} was put to execute \llvm code. \textsc{Klee}
 optimizes solver queries, has better search heuristics, and other improvements
-like a file system model to simulate a filesystem without really involving it.
-This allowed for an analysis of \textsc{Coreutils}, the basic set of utilities
-most Linux users work with and to actually find errors there.  \textsc{Klee}
-was used also for checking a tool equivalence. It took two implementations of
-the same and symbolically compared the results. Several deviations from the
-standard behaviour were found that way. This was later improved more in
-\textsc{UC-Klee}~\cite{ucklee}. First, it compares memory contents of both
+like a model to simulate a filesystem without really involving it.  This
+allowed for a successful error finding in \textsc{Coreutils}, the basic set of
+utilities most Linux users work with. \textsc{Klee} can be used also for
+checking a tool equivalence. It takes two implementations of the same and
+symbolically compares the results. Several deviations from the standard
+behaviour of some utilities were found that way. This was later improved more
+in \textsc{UC-Klee}~\cite{ucklee}. First, it compares memory contents of both
 implementations. Second, it makes the memory symbolic when accessed
-(on-demand). Third, it checks that both implementations behave the same with
+(on-demand). Finally, it checks that both implementations behave the same with
 respect to error conditions like division by zero. \textsc{Klee} and
-\textsc{UC-Klee} are put into concolic executors since it allows to invoke
+\textsc{UC-Klee} are put into concolic executors since they allow to invoke
 library functions dynamically.
 
-Since any of the concolic execution tools is prone to selected strategy that
-decides which states are explored next, they were studied and compared in
-\textsc{Crest}~\cite{crest}.  It is a tool very close to \textsc{Cute} in what
-it performs, except it is freely available, source codes inclusive.
-
-Instead of generating only a single input, \textsc{Sage}~\cite{sage} defines
-the term \emph{generational search} to generate as many inputs as possible at
-once. This is unimportant for cases, where the whole state space is
-explored. Nonetheless, this is not the case as real programs cannot be covered
-fully. So generating more input often helps more coverage. The same as above,
-it records branching conditions from the first dynamic run, negates all of
-them one by one and asks a solver for a solution.  For each positive reply the
-solver gives, \textsc{Sage} generates a separate input. The whole tool does
-not use any intermediate language, it symbolically executes directly the x86
-binary code. So it can be used also in cases where source code is not known.
-The whole approach in \textsc{Sage} is called \emph{automated whitebox fuzz
-testing}. \textsc{SmartFuzz}~\cite{smartfuzz} works very similarly, but the
-set of errors the tool aims at is limited only to integer errors.
+Instead of generating only a single input, \textsc{Sage}~\cite{active_props,
+sage} defines the term \emph{generational search} to generate as many inputs
+as possible in a single symbolic run. This is unimportant for cases, where the
+whole state space is explored. But this is not the case as real programs are
+barely covered fully. So generating more inputs often helps more coverage. As
+it is a concolic executor, it records branching conditions from the first
+dynamic run.  But it negates \emph{all} of them one by one and asks a solver
+for a solution.  For each positive reply the solver gives, \textsc{Sage}
+generates a separate input. The whole tool does not use any intermediate
+language, it symbolically executes directly the x86 binary code. So it can be
+used also in cases where source code is not known.  The whole approach in
+\textsc{Sage} is called \emph{automated whitebox fuzz testing}.
+\textsc{SmartFuzz}~\cite{smartfuzz} works very similarly, but the set of
+errors the tool aims at is limited only to integer errors. That is,
 \textsc{SmartFuzz} captures signed/unsigned conversions for example. The
 generated inputs are filtered, so more eager heuristics that allow more inputs
 generation are allowed.
@@ -940,39 +946,45 @@ boundary of the symbolic and concrete execution. This was one of the two
 novelties in \textsc{S${}^2$e}~\cite{s2e}: \emph{selective symbolic
 execution}. It was published by some of the authors earlier to solve the
 problem of path explosion in libraries and system calls~\cite{se_selective}.
-As we are mainly interested only in some parts of libraries, the symbolic
-execution does not fork and only the execution is forked at branches when it
-gets back to our code from the library. Note this is somewhat similar to the
-barrier slicing. The second novelty is a true concolic execution because it
-runs the \textsc{Klee} symbolic executor and a modified \textsc{Qemu} virtual
-machine in parallel. Those two communicate with each other and exchange
-information, especially the symbolic state is updated from the dynamic
-execution and concrete values instantiated from the symbolic run whenever
-needed. Converters in both directions from x86 code to \llvm have to be in
-place to have both executions running. \textsc{S${}^2$e} was used to to find
-errors in Windows network drivers, and allegedly it was the first one to
-employ the symbolic execution for performance analysis too.
-\textsc{S${}^2$e}'s parallel engined works on the top of \textsc{Ddt${}^+$},
-which is a reimplementation of a closed source tool \textsc{Ddt}~\cite{ddt}. A
-very similar to \textsc{S${}^2$e}, but less generic framework is
-\textsc{BitBlaze}~\cite{bitblaze}. It analyses binary files and creates
-intermediate code with a reduced instruction set. This code is executed
-symbolically.  Concurrently, the analyzed program is executed dynamically by a
-component that is capable of monitoring and binary instrumentation. These two
-are glued together by a third component that ensures communication between
-the first two. One of unusual uses is generating exploits by a comparison of
-unpatched and patched versions.  \textsc{BitBlaze} was used for checking HTTP
-and NTP protocol servers~\cite{bitblaze_net}.
+As we are mainly interested only in some parts of the analyzed code, the
+symbolic execution does not fork in, let us say, libraries. Only when the
+execution gets back to our code from the libraries, it can fork again.  The
+second novelty is a true concolic execution because it runs the \textsc{Klee}
+symbolic executor and a modified \textsc{Qemu} virtual machine in parallel.
+Those two communicate with each other and exchange information, especially the
+symbolic state is updated from the dynamic execution and concrete values
+instantiated from the symbolic run whenever needed. Converters in both
+directions from x86 code to \llvm have to be in place to have both executions
+running.  \textsc{S${}^2$e} was used to to find errors in Windows network
+drivers, and allegedly it was the first one to employ the symbolic execution
+for performance analysis too.  \textsc{S${}^2$e}'s parallel engine works on
+the top of \textsc{Ddt${}^+$}, which is a reimplementation of a closed source
+tool \textsc{Ddt}~\cite{ddt}. A very similar to \textsc{S${}^2$e}, but less
+generic framework is \textsc{BitBlaze}~\cite{bitblaze}. It analyses binary
+files and creates intermediate code with a reduced instruction set. That is
+executed symbolically.  One of unusual uses is generating exploits by a
+comparison of unpatched and patched versions.  \textsc{BitBlaze} was used for
+checking HTTP and NTP protocol servers~\cite{bitblaze_net}.
 \textsc{Bitscope}~\cite{bitscope} is built on the same cornerstone as
 \textsc{BitBlaze}, but provides understanding of dependencies between program
 inputs and outputs. Both were used for recognizing malware in software.
 Another true concolic executor is \textsc{Sjpf}~\cite{sjpf} stemming from
-\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference is that it
-symbolically executes the Java bytecode, therefore performing the symbolic
-execution more directly. Nevertheless its downside is that it still does not
-track constraints when switching from symbolic execution to concrete as the
-ones above.
+\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference between them is
+that \textsc{Sjpf} symbolically executes the Java bytecode, therefore performs
+the symbolic execution more directly. Nevertheless its downside is that it
+still does not track constraints in both directions as the ones above, only
+when switching from concrete execution to symbolic.
 
+\textsc{Check 'n' Crash}~\cite{check_crash} does quite the opposite to
+\textsc{Cute}. First, it runs coarse symbolic execution to find a suspicious
+location in code, then the tool generates a test case and runs the program
+dynamically to verify the test.  There are also overviews where is a
+summarization of some symbolic execution techniques we mention
+above~\cite{se_review88, se_review09, se_review10, se_review13}. And we also
+employ the symbolic execution in our tool described in
+Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
+
+% SADAT and IVS are missing
 %EL1~\cite{se_el1}
 
 
