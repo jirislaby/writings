@@ -5,59 +5,46 @@ At the beginning of the PhD studies, we were surveying the current known
 techniques used for software checking. Of course many techniques were available
 and some software projects were in the development. One of the papers to
 really stir interest was~\cite{metacomp}, showing that static analysis can
-efficiently find many interesting bugs in real-world code.  This work
+efficiently find many interesting errors in real-world code. This work
 eventually led to a successful commercial tool called
 \textsc{Coverity Prevent}~\cite{coverity}. Over the years, several other
 successful tools, like \textsc{CodeSonar}~\cite{codesonar} or
 \textsc{Klocwork}~\cite{klocwork}, appeared.  However, such fully-featured
-tools are neither free to obtain, nor is their code available (e.g.~for
+tools are neither free to obtain, nor is their code available (e.g.\ for
 developing new algorithms or tailoring the existing tools to specific tasks).
-The existing free tools are usually severely limited in what they can do,
-especially when it comes to checking real-world C code such as the Linux kernel
-(e.g.~\textsc{Uno}~\cite{uno}, \textsc{Sparse}~\cite{sparse},
-\textsc{Smatch}~\cite{smatch}).  One notable exception is
-\textsc{FindBugs}~\cite{findbugs}, a successful tool, but working solely on
-Java code.
+The existing free tools were usually severely limited in what they can do,
+especially when it comes to checking real-world C code such as the Linux
+kernel. These include \textsc{Uno}~\cite{uno}, \textsc{Sparse}~\cite{sparse},
+and \textsc{Smatch}~\cite{smatch}.
 
-We decided to implement an open source program for finding bugs aimed at
-checking the kernel. We were inspired by success of
-\textsc{xgcc}~\cite{metacomp} and its property-description language
-\textsc{Metal}~\cite{metal}. In this section we follow the development of the
-tool including the theory behind and report of successes and failures.
+We decided to implement an open source robust framework for two purposes:
+finding errors in software and to make easier development of diverse static
+analysis algorithms. We named the framework \stan. It is an abbreviation of
+static analyser and was deliberately chosen not to be any English word for
+easier searching on the web. To fulfill \stan's role, we decided to write it in
+Java as it is relatively easy to learn and is not prone to some pointer errors
+class present in other languages. We tried to design it to be fully generic to
+allow for implementation of many types of analyses. An implementation of such
+an algorithm within the framework is called a \emph{checker}. We implemented
+some checkers too, so \stan already contains four of them. The most concise
+checker was inspired by the success of \textsc{Xgcc}~\cite{metacomp} and its
+property-description language \textsc{Metal}~\cite{metal}.
 
-\cite{cpachecker}
+\stan is specifically developed to check software written in C. Its parser is
+powerful enough to handle the code like the whole Linux kernel. So an
+implemented checker can be immediately evaluated on large real-world software.
+This chapter covers the development of \stan including the theory behind and
+report of successes and failures.  Since the time we released \stan, other
+similarly powerful frameworks appeared. We provide
+\textsc{CPAchecker}~\cite{cpachecker} as an example.
 
-\section{The Tool}
-
-\stan is intended to fill this gap for the C language. It can be
-seen in two ways:
-\begin{enumerate}
-\item \stan is a robust framework (written predominantly in Java) for
-  implementing diverse static analysis algorithms. An implemented algorithm
-  can be immediately evaluated on large real-world software projects written
-  in C as the framework is capable to process such projects (for example, it
-  can process the whole Linux kernel). An implementation of such an algorithm
-  within the framework is called a \emph{checker}.
-
-  \item As \stan already contains four checkers, it can be also seen as a
-  working static analysis tool.
-\end{enumerate}
-
-% OBDA - this is unnecessary
-% \MT{
-% The tools mentioned so far, including \stan, provide may\todo{this was
-% circled} analysis. There is also a wide range of static analysis tools
-% providing must analysis. Successful tools like \textsc{Pex}, \textsc{Klee},
-% \textsc{Exe}, or \textsc{Sage} are of that kind. Since may and must analyses
-% are complementary, they are very different from \stan in basic principles.
-% }
-
-The paper is structured as follows. Section~\ref{sec:framework}
-describes the functionality provided by the framework, while
-Section~\ref{sec:checkers} is devoted to the four existing checkers.
-In Section~\ref{sec:results} we present some results of running \stan on the Linux
-kernel. The last section summarises the basic strengths of \stan and
-mentions some directions of future development.
+\paragraph{Chapter Organization}
+This chapter is structured as follows. Section~\ref{sec:framework} describes
+the functionality provided by the framework, while Section~\ref{sec:checkers}
+is devoted to the four existing checkers.  In Section~\ref{sec:results} we
+present some results of running \stan on the Linux kernel. The last section
+summarises the basic strengths of \stan and mentions some directions of future
+development.
 
 %}}}
 %{{{ Framework
@@ -65,15 +52,11 @@ mentions some directions of future development.
 \section{Framework Functionality}
 \label{sec:framework}
 
-The \stan framework is modular and fully open. It is designed to allow
-static analysis of large software projects like Linux kernel. Furthermore it is
-aimed to reduce effort when implementing a new static analysis technique.
-Architecture of the framework is depicted in Fig.~\ref{fig:architecture},
-and is more or less standard. The bug-finding algorithms are implemented as
-\emph{checkers}, and will be described in more detail in
-Section~\ref{sec:checkers}. In this section we focus on the functionality of
-the framework itself, describing only the non-standard or for some other
-reason interesting features.
+The \stan framework is modular and fully open.  Architecture of the framework
+is depicted in Figure~\ref{fig:architecture}, and is more or less standard.
+In this section we focus on the functionality of the framework itself,
+describing only the non-standard or for some other reason interesting
+features.
 
 \begin{figure}[!htb]
   \centering
@@ -95,19 +78,19 @@ the necessary information from a project \textsf{Makefile}. In this case,
 \stan also remembers compiler flags for preprocessing purposes. This
 functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. 
 % At the
-% bottom left corner of Fig.~\ref{fig:architecture}, we show a list of
+% bottom left corner of Figure~\ref{fig:architecture}, we show a list of
 % \texttt{.C} files which are identified in the configuration.
 
 The user must also specify the checkers which should be run on the
 configured source files. 
 % We can see the list of selected checkers on the top of
-% Fig.~\ref{fig:architecture}. 
+% Figure~\ref{fig:architecture}. 
 There can be many checkers running simultaneously in \stan. However they
 cannot share any data and proceed independently.
 Checkers themselves can also be configured through their own configuration
 files. 
 % They are
-% depicted at the top right corner of Fig.~\ref{fig:architecture}.
+% depicted at the top right corner of Figure~\ref{fig:architecture}.
 The configuration can be passed to the \stan framework either via command line
 arguments, or using the graphical interface.
 
@@ -120,7 +103,7 @@ kernel. We are currently working on support of other languages, in
 particular C++, a prototype implementation for which is included in the
 distribution. The parsing pipeline, including a preprocessing the source
 files by the standard GNU C preprocessor, is depicted at the bottom in
-Fig.~\ref{fig:architecture}.  It is important to note that we do not parse
+Figure~\ref{fig:architecture}.  It is important to note that we do not parse
 the source files in a sequence one by one as they appear in a
 configuration. Since we use streaming (which we discuss later), the pipeline
 is applied as needed for each individual source file.
@@ -148,7 +131,7 @@ Once the code is parsed, it is represented using \stan's \emph{internal structur
 among functions, a control flow graph (CFG) for each function, and an abstract
 syntax tree (AST) for the whole file. Subtrees in the AST are referenced from
 appropriate CFG nodes. We show these structures in the middle of
-Fig.~\ref{fig:architecture}. All these structures can be dumped in a textual
+Figure~\ref{fig:architecture}. All these structures can be dumped in a textual
 or graphical form.
 
 Since we aim at large software projects consisting of hundreds or thousands of
@@ -249,10 +232,10 @@ value returning). Again, this can be done using a single call to the \stan
 framework.  
 
 The functionality described in this section is shown in
-Fig.~\ref{fig:architecture} as ``Code navigating libraries''.
+Figure~\ref{fig:architecture} as ``Code navigating libraries''.
 
 % The discussed functionality is shown to the left of internal representation in
-% Fig.~\ref{fig:architecture}.
+% Figure~\ref{fig:architecture}.
 
 \subsubsection{Support for Function Summaries}
 \label{ssec:summaries}
@@ -274,7 +257,7 @@ static analysis technique. Each checker has an access to a shared internal
 structure of analysed source files. They are also provided with an access to
 the algorithms providing navigation in those structures. This is done by an
 interface between checkers and internal structure and libraries of the
-framework. The interface is depicted in Fig.~\ref{fig:architecture} right
+framework. The interface is depicted in Figure~\ref{fig:architecture} right
 bellow the checkers.
 
 The checkers are integrated in the framework of \stan using concrete factory
@@ -311,7 +294,7 @@ error. A datatype is provided in the \stan framework to describe an error.
 In the framework there are then several possibilities how to present the error
 traces back to the user of \stan: they can be printed to the console,
 displayed using a built-in error trace browser in the GUI (see
-Fig.~\ref{fig:bugtrace}), or saved to an external file in XML format. This
+Figure~\ref{fig:bugtrace}), or saved to an external file in XML format. This
 XML file has a wide variety of possible applications. For example, we supply a
 tool transforming the XML file into an \textsc{SQLite} database. The database
 is supplemented with a web interface allowing to browse errors in the database
@@ -322,7 +305,7 @@ frequency of errors of the same kind, percentage of false positives (based on
 user feedback).
 
 Error reporting and tracing pipeline is depicted to the right of interface and
-internal representation of Fig.~\ref{fig:architecture}.
+internal representation of Figure~\ref{fig:architecture}.
 
 %}}}
 %{{{ Checkers
@@ -341,7 +324,7 @@ transitions, i.e.~pairing of patterns and automaton state changes. Properties
 like locking discipline, interrupt management, null pointer dereference,
 dangling pointers and many others can be described this way.
 
-An example of the locking checker is presented in Fig.~\ref{fig:automaton}.
+An example of the locking checker is presented in Figure~\ref{fig:automaton}.
 The automaton starts in the unlocked state (\textsf{U}) and a transition is
 made when there is an outgoing edge from the current state with a pattern
 matching the action currently performed by the analysed program. E.g. if
