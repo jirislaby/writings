@@ -370,8 +370,7 @@ whatever value to remain sound).
 
 \subsection*{Types of Analyses}\label{sec:types_anal}
 Analyses are also split into sets of what information they provide. There
-are two properties in this category presented below. More on those are in
-Section~\ref{sec:data-flow}\todo{really?}.
+are two properties in this category presented below.
 
 \begin{description}
 \item[May/must] Sometimes we are interested whether some result given by an
@@ -395,7 +394,7 @@ already set to some value, analyzers usually propagate the information
 forwards.
 \end{description}
 
-\todo{emphasize that this thesis delas with practical aspects of using static
+\todo{emphasize that this thesis deals with practical aspects of using static
 analyzers}
 
 \subsection*{Other Views}
@@ -643,20 +642,10 @@ but we do not need more information for the purposes of this thesis. More
 information on parsers can be learnt from various literature about
 compilers~\cite{dragon, muchnick}.
 
-\subsection*{Pointer Analysis}
+\subsection*{Pointer Analysis}\label{sec:pointer_analysis}
 For languages using pointers like C, it is important to know where these
 pointers point to. Consider the global integer variable and an integer pointer
-as are in the code depicted in Figure~\ref{fig:lst_ptsto}. Without knowing
-that \code{p} can point to and actually changes \code{x}, we would conclude
-that \code{fun} always returns 0. But it returns whatever it gets on the
-input as a parameter \code{a}. For that purpose, algorithms known as
-\emph{pointer analyses} exist.  There are two basic approaches to pointer
-analysis used nowadays. They are either based on equalities~\cite{steensgaard}
-or subsets~\cite{andersen} of the sets of possible pointer targets. While
-the former makes the sets of targets equal, the latter only copies the
-members. In general, this makes subset-based analyses more precise, but a
-little bit slower.
-
+as are in the code depicted in Figure~\ref{fig:lst_ptsto}.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -672,6 +661,25 @@ int fun(int a) {
 \end{center}
 \caption{Pointer analysis demonstrative example.} \label{fig:lst_ptsto}
 \end{figure}
+Without knowing that \code{p} can point to and actually changes \code{x}, we
+would conclude that \code{fun} always returns 0. But it returns whatever it
+gets on the input as a parameter \code{a}. For that purpose, algorithms known
+as \emph{pointer analyses} exist.  There are two basic approaches to pointer
+analysis used nowadays: Steensgard's~\cite{steensgaard} and
+Andersen's~\cite{andersen}. Both analyses are \emph{may}. But while the former
+is based on equalities of the sets of possible pointer targets, the other on
+their subsets. So the former makes the sets of targets equal whenever two
+pointers can point to a variable. The latter only copies some (or all)
+members. In general, this makes subset-based analyses more precise, but
+slower. There is an approach that tries to speed up the Andersen's analysis
+while preserving its accuracy. This approach was suggested by Shapiro and
+Horwitz~\cite{shapiro_horwitz}.  They divide the program variables into
+categories. Then, it works similar to Steensgaard's algorithm, except they
+make variables set equal only if they are in the same category. The analysis
+is then repeated with information about categories from the previous run. This
+often results in more accurate results than Steensgaard's algorithm, but it is
+faster than Andersen's. The speed is still slower than Steensgaard's
+nonetheless.
 
 The \emph{alias} or sometimes \emph{points-to analysis}~\cite{alias_anal} is a
 bit different to the pointer analysis in what it is able to tell about
@@ -708,6 +716,9 @@ member \code{void *x}, this analysis considers them to be the same and updates
 a new object. The other analysis, the true \emph{field-sensitive} one,
 properly handles members of structures in the natural sense, but for a higher
 computation price, of course.
+
+For more information about pointer analysis, see for example Hind's
+discussion~\cite{ptr_solved}.
 
 \section{The Goals}
 This thesis studies applications of contemporary automatic bug-finding

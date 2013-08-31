@@ -4,12 +4,12 @@
 At the beginning of the PhD studies, we were surveying the current known
 techniques used for software checking. Of course many techniques were available
 and some software projects were in the development. One of the papers to
-really stir interest was~\cite{metacomp}, showing that static analysis can
-efficiently find many interesting errors in real-world code. This work
-eventually led to a successful commercial tool called
-\textsc{Coverity Prevent}~\cite{coverity}. Over the years, several other
-successful tools, like \textsc{CodeSonar}~\cite{codesonar} or
-\textsc{Klocwork}~\cite{klocwork}, appeared.  However, such fully-featured
+really stir the interest was about metacompilation~\cite{metacomp}. It showed
+that static analysis can efficiently find many interesting errors in
+real-world code. This work eventually led to a successful commercial tool
+called \textsc{Coverity Prevent}~\cite{coverity}. Over the years, several
+other successful tools, like \textsc{CodeSonar}~\cite{codesonar} or
+\textsc{Klocwork}~\cite{klocwork} appeared.  However, such fully-featured
 tools are neither free to obtain, nor is their code available (e.g.\ for
 developing new algorithms or tailoring the existing tools to specific tasks).
 The existing free tools were usually severely limited in what they can do,
@@ -28,14 +28,18 @@ allow for implementation of many types of analyses. An implementation of such
 an algorithm within the framework is called a \emph{checker}. We implemented
 some checkers too, so \stan already contains four of them. The most concise
 checker was inspired by the success of \textsc{Xgcc}~\cite{metacomp} and its
-property-description language \textsc{Metal}~\cite{metal}.
+property-description language \textsc{Metal}~\cite{metal}. This work
+implements the abstract interpretation as is discussed in
+Chapter~\ref{sec:ai}.
 
 \stan is specifically developed to check software written in C. Its parser is
 powerful enough to handle the code like the whole Linux kernel. So an
 implemented checker can be immediately evaluated on large real-world software.
+\stan has also \emph{graphical user interface} (GUI) for easier .
 This chapter covers the development of \stan including the theory behind and
-report of successes and failures.  Since the time we released \stan, other
-similarly powerful frameworks appeared. We provide
+report of successes and failures. \stan was released and a paper about the
+framework published~\cite{stanse} some time ago. Since then, other similarly
+powerful frameworks appeared.  We provide
 \textsc{CPAchecker}~\cite{cpachecker} as an example.
 
 \paragraph{Chapter Organization}
@@ -57,7 +61,6 @@ is depicted in Figure~\ref{fig:architecture}, and is more or less standard.
 In this section we focus on the functionality of the framework itself,
 describing only the non-standard or for some other reason interesting
 features.
-
 \begin{figure}[htb]
 \begin{center}
     \pgfdeclarelayer{background}
@@ -72,13 +75,13 @@ features.
 	\node [tl_state, inner xsep=3mm, inner ysep=5mm, yshift=3mm,
 	  bottom color=black!10, top color=black!2,
 	  fit= (AST) (CFG) (CG) (MORE)] (INT) {};
-	\node [below=1.5mm of INT.north] {Internal representation};
+	\node [below=1.5mm of INT.north] {Internal Representation};
       \end{pgfonlayer}
 
       \node [tl_phase, below=4mm of INT] (PARSER) {Parser}
         edge[->] node {} (INT);
       \node [tl_state, align=center, below=4mm of PARSER] (PREPF) {
-	Preprocessed \\
+	  Preprocessed \\
 	  Files
 	}
         edge[->] node {} (PARSER);
@@ -122,7 +125,7 @@ features.
   \label{fig:architecture}
 \end{figure}
 
-\subsubsection{Configuration}
+\subsection*{Configuration}
 
 The \stan framework contains data structures capturing a configuration of an
 analysis to be performed. We always need to know what source files to analyse
@@ -131,65 +134,61 @@ and by what checkers. That information we call \emph{configuration}.
 There are several ways how to tell \stan which source files to analyse. Besides
 the standard possibilities (a given file, all files from a given
 directory, all files listed in a list), \stan can also derive all
-the necessary information from a project \textsf{Makefile}. In this case,
+the necessary information from a project \code{Makefile}. In this case,
 \stan also remembers compiler flags for preprocessing purposes. This
-functionality is inspired by the \textsc{Sparse}~\cite{sparse} tool. 
-% At the
-% bottom left corner of Figure~\ref{fig:architecture}, we show a list of
-% \texttt{.C} files which are identified in the configuration.
+functionality is inspired by the \textsc{Sparse} tool~\cite{sparse}.
 
-The user must also specify the checkers which should be run on the
-configured source files. 
-% We can see the list of selected checkers on the top of
-% Figure~\ref{fig:architecture}. 
-There can be many checkers running simultaneously in \stan. However they
-cannot share any data and proceed independently.
+The user must also specify checkers which should be run on the chosen source
+files.  There can be many checkers running simultaneously in \stan.
+Nonetheless when they want to share data, thy cannot proceed independently.
 Checkers themselves can also be configured through their own configuration
-files. 
-% They are
-% depicted at the top right corner of Figure~\ref{fig:architecture}.
+files as can be see in Figure~\ref{fig:architecture} for \textsf{Checker N}.
 The configuration can be passed to the \stan framework either via command line
 arguments, or using the graphical interface.
 
-\subsubsection{Parsing Source Files}
+\subsection*{Parsing Source Files}
 
 The \stan framework can process source files written in C, more
-specifically in the ISO/ANSI C99 standard together with most of the GNU C
-extensions. This allows \stan to process software projects like the Linux
-kernel. We are currently working on support of other languages, in
-particular C++, a prototype implementation for which is included in the
-distribution. The parsing pipeline, including a preprocessing the source
-files by the standard GNU C preprocessor, is depicted at the bottom in
-Figure~\ref{fig:architecture}.  It is important to note that we do not parse
-the source files in a sequence one by one as they appear in a
-configuration. Since we use streaming (which we discuss later), the pipeline
-is applied as needed for each individual source file.
+specifically in the ISO/ANSI C99 standard~\cite{ansi_c} together with most of
+the GNU C extensions~\cite{gcc}. This allows \stan to process software
+projects like the Linux kernel. We also provide an experimental implementation
+to support C++~\cite{ansi_cpp}.  The parsing pipeline includes preprocessing
+of source files as can be seen at the bottom of Figure~\ref{fig:architecture}.
+This is done by the standard GNU C preprocessor \textsc{Cpp}.  It is important
+to note that we do not parse the source files in a sequence one by one as they
+appear in a configuration. Since we use streaming (which we discuss later),
+the pipeline is applied as on-demand for each individual source file.
 
-The parser used in \stan is generated using the \textsc{AntLR} tool from
-our own annotated C grammar. The reason for us to write our own parser was
-that at the time we started to develop \textsc{Stanse} we could not find
-free parser which, while being suitable for our purposes, would be able to
-parse most of the GNU C. (Linux Kernel makes heavy use of GNU C language
-extensions.)  There is one notable exception: \textsc{Clang}, which is
-slowly improving and will be able to handle the Linux kernel in the near
-future. However, in its current form it still contains bugs and cannot be
-used reliably. Our plan is to switch from our parser to \textsc{Clang} once
-it becomes stable and feature complete.
+The parser used in \stan is generated using the \textsc{AntLR}
+tool~\cite{antlr4} from our own annotated C grammar. The reason for us to
+write our own parser was that at the time we started developing
+\textsc{Stanse} we could not find a free parser suitable for our purposes.
+The main requirement was to parse most of the GNU C as the Linux kernel makes
+heavy use of GNU C language extensions. Even though there were full compilers
+like \textsc{Clang}~\cite{clang}, they are not still capable to handle the
+kernel fully now. And in its current form, it still contains bugs so cannot
+be used reliably. Our plan is to switch from our parser to \textsc{Clang} once
+it becomes stable and feature complete, or any new compiler if there appears
+one.
 
-Also, one may object that we could use the parser from the GNU compiler
-(GCC).  Unfortunately this parser, and most importantly its internal
-structures, is not suitable for our purposes.  For example the CFG is built
-on the top of RTL or tree representation (we encourage the reader to look
-into the GCC manual where these are described).
+Of course there must be at least a parser which the is able to handle the
+kernel, otherwise kernel developers could not run the kernel. They use
+\textsc{Gcc}.  Unfortunately parser in this compiler, and most importantly its
+internal structures, is not suitable for our purposes. One reason is that
+control flow graph is built on the top of register transfer language (RTL) or
+tree representation. Those are very hard to work with when it comes to the
+code analysis. We encourage the reader to look into the GNU C compiler
+internal manual~\cite{gcc_intern} where these are described.
 
-\subsubsection{Program Internal Representation}
+\subsection*{Program Internal Representation}
 
 Once the code is parsed, it is represented using \stan's \emph{internal structures}: a call graph
 among functions, a control flow graph (CFG) for each function, and an abstract
 syntax tree (AST) for the whole file. Subtrees in the AST are referenced from
-appropriate CFG nodes. We show these structures in the middle of
-Figure~\ref{fig:architecture}. All these structures can be dumped in a textual
-or graphical form.
+appropriate CFG nodes. These structures are depicted in the middle of
+Figure~\ref{fig:architecture} as ``Internal Representation''. For developers
+of new checkers, all these structures can be dumped in a textual or graphical
+form.
 
 Since we aim at large software projects consisting of hundreds or thousands of
 modules (compilation units), it is often impossible in practice to store the
@@ -201,41 +200,37 @@ needs to access some internal structure belonging to the module. In other
 words, the internal structures are constructed on demand, in a lazy manner.
 
 If the memory occupied by internal structures exceeds a given limit, some
-internal structures have to be freed before another module is streamed
-in. The structures to be freed are selected using the LRU (least recently used)
+internal structures have to be freed before another module is streamed in. The
+structures to be freed are selected using the least recently used (LRU)
 approach: \stan discards all internal structures of the module whose
 structures are not accessed for the longest time. If the discarded structure
 is accessed again later, the corresponding module is streamed back in. Both
 laziness of internal structures and streaming are completely invisible to
 checkers. 
 
-In the current implementation of streaming, each source file streamed out
-from the memory is completely discarded. \stan does not back up already
-parsed internal structures into auxiliary files before discarding. As a
-consequence, when internal structures of the discarded file are needed again,
-\stan starts the parsing pipeline of the file from scratch to recreate
-requested internal structures. Although loading of previously parsed internal
-structures from auxiliary files would speed up the streaming process,
-profiling of \stan's performance on the Linux kernel has not shown
-streaming to be a performance bottleneck. However this could be easily
-changed if streaming performance becomes a problem in the future.
+In the current implementation of streaming, each source file streamed out from
+the memory is completely discarded. \stan does not back up already parsed
+internal structures into auxiliary files before discarding. As a consequence,
+when internal structures of the discarded file are needed again, \stan starts
+the parsing pipeline of the file from scratch to recreate requested internal
+structures. Although loading of previously parsed internal structures from
+auxiliary files would speed up the streaming process, profiling of \stan's
+performance on the Linux kernel has not shown streaming to be a performance
+bottleneck. This could be easily changed if streaming performance becomes a
+problem in the future, nonetheless.
 
 
-\subsubsection{Pointer Analysis in \stan}
+\subsection*{Pointer Analysis in \stan}
 
 Since each bug-finding/program analysis technique may have different
 requirements regarding pointer analysis, the \stan framework currently
-provides two pointer analyses: \textit{Steensgaard}'s~\cite{steensgaard} and
-\textit{Shapiro-Horowitz}'s~\cite{shapiro_horwitz}. Both analyses are
-\emph{may} analyses. The \textit{Steensgard}'s analysis is very fast and it is
-widely used in practice.  On the other hand it is not very accurate. The
-\textit{Shapiro-Horowitz}'s analysis allows parametrisation between
-\textit{Steensgard}'s and \textit{Andersen}'s analyses. One can therefore
-balance between speed of \textit{Steensgard}'s analysis and accuracy of
-\textit{Andersen}'s one.
+provides a developer with two pointer analyses:
+\textit{Steensgaard}'s~\cite{steensgaard} and
+\textit{Shapiro-Horowitz}'s~\cite{shapiro_horwitz}. See
+Section~\ref{sec:pointer_analysis} for introduction to pointer analyses or
+Hind's discussion~\cite{ptr_solved}.
 
-
-\subsubsection{Matching Language Constructs}
+\subsection*{Matching Language Constructs}
 
 Many static analyses change their internal state only on some subset of
 program expressions. For example, when finding race conditions in a
@@ -244,19 +239,18 @@ while ignoring all others. The \stan framework therefore provides a
 specification language for determining a set of program expressions.
 
 The language defines a collection of \emph{patterns}. Each pattern is supposed
-to identify a single specific kind of sub-trees in AST of analysed program. A
-pattern itself is therefore also a sub-tree of AST, where some of its vertices
-are ``special''. They allow to define a set of possible sub-trees at that
-vertex.
+to identify a single specific kind of sub-trees in an AST of an analysed
+program.  A pattern itself is therefore also a sub-tree of the AST, where some
+of its vertices are ``special''. The special vertices allow to define a set of
+possible sub-trees at that vertex, e.g.\ wildcards.
 
-This is, however, not the only possible approach. For example, in the
-METAL~\cite{metal}\todo{tady bylo METAL} specification language, a \texttt{C} expression can be
-directly parametrised to define a set. The solution we implemented exploits
-the fact that checkers in \stan work with AST intensively, and therefore
-identifying expressions in terms of AST is very practical.
+This is, nonetheless, not the only possible approach. For example, in the
+METAL~\cite{metal} specification language, a C expression can be directly
+parametrised to define a set. The solution we implemented exploits the fact
+that checkers in \stan work with the AST intensively, and therefore
+identifying expressions in terms of the AST is very practical.
 
-\subsubsection{Traversing Internal Representation}
-\label{ssec:travers}
+\subsection*{Traversing Internal Representation}\label{sec:travers}
 
 Although a checker may need to work with the internal structures in an
 arbitrary way, most checkers walk through CFGs using some standard
@@ -267,8 +261,8 @@ specifying
 \begin{itemize}
 \item whether it should go through CFGs forwards or backwards, breadth-first
   or depth-first,
-\item whether the interprocedural walk-through should be performed or not (if
-  not, the function calls are ignored), and
+\item whether the walk-through should be performed inter-procedurally or not
+  (if not, the function calls are ignored), and
 \item a method (callback) to be called for each visited node in a CFG.
 \end{itemize}
 This makes implementation of new algorithms extremely simple.
@@ -276,261 +270,288 @@ This makes implementation of new algorithms extremely simple.
 For example, when a checker needs to implement a forward flow-sensitive
 analysis, it may ask the \stan framework to traverse paths in CFGs in forward
 depth-first manner. This can be implemented by a single call to a function
-\texttt{traverseCFGToDepthForward}, which takes as an argument a CFG and a
-subclass of \stan class \texttt{CFGPathVisitor}. In this class the checker
+\code{traverseCFGToDepthForward}, which takes as an argument a CFG and a
+subclass of \stan's class \code{CFGPathVisitor}. In this class the checker
 defines the action which should be taken whenever a CFG node is visited
 (already in the requested order). The checker implements the action in a
-method \texttt{visit} of the subclass.
+method \code{visit} of the subclass.
 
-In addition, for those interprocedural analyses which do not construct
-summaries \stan provides an automated traversal among different CFGs
+In addition, for those inter-procedural analyses which do not construct
+summaries, \stan provides an automated traversal among different CFGs
 according to function calls (involving automated parameters passing and
 value returning). Again, this can be done using a single call to the \stan
 framework.  
 
-The functionality described in this section is shown in
-Figure~\ref{fig:architecture} as ``Code navigating libraries''.
+All this functionality described in this section is shown in
+Figure~\ref{fig:architecture} as ``Code Navigating Libraries''.
 
-% The discussed functionality is shown to the left of internal representation in
-% Figure~\ref{fig:architecture}.
+\subsection*{Support for Function Summaries}\label{ssec:summaries}
 
-\subsubsection{Support for Function Summaries}
-\label{ssec:summaries}
-
-Interprocedural analyses typically build function summaries. Unfortunately,
+Inter-procedural analyses typically build function summaries. Unfortunately,
 these summaries may differ from one analysis to another. Nonetheless, quite
 common part in building many summaries is passing formal and actual parameters
 to call sites and mapping return values to appropriate variables. Therefore,
 the \stan framework provides classes simplifying the parameter passing and
 values returning for checkers. These classes also provide a conversion of a
 given expression in the caller into an equal expression in the called
-function. The conversion can also be required in the opposite direction,
-i.e.~for returned values.
+function. The conversion can also be requested in the opposite direction,
+i.e.\ for returned values.
 
-\subsubsection{The Concept of Checkers}
+\subsection*{The Concept of Checkers}
 
-In the \stan framework a checker is an implementation of some concrete
-static analysis technique. Each checker has an access to a shared internal
-structure of analysed source files. They are also provided with an access to
+In the \stan framework, a checker is an implementation of some concrete
+static analysis technique. Each checker has an access to shared internal
+structures of analysed source files. They are also provided with an access to
 the algorithms providing navigation in those structures. This is done by an
-interface between checkers and internal structure and libraries of the
-framework. The interface is depicted in Figure~\ref{fig:architecture} right
-bellow the checkers.
+interface among checkers, internal structures and libraries of the framework.
+The interface is depicted in Figure~\ref{fig:architecture} right bellow the
+checkers.
 
 The checkers are integrated in the framework of \stan using concrete factory
 design pattern. Therefore, to insert a new checker to the framework one needs
 to implement generic checker interface and register it to the checkers'
 factory of the framework. Then it gains a full access to the features of the
-framework accessible through the discussed interface.
+framework accessible through the discussed interface.  The process of
+integration requires only three simple steps. The first step is to create a
+subclass of \stan's abstract class \code{Checker}, say \code{MyChecker}.
+The most important method to implement is \code{check}. This is a method where
+the analysis algorithm should be implemented. The second step is to integrate
+the newly created class into the framework. This means implementation of
+\code{MyCheckerCreator}, a subclass of the \code{CheckerCreator} abstract
+class. The final step is to register the class \code{MyCheckerCreator}. It
+comprises adding a line \code{registerCheckerCreator(new MyCheckerCreator())}
+at the end of \code{CheckerFactory.java}.
 
-It is very easy to integrate a new checker into \stan. The process requires
-only three simple steps to be fully functional. The first step is to create a
-subclass of \stan abstract class \texttt{Checker}, say \texttt{MyChecker}.
-The most important method to implement is \texttt{check}. There the analysis
-algorithm should be implemented.
-
-The second step is to integrate the newly created class into the framework.
-This means implementation of \texttt{MyCheckerCreator}, a subclass of
-\texttt{CheckerCreator} abstract class. And the final step is to register the
-class \texttt{MyCheckerCreator}. It comprises adding a line
-\texttt{registerCheckerCreator(new MyCheckerCreator())} at the end of
-\texttt{CheckerFactory.java}.
-
-\subsubsection{Processing Errors}
+\subsection*{Processing Errors}
 
 \begin{figure}[t]
   \centering
-    \includegraphics[width=9cm]{images/screen-bug-tracing}
+    \includegraphics[width=12cm]{images/screen-bug-tracing}
   \caption{Error trace browser in the \stan GUI.}
   \label{fig:bugtrace}
 \end{figure}
 
 Once a checker finds an error, it reports the error back to the framework in
-the form of an annotated \emph{error trace} - a path in the analysed code demonstrating this
-error. A datatype is provided in the \stan framework to describe an error. 
-In the framework there are then several possibilities how to present the error
-traces back to the user of \stan: they can be printed to the console,
-displayed using a built-in error trace browser in the GUI (see
-Figure~\ref{fig:bugtrace}), or saved to an external file in XML format. This
-XML file has a wide variety of possible applications. For example, we supply a
-tool transforming the XML file into an \textsc{SQLite} database. The database
-is supplemented with a web interface allowing to browse errors in the database
-via a web browser. Using the web browser or the built-in graphical error
-browser, one can mark errors as real bugs or false positives. \stan also
-provides various statistics of errors like number of errors per checker,
-frequency of errors of the same kind, percentage of false positives (based on
-user feedback).
+the form of an annotated \emph{error trace} -- a path in the analysed code
+demonstrating this error. We provide a datatype in the \stan framework to
+describe an error. The framework yields three possibilities how to present
+the error traces back to the user of \stan. First, they can be printed to the
+console. But as it is only a textual output, the traces are not very usable
+for large projects. Hence the GUI in \stan has a built-in trace browser which
+supports displaying the traces.  There is an example of a trace in the GUI in
+Figure~\ref{fig:bugtrace}. Finally, the traces can be saved to an external
+file in the XML format. This XML file has a wide variety of possible
+applications. For example, we supply a tool transforming the XML file into an
+\textsc{SQLite} database. The database is supplemented with a web interface
+allowing to browse errors in the database via a web browser. Using the web
+browser or the built-in graphical error browser, one can mark errors as real
+errors or false positives. \stan also provides various statistics of errors
+like number of errors per checker, frequency of errors of the same kind,
+percentage of false positives (based on the user feedback).
 
 Error reporting and tracing pipeline is depicted to the right of interface and
-internal representation of Figure~\ref{fig:architecture}.
+internal representation in Figure~\ref{fig:architecture}.
 
 %}}}
 %{{{ Checkers
 
 \section{Checkers}\label{sec:checkers}
 
-In this section we briefly describe the four currently available checkers. All
-four checkers  are provided with sample configuration so that they can be used
-instantly, however they can be configured differently when necessary. 
+In this section we describe the four currently available checkers. The first
+three checkers need a configuration of project-specific parameters like
+an enumeration of special function calls.  We provide a sample configuration for
+all of them so that they can be used out of the box. Of course, the
+configuration can be tailored to specific needs of other projects easily.
 
-\subsubsection{\AC}
-is heavily influenced by~\cite{metacomp}. It takes, as an input, a set of
-finite-state automata that describe the properties we want to check,
-patterns which match against the code to be checked, and finally
-transitions, i.e.~pairing of patterns and automaton state changes. Properties
-like locking discipline, interrupt management, null pointer dereference,
-dangling pointers and many others can be described this way.
-
-An example of the locking checker is presented in Figure~\ref{fig:automaton}.
-The automaton starts in the unlocked state (\textsf{U}) and a transition is
-made when there is an outgoing edge from the current state with a pattern
-matching the action currently performed by the analysed program. E.g. if
-there is an unlock action while the automaton is in an unlocked state, an error
-is reported.
-
-\begin{figure}[!htb]
+\subsection*{\AC}
+The \AC is heavily influenced by \textsc{Xgcc}~\cite{metacomp}. As can be seen
+from the name of the checker, it employs finite state automata. They describe
+the properties we want to check. These include checking locking discipline,
+interrupt management, null pointer dereference, dangling pointers and many
+others. Given such automaton, the checker tries to match the automata against
+code execution. To perform that, the \AC needs to know when to perform a
+transition. This is accomplished by specifying code patterns on the edges.
+Since the checker works on the control flow graph and we have subtrees of
+abstract syntax trees in there, patterns are AST subtrees too. It works
+similar to pattern matching described in Section~\ref{sec:pattern_matching}:
+we have an AST subtree with possible wildcards. An example of an automaton
+for checking proper pairing of locks is presented in
+Figure~\ref{fig:automaton}.
+\begin{figure}[htb]
   \begin{center}
     \tikzstyle{stat} = [circle,thick,draw,minimum size=1cm]
     \tikzstyle{edge} = [shorten <=1pt,>=stealth',semithick]
     \begin{tikzpicture}[node distance=2cm,font=\sffamily]
-        \node [stat] (ERR) {\textbf{Err}};
+        \node [stat] (ERR) {\textbf{Err}}
+	  edge [edge,loop above] node[right, xshift=2mm, yshift=-2mm]
+	  {\code{lock()}/\code{unlock()}} ();
         \node [stat] (U) [below left=of ERR] {U}
 	  edge [edge,->] node[above left] {\code{unlock()}} (ERR);
         \node [stat] (L) [below right=of ERR] {L}
 	  edge [edge,->] node[above right] {\code{lock()}} (ERR)
 	  edge [edge,<-,bend right=20] node[above] {\code{lock()}} (U)
 	  edge [edge,->,bend left=20] node[below] {\code{unlock()}} (U);
+	\node [left=6mm of U] {}
+	  edge [edge,->] node {} (U);
     \end{tikzpicture}
   \end{center}
-  \caption{Automaton for locks checking}
+  \caption{An automaton for checking locking properties.}
   \label{fig:automaton}
 \end{figure}
+The automaton starts in the unlocked state (\textsf{U}). A transition from
+that state is fired either when the checker matches a call to \code{unlock} or
+\code{lock}. In the former case, the automaton is transferred to the error
+state (\textsf{Err}) and the checker flags an error by generating an error
+trace. In the other case, the checker simply transfers the automaton to the
+locked state (\textsf{L}). The evaluation continues until a fixed point is
+reached.
 
-Compared to the implementation described in~\cite{metacomp} and~\cite{metal},
-our technique differs in several aspects. In particular, we do not use
-metacompilation, automata are not input-language specific (a pattern
-matching is used instead), and the interprocedural analysis is done in the
-context of a single input file.
+Compared to the implementation described by Engler et al.~\cite{metacomp,
+metal}, our technique differs in several aspects. In particular, we do not use
+metacompilation, automata are not input-language specific (a pattern matching
+is used instead), and the inter-procedural analysis is done in the context of
+a single input file.
 
-\subsubsection{\LC}
-accounts statistics about variable accesses. It also tracks which locks are
-locked while each of the variable is accessed. Again both variable accesses
-and locks are specified by patterns.
+\subsection*{\LC}
+The \LC tries to find locking errors in analyzed code. It performs so by
+accounting statistics about locked accesses to a variable. This approach is
+not new and is based on a previous work~\cite{lockchecker}.  Apart of tracking
+accesses to a variable, it also tracks which locks are locked while each
+of the variable is accessed. Then the \LC combines the two pieces of
+information together and counts statistics in how many cases each variable is
+accessed while some lock is held. If the difference is proportional, an error
+is reported. For instance if, some variable is changed 99 times while some
+lock is held and in one case the lock is not held, this is reported as a
+possible error. The boundary is currently set to 70. So if there is a variable
+accessed under a lock in more than 70\% cases and once or more it is not, the
+latter cases are reported as errant. Similar to the \AC, both variable
+accesses and locks are specified in a configuration by patterns.
 
-Then, combining the information about accesses and locks held, it
-counts a statistics in how many cases each variable is accessed while some
-lock is held. If the difference is proportional, an error is reported. So if,
-for instance, some variable is changed 99 times while some lock is held and in
-one case the lock is not, this is reported as a possible error. The boundary
-is currently set to 70, so that at least 70\% of accesses must be under locks.
-The rest (30\%) is then reported. This work is based upon~\cite{lockchecker}.
+\subsection*{\TC}
+The \TC is aimed at checking of possible deadlocks in concurrent programs.
+The technique is based on the notions of locksets~\cite{relay} and deadlock
+detection by looking for cycles in \emph{resource allocation graphs} (RAG).
+The \TC first tries to identify the parts of code which can run in parallel,
+as different threads. This is performed by searching of functions
+instantiating threads. We implicitly try functions such as
+\code{pthread\_create}. This is not enough for projects like the Linux kernel.
+There need not be explicit thread creation functions in modules. As some hooks
+in modules can be called in parallel, the code can run concurrently
+nonetheless. So on the top of list of thread creation functions, a user can
+also specify manually which hooks can run concurrently.
 
-\subsubsection{\TC}
-aims to check for possible deadlocks in concurrent programs. The technique
-is based on the notions of locksets of~\cite{relay} and deadlock detection
-by looking for cycles in \emph{resource allocation graphs (RAGs)}. \TC first
-tries to identify the parts of the code which can run in parallel, as
-different threads. This is performed by searching of functions instantiating
-threads (such as \texttt{pthread\_create}). Or, for the Linux kernel, we also
-specify manually which hooks may be run parallel.
+With the knowledge of where a thread starts, the \TC builds a set of
+\emph{dependency graphs} for each such thread. A dependency graph statically
+represents possible locksets during one execution of a thread. Dependency
+graphs are then combined and transformed into RAGs. If there is a circular
+lock dependency, a RAG contains a cycle. In such case an error is reported to
+the \stan framework.
 
-Then the checker builds a set of \emph{dependency graphs} for each such
-thread. A dependency graph statically represents possible locksets during
-one execution of a thread. Dependency graphs are then combined and transformed
-into RAGs. If there is a circular lock dependency, RAG contains a cycle. In
-such case an error is reported to the user.
-
-\subsubsection{\RC}
-searches CFGs for unreachable nodes. These are then reported as warnings or
-errors, depending on importance (e.g.~superfluous semicolons are less
-important than unused branch). The primary goal of \RC is to demonstrate the
-simplicity of a new checker implementation. With a help of the framework
-features described in Subsection~\ref{ssec:travers}, the code of the checker
-has less than 200 lines including the mentioned error/warning classification
-and many strings and comments.
-
-Even though it is a very simple checker it was still able to find serious bugs
-in the kernel. For example a superfluous semicolon can cause unexpected
-unconditional returns from functions like in the following code: \textsf{if
-(cond)\underline{;} return;}.
+\subsection*{\RC}
+The \RC is the simplest and also the smallest checker in \stan. Its name
+correctly suggests searching CFGs for unreachable nodes. These are then
+reported as warnings or errors depending on importance. The importance stems
+from the nature of an unreachable node. For example superfluous semicolons
+(which are still statements) are less important than an unused branch. The
+primary goal of the \RC is to demonstrate the simplicity of a new checker
+implementation. With help of the framework features described in
+Section~\ref{sec:travers}, the code of the checker has less than 200 lines
+including the mentioned error/warning classification and comments.  Even
+though it is a very simple checker, it was still able to find serious bugs in
+the Linux kernel. For example a superfluous semicolon can cause unexpected
+unconditional returns from functions like in the code of
+Figure~\ref{fig:stan_unreach}. As we can see on line~\ref{line:stan_unreach},
+there is a superfluous semicolon. It causes a preliminary unconditional return
+from a function. This was an error in the \code{ath9k} wireless driver.
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}
+if (rate_table->info[rate].valid_single_stream &&
+    !(ath_rc_priv->ht_cap & WLAN_RC_DS_FLAG));(*@\label{line:stan_unreach}@*)
+  return rate;
+\end{lstlisting}
+\end{tabular}
+\end{center}
+  \caption{A bug found by the \RC.}
+  \label{fig:stan_unreach}
+\end{figure}
 
 %}}}
 %{{{ Results
 
-\section{Results on the Linux Kernel}
-\label{sec:results}
+\section{Results on the Linux Kernel}\label{sec:results}
 
 We have several reasons to choose the Linux kernel for testing \stan: the
 kernel is a large and freely available codebase, it fully exercises most
-of the features of ISO/ANSI C99 and GNU C extensions, it is under constant
-development (there is a constant income of new bugs), and the absence of bugs is
-of a great concern. 
-
-We applied \stan, together with the four checkers described in the
-previous section, to the Linux kernel version 2.6.28. The \AC was configured
-with three automata describing the following types of errors:
+of the features of ISO/ANSI C99~\cite{ansi_c} and GNU C extensions~\cite{gcc},
+it is under constant development (there is a constant income of new bugs), and
+the absence of bugs is of a great concern.  We applied \stan, together with
+the four checkers described in Section~\ref{sec:checkers}, to the Linux kernel
+version 2.6.28. The \AC was configured with four automata describing the
+following types of errors:
 \begin{itemize}
 \item incorrect pairing of functions (imbalanced locking, reference
-  counting errors)
-\item bugs in pointer manipulation (null dereference, dangling pointers, etc.)
-\item deadlocks caused by sleeping inside spinlocks or interrupt handlers
+  counting errors),
+\item resource or memory leaks,
+\item errors in pointer manipulation (null dereference, dangling pointers,
+  etc.), and 
+\item deadlocks caused by sleeping inside spinlocks or interrupt handlers.
 \end{itemize}
 
 The running time of \stan on a common desktop machine with two 2.5\,GHz
 cores and 4\,GiB of memory was under two hours. The memory usage of the Java
-process oscillated between 400 and 1000\,MiB. The number of errors found by
-the checkers is presented in Table~\ref{tab:results_stan}. Let us note that \RC
-actually found 751 errors, but 720 of them are of low importance
-(including 696 superfluous semicolons) and they are omitted from our
-statistics.
-
-\begin{table*}[tb]
+process oscillated between 400 and 1000\,MiB. The number of reports by the
+checkers is presented in Table~\ref{tab:results_stan}.
+\begin{table}[tb]
 \begin{center}
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{|l|l|c|c|c|c|} \hline
-\textbf{Checker} & \textbf{Automaton} &
-\multicolumn{3}{|c|}{\textbf{Errors}} & \textbf{Real/classified} \\ \cline{3-5}
-&&\textbf{Found} & \textbf{Real} & \textbf{False pos.} & \textbf{error ratio}\\ \hline\hline
-& Pairing                    & 266 & 65  & 143 & 31.3\,\% \\ \cline{2-6}
-\AC & Pointers               & 86  & 48  & 37  & 56.5\,\% \\ \cline{2-6}
-& Deadlocks                  & 35  & 16  & 18  & 47.1\,\% \\ \hline
-\multicolumn{2}{|l|}{\LC}    & 13  & 6   & 7   & 46.2\,\%  \\ \hline
-\multicolumn{2}{|l|}{\TC}    & 20  & 9   & 11  & 45.0\,\% \\ \hline
-\multicolumn{2}{|l|}{\RC}    & 31  & 31  & 0   & 100.0\,\%  \\ \hline\hline
-\multicolumn{2}{|l|}{\textbf{Overall}}  & \textbf{451} & \textbf{175} &
-\textbf{216} & \textbf{47.9\,\%} \\ \hline
+%\setlength{\tabcolsep}{3pt}
+\begin{tabular}{|ll||c|c|c|c|} \hline
+\multicolumn{2}{|c||}{\multirow{2}{*}{\textbf{Checker}}} &
+  \multicolumn{3}{c|}{\textbf{Reports}} & \textbf{Real/classified} \\ \cline{3-5}
+&&\textbf{Total} & \textbf{Real} & \textbf{False} & \textbf{Error Ratio} \\ \hline\hline
+\multirow{4}{6em}{\textsc{Automaton} \textsc{Checker}}
+& \multicolumn{1}{|l||}{Pairing}   & 543 & 73  & 441 & 14.2\,\% \\ \cline{2-6}
+& \multicolumn{1}{|l||}{Leaks}     & 108 & 20  & 86  & 18.9\,\% \\ \cline{2-6}
+& \multicolumn{1}{|l||}{Pointers}  & 35  & 17  & 18  & 48.6\,\% \\ \cline{2-6}
+& \multicolumn{1}{|l||}{Deadlocks} & 35  & 16  & 19  & 45.7\,\% \\ \hline
+\multicolumn{2}{|l||}{\LC}         & 13  & 6   & 7   & 46.2\,\% \\ \hline
+\multicolumn{2}{|l||}{\TC}         & 20  & 9   & 11  & 45.0\,\% \\ \hline
+\multicolumn{2}{|l||}{\RC}         & 31  & 31  & 0   & 100.0\,\% \\ \hline\hline
+\multicolumn{2}{|l||}{\textbf{Overall}} & \textbf{785} & \textbf{172} &
+  \textbf{582} & \textbf{22.8\,\%} \\ \hline
 \end{tabular}
 \end{center}
 \caption{\stan results on the Linux kernel version 2.6.28.}
 \label{tab:results_stan}
-\end{table*}
+\end{table}
+Let us note that \RC actually found 751 errors, but 720 of them are of low
+importance (including 696 superfluous semicolons). Even though they are real,
+we omitted them from the statistics.
 
-We have manually analysed all the found errors and classified them as real
-errors or false positives (with an exception of 60 errors found by \AC where
-we are not able to decide in a short time whether it is a false positive or
-not). Note that the checkers do not produce any false
-negatives (assuming there is no bug in the checkers' implementation). The
-reason is that all the checkers
-implement may analyses, overapproximating the set of error behaviours.  The numbers of real errors, false
-positives and the ratio of real errors to all classified errors can be also
-found in Table~\ref{tab:results_stan}. The overall ratio of real errors to all
-classified errors is not high: 47.9\%.  However, \stan in the current
-version does not have any thorough false positive filtering technique, which
-may be implemented in future.
+We have manually analysed the reports and tried to classify them as real
+errors or false positives. We classified all except 31 reports found by \AC.
+There, we are not able to decide whether it is a real error or not in a short
+time. The numbers of real errors, false positives and the ratio of real errors
+to all classified errors can be also found in Table~\ref{tab:results_stan}.
+The overall ratio of real errors to all classified errors is not high: 22.8\%.
+Nonetheless, \stan in the current version does not have any thorough false
+positive filtering technique, which may be implemented in the future. Finally,
+note that the checkers do not produce any false negatives assuming there is no
+bug in the checkers' implementation. The reason is that all the checkers
+implement may analyses, over-approximating the set of error behaviours.
 
-More than 70 of the 169 real errors have been reported to kernel developers
-and fixed in the following kernel releases (the rest have been independently
-discovered and reported by someone else or the incorrect code disappeared
-from the kernel before we finished our evaluation of found errors). Some of
-the reported bugs remained undiscovered for more than seven years (for
-illustration, see our report at \url{http://lkml.org/lkml/2009/3/11/380}).
-% This is despite the kernel being regularly checked by \textsc{Coverity}. We
-% guess that it is due to a very restrictive false positive filtering used.
+More than 120 of the 172 real errors were reported to kernel developers and
+fixed in the following kernel releases. The rest was either discovered by
+independent checkers and reported by someone else or the incorrect code
+disappeared from the kernel completely before we finished our evaluation of
+the reports. Interestingly, some of the reported errors remained undiscovered
+for more than seven years. For illustration, see our report at
+\url{http://lkml.org/lkml/2009/3/11/380}. The whole list of reports generated
+by \stan on that particular kernel version can be found in our database from
+Chapter~\ref{sec:clabure}.
 
-We have reported another 60 bugs found by \stan in the subsequent versions
-of the kernel. This number is increasing every month.
-
-\subsubsection{Important Bugs found by \stan}
+\subsection*{Important Errors Found by \stan}
 Although checkers currently implemented in \stan are based on widely known
 techniques, running them on the Linux kernel helped to uncover several
 important bugs. In the text below we present two typical bugs discovered by
