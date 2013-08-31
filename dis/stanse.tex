@@ -58,9 +58,66 @@ In this section we focus on the functionality of the framework itself,
 describing only the non-standard or for some other reason interesting
 features.
 
-\begin{figure}[!htb]
-  \centering
-    \includegraphics[width=10cm]{images/fig_architecture}
+\begin{figure}[htb]
+\begin{center}
+    \pgfdeclarelayer{background}
+    \pgfsetlayers{background,main}
+    \tikzstyle{tl_uses}=[<->, dashed]
+    \begin{tikzpicture}[<-, >=stealth', node distance=7mm, font=\sffamily]
+      \node [tl_state] (AST) {AST};
+      \node [tl_state, right=2mm of AST] (CFG) {CFG};
+      \node [tl_state, right=2mm of CFG, align=center] (CG) {Call \\ Graph};
+      \node [tl_state, right=2mm of CG] (MORE) {\dots};
+      \begin{pgfonlayer}{background}
+	\node [tl_state, inner xsep=3mm, inner ysep=5mm, yshift=3mm,
+	  bottom color=black!10, top color=black!2,
+	  fit= (AST) (CFG) (CG) (MORE)] (INT) {};
+	\node [below=1.5mm of INT.north] {Internal representation};
+      \end{pgfonlayer}
+
+      \node [tl_phase, below=4mm of INT] (PARSER) {Parser}
+        edge[->] node {} (INT);
+      \node [tl_state, align=center, below=4mm of PARSER] (PREPF) {
+	Preprocessed \\
+	  Files
+	}
+        edge[->] node {} (PARSER);
+      \node [tl_phase, left=of PREPF] (PREP) {Preprocessor}
+        edge[->] node {} (PREPF);
+      \node [tl_state, left=of PREP] (SRC) {Sources}
+        edge[->] node {} (PREP);
+
+      \node [tl_phase, align=center, left=of INT] (NAVIG) {
+	  Code \\
+	  Navigation \\
+	  Libraries
+	}
+	edge[tl_uses] node {} (INT);
+      \node [tl_phase, align=center, text width=8cm, above=of INT, xshift=-1cm]
+	(INTF) {Checker Interface}
+	edge[<->, in=90, out=250] node {} (NAVIG)
+	edge[in=90, out=290] node {} (INT);
+      \node [tl_phase, above=of INTF, xshift=-2cm] (CH1) {Checker 1}
+	edge[<->, in=110, out=270] node {} (INTF);
+      \node [tl_phase, above=of INTF, xshift=2cm] (CH2) {Checker N}
+	edge[<->, in=70, out=270] node {} (INTF);
+      \draw[-, loosely dotted] (CH1) -- (CH2);
+      \node [tl_state, align=center, right=of CH2] (CH2D) {Checker N\\ Data File}
+	edge[->] node {} (CH2);
+
+      \node [tl_state, align=center, right=of INTF] (REP) {Error \\ Reports}
+	edge node {} (INTF);
+      \node [tl_phase, align=center, below=of REP] (GUI) {
+	  GUI \\
+	  Error \\
+	  Report \\
+	  Tracing
+	}
+	edge node {} (REP)
+	edge[<->, in=0, out=270] node {} (PREPF);
+
+    \end{tikzpicture}
+\end{center}
   \caption{\stan framework architecture.}
   \label{fig:architecture}
 \end{figure}
