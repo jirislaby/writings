@@ -45,10 +45,12 @@ powerful frameworks appeared.  We provide
 \paragraph{Chapter Organization}
 This chapter is structured as follows. Section~\ref{sec:framework} describes
 the functionality provided by the framework, while Section~\ref{sec:checkers}
-is devoted to the four existing checkers.  In Section~\ref{sec:results} we
-present some results of running \stan on the Linux kernel. The last section
-summarises the basic strengths of \stan and mentions some directions of future
-development.
+is devoted to the four existing checkers.  In Section~\ref{sec:stan_results}
+we present some results of running \stan on the Linux kernel.
+Section~\ref{sec:stan_discuss} discusses weaknesses of the technique.  The
+last Section~\ref{sec:stan_concl} summarises the basic strengths of \stan.
+%and the last Section~\ref{sec:stan_future} mentions some directions of future
+%development.
 
 %}}}
 %{{{ Framework
@@ -339,18 +341,22 @@ the error traces back to the user of \stan. First, they can be printed to the
 console. But as it is only a textual output, the traces are not very usable
 for large projects. Hence the GUI in \stan has a built-in trace browser which
 supports displaying the traces.  There is an example of a trace in the GUI in
-Figure~\ref{fig:bugtrace}. Finally, the traces can be saved to an external
-file in the XML format. This XML file has a wide variety of possible
-applications. For example, we supply a tool transforming the XML file into an
-\textsc{SQLite} database. The database is supplemented with a web interface
-allowing to browse errors in the database via a web browser. Using the web
-browser or the built-in graphical error browser, one can mark errors as real
-errors or false positives. \stan also provides various statistics of errors
-like number of errors per checker, frequency of errors of the same kind,
-percentage of false positives (based on the user feedback).
+Figure~\ref{fig:bugtrace}. Also, a plug-in for integration \stan into the
+\textsc{Eclipse} \emph{integrated development environment} (IDE) exists too.
+It can be used for tracking errors directly when developing code. And finally,
+the traces can be saved to an external file in the XML format. This XML file
+has a wide variety of possible applications. For example, we supply a tool
+transforming the XML file into an \textsc{SQLite} database. The database is
+supplemented with a web interface allowing to browse errors in the database
+via a web browser. Using the web browser or the built-in graphical error
+browser, one can mark errors as real errors or false positives. \stan also
+provides various statistics of errors like number of errors per checker,
+frequency of errors of the same kind, percentage of false positives (based on
+the user feedback).
 
-Error reporting and tracing pipeline is depicted to the right of interface and
-internal representation in Figure~\ref{fig:architecture}.
+Error reporting and tracing pipeline is depicted in
+Figure~\ref{fig:architecture} to the right of interface and internal
+representation.
 
 %}}}
 %{{{ Checkers
@@ -376,7 +382,7 @@ abstract syntax trees in there, patterns are AST subtrees too. It works
 similar to pattern matching described in Section~\ref{sec:pattern_matching}:
 we have an AST subtree with possible wildcards. An example of an automaton
 for checking proper pairing of locks is presented in
-Figure~\ref{fig:automaton}.
+Figure~\ref{fig:stan_automaton}.
 \begin{figure}[htb]
   \begin{center}
     \tikzstyle{stat} = [circle,thick,draw,minimum size=1cm]
@@ -396,7 +402,7 @@ Figure~\ref{fig:automaton}.
     \end{tikzpicture}
   \end{center}
   \caption{An automaton for checking locking properties.}
-  \label{fig:automaton}
+  \label{fig:stan_automaton}
 \end{figure}
 The automaton starts in the unlocked state (\textsf{U}). A transition from
 that state is fired either when the checker matches a call to \code{unlock} or
@@ -462,7 +468,9 @@ the Linux kernel. For example a superfluous semicolon can cause unexpected
 unconditional returns from functions like in the code of
 Figure~\ref{fig:stan_unreach}. As we can see on line~\ref{line:stan_unreach},
 there is a superfluous semicolon. It causes a preliminary unconditional return
-from a function. This was an error in the \code{ath9k} wireless driver.
+from a function. This was an error in the \code{ath9k} wireless driver and was
+fixed later in 2.6.32 by the commit ``ath9k: fix misplaced semicolon on rate
+control''.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -473,14 +481,14 @@ if (rate_table->info[rate].valid_single_stream &&
 \end{lstlisting}
 \end{tabular}
 \end{center}
-  \caption{A bug found by the \RC.}
+  \caption{An error found by the \RC.}
   \label{fig:stan_unreach}
 \end{figure}
 
 %}}}
 %{{{ Results
 
-\section{Results on the Linux Kernel}\label{sec:results}
+\section{Results on the Linux Kernel}\label{sec:stan_results}
 
 We have several reasons to choose the Linux kernel for testing \stan: the
 kernel is a large and freely available codebase, it fully exercises most
@@ -505,11 +513,12 @@ process oscillated between 400 and 1000\,MiB. The number of reports by the
 checkers is presented in Table~\ref{tab:results_stan}.
 \begin{table}[tb]
 \begin{center}
-%\setlength{\tabcolsep}{3pt}
 \begin{tabular}{|ll||c|c|c|c|} \hline
 \multicolumn{2}{|c||}{\multirow{2}{*}{\textbf{Checker}}} &
-  \multicolumn{3}{c|}{\textbf{Reports}} & \textbf{Real/classified} \\ \cline{3-5}
-&&\textbf{Total} & \textbf{Real} & \textbf{False} & \textbf{Error Ratio} \\ \hline\hline
+  \multicolumn{3}{c|}{\textbf{Reports}} & \textbf{Real/classified}
+  \\ \cline{3-5}
+&&\textbf{Total} & \textbf{Real} & \textbf{False} & \textbf{Error Ratio}
+  \\ \hline\hline
 \multirow{4}{6em}{\textsc{Automaton} \textsc{Checker}}
 & \multicolumn{1}{|l||}{Pairing}   & 543 & 73  & 441 & 14.2\,\% \\ \cline{2-6}
 & \multicolumn{1}{|l||}{Leaks}     & 108 & 20  & 86  & 18.9\,\% \\ \cline{2-6}
@@ -541,15 +550,15 @@ note that the checkers do not produce any false negatives assuming there is no
 bug in the checkers' implementation. The reason is that all the checkers
 implement may analyses, over-approximating the set of error behaviours.
 
-More than 120 of the 172 real errors were reported to kernel developers and
+More than 130 of the 172 real errors were reported to kernel developers and
 fixed in the following kernel releases. The rest was either discovered by
 independent checkers and reported by someone else or the incorrect code
 disappeared from the kernel completely before we finished our evaluation of
 the reports. Interestingly, some of the reported errors remained undiscovered
 for more than seven years. For illustration, see our report at
 \url{http://lkml.org/lkml/2009/3/11/380}. The whole list of reports generated
-by \stan on that particular kernel version can be found in our database from
-Chapter~\ref{sec:clabure}.
+by \stan on that particular kernel version can be found in our database which
+we describe in Chapter~\ref{sec:clabure}.
 
 \subsection*{Important Errors Found by \stan}
 Although checkers currently implemented in \stan are based on widely known
@@ -557,46 +566,61 @@ techniques, running them on the Linux kernel helped to uncover several
 important bugs. In the text below we present two typical bugs discovered by
 \stan, each using a different checker.
 
-\paragraph{AutomatonChecker}
-Many bugs found by the \AC trigger only under specific conditions, however
-some of them may be visible to the user. Consider this code excerpt taken
-from the 2.6.27 kernel, \textsf{drivers/pci/hotplug/pciehp\_core.c} file,
-\textsf{set\_lock\_status} function:
-
-\begin{lstlisting}[language=C]
+\subsubsection*{\AC}
+Many errors found by the \AC trigger only under specific conditions. It is
+caused by the fact that the standard paths are usually dynamically tested.
+Nonetheless some of the specific conditions may be established by a user.
+Consider the code excerpt in Figure~\ref{fig:stan_ac_bug} taken from the
+Linux kernel 2.6.28. The excerpt is extracted from \code{set_lock_status}
+function in file \code{drivers/pci/hotplug/pciehp_core.c}.
+\begin{figure}[htb]
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}
 mutex_lock(&slot->ctrl->crit_sect);
 /* has it been >1 sec since our last toggle? */
 if ((get_seconds() - slot->last_emi_toggle) < 1)
 	return -EINVAL;
-\end{lstlisting}
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+    \caption{An error found by the \AC.}
+    \label{fig:stan_ac_bug}
+\end{figure}
+Note that the call to \code{mutex_lock} function is followed by a conditional
+statement. The code returns immediately in case the condition holds. The
+problem is an omitted call to \code{mutex_unlock} in that branch. In fact this
+deadlock could be easily triggered by a user. It is sufficient to write
+\code{1} to \code{/sys/bus/pci/slots/.../lock} file twice within a second.
+This deadlock was fixed in 2.6.29 by the commit ``PCI hotplug: fix lock
+imbalance in pciehp''. By that commit, the omitted call to \code{mutex_unlock}
+was added.
 
-Note that the call to \textsf{mutex\_lock} function is followed by an \textbf{if}
-statement, which returns immediately in the true branch, omitting a call to 
-\textsf{mutex\_unlock}. In fact this
-deadlock could be easily triggered by a user. It is sufficient to write "1" to
-\textsf{/sys/bus/pci/slots/.../lock} file twice within a second.
-
-\paragraph{ThreadChecker}
+\subsubsection*{\TC}
 %http://lkml.org/lkml/2009/4/14/527
-An example of non-trivial error which could not be found by the \AC. The code
-described here is from the 2.6.28 kernel, file \textsf{fs/ecryptfs/messaging.c}.
-
-There are three locks in the code,
-\textsf{msg\_ctx-\textgreater mux}, which is local per context, and two
-global locks --
-\textsf{ecryptfs\_daemon\_hash\_mux} and
-\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.
+Here, we present an example of a non-trivial error found by the \TC. The error
+could not be found by the \AC as it is not thread-aware. The error described
+here is from the Linux kernel 2.6.28. It is in the enterprise cryptographic
+filesystem \textsc{eCryptfs}, more specificaly from its file
+\code{fs/ecryptfs/messaging.c}. There are three locks in the file.  One is
+local per context: \code{msg_ctx->mux}.  The other two are global locks:
+\code{ecryptfs_daemon_hash_mux} and \code{ecryptfs_msg_ctx_lists_mux}.
 
 Let us denote lock dependencies as a binary relation where the first component
-depends on the second. I.e. \textsf{lock(A)} followed by \textsf{lock(B)}
-means dependency B on A, and we write $A\leftarrow B$.
-
-\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX}]
-int ecryptfs_process_response(...)
-{
+depends on the second. For example \code{lock(A)} followed by \code{lock(B)}
+means a dependency of B on A, and we write B $\rightarrow$ A. So in
+Figure~\ref{fig:stan_tc_bug1}, we see two calls to locking functions on
+lines~\ref{line:ecrypt_mux1} and~\ref{line:ecrypt_hmux1}. They produce
+a dependency \code{ecryptfs_daemon_hash_mux} $\rightarrow$
+\code{msg_ctx->mux}.
+\begin{figure}[htb]
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}[name=stan_tc_bug]
+int ecryptfs_process_response(...) {
 	...
-	mutex_lock(&msg_ctx->mux); XY\label{ecrypt_mux1}YX
-	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux1}YX
+	mutex_lock(&msg_ctx->mux);(*@\label{line:ecrypt_mux1}@*)
+	mutex_lock(&ecryptfs_daemon_hash_mux);(*@\label{line:ecrypt_hmux1}@*)
 	...
 	mutex_unlock(&ecryptfs_daemon_hash_mux);
 	...
@@ -605,36 +629,52 @@ unlock:
 out:
 	return rc;
 }
-\end{lstlisting}
-Here the two locks on lines~\ref{ecrypt_mux1} and~\ref{ecrypt_hmux1} give
-\textsf{msg\_ctx-\textgreater mux} $\leftarrow$
-\textsf{ecryptfs\_daemon\_hash\_mux}.
-\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
-static int ecryptfs_send_message_locked(...)
-{
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+    \caption{An error found by the \TC, dependency one.}
+    \label{fig:stan_tc_bug1}
+\end{figure}
+
+Further, on line~\ref{line:ecrypt_call} of Figure~\ref{fig:stan_tc_bug2},
+function \code{ecryptfs_send_message_locked} is called from
+\code{ecryptfs_send_message}. Hence the locks on lines~\ref{line:ecrypt_lmux2}
+and~\ref{line:ecrypt_hmux2} generate a lock dependency
+\code{ecryptfs_msg_ctx_lists_mux}$\rightarrow$
+\code{ecryptfs_daemon_hash_mux}.
+\begin{figure}[htb]
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}[name=stan_tc_bug]
+static int ecryptfs_send_message_locked(...) {
 	...
-	mutex_lock(&ecryptfs_msg_ctx_lists_mux); XY\label{ecrypt_lmux2}YX
+	mutex_lock(&ecryptfs_msg_ctx_lists_mux);(*@\label{line:ecrypt_lmux2}@*)
 	...
 	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
 	...
 }
 
-int ecryptfs_send_message(...)
-{
+int ecryptfs_send_message(...) {
 	int rc;
-
-	mutex_lock(&ecryptfs_daemon_hash_mux); XY\label{ecrypt_hmux2}YX
-	rc = ecryptfs_send_message_locked(...) XY\label{ecrypt_call}YX
+	mutex_lock(&ecryptfs_daemon_hash_mux);(*@\label{line:ecrypt_hmux2}@*)
+	rc = ecryptfs_send_message_locked(...);(*@\label{line:ecrypt_call}@*)
 	mutex_unlock(&ecryptfs_daemon_hash_mux);
 	return rc;
 }
-\end{lstlisting}
-At line~\ref{ecrypt_call}, function \textsf{ecryptfs\_send\_message\_locked}
-is called from \textsf{ecryptfs\_send\_message}, hence the locks at
-lines~\ref{ecrypt_lmux2} and~\ref{ecrypt_hmux2} generate lock dependency of
-\textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$
-\textsf{ecryptfs\_msg\_ctx\_lists\_mux}.
-\begin{lstlisting}[language=C,numbers=left,escapeinside={XY}{YX},firstnumber=last]
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+    \caption{An error found by the \TC, dependency two.}
+    \label{fig:stan_tc_bug2}
+\end{figure}
+
+Finally, the function \code{ecryptfs_wait_for_response} of
+Figure~\ref{fig:stan_tc_bug3} introduces another dependency
+\code{msg_ctx->mux} $\rightarrow$\code{ecryptfs_msg_ctx_lists_mux}.
+\begin{figure}[htb]
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}[name=stan_tc_bug]
 int ecryptfs_wait_for_response(...)
 {
 	...
@@ -645,49 +685,111 @@ int ecryptfs_wait_for_response(...)
 	mutex_unlock(&ecryptfs_msg_ctx_lists_mux);
 	return rc;
 }
-\end{lstlisting}
-Finally, this function introduces \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
-$\leftarrow$ \textsf{msg\_ctx-\textgreater mux}.
-
-Composing these results together the following circular dependency of these
-three locks was found:
-\begin{itemize}
-\item \textsf{msg\_ctx-\textgreater mux} $\leftarrow$ \textsf{ecryptfs\_daemon\_hash\_mux}
-\item \textsf{ecryptfs\_daemon\_hash\_mux} $\leftarrow$ \textsf{ecryptfs\_msg\_ctx\_lists\_mux}
-\item \textsf{ecryptfs\_msg\_ctx\_lists\_mux} $\leftarrow$
-  \textsf{msg\_ctx-\textgreater mux}
-\end{itemize}
-
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+    \caption{An error found by the \TC, dependency three.}
+    \label{fig:stan_tc_bug3}
+\end{figure}
+Composing these dependencies together, we obtain a circular
+dependency of the three locks as can be seen in Figure~\ref{fig:stan_tc_bug}.
+\begin{figure}[htb]
+  \begin{center}
+    \tikzstyle{node} = [rectangle, rounded corners=5pt, thick, draw]
+    \tikzstyle{edge} = [->, bend left, shorten <=1pt, >=stealth', semithick]
+    \begin{tikzpicture}[node distance=2cm]
+        \node [node] (TOP) {\code{msg_ctx->mux}};
+        \node [node] (LEFT) [below left=1cm and -1cm of TOP]%, xshift=2.2cm]
+	  {\code{ecryptfs_daemon_hash_mux}}
+	  edge [edge] node {} (TOP);
+        \node [node] (RIGHT) [below right=1cm and -1cm of TOP]%, xshift=-2.2cm]
+	  {\code{ecryptfs_msg_ctx_lists_mux}}
+	  edge [edge] node {} (LEFT)
+	  edge [edge, <-, bend right] node {} (TOP);
+    \end{tikzpicture}
+  \end{center}
+    \caption{An error found by the \TC.}
+    \label{fig:stan_tc_bug}
+\end{figure}
 This issue was later confirmed as a real bug leading to a
-deadlock\footnote{http://lkml.org/lkml/2009/4/14/527}.
+deadlock\footnote{http://lkml.org/lkml/2009/4/14/527}. Nonetheless it took
+over two more years before one of the dependencies was removed from the kernel
+in 3.6 as a side-effect of the commit ``eCryptfs: Make all miscdev functions
+use daemon ptr in file private\_data''.
+
+%}}}
+%{{{ Downside
+
+\section{Discussion}\label{sec:stan_discuss}
+A lot of work is needed to be done in the area of automatic false alarm
+filtering and error importance classification. As we know from
+Section~\ref{sec:stan_results}, the \AC was used for checking the Linux kernel
+and it produced hundreds of reports. We also know that many of them (81.7\%)
+were false positives. In this section we discuss where these false reports
+reports usually stem from.
+
+In the first place, it is the analyzed code complexity that causes headache to
+many developers of static analyzers. Analyzing simple and short sources is
+easy as was presented in many experimental tools. When it comes to real-world
+code with many inter-dependencies among files and complex inter-procedural
+flows of checked properties, experimental tools often stop working.  We also
+started naively with simple configurations for the \AC, similar to automaton
+for locking of Figure~\ref{fig:stan_automaton}. It turned out to be too naive
+as we ended up with tens thousands of reports with no useful information. We
+had to tune the automaton, so that we currently have is XXX.
+
+%Example of false-negatives/positives -- where it does not work, description of
+%where it does not work.
+
+\begin{figure}[htb]
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}
+static inline int rx_refill(...) {
+        unsigned i;
+        unsigned long flags = 0;
+...
+        if (gfp == GFP_ATOMIC)
+                spin_lock_irqsave(..., flags);
+        for (i=0; i<NR_RX_DESC; i++) {
+...
+        }
+        if (gfp == GFP_ATOMIC)
+                spin_unlock_irqrestore(..., flags);
+
+        return i ? 0 : -ENOMEM;
+}
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+    \caption{XXX}
+    \label{fig:stan_}
+\end{figure}
 
 %}}}
 %{{{ Conclusions
 
-\section{Conclusions and Future Work}
+\section{Conclusions}\label{sec:stan_concl}
 
 \stan is a free Java-based framework design for simple and efficient
-implementation of bug-finding algorithms based on static analysis. The
-framework can process large-scale software projects written in ISO/ANSI C99,
-together with most the GNU C extensions. \stan does not currently use any new
-techniques -- its novelty comes from the fact that (to our best knowledge)
-there is no other open-source framework with comparable applicability and
-efficiency. We note that more than 130 bugs found by \stan have been reported
-to and confirmed by Linux kernel developers already. More information and the
-tool itself can be found at \url{http://stanse.fi.muni.cz/}.
+implementation of error-finding algorithms based on the static analysis. The
+framework can process large-scale software projects written in ISO/ANSI
+C99~\cite{ansi_c}, together with most the GNU C extensions~\cite{gcc}. There
+is also an experimental support for C++.
+\stan
+does not currently use any new techniques -- its novelty comes from the fact
+that (to our best knowledge) there is no other open-source framework with
+comparable applicability and efficiency. We note that more than 130 errors
+found by \stan have been reported to and confirmed by Linux kernel developers
+already. More information and the tool itself can be found at
+\url{http://stanse.fi.muni.cz/}.
 
-\subsubsection{Future Work}
-We plan to improve the framework in several directions. Firstly we are
-currently working on C++ support. Furthermore we plan to provide \stan in the
-form of an IDE plug-in, e.g.~for Eclipse and NetBeans. A lot of work can be
-done in the area of automatic false alarm filtering and error importance
-classification.  Independently of developing new features, we would like to
-speed up the framework as well. To this end we intend to replace the current
-parser written in Java by an optimised parser written in C, to replace the XML
-format of internal structures by a more succinct representation, to add a
-support for function summaries, etc.
+%\section{Future Work}\label{sec:stan_future}
+%\stan framework can be improved in several directions. 
+%Independently of developing new features, we would like to
+%speed up the framework as well. To this end we intend to replace the current
+%parser written in Java by an optimised parser written in C, to replace the XML
+%format of internal structures by a more succinct representation, to add a
+%support for function summaries, etc.
 
-\section{Results}
-
-Example of false-negatives/positives -- where it does not work, description of
-where it does not work.
+%}}}
