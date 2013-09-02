@@ -745,13 +745,9 @@ started naively with simple configurations for the \AC, similar to automaton
 for locking of Figure~\ref{fig:stan_automaton}. It turned out to be too naive
 as we ended up with tens thousands of reports with no useful information. We
 had to tune the automaton. The result is an automaton which, when its height
-fit on an A4 paper, would need 28 sheets for its width. A very simplified
-variant of the automaton is in Figure~\ref{fig:stan_big_automaton}.  It
-neither contains loops on final states, nor transitions as they make the
-picture totally unreadable, nor parametrizations of states. \stan allows us to
-parametrize nodes to support more locks and model situations like nested
-locking (\code{lock(A); lock(B); unlock(B); unlock(A);}) without losing
-precision.
+fits on an A4 paper oriented landscape, would need 28 sheets for its width. A
+very simplified variant of the automaton is in
+Figure~\ref{fig:stan_big_automaton}.
 \begin{figure}[htb]
   \begin{center}
   \input{stanse_big_automaton}
@@ -759,15 +755,24 @@ precision.
     \caption{A simplified automaton used for checking the kernel locking.}
     \label{fig:stan_big_automaton}
 \end{figure}
+It neither contains loops on final states, nor transitions as they make the
+picture totally unreadable. Nonetheless the transitions are easily
+conceivable. We mark locked states by a suffix \code{L} and unlocked states by
+a suffix \code{U}. The more \code{L}'s, the more nested a lock is. Finally, we
+have several lock categories like anonymous locks \code{A}. The picture is not
+complete also because we omitted parametrizations of states. \stan allows us
+to parametrize nodes and transitions to support named locks and model
+situations like nested locking (\code{lock(A); lock(B); unlock(B);
+unlock(A);}) without losing precision.
 
 After months of tuning of the configurations we finally got some meaningful
-results. There started appearing errors like those described earlier in
-Section~\ref{sec:stan_imp_errors}. But there were still also false positives
-stemming from the limits of the abstract interpretation which the \AC is based
-upon. Let us demonstrate this on a typical case which we took again from the
-Linux kernel 2.6.28, file \code{drivers/net/ns83820.c}. In particular, we are
-intereseted in the function \code{rx_refill} of
-Figure~\ref{fig:stan_typical_fp}.
+results. There finally started appearing real errors like those described
+earlier in Section~\ref{sec:stan_imp_errors}. But there were still also false
+positives stemming from the limits of the abstract interpretation which the
+\AC is based upon. Let us demonstrate a typical false positive which we took
+again from the analysis of the Linux kernel 2.6.28, file
+\code{drivers/net/ns83820.c}. In particular, the checker flagged some reports
+in the function \code{rx_refill} of Figure~\ref{fig:stan_typical_fp}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
@@ -792,48 +797,52 @@ static inline int rx_refill(...) {
     \caption{A typical false positive produced by the \AC.}
     \label{fig:stan_typical_fp}
 \end{figure}
-As can be seen in the code, or better, in its control flow graph of
+As can be seen in the code, or better, in its simplified control flow graph of
 Figure~\ref{fig:stan_typical_fp_cfg}, there are two possible paths to generate
-a false positive.
+a false positive, but no real error.
 \begin{figure}[htb]
   \begin{center}
     \tikzstyle{fp1}=[cfg_edge, bend right, blue, dotted]
-    \tikzstyle{fp2}=[cfg_edge, bend left, red, dashed]
+    \tikzstyle{fp2}=[cfg_edge, bend right, red, dashed]
     \begin{tikzpicture}[node distance=4mm]
         \node [cfg_start] (ST) {};
-        \node [cfg] (IF1) [below=of ST] {\code{gfp}}
+        \node [cfg] (IF1) [below=of ST] {\code{gfp == GFP_ATOMIC}}
 	  edge [cfg_edge] node {} (ST)
-	  edge [fp1] node {} (ST)
+	  edge [fp1, bend left] node {} (ST)
 	  edge [fp2] node {} (ST);
-        \node [cfg] (LOCK1) [below right=of IF1] {\code{lock()}}
-	  edge [cfg_edge] node {} (IF1)
-	  edge [fp1] node {} (IF1);
+        \node [cfg] (LOCK1) [below right=of IF1] {\code{spin_lock()}}
+	  edge [cfg_edge] node[below left, xshift=0.5mm, yshift=0.5mm]
+	    {\code{true}} (IF1)
+	  edge [fp1, bend right=20] node {} (IF1);
         \node [cfg] (FOR) [below=10mm of IF1] {\code{for}}
-	  edge [cfg_edge] node {} (IF1)
+	  edge [cfg_edge] node[left, xshift=0.5mm] {\code{false}} (IF1)
 	  edge [cfg_edge] node {} (LOCK1)
 	  edge [cfg_edge, loop left] node {} ()
 	  edge [fp1] node {} (LOCK1)
 	  edge [fp2] node {} (IF1);
-        \node [cfg] (IF2) [below=of FOR] {\code{gfp}}
+        \node [cfg] (IF2) [below=of FOR] {\code{gfp == GFP_ATOMIC}}
 	  edge [cfg_edge] node {} (FOR)
 	  edge [fp1, bend left] node {} (FOR)
-	  edge [fp2, bend right] node {} (FOR);
-        \node [cfg] (LOCK2) [below right=of IF2] {\code{unlock()}}
-	  edge [cfg_edge] node {} (IF2)
-	  edge [fp2, bend right] node {} (IF2);
+	  edge [fp2] node {} (FOR);
+        \node [cfg] (LOCK2) [below right=of IF2] {\code{spin_unlock()}}
+	  edge [cfg_edge] node[below left, xshift=0.5mm, yshift=0.5mm]
+	    {\code{true}} (IF2)
+	  edge [fp2, bend right=20] node {} (IF2);
         \node [cfg_end] (END) [below=10mm of IF2] {}
-	  edge [cfg_edge] node {} (IF2)
+	  edge [cfg_edge] node[left, xshift=0.5mm] {\code{false}} (IF2)
 	  edge [cfg_edge] node {} (LOCK2)
-	  edge [fp1, bend left] node {} (IF2)
+	  edge [fp1] node {} (IF2)
 	  edge [fp2, bend right] node {} (LOCK2);
     \end{tikzpicture}
   \end{center}
-    \caption{A CFG of \code{rx_refill} from Figure~\ref{fig:stan_typical_fp}.}
+    \caption{A CFG of \code{rx_refill} from Figure~\ref{fig:stan_typical_fp}.
+    Two false positives shown by a dotted and dashed set of edges.}
     \label{fig:stan_typical_fp_cfg}
 \end{figure}
-We emphasized one by dashed edges and the other by dotted edges.  Since the
-abstract interpretation of automata is not path-sensitive, the \AC generates
-exactly these two false positives.
+We emphasized one false positive by dashed edges and the other by dotted edges
+over the control flow.  Since the abstract interpretation is not
+path-sensitive, the \AC generates reports exactly about these two false
+positives.
 
 We tried to evade false positives like these by searching for similar patterns
 along paths. In this particular case, we would extract that both dotted and
