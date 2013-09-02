@@ -184,13 +184,13 @@ internal manual~\cite{gcc_intern} where these are described.
 
 \subsection*{Program Internal Representation}
 
-Once the code is parsed, it is represented using \stan's \emph{internal structures}: a call graph
-among functions, a control flow graph (CFG) for each function, and an abstract
-syntax tree (AST) for the whole file. Subtrees in the AST are referenced from
-appropriate CFG nodes. These structures are depicted in the middle of
-Figure~\ref{fig:architecture} as ``Internal Representation''. For developers
-of new checkers, all these structures can be dumped in a textual or graphical
-form.
+Once the code is parsed, it is represented using \stan's \emph{internal
+structures}: a call graph among functions, a control flow graph (CFG) for each
+function, and an abstract syntax tree (AST) for the whole file. Subtrees in
+the AST are referenced from appropriate CFG nodes. These structures are
+depicted in the middle of Figure~\ref{fig:architecture} as ``Internal
+Representation''. For developers of new checkers, all these structures can be
+dumped in a textual or graphical form.
 
 Since we aim at large software projects consisting of hundreds or thousands of
 modules (compilation units), it is often impossible in practice to store the
@@ -328,19 +328,27 @@ at the end of \code{CheckerFactory.java}.
 
 \begin{figure}[t]
   \centering
-    \includegraphics[width=12cm]{images/screen-bug-tracing}
+    \includegraphics[width=\textwidth]{images/screen-bug-tracing}
   \caption{Error trace browser in the \stan GUI.}
   \label{fig:bugtrace}
 \end{figure}
 
 Once a checker finds an error, it reports the error back to the framework in
 the form of an annotated \emph{error trace} -- a path in the analysed code
-demonstrating this error. We provide a datatype in the \stan framework to
-describe an error. The framework yields three possibilities how to present
-the error traces back to the user of \stan. First, they can be printed to the
-console. But as it is only a textual output, the traces are not very usable
-for large projects. Hence the GUI in \stan has a built-in trace browser which
-supports displaying the traces.  There is an example of a trace in the GUI in
+demonstrating this error. This is performed using a provided datatype which
+describes an error in the \stan framework. As once can imagine there might be
+many code paths representing an error. So the question is which one to show to
+the user. First, we tried to generate as many traces as possible from each
+checker.  But this resulted in hundreds traces for a single reported error.
+The user would be confused by so many traces, so we currently generate only
+the first trace generated from most checker. Nonetheless, the functionality is
+still in the framework and some checkers need and use it.
+
+The framework yields three possibilities how to present the error traces back
+to the user of \stan. First, they can be printed to the console. But as it is
+only a textual output, the traces are not very usable for large projects.
+Hence the GUI in \stan has a built-in trace browser which supports displaying
+the traces.  There is an example of a trace in the GUI in
 Figure~\ref{fig:bugtrace}. Also, a plug-in for integration \stan into the
 \textsc{Eclipse} \emph{integrated development environment} (IDE) exists too.
 It can be used for tracking errors directly when developing code. And finally,
@@ -369,7 +377,7 @@ an enumeration of special function calls.  We provide a sample configuration for
 all of them so that they can be used out of the box. Of course, the
 configuration can be tailored to specific needs of other projects easily.
 
-\subsection*{\AC}
+\subsection{\AC}
 The \AC is heavily influenced by \textsc{Xgcc}~\cite{metacomp}. As can be seen
 from the name of the checker, it employs finite state automata. They describe
 the properties we want to check. These include checking locking discipline,
@@ -418,7 +426,7 @@ metacompilation, automata are not input-language specific (a pattern matching
 is used instead), and the inter-procedural analysis is done in the context of
 a single input file.
 
-\subsection*{\LC}
+\subsection{\LC}
 The \LC tries to find locking errors in analyzed code. It performs so by
 accounting statistics about locked accesses to a variable. This approach is
 not new and is based on a previous work~\cite{lockchecker}.  Apart of tracking
@@ -433,7 +441,7 @@ accessed under a lock in more than 70\% cases and once or more it is not, the
 latter cases are reported as errant. Similar to the \AC, both variable
 accesses and locks are specified in a configuration by patterns.
 
-\subsection*{\TC}
+\subsection{\TC}
 The \TC is aimed at checking of possible deadlocks in concurrent programs.
 The technique is based on the notions of locksets~\cite{relay} and deadlock
 detection by looking for cycles in \emph{resource allocation graphs} (RAG).
@@ -453,7 +461,7 @@ graphs are then combined and transformed into RAGs. If there is a circular
 lock dependency, a RAG contains a cycle. In such case an error is reported to
 the \stan framework.
 
-\subsection*{\RC}
+\subsection{\RC}
 The \RC is the simplest and also the smallest checker in \stan. Its name
 correctly suggests searching CFGs for unreachable nodes. These are then
 reported as warnings or errors depending on importance. The importance stems
@@ -560,7 +568,7 @@ for more than seven years. For illustration, see our report at
 by \stan on that particular kernel version can be found in our database which
 we describe in Chapter~\ref{sec:clabure}.
 
-\subsection*{Important Errors Found by \stan}
+\subsection*{Important Errors Found by \stan}\label{sec:stan_imp_errors}
 Although checkers currently implemented in \stan are based on widely known
 techniques, running them on the Linux kernel helped to uncover several
 important bugs. In the text below we present two typical bugs discovered by
@@ -736,11 +744,30 @@ flows of checked properties, experimental tools often stop working.  We also
 started naively with simple configurations for the \AC, similar to automaton
 for locking of Figure~\ref{fig:stan_automaton}. It turned out to be too naive
 as we ended up with tens thousands of reports with no useful information. We
-had to tune the automaton, so that we currently have is XXX.
+had to tune the automaton. The result is an automaton which, when its height
+fit on an A4 paper, would need 28 sheets for its width. A very simplified
+variant of the automaton is in Figure~\ref{fig:stan_big_automaton}.  It
+neither contains loops on final states, nor transitions as they make the
+picture totally unreadable, nor parametrizations of states. \stan allows us to
+parametrize nodes to support more locks and model situations like nested
+locking (\code{lock(A); lock(B); unlock(B); unlock(A);}) without losing
+precision.
+\begin{figure}[htb]
+  \begin{center}
+  \input{stanse_big_automaton}
+  \end{center}
+    \caption{A simplified automaton used for checking the kernel locking.}
+    \label{fig:stan_big_automaton}
+\end{figure}
 
-%Example of false-negatives/positives -- where it does not work, description of
-%where it does not work.
-
+After months of tuning of the configurations we finally got some meaningful
+results. There started appearing errors like those described earlier in
+Section~\ref{sec:stan_imp_errors}. But there were still also false positives
+stemming from the limits of the abstract interpretation which the \AC is based
+upon. Let us demonstrate this on a typical case which we took again from the
+Linux kernel 2.6.28, file \code{drivers/net/ns83820.c}. In particular, we are
+intereseted in the function \code{rx_refill} of
+Figure~\ref{fig:stan_typical_fp}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
@@ -750,7 +777,7 @@ static inline int rx_refill(...) {
         unsigned long flags = 0;
 ...
         if (gfp == GFP_ATOMIC)
-                spin_lock_irqsave(..., flags);
+                spin_lock_irqsave(..., flags);(*@\label{line:stan_lock}@*)
         for (i=0; i<NR_RX_DESC; i++) {
 ...
         }
@@ -762,9 +789,65 @@ static inline int rx_refill(...) {
   \end{lstlisting}
   \end{tabular}
   \end{center}
-    \caption{XXX}
-    \label{fig:stan_}
+    \caption{A typical false positive produced by the \AC.}
+    \label{fig:stan_typical_fp}
 \end{figure}
+As can be seen in the code, or better, in its control flow graph of
+Figure~\ref{fig:stan_typical_fp_cfg}, there are two possible paths to generate
+a false positive.
+\begin{figure}[htb]
+  \begin{center}
+    \tikzstyle{fp1}=[cfg_edge, bend right, blue, dotted]
+    \tikzstyle{fp2}=[cfg_edge, bend left, red, dashed]
+    \begin{tikzpicture}[node distance=4mm]
+        \node [cfg_start] (ST) {};
+        \node [cfg] (IF1) [below=of ST] {\code{gfp}}
+	  edge [cfg_edge] node {} (ST)
+	  edge [fp1] node {} (ST)
+	  edge [fp2] node {} (ST);
+        \node [cfg] (LOCK1) [below right=of IF1] {\code{lock()}}
+	  edge [cfg_edge] node {} (IF1)
+	  edge [fp1] node {} (IF1);
+        \node [cfg] (FOR) [below=10mm of IF1] {\code{for}}
+	  edge [cfg_edge] node {} (IF1)
+	  edge [cfg_edge] node {} (LOCK1)
+	  edge [cfg_edge, loop left] node {} ()
+	  edge [fp1] node {} (LOCK1)
+	  edge [fp2] node {} (IF1);
+        \node [cfg] (IF2) [below=of FOR] {\code{gfp}}
+	  edge [cfg_edge] node {} (FOR)
+	  edge [fp1, bend left] node {} (FOR)
+	  edge [fp2, bend right] node {} (FOR);
+        \node [cfg] (LOCK2) [below right=of IF2] {\code{unlock()}}
+	  edge [cfg_edge] node {} (IF2)
+	  edge [fp2, bend right] node {} (IF2);
+        \node [cfg_end] (END) [below=10mm of IF2] {}
+	  edge [cfg_edge] node {} (IF2)
+	  edge [cfg_edge] node {} (LOCK2)
+	  edge [fp1, bend left] node {} (IF2)
+	  edge [fp2, bend right] node {} (LOCK2);
+    \end{tikzpicture}
+  \end{center}
+    \caption{A CFG of \code{rx_refill} from Figure~\ref{fig:stan_typical_fp}.}
+    \label{fig:stan_typical_fp_cfg}
+\end{figure}
+We emphasized one by dashed edges and the other by dotted edges.  Since the
+abstract interpretation of automata is not path-sensitive, the \AC generates
+exactly these two false positives.
+
+We tried to evade false positives like these by searching for similar patterns
+along paths. In this particular case, we would extract that both dotted and
+dashed paths go once through the true branch of a condition and once through
+the false branch while the condition is the same. But this needed non-trivial
+effort as the paths usually start only after the first condition. In our
+code of Figure~\ref{fig:stan_typical_fp}, by the lock on
+line~\ref{line:stan_lock}. One solution to this problem is to construct a path
+condition over a path since the starting point of the analysis. Then use a
+solver to check validity of the path condition. And the report is not created
+unless the path can be validated. The other approach is more heavy-weight: to
+run symbolic execution through the code and see whether it reports the same
+error.  We try this and the output of this test is described throughout
+Chapter~\ref{sec:fmics}.
 
 %}}}
 %{{{ Conclusions
@@ -781,8 +864,17 @@ does not currently use any new techniques -- its novelty comes from the fact
 that (to our best knowledge) there is no other open-source framework with
 comparable applicability and efficiency. We note that more than 130 errors
 found by \stan have been reported to and confirmed by Linux kernel developers
-already. More information and the tool itself can be found at
-\url{http://stanse.fi.muni.cz/}.
+already.
+
+We also discussed the weaknesses of the implemented analyses. The \stan's
+major downside are false stemming from the nature of the implementation of the
+abstract interpretation. We suggested few solutions to filter them out, but
+were not much successful, as the false positive ratio is till high. The
+following Chapter~\ref{sec:fmics} tries harder to beat the false positives.
+
+\subsection*{Availability}
+\noindent Web pages: \url{http://stanse.fi.muni.cz/} \\
+\noindent License: GNU General Public License v2.0
 
 %\section{Future Work}\label{sec:stan_future}
 %\stan framework can be improved in several directions. 
