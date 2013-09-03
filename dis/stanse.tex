@@ -1,6 +1,6 @@
 % vim: textwidth=78 ai spell spelllang=en filetype=tex sw=2
 
-\chapter{Stanse}\label{sec:stanse}\todo{popsat starting functions}
+\chapter{Stanse}\label{sec:stanse}
 At the beginning of the PhD studies, we were surveying the current known
 techniques used for software checking. Of course many techniques were available
 and some software projects were in the development. One of the papers to
@@ -137,8 +137,7 @@ There are several ways how to tell \stan which source files to analyse. Besides
 the standard possibilities (a given file, all files from a given
 directory, all files listed in a list), \stan can also derive all
 the necessary information from a project \code{Makefile}. In this case,
-\stan also remembers compiler flags for preprocessing purposes. This
-functionality is inspired by the \textsc{Sparse} tool~\cite{sparse}.
+\stan also remembers compiler flags for preprocessing purposes.
 
 The user must also specify checkers which should be run on the chosen source
 files.  There can be many checkers running simultaneously in \stan.
@@ -186,11 +185,12 @@ internal manual~\cite{gcc_intern} where these are described.
 
 Once the code is parsed, it is represented using \stan's \emph{internal
 structures}: a call graph among functions, a control flow graph (CFG) for each
-function, and an abstract syntax tree (AST) for the whole file. Subtrees in
-the AST are referenced from appropriate CFG nodes. These structures are
-depicted in the middle of Figure~\ref{fig:architecture} as ``Internal
-Representation''. For developers of new checkers, all these structures can be
-dumped in a textual or graphical form.
+function, and an abstract syntax tree (AST) for the whole file. The AST is in
+the form of XML for the ease of use. CFG nodes reference appropriate subtrees
+in the AST. All these structures are depicted in the middle of
+Figure~\ref{fig:architecture} as ``Internal Representation''. For developers
+of new checkers, all these structures can be dumped in a textual form to a
+file or in graphical form in the well-known \textsc{Graphviz} dot format.
 
 Since we aim at large software projects consisting of hundreds or thousands of
 modules (compilation units), it is often impossible in practice to store the
@@ -242,9 +242,27 @@ specification language for determining a set of program expressions.
 
 The language defines a collection of \emph{patterns}. Each pattern is supposed
 to identify a single specific kind of sub-trees in an AST of an analysed
-program.  A pattern itself is therefore also a sub-tree of the AST, where some
-of its vertices are ``special''. The special vertices allow to define a set of
-possible sub-trees at that vertex, e.g.\ wildcards.
+program. Since the AST is in the form of the XML, a pattern itself is
+therefore also an XML sub-tree of the AST. When we want to express division by
+zero as a pattern in the XML format, we can use something similar to what is
+depicted in Figure~\ref{fig:stan_div0}.
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}[language=XML]
+<binaryExpression op="/">
+  <any/>
+  <intConst>0</intConst>
+</binaryExpression>
+\end{lstlisting}
+\end{tabular}
+\end{center}
+  \caption{An example of an XML pattern.}
+  \label{fig:stan_div0}
+\end{figure}
+As we can see, we allow some of its nodes to be ``special'' to
+define a set of possible sub-trees at that node, e.g.\ wildcards such as
+\code{any}.
 
 This is, nonetheless, not the only possible approach. For example, in the
 METAL~\cite{metal} specification language, a C expression can be directly
@@ -366,6 +384,39 @@ Error reporting and tracing pipeline is depicted in
 Figure~\ref{fig:architecture} to the right of interface and internal
 representation.
 
+\subsection*{Support for Large Projects}
+As we already know, \stan supports large project internally. But it would be
+unusable without some scripts to support all the functionality. In this
+section we describe the scripts one by one. Most of them are written in the
+programming language \textsc{Perl}.
+
+\begin{description}
+\item[\textsf{stcc}] \code{stcc} is provided as a replacement for a compiler
+of an analyzed project. By using \code{stcc} instead of the original compiler
+like \code{gcc}, the project is still compiled by the original compiler, but
+also a file list and compiler options used for the compiled files are stored
+aside. These are then used as a configuration for \stan. This is effectively a
+support of build systems as it is enough to set the environment variable
+\code{CC=stcc} and compile the project as usual.  This script is inspired by
+the \textsc{Sparse} tool~\cite{sparse}.
+\item[\textsf{stanse\_run}] For even easier evaluation, we also provide users
+with this script. It is basically a wrapper around \code{stcc}, build system,
+and \stan. So it builds a project and the obtained configuration is passed to
+\stan immediately. It also predefines configurations for checkers to be used
+for the Linux kernel. This is enabled by the parameter \code{-k}. So to analyze
+the kernel, one needs not do anything, but running this script.
+\item[\textsf{st\_xml2sqlite3}] As mentioned earlier, we can transform the
+reported errors into an \textsc{SQLite} database. This scripts takes care of
+this task.
+\item[\textsf{st\_xml\_bugcount}] When we are finished with classification of
+the reports to real errors/false positives, this script reports statistics on
+this topic.
+\item[\textsf{st\_automaton}] For an easier design of automata, we provide a
+script to convert them from the \stan's condifuration into 2 formats:
+\textsc{Graphviz} dot and \textsc{Tikz} graph files. This script was used to
+generate the large automaton described later in this chapter.
+\end{description}
+
 %}}}
 %{{{ Checkers
 
@@ -393,9 +444,9 @@ for checking proper pairing of locks is presented in
 Figure~\ref{fig:stan_automaton}.
 \begin{figure}[htb]
   \begin{center}
-    \tikzstyle{stat} = [circle,thick,draw,minimum size=1cm]
+    \tikzstyle{stat} = [circle,thick,draw,minimum size=8mm]
     \tikzstyle{edge} = [shorten <=1pt,>=stealth',semithick]
-    \begin{tikzpicture}[node distance=2cm,font=\sffamily]
+    \begin{tikzpicture}[node distance=18mm,font=\sffamily]
         \node [stat] (ERR) {\textbf{Err}}
 	  edge [edge,loop above] node[right, xshift=2mm, yshift=-2mm]
 	  {\code{lock()}/\code{unlock()}} ();
@@ -425,6 +476,22 @@ metal}, our technique differs in several aspects. In particular, we do not use
 metacompilation, automata are not input-language specific (a pattern matching
 is used instead), and the inter-procedural analysis is done in the context of
 a single input file.
+
+\paragraph{Starting Functions}
+Since we perform the checking on separate files, we hit a problem when trying
+to employ the \AC on the Linux kernel. If we analyzed every function
+with its calling subtree separately, we would obtain false positives.
+So the problem is in fact which function to choose for the analysis as a
+\emph{starting function}?  Or in other words, what is the \code{main} function
+of the file which has no \code{main} functions?  We solved this by using the
+call graph provided by the \stan framework. We start the analysis in every
+root of the call graph. That is we consider as a starting function every
+function which has no callers in that file. This is still not perfect as we
+get false positives for cases, where the automaton would have a different
+than starting state for functions called from outside of the file. But this
+approach definitely helped us to evade many false positives inside the file at
+least. This approach is predominantly used in the \AC, but thanks to it is
+generic, it can be used in newly implemented checkers too.
 
 \subsection{\LC}
 The \LC tries to find locking errors in analyzed code. It performs so by
@@ -468,17 +535,14 @@ reported as warnings or errors depending on importance. The importance stems
 from the nature of an unreachable node. For example superfluous semicolons
 (which are still statements) are less important than an unused branch. The
 primary goal of the \RC is to demonstrate the simplicity of a new checker
-implementation. With help of the framework features described in
+implementation. With the help of the framework features described in
 Section~\ref{sec:travers}, the code of the checker has less than 200 lines
 including the mentioned error/warning classification and comments.  Even
 though it is a very simple checker, it was still able to find serious bugs in
 the Linux kernel. For example a superfluous semicolon can cause unexpected
 unconditional returns from functions like in the code of
-Figure~\ref{fig:stan_unreach}. As we can see on line~\ref{line:stan_unreach},
-there is a superfluous semicolon. It causes a preliminary unconditional return
-from a function. This was an error in the \code{ath9k} wireless driver and was
-fixed later in 2.6.32 by the commit ``ath9k: fix misplaced semicolon on rate
-control''.
+Figure~\ref{fig:stan_unreach}.  This is taken from the \code{ath9k} wireless
+driver, file \code{drivers/net/wireless/ath/ath9k/rc.c}.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -492,11 +556,16 @@ if (rate_table->info[rate].valid_single_stream &&
   \caption{An error found by the \RC.}
   \label{fig:stan_unreach}
 \end{figure}
+As we can see on line~\ref{line:stan_unreach}, there is a superfluous
+semicolon. It causes a preliminary unconditional return from the function.
+This error was confirmed and fixed later in 2.6.32 by the commit ``ath9k: fix
+misplaced semicolon on rate control''. The sole purpose of the commit was to
+remove the semicolon.
 
 %}}}
 %{{{ Results
 
-\section{Results on the Linux Kernel}\label{sec:stan_results}
+\section{Results on Linux Kernel}\label{sec:stan_results}
 
 We have several reasons to choose the Linux kernel for testing \stan: the
 kernel is a large and freely available codebase, it fully exercises most
@@ -504,16 +573,24 @@ of the features of ISO/ANSI C99~\cite{ansi_c} and GNU C extensions~\cite{gcc},
 it is under constant development (there is a constant income of new bugs), and
 the absence of bugs is of a great concern.  We applied \stan, together with
 the four checkers described in Section~\ref{sec:checkers}, to the Linux kernel
-version 2.6.28. The \AC was configured with four automata describing the
+version 2.6.28.  The \AC was configured with four automata describing the
 following types of errors:
-\begin{itemize}
-\item incorrect pairing of functions (imbalanced locking, reference
-  counting errors),
-\item resource or memory leaks,
-\item errors in pointer manipulation (null dereference, dangling pointers,
-  etc.), and 
-\item deadlocks caused by sleeping inside spinlocks or interrupt handlers.
-\end{itemize}
+\begin{description}
+\item[Incorrect pairing of functions] This includes imbalanced locking and
+  reference counting errors. Both are of the same kind when a programmer omits
+  to unlock a lock on some path or decrease a reference which was previously
+  increased.
+\item[Resource or memory leaks] These are usual errors when working with
+  dynamic memory allocations and similar resources. Some path omits to free
+  the resources which were requested earlier.
+\item[Errors in pointer manipulation] Often, when manipulating pointers,
+  programmers, screw a pointer and for example try to dereference the null
+  pointer or dangling pointers which point to already freed memory.
+\item[Deadlocks] We specifically aimed at kernel specific deadlocks caused by
+  sleeping inside spinlock critical sections or interrupt handlers. This is
+  not allowed in the kernel and the results of such code are undefined
+%  -- it often leads to a deadlock.
+\end{description}
 
 The running time of \stan on a common desktop machine with two 2.5\,GHz
 cores and 4\,GiB of memory was under two hours. The memory usage of the Java
@@ -571,56 +648,63 @@ we describe in Chapter~\ref{sec:clabure}.
 \subsection*{Important Errors Found by \stan}\label{sec:stan_imp_errors}
 Although checkers currently implemented in \stan are based on widely known
 techniques, running them on the Linux kernel helped to uncover several
-important bugs. In the text below we present two typical bugs discovered by
-\stan, each using a different checker.
+important bugs. It is despite the fact that some industrial tools check the
+kernel periodically. We presented one error reported by the \RC earlier. In
+the text below we present two typical errors discovered by \stan, using two
+other checkers.
 
 \subsubsection*{\AC}
 Many errors found by the \AC trigger only under specific conditions. It is
 caused by the fact that the standard paths are usually dynamically tested.
-Nonetheless some of the specific conditions may be established by a user.
-Consider the code excerpt in Figure~\ref{fig:stan_ac_bug} taken from the
-Linux kernel 2.6.28. The excerpt is extracted from \code{set_lock_status}
-function in file \code{drivers/pci/hotplug/pciehp_core.c}.
+Nonetheless some of the specific conditions may be established by a user
+rather easily.  Consider the code excerpt in Figure~\ref{fig:stan_ac_bug}
+taken from the Linux kernel 2.6.28. The excerpt is extracted from the
+\code{set_lock_status} function in file
+\code{drivers/pci/hotplug/pciehp_core.c}. This is a driver which adds a
+support for the PCI Express hot-plug.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
   \begin{lstlisting}
-mutex_lock(&slot->ctrl->crit_sect);
+mutex_lock(&slot->ctrl->crit_sect);(*@\label{line:stan_rc_lock}@*)
 /* has it been >1 sec since our last toggle? */
-if ((get_seconds() - slot->last_emi_toggle) < 1)
-	return -EINVAL;
+if ((get_seconds() - slot->last_emi_toggle) < 1)(*@\label{line:stan_rc_if}@*)
+	return -EINVAL;(*@\label{line:stan_rc_ret}@*)
   \end{lstlisting}
   \end{tabular}
   \end{center}
     \caption{An error found by the \AC.}
     \label{fig:stan_ac_bug}
 \end{figure}
-Note that the call to \code{mutex_lock} function is followed by a conditional
-statement. The code returns immediately in case the condition holds. The
-problem is an omitted call to \code{mutex_unlock} in that branch. In fact this
-deadlock could be easily triggered by a user. It is sufficient to write
-\code{1} to \code{/sys/bus/pci/slots/.../lock} file twice within a second.
-This deadlock was fixed in 2.6.29 by the commit ``PCI hotplug: fix lock
-imbalance in pciehp''. By that commit, the omitted call to \code{mutex_unlock}
-was added.
+In the figure, note that the call to the \code{mutex_lock} function on
+line~\ref{line:stan_rc_lock} is followed by a conditional statement. The code
+returns immediately on line~\ref{line:stan_rc_ret} in case the condition
+holds. The problem is the omitted call to \code{mutex_unlock} in that branch.
+If this branch is hit and the lock is to be taken again later, we will
+encounter a deadlock. In fact, the deadlock could be easily triggered by a
+user. It is sufficient to write \code{1} to any of the
+\code{/sys/bus/pci/slots/.../lock} files twice within a second.  This deadlock
+was confirmed and fixed in the kernel 2.6.29 by the commit ``PCI hotplug: fix
+lock imbalance in pciehp''. By that commit, the omitted call to
+\code{mutex_unlock} was added.
 
 \subsubsection*{\TC}
 %http://lkml.org/lkml/2009/4/14/527
 Here, we present an example of a non-trivial error found by the \TC. The error
 could not be found by the \AC as it is not thread-aware. The error described
 here is from the Linux kernel 2.6.28. It is in the enterprise cryptographic
-filesystem \textsc{eCryptfs}, more specificaly from its file
-\code{fs/ecryptfs/messaging.c}. There are three locks in the file.  One is
-local per context: \code{msg_ctx->mux}.  The other two are global locks:
-\code{ecryptfs_daemon_hash_mux} and \code{ecryptfs_msg_ctx_lists_mux}.
+filesystem \textsc{eCryptfs}, more specifically from its file
+\code{fs/ecryptfs/messaging.c}. In the file, there are three locks which we
+are interested in. One is local per context: \code{msg_ctx->mux}. The other
+two are global locks: \code{ecryptfs_daemon_hash_mux} and
+\code{ecryptfs_msg_ctx_lists_mux}.
 
 Let us denote lock dependencies as a binary relation where the first component
-depends on the second. For example \code{lock(A)} followed by \code{lock(B)}
-means a dependency of B on A, and we write B $\rightarrow$ A. So in
-Figure~\ref{fig:stan_tc_bug1}, we see two calls to locking functions on
-lines~\ref{line:ecrypt_mux1} and~\ref{line:ecrypt_hmux1}. They produce
-a dependency \code{ecryptfs_daemon_hash_mux} $\rightarrow$
-\code{msg_ctx->mux}.
+depends on the second. For example the call \code{lock(A)} followed by the
+call \code{lock(B)} means a dependency of B on A, and we write B $\rightarrow$
+A. So in Figure~\ref{fig:stan_tc_bug1}, we see two calls to locking functions
+on lines~\ref{line:ecrypt_mux1} and~\ref{line:ecrypt_hmux1}. They produce a
+dependency \code{ecryptfs_daemon_hash_mux} $\rightarrow$ \code{msg_ctx->mux}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
@@ -854,9 +938,9 @@ line~\ref{line:stan_lock}. One solution to this problem is to construct a path
 condition over a path since the starting point of the analysis. Then use a
 solver to check validity of the path condition. And the report is not created
 unless the path can be validated. The other approach is more heavy-weight: to
-run symbolic execution through the code and see whether it reports the same
-error.  We try this and the output of this test is described throughout
-Chapter~\ref{sec:fmics}.
+run the symbolic execution through the code and see whether it reports the
+same error.  We tried this and the output of this experiment is described
+throughout Chapter~\ref{sec:fmics}.
 
 %}}}
 %{{{ Conclusions
@@ -883,6 +967,7 @@ following Chapter~\ref{sec:fmics} tries harder to beat the false positives.
 
 \subsection*{Availability}
 \noindent Web pages: \url{http://stanse.fi.muni.cz/} \\
+\noindent Repository: \url{http://github.com/jirislaby/stanse/} \\
 \noindent License: GNU General Public License v2.0
 
 %\section{Future Work}\label{sec:stan_future}
