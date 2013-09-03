@@ -668,7 +668,7 @@ integer, then the symbolic execution of one call of \code{copy} explores more
 then $2^{31}$ real paths.
 
 \begin{figure}[!tb]
-    \centering
+    \begin{center}
     \tikzstyle{loc} = [circle, thick, draw, minimum size=6mm, inner sep=0pt]
     \tikzstyle{pre} = [<-, shorten <=1pt, >=stealth', semithick]
     \tikzstyle{post} = [pre, ->]
@@ -763,6 +763,7 @@ then $2^{31}$ real paths.
 %        \node [] (X1) [above of=1,yshift=2mm] {}
 %            edge [dotted,thick,draw] node {} (1);
     \end{tikzpicture}
+    \end{center}
     \caption{A symbolic execution tree of the sliced program of
       Figure~\ref{fig:copy_sliced}.}
         \label{fig:copy_sliced:SET}
@@ -812,8 +813,71 @@ implementation is written in three modules for the \llvm
 framework~\cite{llvm}, namely \code{Prepare}, \code{Slicer}, and
 \code{Kleerer}. The framework provides us with a C compiler
 \clang~\cite{clang}. We also use an existing symbolic executor for \llvm
-called \klee~\cite{klee}.
+called \klee~\cite{klee}. The whole pipeline is depicted in
+Figure~\ref{fig:fmics_pipeline}
 
+\begin{figure}[tb]
+    \begin{center}
+    \begin{tikzpicture}[node distance=6mm, font=\sffamily]
+      \node (S) {};
+      \node [tl_state, right=5mm of S] (C) {C Sources}
+        edge[tl_edge] node {} (S);
+      \node [tl_phase, right=of C, align=center] (PREP) {
+	  C Preprocessor/ \\
+	  Instrumentor
+	}
+        edge[tl_edge] node {} (C);
+      \node [tl_state, right=of PREP, align=center] (PREPS) {
+	  Instrumented \\
+	  and preprocessed \\
+	  C code
+	}
+        edge[tl_edge] node {} (PREP);
+      \node [tl_phase, below=6mm of PREPS] (CLANG) {\clang}
+        edge[tl_edge] node {} (PREPS);
+      \node [tl_state, left=of CLANG] (LLVM) {Llvm}
+        edge[tl_edge] node {} (CLANG);
+      \node [tl_phase, left=of LLVM] (PREPARE) {\code{Prepare}}
+        edge[tl_edge] node {} (LLVM);
+      \node [tl_state, left=of PREPARE, align=center] (LLVMPREP) {
+	  Llvm with \\
+	  globals etc.
+	}
+        edge[tl_edge] node {} (PREPARE);
+      \node [tl_phase, left=of LLVMPREP] (SLICER) {\code{Slicer}}
+        edge[tl_edge] node {} (LLVMPREP);
+      \node [tl_state, below=8mm of SLICER, align=center] (SLICED) {Sliced \\ Llvm}
+        edge[tl_edge] node {} (SLICER);
+      \node [tl_phase, right=of SLICED] (KLEERER) {\code{Kleerer}}
+        edge[tl_edge] node {} (SLICED);
+      \node [tl_state, right=of KLEERER, align=center] (KLEERED) {
+	  Llvm with \\
+	  \code{main}
+	}
+        edge[tl_edge] node {} (KLEERER);
+      \node [tl_phase, right=of KLEERED] (KLEE) {\klee}
+        edge[tl_edge] node {} (KLEERED);
+      \node [tl_state, right=of KLEE] (RESULTS) {Results}
+        edge[tl_edge] node {} (KLEE);
+
+      \node [inner sep=7pt, fit=(PREP)] (PREPBB) {};
+      \node [inner sep=7pt, fit=(PREPARE)] (PREPAREBB) {};
+      \path[draw, densely dashed]
+	(PREPBB.north west) -- (PREPBB.south west) --
+	(PREPAREBB.north west) -- (PREPAREBB.south west) --
+	(PREPAREBB.south east) -- (PREPAREBB.north east) --
+	(PREPBB.south east) -- (PREPBB.north east) -- (PREPBB.north west);
+      \node [above=-0.5mm of PREPARE, align=center, xshift=1mm] (2PHASE_DESC) {
+	  \footnotesize{Instrumentation} \\[-1.5mm]
+	  \footnotesize{(2 phases)}
+	};
+    \end{tikzpicture}
+    \end{center}
+    \caption{The pipeline of \symbio.}
+    \label{fig:fmics_pipeline}
+\end{figure}
+
+\subsection*{Instrumentation}
 The instrumentation of a given program proceeds in two steps. Using a C
 preprocessor, the original program is instrumented with function calls to
 \code{smFire} located just above statements changing states of automata.
@@ -822,37 +886,67 @@ Optimizations are turned off as required by \klee. The rest of the
 instrumentation (e.g.\ adding global variables and changing the code to work
 with them) is done on the \llvm code using the module \code{Prepare}.
 
+\subsection*{Slicer}
 The module \code{Slicer} implements a variant of the inter-procedural
 slicing algorithm by Weiser~\cite{slicing}. To guarantee correctness and
 to improve performance of the slicing, the algorithm employs the pointer
 analysis by Andersen~\cite{andersen}.
 
-The module \code{Kleerer} performs a final processing of the sliced
-bytecode before it is passed to \klee. In particular, the module
-adds to the bytecode a function \code{main} that calls a \emph{starting
-function}.  The \code{main} function also allocates a symbolic memory for
-each parameter of the starting function. Size of the allocated memory is
-determined by the parameter type. Plus, when the parameter is a pointer, the
-size is multiplied by 4000. For example, 4 bytes are allocated for an integer
-and 16000 bytes for an integer pointer. Further, for the pointer case, we pass
-a pointer to the middle of the allocated memory (functions might dereference
-memory at negative index). The idea behind is explained in
-\ucklee~\cite{ucklee}.  Finally, the resulting bytecode is symbolically
-executed by \klee. If a symbolic execution touches a memory out of the
-allocated area, we get a \emph{memory error}. To remedy this inconvenience, we
-plan to implement the same on-demand memory handling
-\ucklee does.
+\subsection*{Kleerer}
+The module \code{Kleerer} performs a final processing of the sliced bytecode
+before it is passed to \klee. In particular, the module adds to the bytecode a
+function \code{main} that calls a \emph{starting function}.  The \code{main}
+function also allocates a symbolic memory for each parameter of the starting
+function. Size of the allocated memory is determined by the parameter type.
+More problematic is a pointer as an argument of the starting function. We have
+no way to find out whether the pointer points to a single value in memory or
+whole array. To overcome the problem, the size is multiplied by 4192 for
+pointers. For example, 4 bytes are allocated for an integer and 16768 bytes
+for an integer pointer. The idea behind the array allocations is taken over
+from the paper about \ucklee~\cite{ucklee}.
 
-%\begin{figure}[htb]
-%\begin{center}
-%\todol{Do we want this figure (picture needed)?} \\
-%C $\rightarrow$ \textsc{Llvm} compiler (\textsc{clang}) $\rightarrow$
-%Instrumentation (Prepare) $\rightarrow$ slicing (Slicer) $\rightarrow$
-%main creator (Kleerer) $\rightarrow$ sym. exe. (Klee)
-%\end{center}
-%\caption{Phases of our tool}
-%\label{fig:phases}
-%\end{figure}
+We had to extend the approach by two means. First, we enumerate some
+known structures which are never passed as arrays. An example of such
+structure is a PCI device descriptor stored in the structure \code{pci_dev}.
+Second, we pass to a starting function a pointer to the middle of the
+allocated memory. This is because functions may dereference memory at negative
+index. This usually happens when a callback is called and as a parameter it
+gets some kernel structure. It is usually a static member of another structure
+owned by a driver. This is illustrated on an example taken from the Linux
+kernel 3.11, file \code{drivers/pci/hotplug/pciehp_ctrl.c}, i.e.\ a PCI
+Express hot-plug driver.
+\begin{figure}[htb]
+    \begin{center}
+    \begin{tabular}{c}
+    \begin{lstlisting}
+struct power_work_info {(*@\label{line:fmics_neg_struct}@*)
+  struct slot *p_slot;
+  struct work_struct work;(*@\label{line:fmics_neg_kernel}@*)
+};
+
+void pciehp_power_thread(struct work_struct *work) {
+  struct power_work_info *info =
+	  container_of(work, struct power_work_info, work);(*@\label{line:fmics_neg_neg}@*)
+  ...
+    \end{lstlisting}
+    \end{tabular}
+    \end{center}
+    \caption{Demonstration of the negative pointer index in a starting
+    function.}
+    \label{fig:fmics_neg}
+\end{figure}
+There is a declaration of a driver structure \code{power_work_info} on
+line~\ref{line:fmics_neg_struct}. It contains also a kernel internal structure
+\code{work_struct} on line~\ref{line:fmics_neg_kernel}. Finally, when the
+callback \code{pciehp_power_thread} is called with a pointer to
+\code{work_struct}, the callback uses \code{container_of} to extract back a
+pointer to \code{power_work_info}. Obviously, the pointer to
+\code{power_work_info} is smaller than to \code{work_struct}.
+
+Finally, the resulting bytecode is symbolically executed by \klee. If a
+symbolic execution touches a memory out of the allocated area, we get a
+\emph{memory error}. To remedy this inconvenience, we plan to implement the
+same on-demand memory handling as \ucklee does.
 
 \subsection*{Experiments}\label{sec:fmics_experiments}
 
