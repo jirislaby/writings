@@ -104,10 +104,10 @@ char *copy(char *dst, char *src, int n, int *L) {(*@\label{line:copy_start}@*)
     lock(L);                             // {L}(*@\label{line:copy_lock}@*)
   }                                      // {U,L}
   i = 0;                                 // {U,L}(*@\label{line:copy_i0}@*)
-  while (i < len) {                      // {U,L}
+  while (i < len) {                      // {U,L}(*@\label{line:copy_loop}@*)
     dst[i] = src[i];                     // {U,L}
     i++;                                 // {U,L}
-  }                                      // {U,L}
+  }                                      // {U,L}(*@\label{line:copy_loopE}@*)
   if (len > 0) {                         // {U,L}(*@\label{line:copy_if2}@*)
     unlock(L);                           // {DU,U}(*@\label{line:copy_unlock}@*)
   }                                      // {U,L}(*@\label{line:copy_if2_e}@*)
@@ -590,10 +590,10 @@ char *copy(char *dst, char *src, int n, int *L) {
     len = n;
     smFire(smGetMachine(L), smLOCK);
   }
-  if (len > 0) {
+  if (len > 0) {(*@\label{line:fmics_len_cond}@*)
     smFire(smGetMachine(L), smUNLOCK);
   }
-  smFire(smGetMachine(L), smRETURN);
+  smFire(smGetMachine(L), smRETURN);(*@\label{line:fmics_2nd_fire}@*)
   return dst;
 }
 
@@ -604,7 +604,7 @@ void foo(char *src, int n) {
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{Functions \texttt{foo} and \texttt{copy} after slicing.}
+    \caption{Functions \code{foo} and \code{copy} after slicing.}
     \label{fig:copy_sliced}
 \end{figure}
 
@@ -649,151 +649,149 @@ technique.
 
 \section{Symbolic Execution} \label{sec:fmics_symexe}
 
-This is the final phase of our technique. We symbolically execute the sliced
-program from the entry location of the starting function. Symbolic execution
-explores real program paths. Therefore, if it reaches some of the assertions
-inside function \texttt{smFire}, then we have found a bug.
+The symbolic execution is the final phase of our technique. We symbolically
+execute the sliced program from the entry location of the starting function.
+The symbolic execution explores real program paths. Therefore, if it reaches
+some of the assertions inside function \code{smFire}, then we have found a
+bug.
 
 Our running example nicely illustrates the crucial role of slicing to
-feasibility of symbolic execution. Let us first consider symbolic execution
-of the original program. It starts at the entry location of the function
-\texttt{foo}. The execution eventually reaches the function
-\texttt{copy}. Note that value of the parameter \texttt{n} is
-symbolic. Therefore, symbolic execution will fork into two executions each
-time we reach line~9 of Figure~\ref{fig:copy}. One of the executions skips
-the loop at lines~9--12, while the other enters it. If we assume that the
-type of \texttt{n} is a 32-bit integer, then the symbolic execution of one
-call of \texttt{copy} explores more then $2^{31}$ real paths.
+feasibility of the symbolic execution. Let us first consider a symbolic
+execution of the original program. It starts at the entry location of the
+function \code{foo}. The execution eventually reaches the function
+\code{copy}. Note that value of the parameter \code{n} is symbolic. Therefore,
+the symbolic execution will fork into two executions each time we reach
+line~\ref{line:copy_loop} of Figure~\ref{fig:copy}. One of the executions
+skips the loop at lines~\ref{line:copy_loop}--\ref{line:copy_loopE},
+while the other enters it. If we assume that the type of \code{n} is a 32-bit
+integer, then the symbolic execution of one call of \code{copy} explores more
+then $2^{31}$ real paths.
 
 \begin{figure}[!tb]
     \centering
-    \tikzstyle{loc} = [circle,thick,draw,minimum size=7mm]
-    \tikzstyle{loc2} = [circle,thick,draw]
-    % \tikzstyle{loc} = [circle,thick,draw,inner sep=0.5pt]
-    % \tikzstyle{loc2} = [circle,thick,draw,inner sep=0.5pt]
-    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
-    \tikzstyle{post} = [->,shorten <=1pt,>=stealth',semithick]
-    \footnotesize
-    \begin{tikzpicture}[node distance=1.1cm]
-	\tikzstyle{every node}=[font=\small]
+    \tikzstyle{loc} = [circle, thick, draw, minimum size=6mm, inner sep=0pt]
+    \tikzstyle{pre} = [<-, shorten <=1pt, >=stealth', semithick]
+    \tikzstyle{post} = [pre, ->]
+    \begin{tikzpicture}[node distance=4mm and 5mm, font=\footnotesize]
         \node [loc] (0) {$19$};
-        \node [loc] (1) [below of=0] {$6$}
+        \node [loc] (1) [below=of 0] {$6$}
             edge [pre] node {} (0);
-        \node [loc] (2) [below of=1] {$7$}
+        \node [loc] (2) [below=of 1] {$7$}
             edge [pre] node {} (1);
 
         % ->false branch
-        \node [loc] (3) [left of=2,below of=2,xshift=-0.5cm] {$11$}
-            edge [pre] node [label=above:F~~] {} (2);
-        \node [loc] (4) [below of=3] {$14$}
+        \node [loc] (3) [below left=4mm and 14mm of 2] {$11$}
+            edge [pre] node [above left, xshift=1mm] {\code{false}} (2);
+        \node [loc] (4) [below=of 3] {$14$}
             edge [pre] node {} (3);
-        \node [loc] (5) [below of=4] {$15$}
+        \node [loc] (5) [below=of 4] {$15$}
             edge [pre] node {} (4);
-        \node [loc] (20) [below of=5] {$20$}
+        \node [loc] (20) [below=of 5] {$20$}
             edge [pre] node {} (5);
-        \node [loc] (21) [below of=20] {$6$}
+        \node [loc] (21) [below=of 20] {$6$}
             edge [pre] node {} (20);
-        \node [loc] (22) [below of=21] {$7$}
+        \node [loc] (22) [below=of 21] {$7$}
             edge [pre] node {} (21);
-        \node [loc] (23) [right of=22,below of=22] {$8$}
-            edge [pre] node [label=above:~~T] {} (22);
-        \node [loc] (24) [below of=23] {$9$}
+        \node [loc] (23) [below right=of 22] {$8$}
+            edge [pre] node [above right, xshift=-1mm] {\code{true}} (22);
+        \node [loc] (24) [below=of 23] {$9$}
             edge [pre] node {} (23);
-        \node [loc] (25) [below of=24] {$11$}
+        \node [loc] (25) [below=of 24] {$11$}
             edge [pre] node {} (24);
-        \node [loc] (26) [left of=22,below of=22] {$11$}
-            edge [pre] node [label=above:F~~] {} (22);
-        \node [loc] (27) [below of=26] {$14$}
+        \node [loc] (26) [below left=of 22] {$11$}
+            edge [pre] node [above left, xshift=1mm] {\code{false}} (22);
+        \node [loc] (27) [below=of 26] {$14$}
             edge [pre] node {} (26);
-        \node [loc] (28) [below of=27] {$15$}
+        \node [loc] (28) [below=of 27] {$15$}
             edge [pre] node {} (27);
-        \node [loc] (29) [left of=25,below of=25] {$14$}
-            edge [pre] node [label=above:F~~] {} (25);
-        \node [] (BUG) [below of=29,yshift=0.2cm] {\emph{bug}};
-        \node [loc] (30) [right of=25,below of=25] {$12$}
-            edge [pre] node [label=above:~~T] {} (25);
-        \node [loc] (31) [below of=30] {$14$}
+        \node [loc] (29) [below left=of 25] {$14$}
+            edge [pre] node [above left, xshift=1mm] {\code{false}} (25);
+        \node [] (BUG) [below=1mm of 29] {\emph{error}};
+        \node [loc] (30) [below right=of 25] {$12$}
+            edge [pre] node [above right, xshift=-1mm] {\code{true}} (25);
+        \node [loc] (31) [below=of 30] {$14$}
             edge [pre] node {} (30);
-        \node [loc] (32) [below of=31] {$15$}
+        \node [loc] (32) [below=of 31] {$15$}
             edge [pre] node {} (31);
 
         % ->true branch
-        \node [loc] (7) [right of=2,below of=2,xshift=0.5cm] {$8$}
-            edge [pre] node [label=above:~~T] {} (2);
-        \node [loc] (8) [below of=7] {$9$}
+        \node [loc] (7) [below right=4mm and 14mm of 2] {$8$}
+            edge [pre] node [above right, xshift=-1mm] {\code{true}} (2);
+        \node [loc] (8) [below=of 7] {$9$}
             edge [pre] node {} (7);
-        \node [loc] (9) [below of=8] {$11$}
+        \node [loc] (9) [below=of 8] {$11$}
             edge [pre] node {} (8);
 
         % ->true->false branch
-        \node [loc] (11) [left of=9,below of=9] {$14$}
-            edge [pre] node [label=above:F~~] {} (9);
-        \node [] (BUG) [below of=11,yshift=0.2cm] {\emph{bug}};
+        \node [loc] (11) [below left=of 9] {$14$}
+            edge [pre] node [above left, xshift=1mm] {\code{false}} (9);
+        \node [] (BUG) [below=1mm of 11] {\emph{error}};
 
         % ->true->true branch
-        \node [loc] (13) [right of=9,below of=9] {$12$}
-            edge [pre] node [label=above:~~T] {} (9);
-        \node [loc] (14) [below of=13] {$14$}
+        \node [loc] (13) [below right=of 9] {$12$}
+            edge [pre] node [above right, xshift=-1mm] {\code{true}} (9);
+        \node [loc] (14) [below=of 13] {$14$}
             edge [pre] node {} (13);
-        \node [loc] (15) [below of=14] {$15$}
+        \node [loc] (15) [below=of 14] {$15$}
             edge [pre] node {} (14);
 
-        \node [loc] (40) [below of=15] {$20$}
+        \node [loc] (40) [below=of 15] {$20$}
             edge [pre] node {} (15);
-        \node [loc] (41) [below of=40] {$6$}
+        \node [loc] (41) [below=of 40] {$6$}
             edge [pre] node {} (40);
-        \node [loc] (42) [below of=41] {$7$}
+        \node [loc] (42) [below=of 41] {$7$}
             edge [pre] node {} (41);
-        \node [loc] (43) [right of=42,below of=42] {$8$}
-            edge [pre] node [label=above:~~T] {} (42);
-        \node [loc] (44) [below of=43] {$9$}
+        \node [loc] (43) [below right=of 42] {$8$}
+            edge [pre] node [above right, xshift=-1mm] {\code{true}} (42);
+        \node [loc] (44) [below=of 43] {$9$}
             edge [pre] node {} (43);
-        \node [loc] (45) [below of=44] {$11$}
+        \node [loc] (45) [below=of 44] {$11$}
             edge [pre] node {} (44);
-        \node [loc] (46) [right of=45,below of=45] {$12$}
-            edge [pre] node [label=above:~~T] {} (45);
-        \node [loc] (47) [below of=46] {$14$}
+        \node [loc] (46) [below right=of 45] {$12$}
+            edge [pre] node [above right, xshift=-1mm] {\code{true}} (45);
+        \node [loc] (47) [below=of 46] {$14$}
             edge [pre] node {} (46);
-        \node [loc] (48) [below of=47] {$15$}
+        \node [loc] (48) [below=of 47] {$15$}
             edge [pre] node {} (47);
-        \node [loc] (49) [left of=42,below of=42] {$11$}
-            edge [pre] node [label=above:F~~] {} (42);
-        \node [loc] (50) [below of=49] {$14$}
+        \node [loc] (49) [below left=of 42] {$11$}
+            edge [pre] node [above left, xshift=1mm] {\code{false}} (42);
+        \node [loc] (50) [below=of 49] {$14$}
             edge [pre] node {} (49);
-        \node [loc] (51) [below of=50] {$15$}
+        \node [loc] (51) [below=of 50] {$15$}
             edge [pre] node {} (50);
 
 %        \node [] (X1) [above of=1,yshift=2mm] {}
 %            edge [dotted,thick,draw] node {} (1);
     \end{tikzpicture}
-    \caption{Symbolic execution tree of the sliced program of
+    \caption{A symbolic execution tree of the sliced program of
       Figure~\ref{fig:copy_sliced}.}
         \label{fig:copy_sliced:SET}
 \end{figure}
 
 By contrast, the sliced program does not contain the loop, which generated
 the huge number of real paths. Therefore, a number of real paths explored by
-the symbolic execution is exactly 6. Figure~\ref{fig:copy_sliced:SET} shows
-the symbolic execution tree of the sliced program of
-Figure~\ref{fig:copy_sliced}. We left out vertices corresponding to lines in
-called functions \texttt{smGetMachine} and \texttt{smFire}. Note that
-although the parameter \texttt{n} has a symbolic value, it can only affect
-the branching at line 11. Moreover, the parameter \texttt{L} always has a
-concrete value. Therefore, we do not fork symbolic execution at branchings
-inside functions \texttt{smGetMachine} and \texttt{smFire}. Two of the
-explored paths are marked with the label \emph{bug}. These paths reach the
-second assertion in function \texttt{smFire} (see Figure~\ref{fig:fmics_fire})
-called from line 14 of the sliced program. In other words, the paths are
-witnesses that we can leave the function \texttt{copy} in a locked state. The
-remaining explored paths of Figure~\ref{fig:copy_sliced:SET} miss the
-assertions in the function \texttt{smFire}. It means that the original program
-contains only one locking error, namely \emph{return in locked state}.
+the symbolic execution is exactly \emph{six}. Figure~\ref{fig:copy_sliced:SET}
+shows the symbolic execution tree of the sliced program of
+Figure~\ref{fig:copy_sliced}. We left out nodes corresponding to lines in
+called functions \code{smGetMachine} and \code{smFire}. Note that
+although the parameter \code{n} has a symbolic value, it can only affect
+the branching on line~\ref{line:fmics_len_cond}. Moreover, the parameter
+\code{L} always has a concrete value. Therefore, we do not fork the symbolic
+execution at branchings inside functions \code{smGetMachine} and
+\code{smFire}. Two of the explored paths are marked with the label
+\emph{error}.  These paths reach the second assertion in function
+\code{smFire} (see Figure~\ref{fig:fmics_fire}) called from
+line~\ref{line:fmics_2nd_fire} of the sliced program. In other words, the
+paths are witnesses that we can leave the function \code{copy} in a locked
+state. The remaining explored paths of Figure~\ref{fig:copy_sliced:SET} miss
+the assertions in the function \code{smFire}. It means that the original
+program contains only one locking error, namely \emph{return in locked state}.
 
 It might be the case for some program and checked property, that the sliced
 code still contains loops. Then the subsequent symbolic execution can be very
 costly due to the well-known path explosion problem. Fortunately, there have
-been done some work tackling the
-problem~\cite{G07,grammar3,GNRT10,SPmCS09,XGM08}.
+been done some work tackling the problem~\cite{G07, grammar3, GNRT10, SPmCS09,
+XGM08, cse_atva}.
 
 % analysis.
 
@@ -801,38 +799,38 @@ problem~\cite{G07,grammar3,GNRT10,SPmCS09,XGM08}.
 %{{{ Implementation
 
 \section{Implementation and Experimental Results} \label{sec:fmics_impl}
-To verify applicability of the presented technique, we have developed an
-experimental implementation. Our experimental tool works with programs in C
-and, for the sake of simplicity, it detects only locking errors described by
-a state machine very similar to $\SA(x)$ of Figure~\ref{fig:sm}. The instances
-of the state machine are associated with arguments of \texttt{lock} and
-\texttt{unlock} function calls. Note that the technique currently works only
-for the cases where a lock is instantiated only once during the run of the
-symbolic executor, which is the most frequent case. However we
-plan to add a support even for the rest. The main part of our implementation
-is written in three modules for the \textsc{Llvm} framework~\cite{llvm},
-namely \texttt{Prepare}, \texttt{Slicer}, and \texttt{Kleerer}. The framework
-provides us with a C compiler \textsc{\textsc{clang}}. We also use an
-existing symbolic executor for \textsc{Llvm} called \textsc{Klee}~\cite{klee}.
+To verify the applicability of the presented technique, we have developed an
+experimental implementation. We call the experimental tool \symbio. \symbio
+works with programs written in C and, for the sake of simplicity, it detects
+only locking errors described by an automaton very similar to $\SA(x)$ of
+Figure~\ref{fig:sm}. The instances of the automaton are associated with
+arguments of \code{lock} and \code{unlock} function calls. Note that the
+technique currently works only for the cases where a lock is instantiated only
+once during the run of the symbolic executor, which is the most frequent case.
+Nonetheless we plan to add a support even for the rest. The main part of our
+implementation is written in three modules for the \llvm
+framework~\cite{llvm}, namely \code{Prepare}, \code{Slicer}, and
+\code{Kleerer}. The framework provides us with a C compiler
+\clang~\cite{clang}. We also use an existing symbolic executor for \llvm
+called \textsc{Klee}~\cite{klee}.
 
-Instrumentation of a given program proceeds in two steps. Using a C
-preprocessor, the original program is instrumented with function calls
-\texttt{smFire} located just above statements changing states of state
-machines. The program is then translated by \textsc{clang} into \textsc{Llvm}
-bytecode~\cite{llvm}. Optimizations are turned off as required by
-\textsc{Klee}. The rest of the instrumentation (e.g.~adding global variables
-and changing the code to work with them) is done on the \textsc{Llvm} code
-using the module \texttt{Prepare}.
+The instrumentation of a given program proceeds in two steps. Using a C
+preprocessor, the original program is instrumented with function calls to
+\code{smFire} located just above statements changing states of automata.
+The program is then translated by \clang into the \llvm bytecode~\cite{llvm}.
+Optimizations are turned off as required by \textsc{Klee}. The rest of the
+instrumentation (e.g.\ adding global variables and changing the code to work
+with them) is done on the \llvm code using the module \code{Prepare}.
 
-The module \texttt{Slicer} implements a variant of the inter-procedural
-slicing algorithm by Weiser~\cite{slicing}. To guarantee correctness and to
-improve performance of slicing, the algorithm employs points-to analysis by
-Andersen~\cite{andersen}.
+The module \code{Slicer} implements a variant of the inter-procedural
+slicing algorithm by Weiser~\cite{slicing}. To guarantee correctness and
+to improve performance of the slicing, the algorithm employs the pointer
+analysis by Andersen~\cite{andersen}.
 
-The module \texttt{Kleerer} performs a final processing of the sliced
+The module \code{Kleerer} performs a final processing of the sliced
 bytecode before it is passed to \textsc{Klee}. In particular, the module
-adds to the bytecode a function \texttt{main} that calls a \emph{starting
-function}.  The \texttt{main} function also allocates a symbolic memory for
+adds to the bytecode a function \code{main} that calls a \emph{starting
+function}.  The \code{main} function also allocates a symbolic memory for
 each parameter of the starting function. Size of the allocated memory is
 determined by the parameter type. Plus, when the parameter is a pointer, the
 size is multiplied by 4000. For example, 4 bytes are allocated for an integer
