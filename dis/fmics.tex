@@ -166,17 +166,6 @@ only if the automaton $\SA(\var{L})$ is in state $L$. As manual sorting of
 error reports containing a pile of false positives is tedious work, the
 practical applicability of such tools is limited.
 
-%Example of false-negatives/positives -- where it does not work, description of
-%where it does not work.
-
-%\section{LLVM Pointer Analysis}
-%field-sensitivity using GEP
-%
-%\begin{verbatim}
-%(call, 1) -> {  }
-%(%1, -1) -> { (call, 0) }
-%\end{verbatim}
-
 \section{Our Contribution}
 
 In contrast to the static analysis, test-generation tools based on the
@@ -879,7 +868,7 @@ Figure~\ref{fig:fmics_pipeline}
     \label{fig:fmics_pipeline}
 \end{figure}
 
-\subsection*{Instrumentation}
+\subsection{Prepare}
 The instrumentation of a given program proceeds in two steps as can be seen in
 Figure~\ref{fig:fmics_pipeline}. Using a standard C preprocessor, the original
 program is instrumented with function calls to \code{smFire} located just
@@ -899,14 +888,45 @@ printing to the output (\code{printf}).
 (Chapter~\ref{sec:stanse}): roots in the call graph.
 \end{itemize}
 
-\subsection*{Slicer}
+\subsection{Slicer}
 The module \code{Slicer} implements a variant of the inter-procedural
 slicing algorithm by Weiser~\cite{slicing} as described in
-Section~\ref{sec:slicing}. To guarantee correctness and to improve performance
-of the slicing, the algorithm employs the pointer analysis by
-Andersen~\cite{andersen}.
+Section~\ref{sec:slicing}. Note that Weiser's algorithm poses a requirement on
+control flow graphs which are to be sliced. They need to be \emph{hammock
+graphs}, i.e.\ graphs with a single entry and single exit. As \clang does not
+necessarily generate such control flow graphs, we convert the graphs into this
+structure first. There is a submodule called \code{CreateHammockCFG} for this
+purpose.
 
-\subsection*{Kleerer}
+\subsubsection{LLVM Pointer Analysis}
+To guarantee correctness and to improve performance of the slicing, the
+algorithm employs the pointer analysis by Andersen~\cite{andersen}. For the
+better understanding and possible replacement, we convert the \llvm code first
+into a sequence of statements like \code{VAR(x)=ALLOC}, \code{VAR(x)=VAR(y)},
+and \code{DEREF(VAR(x))=REF(VAR(y))} according to the \llvm semantics.  Only
+these are then passed to the pointer analysis. The implementation of the
+analysis then computes a fixed point over the statements using the Andersen's
+rules. Finally, pointers are in these terms \llvm variables and their pointer
+sets contain global variables and \llvm instructions where an allocation
+happen.
+
+Initially, we had only a field-insensitive analysis, but this caused too much
+code to be sliced away. As an example, it insisted on uttering that the two
+statements \code{a.x = 0} and \code{a.y = 0} store to the same memory
+location. So the pointer analysis allowed the slicer to remove the first
+assignment, while it still perfectly can affect user's slicing criteria. Hence
+pointers were changed to be pairs of a \llvm variable and byte offset. The
+same holds for members of pointer sets. One may wonder why we need pairs for
+pointers, why not only for a pointed memory. But consider a structure in C.
+Each member can be a pointer and that can point somewhere. We can now have a
+separate information for each of the pointer in that structures. The extension
+is straightforward in the scope of \llvm. It has a special instruction for
+taking an offset of a memory location: \code{GetElementPtr}. So we added
+another rule to the pointer analysis framework \code{VAR(x)=GEP(y)}. Finally,
+the pointer analysis implementation extracts the offset from the instruction's
+parameters and adds it to the offset member of the pointed pair.
+
+\subsection{Kleerer}
 The module \code{Kleerer} performs a final processing of the sliced bytecode
 before it is passed to \klee. In particular, the module adds to the bytecode a
 function \code{main} that calls a starting function.  The \code{main}
@@ -958,7 +978,7 @@ to \code{work_struct}, the callback uses \code{container_of} to extract back a
 pointer to \code{power_work_info}. Obviously, the pointer to
 \code{power_work_info} is smaller than to \code{work_struct}.
 
-\subsection*{Symbolic Execution}
+\subsection{Symbolic Execution}
 After we obtain \llvm code with the \code{main} function, we can start the
 symbolic execution. Note that in principle, there can be more than one
 starting function, i.e.\ more input files for the symbolic execution. But
@@ -1259,10 +1279,13 @@ designed for a similar purpose.
 \section{Conclusion}\label{sec:fmics_conclusion}
 We have presented a novel technique combining three standard methods
 (instrumentation, slicing, and symbolic execution) to check program
-properties given in form of finite state machines. We have discussed a
-synergy of the three methods. Moreover, our experimental results indicate
-that the technique can recognize some false positives and some real errors
-in error reports produced by other error-detection tools.
+properties given in a form of finite state automata. We have discussed a
+synergy of the three methods. Moreover, our experimental results indicate that
+the technique can recognize some false positives and some real errors in error
+reports produced by other error-detection tools.
+
+%Example of false-negatives/positives -- where it does not work, description of
+%where it does not work.
 
 \subsection*{Availability}
 \noindent Web pages: \url{http://sf.net/projects/symbiotic/} \\
