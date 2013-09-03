@@ -334,7 +334,7 @@ precision of error detection.
 %         \node [] (TINF) [below of=27,right of=27] {}
 %             edge [dotted,thick] node {} (27);
 %     \end{tikzpicture}
-%     \caption{Symbolic execution tree of function \texttt{copy}}
+%     \caption{Symbolic execution tree of function \code{copy}}
 %         \label{fig:copy:SET}
 % \end{figure}
 
@@ -380,13 +380,13 @@ locks in the analysed program. More precisely, we look for all those code
 fragments matching edge labels of the automaton $\SA(x)$ of
 Figure~\ref{fig:sm}. The analysed program contains three such fragments, all
 of them in the function \code{copy} (see Figure~\ref{fig:copy}): the call to
-\code{lock} on line~\ref{line:copy_lock}, the call to \texttt{unlock} on
+\code{lock} on line~\ref{line:copy_lock}, the call to \code{unlock} on
 line~\ref{line:copy_unlock}, and the \code{return} statement on
 line~\ref{line:copy_ret}.
 
 Next we determine a set of all locks that are manipulated by the program.
 From the recognized code fragments, we find out that the pointer variable
-\code{L} in \texttt{copy} is the only program variable through which the
+\code{L} in \code{copy} is the only program variable through which the
 program manipulates with locks.  Using the pointer analysis, we obtain the set
 $\{ \var{L1}, \var{L2} \}$ of all possible locks the program manipulates with.
 
@@ -799,7 +799,7 @@ XGM08, cse_atva}.
 %}}}
 %{{{ Implementation
 
-\section{Implementation and Experimental Results} \label{sec:fmics_impl}
+\section{Implementation} \label{sec:fmics_impl}
 To verify the applicability of the presented technique, we have developed an
 experimental implementation. We call the experimental tool \symbio. \symbio
 works with programs written in C and, for the sake of simplicity, it detects
@@ -857,6 +857,8 @@ Figure~\ref{fig:fmics_pipeline}
         edge[tl_edge] node {} (KLEERER);
       \node [tl_phase, right=of KLEERED] (KLEE) {\klee}
         edge[tl_edge] node {} (KLEERED);
+      \draw [tl_edge] ([yshift=-2mm] KLEE.west) -- ([yshift=-2mm]KLEERED.east);
+      \draw [tl_edge] ([yshift=2mm] KLEE.west) -- ([yshift=2mm]KLEERED.east);
       \node [tl_state, right=of KLEE] (RESULTS) {Results}
         edge[tl_edge] node {} (KLEE);
 
@@ -878,41 +880,54 @@ Figure~\ref{fig:fmics_pipeline}
 \end{figure}
 
 \subsection*{Instrumentation}
-The instrumentation of a given program proceeds in two steps. Using a C
-preprocessor, the original program is instrumented with function calls to
-\code{smFire} located just above statements changing states of automata.
-The program is then translated by \clang into the \llvm bytecode~\cite{llvm}.
-Optimizations are turned off as required by \klee. The rest of the
-instrumentation (e.g.\ adding global variables and changing the code to work
-with them) is done on the \llvm code using the module \code{Prepare}.
+The instrumentation of a given program proceeds in two steps as can be seen in
+Figure~\ref{fig:fmics_pipeline}. Using a standard C preprocessor, the original
+program is instrumented with function calls to \code{smFire} located just
+above statements changing states of automata.  The program is then translated
+by \clang into the \llvm bytecode~\cite{llvm}. Since \klee requires \llvm code
+to be compiled without optimizations, \clang is set to generate such code.
+Then, the final stage of instrumentation is performed on the \llvm code by
+the module \code{Prepare}. This phase performs several tasks:
+\begin{itemize}
+\item It adds missing global variables and makes them symbolic.
+\item It removes bodies of many predefined functions, because they contain
+assembler. Instead, it links in pure \llvm implementations.
+\item It removes calls to functions which have no side effect. These include
+printing to the output (\code{printf}).
+\item It finds assembler patterns and replaces them by pure \llvm code.
+\item Finally, it establishes the set of starting functions similarly to \stan
+(Chapter~\ref{sec:stanse}): roots in the call graph.
+\end{itemize}
 
 \subsection*{Slicer}
 The module \code{Slicer} implements a variant of the inter-procedural
-slicing algorithm by Weiser~\cite{slicing}. To guarantee correctness and
-to improve performance of the slicing, the algorithm employs the pointer
-analysis by Andersen~\cite{andersen}.
+slicing algorithm by Weiser~\cite{slicing} as described in
+Section~\ref{sec:slicing}. To guarantee correctness and to improve performance
+of the slicing, the algorithm employs the pointer analysis by
+Andersen~\cite{andersen}.
 
 \subsection*{Kleerer}
 The module \code{Kleerer} performs a final processing of the sliced bytecode
 before it is passed to \klee. In particular, the module adds to the bytecode a
-function \code{main} that calls a \emph{starting function}.  The \code{main}
+function \code{main} that calls a starting function.  The \code{main}
 function also allocates a symbolic memory for each parameter of the starting
 function. Size of the allocated memory is determined by the parameter type.
 More problematic is a pointer as an argument of the starting function. We have
 no way to find out whether the pointer points to a single value in memory or
-whole array. To overcome the problem, the size is multiplied by 4192 for
-pointers. For example, 4 bytes are allocated for an integer and 16768 bytes
-for an integer pointer. The idea behind the array allocations is taken over
-from the paper about \ucklee~\cite{ucklee}.
+whole array. To overcome the problem, we assume there are at most 4192 members
+in the array. So for example, 4 bytes are allocated for an integer and 16768
+bytes for an integer pointer. The idea behind the array allocations is taken
+over from the paper introducing \ucklee~\cite{ucklee}.
 
-We had to extend the approach by two means. First, we enumerate some
+We still had to extend the approach by two means. First, we enumerate some
 known structures which are never passed as arrays. An example of such
 structure is a PCI device descriptor stored in the structure \code{pci_dev}.
-Second, we pass to a starting function a pointer to the middle of the
-allocated memory. This is because functions may dereference memory at negative
-index. This usually happens when a callback is called and as a parameter it
-gets some kernel structure. It is usually a static member of another structure
-owned by a driver. This is illustrated on an example taken from the Linux
+We just pass a memory of the structure size.  Second, we pass to a starting
+function a pointer to the middle of the allocated memory. This is because
+functions may dereference memory at a negative index. This usually happens
+when some callback in a driver is called and it has as a parameter some kernel
+structure. Such structure is usually a static member of another structure
+owned by a driver. Let us illustrate that on an example taken from the Linux
 kernel 3.11, file \code{drivers/pci/hotplug/pciehp_ctrl.c}, i.e.\ a PCI
 Express hot-plug driver.
 \begin{figure}[htb]
@@ -935,20 +950,33 @@ void pciehp_power_thread(struct work_struct *work) {
     function.}
     \label{fig:fmics_neg}
 \end{figure}
-There is a declaration of a driver structure \code{power_work_info} on
-line~\ref{line:fmics_neg_struct}. It contains also a kernel internal structure
-\code{work_struct} on line~\ref{line:fmics_neg_kernel}. Finally, when the
-callback \code{pciehp_power_thread} is called with a pointer to
-\code{work_struct}, the callback uses \code{container_of} to extract back a
+There is a declaration of the driver structure \code{power_work_info} on
+line~\ref{line:fmics_neg_struct}. The structure contains also the kernel
+internal structure \code{work_struct} on line~\ref{line:fmics_neg_kernel}.
+Finally, when the callback \code{pciehp_power_thread} is called with a pointer
+to \code{work_struct}, the callback uses \code{container_of} to extract back a
 pointer to \code{power_work_info}. Obviously, the pointer to
 \code{power_work_info} is smaller than to \code{work_struct}.
 
-Finally, the resulting bytecode is symbolically executed by \klee. If a
-symbolic execution touches a memory out of the allocated area, we get a
-\emph{memory error}. To remedy this inconvenience, we plan to implement the
-same on-demand memory handling as \ucklee does.
+\subsection*{Symbolic Execution}
+After we obtain \llvm code with the \code{main} function, we can start the
+symbolic execution. Note that in principle, there can be more than one
+starting function, i.e.\ more input files for the symbolic execution. But
+\klee needs to perform the symbolic execution only on one starting function.
+On the one that was used in the analyzer that generated a report which we are
+trying to verify.
 
-\subsection*{Experiments}\label{sec:fmics_experiments}
+The symbolic execution need not finish if the analyzed code is still too
+complex. But ideally, when if finishes, it can do so in several ways. First,
+\klee can tell us there is no error or there is an error. We have a conclusion
+in that case.  But \klee also sometimes crashes, or finishes the execution
+with a \emph{memory error}.  In either case, we cannot conclude anything about
+the input file. The memory errors are caused by too low limits for the
+allocated memory and the code touched a memory out of bounds while was being
+executed.  To remedy this inconvenience, we plan to implement the same
+on-demand memory handling as \ucklee does.
+
+\section{Experimental Results}\label{sec:fmics_experiments}
 
 \begin{table}[tb]
 \begin{center}
@@ -957,59 +985,59 @@ same on-demand memory handling as \ucklee does.
 %\scriptsize
 \begin{tabular}{|l|c|c|c|c|c|c|c|c|} \hline
   {\textbf{File}}&
-  \multicolumn{5}{|c|}{\textbf{Running Time} (s)} & 
+  \multicolumn{5}{c|}{\textbf{Running Time} (s)} & 
   \multirow{2}{*}{\textbf{Sliced}} &
-  \multirow{2}{*}{\textbf{Result}} & \textbf{Factual} \\ \cline{2-6}
-  {\textbf{Function}} & \textbf{Comp.} & \textbf{Instr.} &
+  \multirow{2}{*}{\textbf{Res.}} & \textbf{Factual} \\ \cline{2-6}
+  {\textbf{Function}} & \textbf{Co.} & \textbf{Inst.} &
    \textbf{Slic.} & \textbf{SE} & \textbf{Total} & &
  & \textbf{State} \\ \hline \hline
 
-  \begin{minipage}{3cm}
-    \smallskip\texttt{\scriptsize fs/jfs/super.c}\\[-1pt]
-    \texttt{jfs\_quota\_write}\smallskip
-  \end{minipage}
+%  \begin{minipage}{3cm}
+%    \smallskip\scriptsize{\code{fs/jfs/super.c}} \\[-1pt]
+    \code{jfs_quota_write}%\smallskip
+%  \end{minipage}
   & 1.25 & 0.18 & 0.15 & 5.09 & 6.67 & 
-  \twolines{369/119}{67.8\%} & BUG & BUG \\ \hline
+  \twolines{369/119}{67.8\%} & E & E \\ \hline
 
   \begin{minipage}{3cm}
-    \smallskip\texttt{\scriptsize drivers/net/qlge/qlge\_main.c}\\[-1pt]
-    \texttt{qlge\_set\_mac\_address}\smallskip
+%    \smallskip\scriptsize{\code{drivers/net/qlge/qlge_main.c}} \\[-1pt]
+    \code{qlge_set_mac_address}\smallskip
   \end{minipage}
   & 2.70 & 0.72 & 26.75 & 13.28 & 43.45 &
-  \twolines{1333/447}{66.5\%} & BUG & BUG \\ \hline
+  \twolines{1333/447}{66.5\%} & E & E \\ \hline
 
   \begin{minipage}{3cm}
-    \smallskip\texttt{\scriptsize drivers/hid/hidraw.c}\\[-1pt]
-    \texttt{hidraw\_read}\smallskip
+%    \smallskip\scriptsize{\code{drivers/hid/hidraw.c}} \\[-1pt]
+    \code{hidraw_read}\smallskip
   \end{minipage}
-  & 1.06 & 0.18 & 0.14 & \multicolumn{2}{|c|}{Timeout} & 
-  \twolines{666/220}{67.0\%} & TO & BUG \\ \hline
+  & 1.06 & 0.18 & 0.14 & \multicolumn{2}{c|}{Timeout} & 
+  \twolines{666/220}{67.0\%} & TO & E \\ \hline
 
   \begin{minipage}{3cm}
-    \smallskip\texttt{\scriptsize drivers/net/ns83820.c}\\[-1pt]
-    \texttt{queue\_refill}\smallskip
+%    \smallskip\scriptsize{\code{drivers/net/ns83820.c}} \\[-1pt]
+    \code{queue_refill}\smallskip
   \end{minipage}
   & 1.76 & 0.29 & 1.72 & 0.62 & 4.39 & 
   \twolines{1212/329}{72.9\%} & FP & FP \\[-2pt] \hline
 
   \begin{minipage}{3.6cm}
-    \smallskip\texttt{\scriptsize drivers/usb/misc/}\\[-3pt]
-    \hspace*{2ex}\texttt{\scriptsize sisusbvga/sisusb\_con.c}\\[-1pt]
-    \texttt{sisusbcon\_set\_palette}\smallskip
+%    \smallskip\scriptsize{\code{drivers/usb/misc/}} \\[-3pt]
+%    \hspace*{2ex}\scriptsize{\code{sisusbvga/sisusb_con.c}}\\[-1pt]
+    \code{sisusbcon_set_palette}\smallskip
   \end{minipage}
   & 1.50 & 0.24 & 0.27 & 17.19 & 19.20 & 
   \twolines{2936/705}{76.0\%} & FP & FP \\\hline
 
   \begin{minipage}{3cm}
-    \smallskip\texttt{\scriptsize fs/jffs2/nodemgmt.c}\\[-1pt]
-    \texttt{jffs2\_reserve\_space}\smallskip
+%    \smallskip\scriptsize{\code{fs/jffs2/nodemgmt.c}} \\[-1pt]
+    \code{jffs2_reserve_space}\smallskip
   \end{minipage}
-  & 1.04 & 0.18 & 0.22 & \multicolumn{2}{|c|}{Timeout} & 
+  & 1.04 & 0.18 & 0.22 & \multicolumn{2}{c|}{Timeout} & 
   \twolines{677/360}{46.8\%} & TO & FP \\ \hline
 
   \begin{minipage}{3cm}
-    \smallskip\texttt{\scriptsize kernel/kprobes.c}\\[-1pt]
-    \texttt{pre\_handler\_kretprobe}\smallskip
+%    \smallskip\scriptsize{\code{kernel/kprobes.c}} \\[-1pt]
+    \code{pre_handler_kretprobe}\smallskip
   \end{minipage}
   & 0.32 & 0.09 & 0.51 & 2.43 & 3.35 & 
   \twolines{202/68}{66.3\%} & ME & FP \\ \hline
@@ -1017,13 +1045,13 @@ same on-demand memory handling as \ucklee does.
 \end{tabular}
 \end{center}
 \caption{Experimental results. The table presents running time of
-  preprocessing and compilation (\textbf{Comp.}), instrumentation including
-  points-to analysis (\textbf{Instr.}), slicing (\textbf{Slic.}), symbolic
+  preprocessing and compilation (\textbf{Co.}), instrumentation including
+  points-to analysis (\textbf{Inst.}), slicing (\textbf{Slic.}), symbolic
   execution (\textbf{SE}), and the total running time. The column
   \textbf{Sliced} presents the ratio of instructions sliced away from the
   instrumented \textsc{Llvm} code and the exact number of instructions
-  before/after slicing. The column \textbf{Result} specifies the
-  result of our tool: BUG means that the tool found a real error, FP means
+  before/after slicing. The column \textbf{Res.} specifies the
+  result of our tool: E means that the tool found a real error, FP means
   that the analysis finished without error found (i.e.~the original error
   report is a false positive), TO that the symbolic execution did not finish in
   time and ME denotes an occurrence of memory error. The last column specifies
@@ -1081,7 +1109,7 @@ code.  The last two columns specify the results of our analysis and the real
 state confirmed by kernel developers. The table clearly shows that the
 bottleneck of our technique is the symbolic execution. However, if we did not
 slice the code, the only function completely executed in time would be
-\texttt{sisusbcon\_set\_palette}, computed in 20.64s.
+\code{sisusbcon\_set\_palette}, computed in 20.64s.
 % , i.e. slower by 17 per cent. As a demonstration, slicer reduces 2936
 % \textsc{Llvm} instructions to 705 there.
 
@@ -1236,4 +1264,9 @@ synergy of the three methods. Moreover, our experimental results indicate
 that the technique can recognize some false positives and some real errors
 in error reports produced by other error-detection tools.
 
+\subsection*{Availability}
+\noindent Web pages: \url{http://sf.net/projects/symbiotic/} \\
+\noindent Repository (Slicer): \url{http://github.com/jirislaby/LLVMSlicer/} \\
+\noindent License: GNU General Public License v2.0
 
+%}}}
