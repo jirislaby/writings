@@ -350,12 +350,7 @@ this phase is therefore a new program that still has the original
 functionality but it also simultaneously updates instrumented state machines.
 We show the process using the automaton $\SA(x)$ of Figure~\ref{fig:sm} and a
 program consisting of two functions: \code{copy} of Figure~\ref{fig:copy} and
-\code{foo} of Figure~\ref{fig:foo}.  The function \code{foo} calls \code{copy}
-twice, first with the lock \code{L1} and then with the lock \code{L2}. The
-locks protect writes into buffers \code{buf1} and \code{buf2} respectively.
-The function \code{foo} is a so-called \emph{starting function}. It is a
-function where the symbolic execution starts.
-
+\code{foo} of Figure~\ref{fig:fmics_foo}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
@@ -372,8 +367,13 @@ void foo(char *src, int n) {
   \end{center}
   \caption{The function \code{foo} forms an analysed program together
     with the function \code{copy}.}
-  \label{fig:foo}
+  \label{fig:fmics_foo}
 \end{figure}
+The function \code{foo} calls \code{copy} twice, first with the lock \code{L1}
+and then with the lock \code{L2}. The locks protect writes into buffers
+\code{buf1} and \code{buf2} respectively.  The function \code{foo} is a
+so-called \emph{starting function}. It is a function where the symbolic
+execution starts.
 
 The instrumentation starts by recognizing code fragments which manipulate with
 locks in the analysed program. More precisely, we look for all those code
@@ -429,9 +429,9 @@ locks \code{L1} and \code{L2} to addresses of corresponding automata.
   \begin{tabular}{c}
     \begin{lstlisting}[name=fmics_impl]
 int *smGetMachine(int *p) {
-   if (p == &L1) return &smL1;
-   if (p == &L2) return &smL2;
-   return NULL;         // unreachable
+  if (p == &L1) return &smL1;
+  if (p == &L2) return &smL2;
+  return NULL;         // unreachable
 }
     \end{lstlisting}
   \end{tabular}
@@ -453,34 +453,34 @@ transition has to be fired.
   \begin{tabular}{c}
     \begin{lstlisting}[name=fmics_impl]
 void smFire(int *SA, int transition) {
-   switch (*SA) {
-   case smU:
-      switch (transition) {
-      case smLOCK:
-         *SA = smL;
-         break;
-      case smUNLOCK:
-         assert(false); // double unlock(*@\label{line:fmics_err_du}@*)
-         break;
-      default: break;
-      }
+  switch (*SA) {
+  case smU:
+    switch (transition) {
+    case smLOCK:
+      *SA = smL;
       break;
-   case smL:
-      switch (transition) {
-      case smLOCK:
-         assert(false); // double lock(*@\label{line:fmics_err_dl}@*)
-         break;
-      case smUNLOCK:
-         *SA = smU;
-         break;
-      case smRETURN:
-         assert(false); // return in locked(*@\label{line:fmics_err_l}@*)
-         break;
-      default: break;
-      }
+    case smUNLOCK:
+      assert(false); // double unlock(*@\label{line:fmics_err_du}@*)
       break;
-   default: break;
-   }
+    default: break;
+    }
+  break;
+  case smL:
+    switch (transition) {
+    case smLOCK:
+      assert(false); // double lock(*@\label{line:fmics_err_dl}@*)
+      break;
+    case smUNLOCK:
+      *SA = smU;
+      break;
+    case smRETURN:
+      assert(false); // return in locked(*@\label{line:fmics_err_l}@*)
+      break;
+    default: break;
+    }
+    break;
+  default: break;
+  }
 }
     \end{lstlisting}
   \end{tabular}
@@ -495,14 +495,15 @@ we also know what objects the fragment manipulates with (if any). Therefore,
 we first retrieve an address of automaton related to manipulated objects (if
 any) by using the function \code{smGetMachine} and then we fire the transition
 by calling the function \code{smFire}. The instrumented version of the
-original program consists of the code of
-Figures~\ref{fig:fmics_const}, \ref{fig:fmics_getm}, \ref{fig:fmics_fire}, and
-the instrumented version of the original functions \code{foo} and \code{copy}
-given in Figure~\ref{fig:copy_instrumented}. The instrumented lines are
-highlighted by~\code{*}.  Note that in our example, the instrumented state
-variables \code{smL1} and \code{smL2} directly correspond to the program locks
-\code{L1} and \code{L2} respectively. In general, nonetheless, states of a
-state machine of a more complex property need not necessarily correspond to
+original program consists of constants with lock variables
+(Figure~\ref{fig:fmics_const}), the functions \code{smGetMachine}
+(Figure~\ref{fig:fmics_getm}) and \code{smFire} (Figure~\ref{fig:fmics_fire}),
+and the instrumented version of the original functions \code{foo} and
+\code{copy} given in Figure~\ref{fig:copy_instrumented}. The instrumented
+lines are highlighted by~\code{*}.  Note that in our example, the instrumented
+state variables \code{smL1} and \code{smL2} directly correspond to the program
+locks \code{L1} and \code{L2} respectively. In general, nonetheless, states of
+a state machine of a more complex property need not necessarily correspond to
 values of a particular program variable. Therefore, we apply this general
 approach to our example too.
 
@@ -514,40 +515,53 @@ approach to our example too.
   int L1, L2;
 
   char *copy(char *dst, char *src, int n, int *L) {
-     int i, len;
-     len = 0;
-     if (src != NULL && dst != NULL) {
-        len = n;
-*       smFire(smGetMachine(L), smLOCK);
-        lock(L);
-     }
-     i = 0;
-     while (i < len) {
-        dst[i] = src[i];
-        i++;
-     }
-     if (len > 0) {
-*       smFire(smGetMachine(L), smUNLOCK);
-        unlock(L);
-     }
-*    smFire(smGetMachine(L), smRETURN);
-     return dst;
+    int i, len;
+    len = 0;
+    if (src != NULL && dst != NULL) {
+      len = n;
+*     smFire(smGetMachine(L), smLOCK);
+      lock(L);
+    }
+    i = 0;
+    while (i < len) {
+      dst[i] = src[i];
+      i++;
+    }
+    if (len > 0) {
+*     smFire(smGetMachine(L), smUNLOCK);
+      unlock(L);
+    }
+*   smFire(smGetMachine(L), smRETURN);
+    return dst;
   }
 
   void foo(char *src, int n) {
-     copy(buf1, src, n, &L1);
-     copy(buf2, src, n, &L2);
+    copy(buf1, src, n, &L1);
+    copy(buf2, src, n, &L2);
   }
     \end{lstlisting}
     \end{tabular}
     \end{center}
-    \caption{Functions \texttt{foo} and \texttt{copy} instrumented by calls
-      of \texttt{smFire} function.}
+    \caption{Functions \code{foo} and \code{copy} instrumented by calls
+      of \code{smFire} function. The instrumented code is marked by \code{*}.}
     \label{fig:copy_instrumented}
 \end{figure}
 
-%\todol{doplnit recognition:} In practice we require a description language expressive enough to recognize wide range of possible expressions.
-%\todol{doplnit constant function mapping (malloc):}
+Note that we instrumented the program of the figures somewhat manually. In
+practice, we need this process automated somehow. One solution is to ask a
+user to instrument header files and a preprocessor distributes the transition
+functions automatically. This approach was successfully employed for checking
+of the Linux kernel locking policy. We manually instrumented macros for
+locking like \code{spin_lock} and \code{spin_unlock}. And the preprocessor
+during the build process expanded these macros in every place where locking is
+used and put there the function \code{smFire}. But as one can imagine, this is
+only possible for projects and properties where such macros exist. A use case
+where this does not work are properties regarding pointer manipulation errors.
+There, we need to fire a transition by most pointer manipulations, but barely
+someone will put some macros around them. In that case, one can use
+instrumenting tools like the one from the \textsc{Ldv} toolkit~\cite{ldv}.
+They perform the model checking of various properties in the kernel and have
+the same use case of instrumentation as we do.
 
 %}}}
 %{{{ Slicing
@@ -562,14 +576,7 @@ code is known to be very expensive, moreover in this case it is yet unneeded.
 Therefore, we use the slicing technique from Weiser~\cite{slicing} to
 eliminate such code from the instrumented program.
 
-Our analysis is interested only in states of the instrumented automata,
-especially in locations corresponding to errors.  Hence, the slicing criterion
-is a pair of a location preceding an \code{assert} statement in the
-\code{smFire} function and the set of all variables representing current
-states of the corresponding automata. The slicing criteria then comprises all
-such pairs.
-
-\begin{figure}[tb]
+\begin{figure}[bt]
     \begin{center}
     \begin{tabular}{l}
     \begin{lstlisting}[language=C]
@@ -577,17 +584,17 @@ char *buf1, *buf2;
 int L1, L2;
 
 char *copy(char *dst, char *src, int n, int *L) {
-   int len;
-   len = 0;
-   if (src != NULL && dst != NULL) {
-      len = n;
-      smFire(smGetMachine(L), smLOCK);
-   }
-   if (len > 0) {
-      smFire(smGetMachine(L), smUNLOCK);
-   }
-   smFire(smGetMachine(L), smRETURN);
-   return dst;
+  int len;
+  len = 0;
+  if (src != NULL && dst != NULL) {
+    len = n;
+    smFire(smGetMachine(L), smLOCK);
+  }
+  if (len > 0) {
+    smFire(smGetMachine(L), smUNLOCK);
+  }
+  smFire(smGetMachine(L), smRETURN);
+  return dst;
 }
 
 void foo(char *src, int n) {
@@ -600,6 +607,13 @@ void foo(char *src, int n) {
     \caption{Functions \texttt{foo} and \texttt{copy} after slicing.}
     \label{fig:copy_sliced}
 \end{figure}
+
+Our analysis is interested only in states of the instrumented automata,
+especially in locations corresponding to errors.  Hence, the slicing criterion
+is a pair of a location preceding an \code{assert} statement in the
+\code{smFire} function and the set of all variables representing current
+states of the corresponding automata. The slicing criteria then comprises all
+such pairs.
 
 In the instrumented program consisting of Figures~\ref{fig:fmics_const},
 \ref{fig:fmics_getm}, \ref{fig:fmics_fire}, and~\ref{fig:copy_instrumented},
