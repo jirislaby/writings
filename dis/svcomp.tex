@@ -6,45 +6,42 @@ errors. We have not considered any other use our tools until we were pointed
 by the authors of \textsc{Predator}~\cite{predator} to the past
 \emph{Competition on Software Verification} (SV-COMP) 2012~\cite{sv-comp12} in
 which they participated. We decided to participate in the next year's
-competition with our tool \symbio~\cite{symbiotic} described earlier in
-Chapter~\ref{sec:fmics}. And since one of authors of every tool is asked to be
-in the competition program committee, the author of this thesis willingly took
-the role.
+competition with our tool \symbio~\cite{symbiotic}. And since one of authors
+of every tool is asked to be in the competition program committee, the author
+of this thesis willingly took the role.
 
-This participation is documented in a paper published in Springer's
-LNCS~\cite{symbiotic-svcomp} and presented on the competition as a part of the
-19th International Conference on Tools and Algorithms for the Construction and
-Analysis of Systems. There is also a competition report from
-2013~\cite{sv-comp13}.
-
-\section{Verification Approach}\label{sec:approach}
-
-\symbio implements our technique~\cite{symbiotic} that combines
-instrumentation, program slicing, and symbolic execution in order to detect
-bugs described by finite state machines. More precisely, we instrument a given
-program with code that tracks runs of state machines representing various
-erroneous behaviors. If an instrumented state machine enters an error location
+We have already provided a detailed description of the \symbio internals in
+Chapter~\ref{sec:fmics}. Now we only sum up that the technique implemented in
+\symbio combines instrumentation, program slicing, and symbolic execution in
+order to detect bugs described by automata. More precisely, we instrument a
+given program with code that tracks runs of automata representing various
+erroneous behaviors. If an instrumented automaton enters an error location
 during a program execution, then the original program contains a bug specified
-by the machine. After instrumentation, we slice~\cite{slicing} the program to
-reduce its size without affecting runs of state machines. Finally, we
-symbolically execute~\cite{se_king} the sliced program to find bugs in the
-program.
+by the automaton. After instrumentation, we slice~\cite{slicing} the program
+to reduce its size without affecting runs of the instrumented automata.
+Finally, we symbolically execute~\cite{se_king} the sliced program to find
+errors in the program.
 
-As reachability of an \texttt{ERROR} label is the only bug considered in the
-SV-COMP, we have modified our instrumentor to put \texttt{assert(0)}
-function calls at \texttt{ERROR} labels in the code. Given the instrumented
-code, we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is
-in turn interprocedurally sliced with respect to slicing criteria, which are
-the instrumented \texttt{assert} calls. In other words we remove all the
-code except the one that has an effect on reachability of \texttt{assert}
-calls. The sliced \textsc{Llvm} bitcode is finally symbolically executed by
-\textsc{Klee}~\cite{klee}. There are several possible outputs that
-\textsc{Klee} may generate. It can either find a reachable \texttt{assert}
+As reachability of an \code{ERROR} label is the only bug considered in the
+SV-COMP, we have modified our instrumentor to put \code{assert(0)} function
+calls at \code{ERROR} labels in the code. Given the instrumented code, we
+execute \clang to produce \llvm bytecode. This is in turn inter-procedurally
+sliced with respect to slicing criteria, which are the instrumented
+\code{assert} calls. In other words we remove all the code except that has an
+effect on reachability of \code{assert} calls. The sliced \llvm bitcode is
+finally symbolically executed by \klee~\cite{klee}. There are several possible
+outputs that \klee may generate. It can either find a reachable \code{assert}
 and report it, or finish the computation without any report, or terminate in
 some errant way (out of time, out of memory, invalid memory dereference, or
 some internal error for example). We map these to the demanded answers:
-\texttt{UNSAFE}, \texttt{SAFE}, or \texttt{UNKNOWN} respectively. This is
-taken care of in a simple scripted filter.
+\code{UNSAFE}, \code{SAFE}, or \code{UNKNOWN} respectively.  This is taken
+care of in a simple scripted filter.
+
+Participation in this competition is documented in a paper published in
+Springer's LNCS~\cite{symbiotic-svcomp} and presented on the competition as a
+part of the 19th International Conference on Tools and Algorithms for the
+Construction and Analysis of Systems. There is also a competition report from
+2013 by Beyer~\cite{sv-comp13}.
 
 %}}}
 %{{{ Software architecture
@@ -59,8 +56,8 @@ symbolic executor is \textsc{Klee} which itself uses the
 more information about \textsc{Klee}, see~\cite{klee}.
 
 \paragraph{Software Structure and Architecture} The architecture described
-in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
-The slicer is written as a plug-in for the optimizer \texttt{opt} from the
+in the introduction above is summarized in Figure~\ref{fig:pipeline}.  The
+slicer is written as a plug-in for the optimizer \texttt{opt} from the
 \textsc{Llvm} suite. It is publicly available in a separate repository at
 \url{https://github.com/jirislaby/LLVMSlicer/}. The slicer improves the
 symbolic execution considerably. For ease of use, all parts of the tool
