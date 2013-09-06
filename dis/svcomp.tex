@@ -1,14 +1,116 @@
 % vim: textwidth=78 ai spell spelllang=en filetype=tex sw=2
 
 \chapter{Participating SV-COMP}\label{sec:svcomp}
-We had a couple of tools, we were checking the Linux kernel and finding real
-errors. We have not considered any other use our tools until we were pointed
-by the authors of \textsc{Predator}~\cite{predator} to the past
-\emph{Competition on Software Verification} (SV-COMP) 2012~\cite{sv-comp12} in
-which they participated. We decided to participate in the next year's
-competition with our tool \symbio~\cite{symbiotic}. And since one of authors
-of every tool is asked to be in the competition program committee, the author
-of this thesis willingly took the role.
+At some point, we had a couple of tools, we were checking the Linux kernel and
+finding real errors. We had not considered any other use for our tools until
+we were pointed by the authors of \textsc{Predator}~\cite{predator} to the
+past \emph{Competition on Software Verification} (SV-COMP)
+2012~\cite{sv-comp12} in which they participated. We decided to participate in
+the next year's competition with our tool \symbio (see
+Chapter~\ref{sec:fmics}). To introduce the reader, we describe the competition
+in this chapter first.
+
+We had to improve the tool to fulfil the requirements of the competition. The
+tool was also unable to handle some benchmarks from the competition. Also it
+gave incorrect results about some other benchmarks. It had several reasons we
+had to cope with and they are dealt with in this chapter too.
+
+Participation in this competition is documented in a paper published in
+Springer's LNCS~\cite{symbiotic-svcomp} and presented on the competition as a
+part of the 19th International Conference on Tools and Algorithms for the
+Construction and Analysis of Systems. There is also a competition report from
+2013 by Beyer~\cite{sv-comp13}.  And yet, since one of authors of every tool
+is asked to be in the competition jury, the author of this thesis was pleased
+to take that role.
+
+\paragraph{Chapter Organization} In the following
+Section~\ref{sec:svcomp_competition} we describe the competition proper. In
+Section~\ref{sec:svcomp_participation} we characterize our path with \symbio
+through the competition. Section~\ref{sec:svcomp_results} shows some results
+from the competition and compares them to the current, improved results of
+\symbio.  Finally, we draw some conclusion about our participation in
+Section~\ref{sec:svcomp_conclusion}.
+
+\section{The Competition}\label{sec:svcomp_competition}
+First, let us introduce to the competition. To its aims, procedure, rules,
+and so on. Although there existed some competitions prior SV-COMP, they were
+only limited in what they demand by the competitors according to the
+SV-COMP organizers. On the contrary, SV-COMP was established to attract
+developers of code analyzers and to push them to improve their tools. The
+tools should be fully automatic, able to handle real code, contain
+state-of-the-art approaches, improve the state-of-the-art, and finally the
+tools should present themselves to a wider audience too.
+
+In the 2012's competition, the benchmarks for exercising tools were required to
+be in \emph{C intermediate language} (CIL). CIL is a subset of the C language
+and the requirement was a bit in a contradiction to the requirement on
+handling large, real projects. So this was changed in 2013's competition and
+the benchmarks are now in CIL or ANSI~C~\cite{ansi_c}. The benchmarks are
+divided into several categories. The basic benchmarks split is
+\emph{concurrency}, \emph{memory safety}, and the rest. The rest comprehends
+\emph{bit vectors}, \emph{control flow integers}, \emph{device drivers},
+\emph{feature checks}, \emph{heap manipulation}, \emph{loops}, \emph{product
+lines}, and \emph{system C}. Concurrency and memory safety benchmarks are
+special as they need specific tools. One needs a tool that can find errors in
+parallelism, the other which can find memory errors. The rest of the
+benchmarks contains a line marked by the \code{ERROR} label. The tools should
+answer whether it is reachable. Overall, some of the benchmarks are small,
+simple code, but many are also large code bases, e.g.\ taken from the Linux
+kernel.
+
+There are three phases during the competition. The first one is a
+\emph{submission of benchmarks}. Everybody is allowed to submit a benchmark to
+bother other's tools a bit. This phase is optional, but allows the developers
+to increase chances of their tool. There is a deadline for this phase. After
+that, the second phase starts. It is a \emph{training} phase. This is when
+benchmarks are frozen and everybody can tune their tools to work as good as
+possible for the benchmarks. This phase usually lasts two months. And at the
+end of this time period, tools and papers about them are due too. This is to
+formally enroll the tools. Now, the \emph{evaluation} phase starts. The tools
+are run by the organizers on all benchmarks and are evaluated. After few
+weeks, the results are made available to the authors and the evaluation ends.
+Then, similar to other conferences, authors of accepted papers are requested
+to provide a final version of the papers. They are finally presented on the
+conference.
+
+The competition has its rules for the evaluation phase. Every tool, when
+it is evaluating a single benchmark should give some answer. It can find
+nothing and declare the benchmark as safe. Or, it can find an error and is
+expected to provide an error path through the program. Finally it can flag
+``unknown'' in case it cannot decide. Every answer the tool gives is scored
+according to Table~\ref{tab:svcomp_scores}.
+\begin{table}[htb]
+  \begin{center}
+  \begin{tabular}{|l|c|c|} \hline
+  \textbf{Tool's}  & \multicolumn{2}{c|}{\textbf{Benchmark}} \\ \cline{2-3}
+  \textbf{Answer}  & \textbf{Safe} & \textbf{Unsafe} \\ \hline
+  \textsf{Safe}    &  2 & -8 \\
+  \textsf{Unsafe}  & -4 &  1 \\
+  \textsf{Unknown} &  0 &  0 \\ \hline
+  \end{tabular}
+  \end{center}
+  \caption{Scores for answers in SV-COMP.}
+  \label{tab:svcomp_scores}
+\end{table}
+Some tools happen to compute the results for a very long time. Hence there is
+a time limit and if the tool does not finish in the limit, the organizers kill
+the process for that particular benchmark and consider the answer as unknown.
+In the 2013's competition, the limit was fifteen minutes.
+
+After a tool is run for all benchmarks in a category, the scores are
+summarized. All tools are compared according to the sum. If there are two with
+the same score, the running time is considered. Finally, when all categories
+are evaluated for every tool, the overall score is computed. It is weighted by
+benchmark counts over categories to ensure fairness. The reasoning and the
+formula used for computation is in the 2013's report~\cite{sv-comp13}.
+
+When the final score is known, the results are given to the authors of the
+tools. They have still a possibility to object, if something really unexpected
+happened with their tool regarding the score. And if it did not, they still
+have a possibility to \emph{opt-out}. If some score in a category is too
+unfavorable, they can have no score in the category by opting out.
+
+\section{Our Participation}\label{sec:svcomp_participation}
 
 We have already provided a detailed description of the \symbio internals in
 Chapter~\ref{sec:fmics}. Now we only sum up that the technique implemented in
@@ -35,67 +137,49 @@ and report it, or finish the computation without any report, or terminate in
 some errant way (out of time, out of memory, invalid memory dereference, or
 some internal error for example). We map these to the demanded answers:
 \code{UNSAFE}, \code{SAFE}, or \code{UNKNOWN} respectively.  This is taken
-care of in a simple scripted filter.
-
-Participation in this competition is documented in a paper published in
-Springer's LNCS~\cite{symbiotic-svcomp} and presented on the competition as a
-part of the 19th International Conference on Tools and Algorithms for the
-Construction and Analysis of Systems. There is also a competition report from
-2013 by Beyer~\cite{sv-comp13}.
-
-%}}}
-%{{{ Software architecture
-
-\section{Software Architecture}
-\paragraph{Libraries/External Tools} For the code translation and for
-operations with the \textsc{Llvm} bitcode we use
-\textsc{Llvm}/\textsc{Clang} 3.1\footnote{\url{http://llvm.org}}. The
-symbolic executor is \textsc{Klee} which itself uses the
-\textsc{Stp} constraint solver~\cite{stp}. We obtained both \textsc{Klee} and
-\textsc{Stp} from the respective GIT repositories and used the snapshots. For
-more information about \textsc{Klee}, see~\cite{klee}.
-
-\paragraph{Software Structure and Architecture} The architecture described
-in the introduction above is summarized in Figure~\ref{fig:pipeline}.  The
-slicer is written as a plug-in for the optimizer \texttt{opt} from the
-\textsc{Llvm} suite. It is publicly available in a separate repository at
-\url{https://github.com/jirislaby/LLVMSlicer/}. The slicer improves the
-symbolic execution considerably. For ease of use, all parts of the tool
-pipeline are one by one run by a single script \texttt{runme}.
+care of in a simple scripted filter. The whole pipeline can be found in
+Figure~\ref{fig:svcomp_pipeline}
 
 \begin{figure}[tb]
 \begin{center}
-  \tikzstyle{stat} = [thick,draw,minimum size=1cm,node distance=1.5cm]
-  \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick]
-  \begin{tikzpicture}[font=\sffamily]
-    \node (START) {};
-    \node [stat,right=of START] (INSTR) {Instrumentor}
-      edge [pre] node [label=above:{C}] {} (START);
-    \node [stat,right=of INSTR] (CLANG) {\textsc{Clang}}
-      edge [pre] node [label=above:{C}] {} (INSTR);
-    \node [stat,right=2cm of CLANG] (SLICER) {Slicer}
-      edge [pre] node [label=above:{LLVM}] {} (CLANG);
-    \node [stat,below=9mm of SLICER] (KLEE) {\textsc{Klee}}
-      edge [pre] node [label=right:{LLVM}] {} (SLICER);
-    \node [stat,left=2.8cm of KLEE] (FILTER) {Filter}
-      edge [pre] node [label=above:{\textsc{Klee} result}] {} (KLEE);
-    \node [left=4.9cm of FILTER] (FINISH) {}
-      edge [pre] node [label=above:{\texttt{SAFE/UNSAFE/UNKNOWN}}] {} (FILTER);
+  \begin{tikzpicture}[node distance=5mm]
+    \node [tl_phase] (C) {Benchmark};
+    \node [tl_state,right=of C] (SYMBIO) {\symbio}
+      edge [tl_edge] node {} (C);
+    \node [tl_phase, right=of SYMBIO, align=center] (KLEE_RES) {
+	\klee \\
+	Results
+      }
+      edge [tl_edge] node {} (SYMBIO);
+    \node [tl_state,right=of KLEE_RES] (FILTER) {Filter}
+      edge [tl_edge] node {} (KLEE_RES);
+    \node [tl_phase, right=of FILTER, align=center] (FINISH) {
+	\code{SAFE}/ \\
+	\code{UNSAFE}/ \\
+	\code{UNKNOWN}
+      }
+      edge [tl_edge] node {} (FILTER);
   \end{tikzpicture}
 \end{center}
-  \caption{Pipeline of the tool}
-\label{fig:pipeline}
+  \caption{Pipeline of the tool at the competition. For the internal pipeline
+  of \symbio, see Figure~\ref{fig:fmics_pipeline}.}
+  \label{fig:svcomp_pipeline}
 \end{figure}
 
-\paragraph{Implementation Technology} The instrumentation is performed by a
-\texttt{bash} script using \texttt{sed}. The final filter also uses
-\texttt{bash} with the help of \texttt{grep}. The rest of the toolchain is
-written in C++ and compiled using \texttt{gcc}.
+\subsection*{Software Architecture}
+For the code translation and for operations with the \llvm bytecode we
+use \llvm~\cite{llvm}/\clang\cite{clang} 3.1. The
+symbolic executor is \klee which itself uses the \textsc{Stp}
+constraint solver~\cite{stp}. We obtained both \textsc{Klee} and \textsc{Stp}
+from the respective GIT repositories and used the snapshots. For more
+information about \klee, see its paper~\cite{klee}.
 
-%}}}
-%{{{ Discussion
+For ease of use, all parts of the tool pipeline are one by one run by a single
+script \code{runme}.
 
-\section{Discussion of Strengths and Weaknesses of the Approach}
+The instrumentation is performed by a \textsc{bash} script using \textsc{sed}.
+The final filter also uses \textsc{bash} with the help of \textsc{grep}. The
+rest of the toolchain is written in C++ and compiled using \textsc{gcc}.
 
 The strength of the tool lies in its high precision of the answers. In theory,
 the only source of incorrect answers is the slicer: it can completely remove
@@ -127,10 +211,7 @@ sliced code remains complex and symbolic execution runs out of time or
 memory. Other sources of \texttt{UNKNOWN} results are internal errors of
 \textsc{Klee} and general limitations of constraint solving.
 
-%}}}
-%{{{ Tool setup and configuration
-
-\section{Tool Setup and Configuration}
+\subsection*{Tool Setup and Configuration}
 \paragraph{Download and Installation Instructions}
 \begin{itemize}
 \item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
@@ -142,19 +223,28 @@ memory. Other sources of \texttt{UNKNOWN} results are internal errors of
 \item Run \texttt{./runme <benchmark.c>} for each source file in the set.
 \end{itemize}
 
+
+
 \paragraph{Results Reported} \texttt{SAFE/UNSAFE/UNKWNOWN} answers match
 the competition rules. The counterexample for an error in some
 \texttt{<benchmark.c>} is generated for each error path in the benchmark to
 \texttt{<benchmark.c>-klee-out/}. There is also a sliced code referred by all
 the error paths.
 
-%}}}
-%{{{ Software project and contributors
-
-\section{Software Project and Contributors}
+\subsection*{Software Project and Contributors}
 The concept of the tool has been developed by the authors of this paper. The
 tool was implemented by Jiri Slaby (contact person), Marek Trt\'ik, and Ben
 Liblit (several fixes).  It is available under the GNU GPLv2 License and is
 hosted by the Faculty of Informatics, Masaryk University.
+
+%}}}
+%{{{ Results
+
+\section{Results}\label{sec:svcomp_results}
+
+%}}}
+%{{{ Conclusion
+
+\section{Conclusion}\label{sec:svcomp_conclusion}
 
 %}}}
