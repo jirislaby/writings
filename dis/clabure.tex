@@ -522,37 +522,46 @@ The installation for this use case is easy. The \textsc{SQLite} sub-database
 needs only a client which is available for many platforms, Linux, Mac OS, and
 Windows including.  Use of the client is similar to other databases. It
 understands \emph{Structured Query Language} (SQL) queries as many other
-databases. Here we provide some examples of use. The database is opened by
-\lstinline[language=bash]@sqlite3 database.db 'SQL query'@.
+databases. The database is opened by \code[language=bash]{sqlite3 database.db}
+and it awaits SQL queries. We provide some examples of use in
+Figure~\ref{fig:cdb_sql}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
-  \begin{lstlisting}[language=SQL]
-aaa
+  \begin{lstlisting}[language=SQL, columns=flexible]
+> SELECT loc_file, loc_line FROM error;
+mm/vmalloc.c|292
+net/core/skbuff.c|147
+...
+> SELECT COUNT(id) FROM error WHERE marking > 0 AND
+  id IN (SELECT error_id FROM error_tool_rel WHERE tool_id = 1) AND
+  id NOT IN (SELECT error_id FROM error_tool_rel WHERE tool_id = 2);
+105
   \end{lstlisting}
   \end{tabular}
   \end{center}
-    \caption{An example of the double resource put error.}
-    \label{fig:cdb_sql1}
+    \caption{An example of SQL queries to a sub-database.}
+    \label{fig:cdb_sql}
 \end{figure}
+First, we query all errors in the sub-database and then we count all real
+errors found by tool 1 and not found by tool 2.
 
-
-The bug-reports produced by the tool are compared to the downloaded data. This
-way, one immediately gets a classification (real error/false positive) of all
-the reports matched in the database and also information about missed real
-errors if there are any. It remains to manually classify the bug-reports
-unmatched with the database content. The numbers of produced false positives,
-detected and missed real errors can be further statistically processed
-according to methodologies suggested elsewhere~\cite{HW08, begbunch}. They
-produce several metrics including accuracy and precision. The metrics, missed
-errors, and false positives are valuable inputs for tuning the tool. 
+With the sub-database, the bug-reports produced by the newly developed tool
+are compared to the downloaded data. We cannot provide a script to
+automatically compare the results to the sub-database as tools tend to output
+the reports in various formats. So when one compares the data, they
+immediately get a classification (real error/false positive) of all the
+reports matched in the database and also information about missed real errors
+if there are any. It remains to manually classify the bug-reports unmatched
+with the database content. The numbers of produced false positives, detected
+and missed real errors can be further statistically processed according to
+methodologies suggested elsewhere~\cite{HW08, begbunch}. They produce several
+metrics including accuracy and precision. The metrics, missed errors, and
+false positives are valuable inputs for tuning the tool. 
 
 Finally, the user is kindly asked to update classification of unclassified
 entries and to insert newly discovered bug-reports with their classification
 into the database too.
-
-%The installation and local database use is described in the \cdb
-%documentation.
 
 %}}}
 %{{{ Future Plans
@@ -563,31 +572,25 @@ We have presented \cdb: the database of classified bug-reports. It is
 intended as an open platform for sharing valuable benchmarks for developers
 of program analysis tools. The database already contains a large collection
 of uniformly described bug-reports produced by various tools on a large
-real-life project, namely the Linux kernel 2.6.28.
+real-life project, namely the Linux kernel 2.6.28. There are also reports
+taken over from two years of a software competition.
 
 \medskip
 We plan to extend the database in several directions. Namely, we intend to
 collect more bug-reports and to support more error types in the Linux kernel
 project. For example, we plan to add error types connected to deadlock and
-livelock. 
-% Note that these errors often need to be represented by more than
-% one program point. 
-Further, we plan to add other real-life projects. We also plan to extend the
-web interface to enable developers of program analysis tools to maintain and
-augment the database.
+livelock.  Further, we plan to add other real-life projects. We also plan to
+extend the web interface to enable developers of program analysis tools to
+maintain and augment the database.
 
 In general, the future of \cdb depends on a feedback from the program analysis
-community. At this point, we would like to encourage you to contact us at
-\texttt{claburedb@fi.muni.cz} if you have any comments, suggestions (for
-example which projects should be added to the database), questions, or
-sources of bug-reports for the Linux kernel or other interesting projects. We
-would especially welcome people willing to participate on creating and
-maintaining the database content for another project.
-
-%The database is still developing in several directions: we plan to add more
-%bug-reports for the Linux kernel, to support other software projects, and to
-%augment the web interface to allow other users to add and maintain the
-%database content.
+community. At this point, we would like to encourage the reader to contact us
+at \href{mailto:claburedb@fi.muni.cz}{\nolinkurl{claburedb@fi.muni.cz}} if
+they have any comments, suggestions (for example which projects should be
+added to the database), questions, or sources of bug-reports for the Linux
+kernel or other interesting projects. We would especially welcome people
+willing to participate on creating and maintaining the database content for
+another project.
 
 \subsection*{Availability}
 \noindent Web pages: \url{http://claburedb.fi.muni.cz/} \\
