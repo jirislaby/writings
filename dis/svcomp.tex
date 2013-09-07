@@ -112,33 +112,49 @@ unfavorable, they can have no score in the category by opting out.
 
 \section{Our Participation}\label{sec:svcomp_participation}
 
-We have already provided a detailed description of the \symbio internals in
-Chapter~\ref{sec:fmics}. Now we only sum up that the technique implemented in
-\symbio combines instrumentation, program slicing, and symbolic execution in
-order to detect bugs described by automata. More precisely, we instrument a
-given program with code that tracks runs of automata representing various
-erroneous behaviors. If an instrumented automaton enters an error location
-during a program execution, then the original program contains a bug specified
-by the automaton. After instrumentation, we slice~\cite{slicing} the program
-to reduce its size without affecting runs of the instrumented automata.
-Finally, we symbolically execute~\cite{se_king} the sliced program to find
-errors in the program.
+We decided to participate in the competition with one of our tools. And we
+chose to participate with \symbio. Since we have already provided a detailed
+description of the \symbio internals in Chapter~\ref{sec:fmics}, let us now only
+summarize that the tool combines instrumentation, program slicing, and
+symbolic execution in order to detect errors described by automata. More
+precisely, we instrument a given program with code that tracks runs of
+automata representing various erroneous behaviors. If an instrumented
+automaton enters an error location during a program execution, then the
+original program contains an error specified by the automaton. After
+instrumentation, we slice~\cite{slicing} the program to reduce its size
+without affecting runs of the instrumented automata.  Finally, we symbolically
+execute~\cite{se_king} the sliced program to find errors in the program.
 
-As reachability of an \code{ERROR} label is the only bug considered in the
-SV-COMP, we have modified our instrumentor to put \code{assert(0)} function
-calls at \code{ERROR} labels in the code. Given the instrumented code, we
-execute \clang to produce \llvm bytecode. This is in turn inter-procedurally
-sliced with respect to slicing criteria, which are the instrumented
-\code{assert} calls. In other words we remove all the code except that has an
-effect on reachability of \code{assert} calls. The sliced \llvm bitcode is
-finally symbolically executed by \klee~\cite{klee}. There are several possible
-outputs that \klee may generate. It can either find a reachable \code{assert}
-and report it, or finish the computation without any report, or terminate in
-some errant way (out of time, out of memory, invalid memory dereference, or
-some internal error for example). We map these to the demanded answers:
-\code{UNSAFE}, \code{SAFE}, or \code{UNKNOWN} respectively.  This is taken
-care of in a simple scripted filter. The whole pipeline can be found in
-Figure~\ref{fig:svcomp_pipeline}
+As we already know, the competition contains three sets of benchmarks. Since
+\symbio handles neither concurrency nor is prepared for memory errors, we
+wanted to cope with the rest of benchmarks only. As reachability of an
+\code{ERROR} label is the only error considered in those benchmarks, we wrote
+an instrumentor to put \code{assert(0)} function calls at \code{ERROR} labels
+in the code.  This is performed by a \textsc{Bash} script with a help of the
+stream editor \textsc{Sed}. We settled with six patterns which appear in the
+code, see \code{instrument.sh} in the \symbio distribution for details.
+
+Given the instrumented code, we executed \clang 3.1 to produce the \llvm
+bytecode. It was in turn inter-procedurally sliced with respect to slicing
+criteria, which are the instrumented \code{assert} calls. In other words we
+remove all the code except that has an effect on reachability of \code{assert}
+calls. The sliced \llvm bytecode is finally symbolically executed by
+\klee~\cite{klee}, which itself uses the \textsc{Stp} constraint
+solver~\cite{stp}. We obtained both \textsc{Klee} and \textsc{Stp} from the
+respective GIT repositories and used the snapshots.
+
+There are several possible outputs that can be given by \klee.  It can either
+find a reachable \code{assert} and report it, or finish the computation
+without any report, or terminate in some errant way (out of time, out of
+memory, invalid memory dereference, or some internal error for example). We
+map these to the demanded answers: \code{UNSAFE}, \code{SAFE}, or
+\code{UNKNOWN} respectively. This is taken care of in a simple scripted
+filter.  The filter also uses \textsc{Bash} with a help of \textsc{Grep}.
+
+For ease of use, all parts of the tool's pipeline are one by one run by a
+single script \code{runme}. It accepts exactly one parameter: the benchmark
+file. The pipeline of the whole process is depicted in
+Figure~\ref{fig:svcomp_pipeline}.
 
 \begin{figure}[tb]
 \begin{center}
@@ -166,66 +182,7 @@ Figure~\ref{fig:svcomp_pipeline}
   \label{fig:svcomp_pipeline}
 \end{figure}
 
-\subsection*{Software Architecture}
-For the code translation and for operations with the \llvm bytecode we
-use \llvm~\cite{llvm}/\clang\cite{clang} 3.1. The
-symbolic executor is \klee which itself uses the \textsc{Stp}
-constraint solver~\cite{stp}. We obtained both \textsc{Klee} and \textsc{Stp}
-from the respective GIT repositories and used the snapshots. For more
-information about \klee, see its paper~\cite{klee}.
-
-For ease of use, all parts of the tool pipeline are one by one run by a single
-script \code{runme}.
-
-The instrumentation is performed by a \textsc{bash} script using \textsc{sed}.
-The final filter also uses \textsc{bash} with the help of \textsc{grep}. The
-rest of the toolchain is written in C++ and compiled using \textsc{gcc}.
-
-The strength of the tool lies in its high precision of the answers. In theory,
-the only source of incorrect answers is the slicer: it can completely remove
-an infinite loop in some cases and thus an unreachable \texttt{ERROR} label
-located below the loop may become reachable. However, there is no such case
-in the competition benchmarks. 
-
-All incorrect answers produced by our tool in the competition are due to bugs
-in implementation.  Since the tool submission, we have fixed most of the bugs
-and improved the implementation a bit. The biggest change on the competition
-benchmarks can be seen in the category \emph{FeatureChecks} (118 files):
-
-\begin{center}
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{|l|c|c|}
-    \hline
-    & Competition Version & Current Version \\ \hline 
-    Correct Answers \texttt{SAFE/UNSAFE} & 81 & 116 \\ \hline
-    Incorrect Answers \texttt{SAFE/UNSAFE} & 17 & 0 \\ \hline
-    \texttt{UNKNOWN} (including timeouts) & 20 & 2 \\ \hline
-  \end{tabular}
-\end{center}
-
-In general, the main weakness of the tool is a high percentage of
-\texttt{UNKNOWN} results. These results come mainly from high computation
-cost of the symbolic execution of programs with loops or recursion. This
-problem is relieved by slicing, but there are still many cases where the
-sliced code remains complex and symbolic execution runs out of time or
-memory. Other sources of \texttt{UNKNOWN} results are internal errors of
-\textsc{Klee} and general limitations of constraint solving.
-
-\subsection*{Tool Setup and Configuration}
-\paragraph{Download and Installation Instructions}
-\begin{itemize}
-\item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
-\item Download \symbio 1 at: \url{https://sf.net/projects/symbiotic/}.
-\item Change the current directory to \texttt{/opt} (this location is
-	needed for \textsc{Klee}).
-\item Untar the archive with the tool.
-\item Change directory into \texttt{/opt/symbiotic}.
-\item Run \texttt{./runme <benchmark.c>} for each source file in the set.
-\end{itemize}
-
-
-
-\paragraph{Results Reported} \texttt{SAFE/UNSAFE/UNKWNOWN} answers match
+\paragraph{Results Reported} \code{SAFE/UNSAFE/UNKWNOWN} answers match
 the competition rules. The counterexample for an error in some
 \texttt{<benchmark.c>} is generated for each error path in the benchmark to
 \texttt{<benchmark.c>-klee-out/}. There is also a sliced code referred by all
@@ -241,6 +198,37 @@ hosted by the Faculty of Informatics, Masaryk University.
 %{{{ Results
 
 \section{Results}\label{sec:svcomp_results}
+
+The strength of the tool lies in its high precision of the answers. In theory,
+the only source of incorrect answers is the slicer: it can completely remove
+an infinite loop in some cases and thus an unreachable \code{ERROR} label
+located below the loop may become reachable. Nonetheless, there is no such
+case in the competition benchmarks. 
+
+All incorrect answers produced by our tool in the competition are due to
+errors in the implementation.  Since the tool submission, we have fixed most of
+the errors and improved the implementation a bit. The biggest change on the
+competition benchmarks can be seen in the category \emph{FeatureChecks} (118
+files):
+
+\begin{center}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{|l|c|c|}
+    \hline
+    & Competition Version & Current Version \\ \hline 
+    Correct Answers \texttt{SAFE/UNSAFE} & 81 & 116 \\ \hline
+    Incorrect Answers \texttt{SAFE/UNSAFE} & 17 & 0 \\ \hline
+    \texttt{UNKNOWN} (including timeouts) & 20 & 2 \\ \hline
+  \end{tabular}
+\end{center}
+
+In general, the main weakness of the tool is a high percentage of
+\code{UNKNOWN} results. These results come mainly from high computation
+cost of the symbolic execution of programs with loops or recursion. This
+problem is relieved by slicing, but there are still many cases where the
+sliced code remains complex and symbolic execution runs out of time or
+memory. Other sources of \code{UNKNOWN} results are internal errors of
+\textsc{Klee} and general limitations of constraint solving.
 
 %}}}
 %{{{ Conclusion
