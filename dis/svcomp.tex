@@ -150,6 +150,9 @@ memory, invalid memory dereference, or some internal error for example). We
 map these to the demanded answers: \code{UNSAFE}, \code{SAFE}, or
 \code{UNKNOWN} respectively. This is taken care of in a simple scripted
 filter.  The filter also uses \textsc{Bash} with a help of \textsc{Grep}.
+Also, when the answer is \code{UNKNOWN}, \klee generates a counterexample for
+each error path in some \code{benchmark.c} to the directory
+\code{benchmark.c-klee-out/}.
 
 For ease of use, all parts of the tool's pipeline are one by one run by a
 single script \code{runme}. It accepts exactly one parameter: the benchmark
@@ -182,18 +185,6 @@ Figure~\ref{fig:svcomp_pipeline}.
   \label{fig:svcomp_pipeline}
 \end{figure}
 
-\paragraph{Results Reported} \code{SAFE/UNSAFE/UNKWNOWN} answers match
-the competition rules. The counterexample for an error in some
-\texttt{<benchmark.c>} is generated for each error path in the benchmark to
-\texttt{<benchmark.c>-klee-out/}. There is also a sliced code referred by all
-the error paths.
-
-\subsection*{Software Project and Contributors}
-The concept of the tool has been developed by the authors of this paper. The
-tool was implemented by Jiri Slaby (contact person), Marek Trt\'ik, and Ben
-Liblit (several fixes).  It is available under the GNU GPLv2 License and is
-hosted by the Faculty of Informatics, Masaryk University.
-
 %}}}
 %{{{ Results
 
@@ -202,37 +193,101 @@ hosted by the Faculty of Informatics, Masaryk University.
 The strength of the tool lies in its high precision of the answers. In theory,
 the only source of incorrect answers is the slicer: it can completely remove
 an infinite loop in some cases and thus an unreachable \code{ERROR} label
-located below the loop may become reachable. Nonetheless, there is no such
+located below the loop may become reachable. Nonetheless, there was no such
 case in the competition benchmarks. 
 
-All incorrect answers produced by our tool in the competition are due to
-errors in the implementation.  Since the tool submission, we have fixed most of
-the errors and improved the implementation a bit. The biggest change on the
-competition benchmarks can be seen in the category \emph{FeatureChecks} (118
-files):
+The main weakness of the tool is high occurrence of \code{UNKNOWN} answers.
+These answers come mainly from the high computation cost of the symbolic
+execution of programs with loops or recursion. This problem is relieved by
+slicing, but there are still many cases where the sliced code remains complex
+and the symbolic execution runs out of time or memory. Other sources of
+\code{UNKNOWN} results are internal errors of \klee and general limitations of
+constraint solving.
 
+\begin{table}[tb]
 \begin{center}
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{|l|c|c|}
-    \hline
-    & Competition Version & Current Version \\ \hline 
-    Correct Answers \texttt{SAFE/UNSAFE} & 81 & 116 \\ \hline
-    Incorrect Answers \texttt{SAFE/UNSAFE} & 17 & 0 \\ \hline
-    \texttt{UNKNOWN} (including timeouts) & 20 & 2 \\ \hline
-  \end{tabular}
-\end{center}
+\begin{tabular}{|l||c|c||c|c|} \hline
+\multirow{2}{*}{\textbf{Category}} &
+  \multicolumn{2}{c||}{\textbf{Competition}} &
+  \multicolumn{2}{c|}{\textbf{Current}} \\ \cline{2-5}
+& \textbf{Incorrect} & \textbf{Score} &
+  \textbf{Incorrect} & \textbf{Score} \\ \hline\hline
+Bit Vectors           &    &     &  0 & 32 \\ \hline
+Control Flow          &
+  \multirow{2}{*}{} & \multirow{2}{*}{28} & \multirow{2}{*}{0} &
+  \multirow{2}{*}{36} \\
+Integers (Precise)    &    &     &    &    \\ \hline
 
-In general, the main weakness of the tool is a high percentage of
-\code{UNKNOWN} results. These results come mainly from high computation
-cost of the symbolic execution of programs with loops or recursion. This
-problem is relieved by slicing, but there are still many cases where the
-sliced code remains complex and symbolic execution runs out of time or
-memory. Other sources of \code{UNKNOWN} results are internal errors of
-\textsc{Klee} and general limitations of constraint solving.
+Control Flow          &
+  \multirow{2}{*}{} & \multirow{2}{*}{} & \multirow{2}{*}{5} &
+  \multirow{2}{*}{-17} \\
+Integers (Simple)     &    &     &    &    \\ \hline
+
+Device Drivers        &    & 870 &    &     \\ \hline
+Feature Checks        &    &  23 &  0 & 191 \\ \hline
+Heap Manipulation     &    &     &  6 & -20 \\ \hline
+Loops                 &    &     &  1 &  39 \\ \hline
+Product Lines         &    &     &  0 & 352 \\ \hline
+System C              &    &   0 &  0 &  12 \\ \hline\hline
+\textbf{Overall}      &    &     &    &     \\ \hline
+\end{tabular}
+\end{center}
+  \caption{Results of \symbio in SV-COMP 2013.}
+  \label{tab:svcomp_results}
+\end{table}
+
+Finally, we present the results from the competition in the second column of
+Table~\ref{tab:svcomp_results}.  We see that the \symbio results were not
+encouraging at all. In the following subsection we describe what caused the
+results to be so suboptimal and gradually fix the causes.
+
+\subsection*{Fixing the Failure}
+The failure was caused by several factors. The worst failure to answer
+correctly laid in the benchmarks. More than 1200 still did not adhere to the C
+standard. In particular, some variables were not initialized, but were used as
+conditions for example. \clang compiler decided many times not to generate
+code for such conditions.  We fixed many such examples. As there were
+thousands in those files, we often provided the organizers only with a
+\textsc{Sed} script instead of fixing the errors on our side which lead to a
+joke that we thought them \textsc{Sed} scripting. Organizers accepted many of
+them, but still, we have to perform some scripting in the \code{build-fix.sh}
+script to fix the rest. To confirm the script is working, we removed the
+slicing phase temporarily. The symbolic execution then answered only
+correctly. But timeouts happened too often without the slicer of course.
+
+The source of the remaining incorrect answers is in the slicer. The slicer in
+some cases simply slices too much code. The reasons were errors in the pointer
+analysis, in incorrect specification of relevant sets of some \llvm
+instructions, and some other minor issues. The pointer analysis was only
+field-insensitive. But this caused a removal of some relevant code as we
+enlightened about in Section~\ref{sec:fmics_slicer}. So we rewrote it to
+support fields. This fixed many of the still failing cases, but there were
+still some. They were caused by other minor issues which were fixed one by
+one. The results of the fixed implementation are in
+Table~\ref{tab:svcomp_results}. Apparently, the slicer still contains some
+more errors to be fixed. Ideally, before the next year's competition starts.
+
+%\begin{center}
+%  \setlength{\tabcolsep}{3pt}
+%  \begin{tabular}{|l|c|c|}
+%    \hline
+%    & Competition Version & Current Version \\ \hline 
+%    Correct Answers \code{SAFE/UNSAFE} & 81 & 116 \\ \hline
+%    Incorrect Answers \code{SAFE/UNSAFE} & 17 & 0 \\ \hline
+%    \code{UNKNOWN} (including timeouts) & 20 & 2 \\ \hline
+%  \end{tabular}
+%\end{center}
 
 %}}}
 %{{{ Conclusion
 
 \section{Conclusion}\label{sec:svcomp_conclusion}
+We participated in the second international competition on software
+verification held at TACAS 2013. We enrolled with our tool \symbio. Its
+results were not encouraging due to both errors in our implementation and in
+the competition benchmarks. We presented, that the competition definitely
+helped us to improve the implementation by the order of magnitude. Hence we
+are looking forward to the next year's competition to collect some more points
+than in 2013.
 
 %}}}
