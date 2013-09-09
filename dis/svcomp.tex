@@ -101,14 +101,24 @@ After a tool is run for all benchmarks in a category, the scores are
 summarized. All tools are compared according to the sum. If there are two with
 the same score, the running time is considered. Finally, when all categories
 are evaluated for every tool, the overall score is computed. It is weighted by
-benchmark counts over categories to ensure fairness. The reasoning and the
-formula used for computation is in the 2013's report~\cite{sv-comp13}.
+benchmark counts over categories to ensure fairness. The formula used for
+computation is in Equation~\ref{eq:svcomp_overall}, where we denote $C$ the
+set of benchmark categories, $s_i$ the score in the category $i$, $n_i$ the
+number of benchmarks in the category $i$, and $\overline{n}$ the average
+number of benchmarks in all categories. The reasoning about the urge for this
+formula is in the 2013's report~\cite{sv-comp13}.
+
+\begin{equation}\label{eq:svcomp_overall}
+s_{overall} = \left( \sum_{i \in C} \frac{s_i}{n_i}\right) \cdot \overline{n}
+\end{equation}
 
 When the final score is known, the results are given to the authors of the
-tools. They have still a possibility to object, if something really unexpected
-happened with their tool regarding the score. And if it did not, they still
-have a possibility to \emph{opt-out}. If some score in a category is too
-unfavorable, they can have no score in the category by opting out.
+tools. They have still a possibility to review the score and raise an issue
+if something really unexpected happened with their tool.  And if everything is
+find, they still have a possibility to \emph{opt-out}. If some score in a
+category is too unfavorable, they can have no score in the category by opting
+out. But that also means, they will have no score in the overall category,
+i.e.\ they cannot win the category.
 
 \section{Our Participation}\label{sec:svcomp_participation}
 
@@ -212,24 +222,24 @@ constraint solving.
   \multicolumn{2}{c|}{\textbf{Current}} \\ \cline{2-5}
 & \textbf{Incorrect} & \textbf{Score} &
   \textbf{Incorrect} & \textbf{Score} \\ \hline\hline
-Bit Vectors           &    &     &  0 & 32 \\ \hline
+Bit Vectors           &   5 &   -2 &  0 & 32 \\ \hline
 Control Flow          &
-  \multirow{2}{*}{} & \multirow{2}{*}{28} & \multirow{2}{*}{0} &
+  \multirow{2}{*}{0} & \multirow{2}{*}{28} & \multirow{2}{*}{0} &
   \multirow{2}{*}{36} \\
-Integers (Precise)    &    &     &    &    \\ \hline
+Integers (Precise)    &     &      &    &    \\ \hline
 
 Control Flow          &
-  \multirow{2}{*}{} & \multirow{2}{*}{} & \multirow{2}{*}{5} &
+  \multirow{2}{*}{4} & \multirow{2}{*}{-24} & \multirow{2}{*}{5} &
   \multirow{2}{*}{-17} \\
-Integers (Simple)     &    &     &    &    \\ \hline
+Integers (Simple)     &     &      &    &    \\ \hline
 
-Device Drivers        &    & 870 &    &     \\ \hline
-Feature Checks        &    &  23 &  0 & 191 \\ \hline
-Heap Manipulation     &    &     &  6 & -20 \\ \hline
-Loops                 &    &     &  1 &  39 \\ \hline
-Product Lines         &    &     &  0 & 352 \\ \hline
-System C              &    &   0 &  0 &  12 \\ \hline\hline
-\textbf{Overall}      &    &     &    &     \\ \hline
+Device Drivers        &  23 &  870 &  4 & 1166 \\ \hline
+Feature Checks        &  17 &   23 &  0 &  191 \\ \hline
+Heap Manipulation     &   4 &  -12 &  6 &  -20 \\ \hline
+Loops                 &  33 & -190 &  1 &   39 \\ \hline
+Product Lines         & 131 & -577 &  0 &  352 \\ \hline
+System C              & n/a &    0 &  0 &   12 \\ \hline\hline
+\textbf{Overall}      & 217 & \textbf{-724} & 16 & \textbf{1104} \\ \hline
 \end{tabular}
 \end{center}
   \caption{Results of \symbio in SV-COMP 2013.}
@@ -237,9 +247,22 @@ System C              &    &   0 &  0 &  12 \\ \hline\hline
 \end{table}
 
 Finally, we present the results from the competition in the second column of
-Table~\ref{tab:svcomp_results}.  We see that the \symbio results were not
-encouraging at all. In the following subsection we describe what caused the
-results to be so suboptimal and gradually fix the causes.
+Table~\ref{tab:svcomp_results}. We do not have a number of incorrect answers
+from the system C category because the benchmarks were not a part of the
+preliminary results we have an access to. The overall score is computed
+according to the rules, i.e.\ by Equation~\ref{eq:svcomp_overall}. We see
+that the \symbio results were not encouraging at all. In the following
+subsection we describe what caused the results to be so suboptimal and
+gradually fix the causes.
+
+Quite interestingly, the competition suggested that it is much easier to
+verify that there is no error in a benchmark than to find an error there. In
+average, it lasted 7.8 seconds to report \code{SAFE} about a safe benchmark
+(median is 0.22), but it took 149.3 seconds to report \code{UNSAFE} about an
+unsafe benchmark (median is 230). We have not found the source of this
+phenomenon yet as it stems from the \klee internals. All the times are
+dependent on a computer where the analysis runs. The competition was evaluated
+on an Intel Core i7 3.4 GHz with 16 GiB of RAM.
 
 \subsection*{Fixing the Failure}
 The failure was caused by several factors. The worst failure to answer
