@@ -131,16 +131,16 @@ them. There are two main tables in each sub-database:
                               & \textsf{INTEGER}      \\
 \underline{\textsf{project\_version}} (null)
                               & \textsf{STRING} \\
-\textsf{note} (null)               & \textsf{STRING} \\
-\underline{\textsf{loc\_file}}& \textsf{STRING}       \\
-\underline{\textsf{loc\_line}}& \textsf{INTEGER}      \\
+\textsf{note} (null)               & \textsf{STRING}   \\
+\underline{\textsf{loc\_file}}     & \textsf{STRING}   \\
+\underline{\textsf{loc\_line}}     & \textsf{INTEGER}  \\
+\textsf{loc\_file\_hash} (null)    & \textsf{STRING}   \\
 \textsf{url} (null)                & \textsf{STRING}   \\
 \textsf{timestamp\_enter} (auto)   & \textsf{DATETIME} \\
 \textsf{timestamp\_lastmod} (null) & \textsf{DATETIME} \\
 \textsf{timestamp\_found} (null)   & \textsf{DATETIME} \\
-\textsf{marking} (null)            & \textsf{INTEGER} \\
-\textsf{loc\_file\_hash} (null)    & \textsf{STRING} \\
-\textsf{confirmation} (null)       & \textsf{STRING} \\
+\textsf{marking} (null)            & \textsf{INTEGER}  \\
+\textsf{confirmation} (null)       & \textsf{STRING}   \\
 	    \end{tabular}
 	  };
         \node [ent] (ERROR_TYPE) [above left=-1.8cm and 8mm of ERROR] {
@@ -230,19 +230,48 @@ This was a nice proof of concept, but a terrible interface. A quest in the
 form of a BSc thesis topic was put in our university system. Shortly after,
 Marek Hornák was lead by the author of this PhD thesis to improve the
 interface in the scope of his bachelor thesis (which is in Slovak so we do not
-cite it here explicitly). He wrote a complete replacement in \textsc{Ruby} and
-defended his thesis successfully.
+cite it here explicitly). He wrote a complete replacement in \textsc{Ruby on
+Rails} and defended his thesis successfully.
 
 Nonetheless the frontend was really slow for large data. Seconds to perform a
 single query was unbearable. So the author of this PhD thesis rewrote the
-frontend, fixed some holes in it and made it public. He also tuned the
-interface part of the frontend as he has some knowledge about Web 2.0 from
-previous work~\cite{web2_isd}. And since the requirement was not to support
-more project, this aspect was considered while rewriting the system. The
-current frontend now fully supports multiple projects, is fast, and hopefully
-safe. The frontend also allows for downloading the database in the
-\textsc{SQLite} format for local use under the \emph{Open Database License
-v1.0}~\cite{ODbL}.
+code of the frontend, fixed some holes in it, and made it public. He also
+tuned the interface part of the frontend as he has some knowledge about Web
+2.0 from previous work~\cite{web2_isd}. And since the requirement for the BSc
+thesis was not to support more project, this aspect was considered while
+rewriting the system.  The current frontend now fully supports multiple
+projects, is fast, and we believe it is safe. The frontend also allows for
+downloading the database in the \textsc{SQLite} format for local use under the
+\emph{Open Database License v1.0}~\cite{ODbL}.
+
+There is an added value in the frontend. We designed it so that a user can
+actually browse the code where a particular bug is. The files are not stored
+in the sub-database, but they are on disk. Since a project can have a large
+number of files, we implemented a tree structure for storing files. Content
+of every file in the project is hashed using SHA1, which is forty hexadecimal
+characters. The hash is split into two parts. The first is only two characters
+and it specifies a directory, the other 38 characters are used for a file name
+in this directory. For example, if the hash of a file content was
+\code{12345678...abcdef}, we would store the content of the file in the
+directory \code{12} as the file \code{345678...abcdef}. So we leverage the
+hashing and underlying filesystem to create a two-level tree for faster
+lookup. This also ensures that no files (e.g.\ from the same project with a
+different version) waste space as they have the same hash. We have not
+encountered a hash conflict yet. If it happens we will solve it by some known
+technique to circumvent the problem. The sub-database has to hold the hash
+too. It is in the \code{error} tables as \code{loc_file_hash}. The tree
+structure of files is inspired by the revision control system \textsc{Git}.
+
+On the top of that, the content of the files can be compressed by
+\textsc{Lzma2} and the suffix \code{.xz} is appended to the hash above.
+Despite \textsc{Lzma2} is slow for inflating (we inflate once), it is fast for
+deflating and provides a very good compression ratio. Further, the \cdb
+frontend supports source highlighting. Either it is precomputed, compressed
+and stored with the suffix \code{-hl.xz} or done later by the frontend
+on-the-fly.  So when the frontend is looking for a file to display, it first
+looks for \code{hash-hl.xz} (considering the first two characters as a
+directory). If there is no such file, it tries \code{hash.xz} and highlights
+it if finds one. If it is does not, no file content is shown to the user.
 
 For illustration of the frontend, Figure~\ref{fig:cdb_error} depicts a list of
 seven bug-reports of type \emph{Double Resource Put} as presented in the
@@ -268,13 +297,13 @@ Software Verification 2012~\cite{sv-comp12} and 2013~\cite{sv-comp13}.
 
 %This section predominantly deals with the Linux kernel reports nonetheless.
 
-\subsection{Sources of Bug-Reports}
+\subsection{Sources of Bug-Reports}\label{sec:cdb_sources}
 
-We used three program analysis tools to gather bug-reports for the kernel:
-\clang~3~\cite{clang}, \stan 1.2~\cite{stanse}, and one commercial tool
-which wanted to stay in anonymity. Note that \clang does not natively detect
-locking errors in the Linux kernel. There is only a checker for locks used by
-developers of user programs. It is called
+We used four code analysis tools to gather bug-reports for the Linux kernel:
+\clang~3~\cite{clang}, \smatch~1.59~\cite{smatch}, \stan~1.2~\cite{stanse},
+and one commercial tool which wanted to stay in anonymity. Note that \clang
+does not natively detect locking errors in the kernel. There is only a checker
+for locks used by developers of user programs. It is called
 \code{experimental.unix.PthreadLock}.  Hence, we slightly modified the checker
 just to understand kernel locking functions.
 
@@ -511,20 +540,20 @@ The web frontend is easy-to-use and we think it needs no detailed explanation.
 On the initial page, one chooses a project which they work later with. The
 interface allows for sorting by several criteria, searching, filtering with
 respect to tools and error types, showing highlighted source codes with the
-line where the reports is, and more.
+line where the report is, and more.
 
-The web frontend is not the typical use of \cdb. The typical use is tuning and
-evaluation of a bug-finding code analysis tool. To evaluate such a tool, one
-chooses a project (or its part) from our benchmark suite and run the tool on
-these source codes.  As the second step, the sub-database of classified
-bug-reports corresponding to the chosen project is downloaded from \cdb.
-The installation for this use case is easy. The \textsc{SQLite} sub-database
-needs only a client which is available for many platforms, Linux, Mac OS, and
-Windows including.  Use of the client is similar to other databases. It
-understands \emph{Structured Query Language} (SQL) queries as many other
-databases. The database is opened by \code[language=bash]{sqlite3 database.db}
-and it awaits SQL queries. We provide some examples of use in
-Figure~\ref{fig:cdb_sql}.
+Even though the web frontend is very practical tool to work with the data, it
+is not the intended use of \cdb. The typical use is tuning and evaluation of a
+bug-finding code analysis tool. To evaluate such a tool, one chooses a project
+(or its part) from our benchmark suite and run the tool on these source codes.
+As the second step, the sub-database of classified bug-reports corresponding
+to the chosen project is downloaded from \cdb.  The installation for this use
+case is easy. The \textsc{SQLite} sub-database needs only a client which is
+available for many platforms, Linux, Mac OS, and Windows including.  Use of
+the client is similar to other databases. It understands \emph{Structured
+Query Language} (SQL) queries as many other databases. The database is opened
+by \code[language=bash]{sqlite3 database.db} and it awaits SQL queries. We
+provide some examples of use in Figure~\ref{fig:cdb_sql}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
@@ -544,24 +573,67 @@ net/core/skbuff.c|147
     \label{fig:cdb_sql}
 \end{figure}
 First, we query all errors in the sub-database and then we count all real
-errors found by tool 1 and not found by tool 2.
+errors found by tool~1 and not found by tool~2.
 
 With the sub-database, the bug-reports produced by the newly developed tool
-are compared to the downloaded data. We cannot provide a script to
-automatically compare the results to the sub-database as tools tend to output
-the reports in various formats. So when one compares the data, they
-immediately get a classification (real error/false positive) of all the
-reports matched in the database and also information about missed real errors
-if there are any. It remains to manually classify the bug-reports unmatched
-with the database content. The numbers of produced false positives, detected
-and missed real errors can be further statistically processed according to
-methodologies suggested elsewhere~\cite{HW08, begbunch}. They produce several
-metrics including accuracy and precision. The metrics, missed errors, and
-false positives are valuable inputs for tuning the tool. 
+are compared to the downloaded data. We provide a script to automatically
+compare the results to the sub-database. It is only required to convert the
+tool's output to a predefined format and run the script. The other option is
+to write a similar script handling the output of the tool of course.  So when
+one compares the data, they immediately get a classification (real error/false
+positive) of all the reports matched in the database and also information
+about missed real errors if there are any. It remains to manually classify the
+bug-reports unmatched with the database content. The numbers of produced false
+positives, detected and missed real errors can be further statistically
+processed according to methodologies suggested elsewhere~\cite{HW08,
+begbunch}. They produce several metrics including accuracy and precision. The
+metrics, missed errors, and false positives are valuable inputs for tuning the
+tool. 
 
 Finally, the user is kindly asked to update classification of unclassified
 entries and to insert newly discovered bug-reports with their classification
 into the database too.
+
+\paragraph{Scripts Summary} We provide several scripts to use with \cdb. Here
+we list them with their description. Most of them are written in \perl. They
+use our common helper module for \perl \code{Helper.pm}. It makes them really
+simple.
+\begin{description}
+\item[\textsf{cmp\_results}] It takes a sub-database and tool's reports on the
+input. The input should be fed by lines in the form of \code{file\\0line},
+where \code{file} is a zero-terminated string. The script takes these lines
+and compares them one by one against the sub-database. Finally, it prints
+statistics about the tool's reports. The results include how many errors
+and false positives were matched and how many reports were missed by the tool.
+
+\item[\textsf{fill\_hashes}] This script is used to fill the SHA1 hashes into
+the sub-database as needed by the frontend (see
+Section~\ref{sec:cdb_frontend}).  On the input, the script accepts a list of
+files and hashes in the form \code{file\\0hash} and fills the sub-database
+accordingly.
+
+\item[\textsf{generic\_filler}] This is a configurable script that inserts
+entries to the sub-database. It accepts input similar to
+\textsf{cmp\_results}: \code{file\\0line\\0classification}, where
+classification is a number. -1 means false positive, 0 unclassified, and 1
+real error.  The script accepts many parameters to specify error type and
+subtype, project and its version, tool and its version. The output of any tool
+can be put into the sub-database using this script when the output is
+converted to the format above.
+
+\item[\textsf{prepare\_db}] This scripts initializes a new sub-database to be
+used in \cdb. After \textsf{prepare\_db} the sub-database is ready to be
+filled by one of the fillers.
+
+\item[\textsf{stanse\_filler}] It is similar to \textsf{generic\_filler}, but
+it directly parses \stan's XML report files (as are described in
+Section~\ref{sec:stan_framework}) and fills them to the sub-database.
+
+\item[\textsf{web\_crawler}] A simple web crawler that takes a list of URLs
+and analyzes them for error reports. More concise and automatic crawler was
+implemented by Ce\v{l}uch as we explained in Section~\ref{sec:cdb_sources}.
+
+\end{description}
 
 %}}}
 %{{{ Future Plans
@@ -594,9 +666,11 @@ another project.
 
 \subsection*{Availability}
 \noindent Web pages: \url{http://claburedb.fi.muni.cz/} \\
-\noindent Repository: \url{http://github.com/jirislaby/claburedb-frontend/} \\
 \noindent Contact:
   \href{mailto:claburedb@fi.muni.cz}{\nolinkurl{claburedb@fi.muni.cz}} \\
+\noindent Repository (frontend): \\ \indent
+  \url{http://github.com/jirislaby/claburedb-frontend/} \\
+\noindent Repository (scripts): \url{https://github.com/jirislaby/bug-types/} \\
 \noindent License (database): Open Database License v1.0 \\
 \noindent License (frontend): GNU General Public License v2.0
 
