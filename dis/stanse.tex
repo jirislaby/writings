@@ -27,7 +27,7 @@ class present in other languages. We tried to design it to be fully generic to
 allow for implementation of many types of analyses. An implementation of such
 an algorithm within the framework is called a \emph{checker}. We implemented
 some checkers too, so \stan already contains four of them. The most concise
-checker was inspired by the success of \textsc{xgcc}~\cite{metacomp} and its
+checker was inspired by the success of \xgcc~\cite{metacomp} and its
 property-description language \textsc{Metal}~\cite{metal}. This work
 implements the abstract interpretation as is discussed in
 Chapter~\ref{sec:ai}.
@@ -35,15 +35,15 @@ Chapter~\ref{sec:ai}.
 \stan is specifically developed to check software written in C. Its parser is
 powerful enough to handle the code like the whole Linux kernel. So an
 implemented checker can be immediately evaluated on large real-world software.
-\stan has also \emph{graphical user interface} (GUI) for easier .
-This chapter covers the development of \stan including the theory behind and
-report of successes and failures. \stan was released and a paper about the
-framework published in the Springer's Lecture Notes in Computer
-Science~\cite{stanse} some time ago. We presented the paper at Annual Doctoral
-Workshop on Mathematical and Engineering Methods in Computer Science 2011.
-Since then, other similarly powerful frameworks were published.  We provide
-\textsc{CPAchecker}~\cite{cpachecker} and \textsc{Frama-C}~\cite{framac} as
-examples.
+\stan has also \emph{graphical user interface} (GUI) to make the work with the
+framework easier. This chapter covers the development of \stan including the
+theory behind and reports of successes and failures. \stan was released and a
+paper about the framework published in the Springer's Lecture Notes in
+Computer Science~\cite{stanse} some time ago. We presented the paper at Annual
+Doctoral Workshop on Mathematical and Engineering Methods in Computer Science
+2011.  Since then, other similarly powerful frameworks were published.  We
+provide \textsc{CPAchecker}~\cite{cpachecker} and
+\textsc{Frama-C}~\cite{framac} as examples.
 
 \paragraph{Chapter Organization}
 This chapter is structured as follows. Section~\ref{sec:stan_framework}
@@ -177,7 +177,7 @@ one.
 
 Of course there must be at least a parser which the is able to handle the
 kernel, otherwise kernel developers could not run the kernel. They use
-\textsc{Gcc}.  Unfortunately parser in this compiler, and most importantly its
+\gcc.  Unfortunately parser in this compiler, and most importantly its
 internal structures, is not suitable for our purposes. One reason is that
 control flow graph is built on the top of register transfer language (RTL) or
 tree representation. Those are very hard to work with when it comes to the
@@ -280,7 +280,7 @@ arbitrary way, most checkers walk through CFGs using some standard
 strategy. To prevent unnecessary reimplementations, the most important and
 heavily used traversal methods are implemented directly inside the framework.
 With this functionality, one can implement a new checker (or its part) by
-specifying
+specifying:
 \begin{itemize}
 \item whether it should go through CFGs forwards or backwards, breadth-first
   or depth-first,
@@ -396,12 +396,13 @@ programming language \perl.
 \begin{description}
 \item[\textsf{stcc}] \code{stcc} is provided as a replacement for a compiler
 of an analyzed project. By using \code{stcc} instead of the original compiler
-like \code{gcc}, the project is still compiled by the original compiler, but
-also a file list and compiler options used for the compiled files are stored
-aside. These are then used as a configuration for \stan. This is effectively a
+like \gcc, the project is still compiled by the original compiler, but also a
+file list and compiler options used for the compiled files are stored aside.
+These are then used as a configuration for \stan. This is effectively a
 support of build systems as it is enough to set the environment variable
 \code{CC=stcc} and compile the project as usual.  This script is inspired by
 the \textsc{Sparse} tool~\cite{sparse}.
+
 \item[\textsf{stanse\_run}] For even easier evaluation, we also provide users
 with this script. It is basically a wrapper around \code{stcc}, build system,
 and \stan. So it builds a project and the obtained configuration is passed to
@@ -432,9 +433,9 @@ all of them so that they can be used out of the box. Of course, the
 configuration can be tailored to specific needs of other projects easily.
 
 \subsection{\AC}
-The \AC is heavily influenced by \textsc{xgcc}~\cite{metacomp}. As can be seen
-from the name of the checker, it employs finite state automata. They describe
-the properties we want to check. These include checking locking discipline,
+The \AC is heavily influenced by \xgcc~\cite{metacomp}. As can be seen from
+the name of the checker, it employs finite state automata. They describe the
+properties we want to check. These include checking locking discipline,
 interrupt management, null pointer dereference, dangling pointers and many
 others. Given such automaton, the checker tries to match the automata against
 code execution. To perform that, the \AC needs to know when to perform a
@@ -442,37 +443,27 @@ transition. This is accomplished by specifying code patterns on the edges.
 Since the checker works on the control flow graph and we have subtrees of
 abstract syntax trees in there, patterns are AST subtrees too. It works
 similar to pattern matching described in Section~\ref{sec:pattern_matching}:
-we have an AST subtree with possible wildcards. An example of an automaton
-for checking proper pairing of locks is presented in
-Figure~\ref{fig:stan_automaton}.
-\begin{figure}[htb]
-  \begin{center}
-    \tikzstyle{stat} = [circle,thick,draw,minimum size=8mm]
-    \tikzstyle{edge} = [shorten <=1pt,>=stealth',semithick]
-    \begin{tikzpicture}[node distance=18mm,font=\sffamily]
-        \node [stat] (ERR) {\textbf{Err}}
-	  edge [edge,loop above] node[right, xshift=2mm, yshift=-2mm]
-	  {\code{lock()}/\code{unlock()}} ();
-        \node [stat] (U) [below left=of ERR] {U}
-	  edge [edge,->] node[above left] {\code{unlock()}} (ERR);
-        \node [stat] (L) [below right=of ERR] {L}
-	  edge [edge,->] node[above right] {\code{lock()}} (ERR)
-	  edge [edge,<-,bend right=20] node[above] {\code{lock()}} (U)
-	  edge [edge,->,bend left=20] node[below] {\code{unlock()}} (U);
-	\node [left=6mm of U] {}
-	  edge [edge,->] node {} (U);
-    \end{tikzpicture}
-  \end{center}
-  \caption{An automaton for checking locking properties.}
-  \label{fig:stan_automaton}
-\end{figure}
-The automaton starts in the unlocked state (\code{U}). A transition from
-that state is fired either when the checker matches a call to \code{unlock} or
-\code{lock}. In the former case, the automaton is transferred to the error
-state (\code{Err}) and the checker flags an error by generating an error
-trace. In the other case, the checker simply transfers the automaton to the
-locked state (\code{L}). The evaluation continues until a fixed point is
-reached.
+we have an AST subtree with possible wildcards. An example of an automaton for
+checking proper pairing of locks is presented in
+Figure~\ref{fig:stan_automaton}.  \begin{figure}[htb] \begin{center}
+\tikzstyle{stat} = [circle,thick,draw,minimum size=8mm] \tikzstyle{edge} =
+[shorten <=1pt,>=stealth',semithick] \begin{tikzpicture}[node
+distance=18mm,font=\sffamily] \node [stat] (ERR) {\textbf{Err}} edge
+[edge,loop above] node[right, xshift=2mm, yshift=-2mm]
+{\code{lock()}/\code{unlock()}} (); \node [stat] (U) [below left=of ERR] {U}
+edge [edge,->] node[above left] {\code{unlock()}} (ERR); \node [stat] (L)
+[below right=of ERR] {L} edge [edge,->] node[above right] {\code{lock()}}
+(ERR) edge [edge,<-,bend right=20] node[above] {\code{lock()}} (U) edge
+[edge,->,bend left=20] node[below] {\code{unlock()}} (U); \node [left=6mm of
+U] {} edge [edge,->] node {} (U); \end{tikzpicture} \end{center} \caption{An
+automaton for checking locking properties.} \label{fig:stan_automaton}
+\end{figure} The automaton starts in the unlocked state (\code{U}). A
+transition from that state is fired either when the checker matches a call to
+\code{unlock} or \code{lock}. In the former case, the automaton is transferred
+to the error state (\code{Err}) and the checker flags an error by generating
+an error trace. In the other case, the checker simply transfers the automaton
+to the locked state (\code{L}). The evaluation continues until a fixed point
+is reached.
 
 Compared to the implementation described by Engler et al.~\cite{metacomp,
 metal}, our technique differs in several aspects. In particular, we do not use
@@ -544,17 +535,17 @@ the \stan framework.
 
 \subsection{\RC}
 The \RC is the simplest and also the smallest checker in \stan. Its name
-correctly suggests searching CFGs for unreachable nodes. These are then
-reported as warnings or errors depending on importance. The importance stems
-from the nature of an unreachable node. For example superfluous semicolons
-(which are still statements) are less important than an unused branch. The
-primary goal of the \RC is to demonstrate the simplicity of a new checker
-implementation. With the help of the framework features described in
-Section~\ref{sec:travers}, the code of the checker has less than 200 lines
-including the mentioned error/warning classification and comments.  Even
-though it is a very simple checker, it was still able to find serious bugs in
-the Linux kernel. For example a superfluous semicolon can cause unexpected
-unconditional returns from functions like in the code of
+correctly suggests that the its task is to search for unreachable nodes in
+control flow graphs. These are then reported as warnings or errors depending
+on importance. The importance stems from the type of an unreachable node. For
+example superfluous semicolons (which are still statements) are less important
+than an unused branch. The primary goal of the \RC is to demonstrate the
+simplicity of a new checker implementation. With the help of the framework
+features described in Section~\ref{sec:travers}, the code of the checker has
+less than 200 lines including the mentioned error/warning classification and
+comments.  Even though it is a very simple checker, it was still able to find
+serious bugs in the Linux kernel. For example a superfluous semicolon can
+cause unexpected unconditional returns from functions like in the code of
 Figure~\ref{fig:stan_unreach}.  This is taken from the \code{ath9k} wireless
 driver, file \code{drivers/net/wireless/ath/ath9k/rc.c}.
 \begin{figure}[htb]
@@ -591,12 +582,12 @@ version 2.6.28.  The \AC was configured with four automata describing the
 following types of errors:
 \begin{description}
 \item[Incorrect pairing of functions] This includes imbalanced locking and
-  reference counting errors. Both are of the same kind when a programmer omits
-  to unlock a lock on some path or decrease a reference which was previously
-  increased.
+  reference counting errors. Both are of the same kind when a programmer
+  unintentionally omits to unlock a lock on some path or decrease a reference
+  which was previously increased.
 \item[Resource or memory leaks] These are usual errors when working with
-  dynamic memory allocations and similar resources. Some path omits to free
-  the resources which were requested earlier.
+  dynamic memory allocations and similar resources. Some path unintentionally
+  omits to free the resources which were requested earlier.
 \item[Errors in pointer manipulation] Often, when manipulating pointers,
   programmers, screw a pointer and for example try to dereference the null
   pointer or dangling pointers which point to already freed memory.

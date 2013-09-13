@@ -123,18 +123,18 @@ read source codes of such large project. This problem stems from the languages
 projects are written in.  Even though there are standards for languages, there
 are many language offshoots that ``evolved'' with respective compilers. Let us
 consider C with the last standard issued in 1999~\cite{ansi_c}. There are many
-deviations from the standard introduced by \textsc{Gcc}~\cite{gcc},
-\textsc{Intel CC}~\cite{intel_cc}, \textsc{MSVC}~\cite{msvc}, and possibly
-others.  Every single of them supports a different superset of the standard.
-Thus it is very hard for analyzers to implement a parser which would be
-universally capable of parsing whichever program with sources in a specified
-language.  Second, the tools are not applicable to real software due to high
-computation time needs (cf.~symbolic execution started being used almost 30
-years after being introduced). Further, the tools need not find any errors in
-large projects.  This happens when the tools, or the projects, are highly
-specialized for example.  In this thesis we aim at mapping and investigation
-of current techniques used for code analysis and their application on real,
-large software projects.
+deviations from the standard introduced by \gcc~\cite{gcc}, \textsc{Intel
+CC}~\cite{intel_cc}, \textsc{MSVC}~\cite{msvc}, and possibly others.  Every
+single of them supports a different superset of the standard.  Thus it is very
+hard for analyzers to implement a parser which would be universally capable of
+parsing whichever program with sources in a specified language.  Second, the
+tools are not applicable to real software due to high computation time needs
+(cf.~symbolic execution started being used almost 30 years after being
+introduced). Further, the tools need not find any errors in large projects.
+This happens when the tools, or the projects, are highly specialized for
+example.  In this thesis we aim at mapping and investigation of current
+techniques used for code analysis and their application on real, large
+software projects.
 
 \subsection{Specifics of Large Projects}
 A compiler support, fast analysis, and a wide range of analyzed properties is
@@ -246,7 +246,7 @@ developed program, a static analyzer in particular.  There is also a small
 introduction to code parsing as we deal with source codes in this thesis and
 they need to be parsed into internal structures.
 
-\subsection*{Theoretical Properties}\label{sec:theor_props}
+\subsection{Theoretical Properties}\label{sec:theor_props}
 Usually, the most important aspect for users of an analyzer is to know whether
 the produced output of the analyzer makes some sense according to what is
 expected, i.e.~if the results are \emph{correct} (sometimes called
@@ -310,7 +310,7 @@ complete. The latter may help in reducing both false positives and false
 negatives for the price of potentially hiding errors, i.e.~adding
 false negatives.
 
-\subsection*{Sensitivity of Analyzers}\label{sec:sensitivity}
+\subsection{Sensitivity of Analyzers}\label{sec:sensitivity}
 Another interesting property of many analyzers is how they are handling
 separate commands and functions present in some code. Consider the example of
 Figure~\ref{fig:lst_sens} and also consider an analysis that is watching
@@ -368,7 +368,7 @@ line~\ref{lst:sens_xa} (the analyzer has to assume \code{a} can contain
 whatever value to remain sound).
 \end{itemize}
 
-\subsection*{Types of Analyses}\label{sec:types_anal}
+\subsection{Types of Analyses}\label{sec:types_anal}
 Analyses are also split into sets of what information they provide. There
 are two properties in this category presented below.
 
@@ -397,7 +397,7 @@ forwards.
 \todo{emphasize that this thesis deals with practical aspects of using static
 analyzers}
 
-\subsection*{Other Views}
+\subsection{Other Views}
 Of course the list above is not complete. There are many other categorizations
 we do not list in here. In short, we can mention white-box versus black-box
 where the algorithm either knows the internals of the checked projects or not.
@@ -419,7 +419,7 @@ often seen in operating system kernels development as behaviour of a kernel
 has to be transparent and as fast as possible, the effects of the kernel
 should become invisible at best.
 
-\subsection*{Code Parsing}
+\subsection{Code Parsing}
 We presented the terms above directly on text written in programming
 languages. This is a form understandable by people when reading, but it is not
 so easy to work with when writing an analyzer. Analyzers are used to work on
@@ -632,55 +632,57 @@ can derive symbol tables, type definitions, perform semantic analysis to
 verify more than syntactic rules etc.
 
 Even though, it is not easy to write a well-working parser by hand, some
-projects like \texttt{gcc} do so. But there also exist tools that help to
-generate lexical and syntactic analyzers automatically from a specified formal
-grammar.  Depending on the programmer's preference on the type of the grammar,
-there are various tools. For LL(*) grammars~\cite[Chapter 4.4]{dragon}, one of
-the most known tools is \textsc{Antlr}~\cite{antlr4}. \textsc{Flex} and
+projects like \gcc do so. But there also exist tools that help to generate
+lexical and syntactic analyzers automatically from a specified formal grammar.
+Depending on the programmer's preference on the type of the grammar, there are
+various tools. For LL(*) grammars~\cite[Chapter 4.4]{dragon}, one of the most
+known tools is \textsc{Antlr}~\cite{antlr4}. \textsc{Flex} and
 \textsc{Bison}~\cite{flex_bison} are used to generate LR parsers~\cite[Chapter
-4.5]{dragon}. This introduction to parsing does not pretend to be complete,
-but we do not need more information for the purposes of this thesis. More
-information on parsers can be learnt from various literature about
+4.5]{dragon}. This introduction to parsing does not want to pretend it is
+complete, but we do not need more information for the purposes of this thesis.
+More information on parsers can be learnt from various literature about
 compilers~\cite{dragon, muchnick}.
 
-\subsection*{Pointer Analysis}\label{sec:pointer_analysis}
+\subsection{Pointer Analysis}\label{sec:pointer_analysis}
 For languages using pointers like C, it is important to know where these
-pointers point to. Consider the global integer variable and an integer pointer
-as are in the code depicted in Figure~\ref{fig:lst_ptsto}.
+pointers can point to. Consider the global integer variable and an integer
+pointer as are in the code depicted in Figure~\ref{fig:lst_ptsto}.
 \begin{figure}[htb]
-\begin{center}
-\begin{tabular}{c}
-\begin{lstlisting}[language=C]
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}[language=C]
 int fun(int a) {
   static int x;
   int *p = &x;
   *p = a;
   return x;
 }
-\end{lstlisting}
-\end{tabular}
-\end{center}
-\caption{Pointer analysis demonstrative example.} \label{fig:lst_ptsto}
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+  \caption{Pointer analysis demonstrative example.}
+  \label{fig:lst_ptsto}
 \end{figure}
 Without knowing that \code{p} can point to and actually changes \code{x}, we
 would conclude that \code{fun} always returns 0. But it returns whatever it
-gets on the input as a parameter \code{a}. For that purpose, algorithms known
-as \emph{pointer analyses} exist.  There are two basic approaches to pointer
-analysis used nowadays: Steensgard's~\cite{steensgaard} and
-Andersen's~\cite{andersen}. Both analyses are \emph{may}. But while the former
-is based on equalities of the sets of possible pointer targets, the other on
-their subsets. So the former makes the sets of targets equal whenever two
-pointers can point to a variable. The latter only copies some (or all)
-members. In general, this makes subset-based analyses more precise, but
-slower. There is an approach that tries to speed up the Andersen's analysis
-while preserving its accuracy. This approach was suggested by Shapiro and
+gets on the input as the parameter \code{a}. To cope with this situation,
+algorithms known as \emph{pointer analyses} exist.  There are two basic
+approaches to pointer analysis widely used nowadays:
+Steensgard's~\cite{steensgaard} and Andersen's~\cite{andersen}. Both analyses
+are \emph{may}. Nonetheless, while the former is based on equalities of the
+sets of possible pointer targets, the other on their subsets. So the former
+makes the sets of targets equal whenever two pointers can point to a common
+target variable.  The latter only copies some (or all) members. In general,
+this makes subset-based analyses more precise, but slower. There is an
+approach that tries to speed up the Andersen's analysis while preserving its
+accuracy.  This approach was suggested by Shapiro and
 Horwitz~\cite{shapiro_horwitz}.  They divide the program variables into
 categories. Then, it works similar to Steensgaard's algorithm, except they
-make variables set equal only if they are in the same category. The analysis
-is then repeated with information about categories from the previous run. This
-often results in more accurate results than Steensgaard's algorithm, but it is
-faster than Andersen's. The speed is still slower than Steensgaard's
-nonetheless.
+make target sets equal only if they are in the same category. The analysis
+is then repeated with information about categories from the previous run until
+it stabilizes. This often results in more accurate results than Steensgaard's
+algorithm, but it is faster than Andersen's. The speed of the Shapiro-Horwitz
+approach is still lower than of Steensgaard, nonetheless.
 
 The \emph{alias} or sometimes \emph{points-to analysis}~\cite{alias_anal} is a
 bit different to the pointer analysis in what it is able to tell about
@@ -699,24 +701,21 @@ leaks or tell whether the list is created properly in the first place.
 \paragraph{Field-sensitivity} In languages allowing structured constructs, like
 \code{struct} in C, we can either consider each of the member of such an
 object when computing the pointer sets or ignore the members. Obviously
-ignoring that information leads to a faster analysis, imprecisions occur
-nonetheless. The imprecisions are two-fold:
-\begin{enumerate}
-\item Each member can be itself a pointer and can have its own pointer target
-set. Storing this information only per each structure in field-insensitive
-sense introduces a big imprecision.
-\item Knowing exactly to which member of a structure a pointer points is
-indeed useful information.
-\end{enumerate}
-The implementation is possible in two ways, depending on the demanded
-precision. First, \emph{field-based} sensitivity have only one
-global information about structure members, per each member name. So when we
-have two totally different structures \code{a} and \code{b} containing a
-member \code{void *x}, this analysis considers them to be the same and updates
-\code{x}'s points-to set any time \code{a.x} or \code{b.x} is set to point to
-a new object. The other analysis, the true \emph{field-sensitive} one,
-properly handles members of structures in the natural sense, but for a higher
-computation price, of course.
+ignoring that information leads to a faster analysis, but imprecisions occur.
+The imprecisions are two-fold: \begin{enumerate} \item Each member can be
+itself a pointer and can have its own pointer target set. Storing this
+information only per each structure in field-insensitive sense introduces a
+big imprecision.  \item Knowing exactly to which member of a structure a
+pointer points is indeed useful information.  \end{enumerate} The
+implementation is possible in two ways, depending on the demanded precision.
+First, \emph{field-based} sensitivity have only one global information about
+structure members, per each member name. So when we have two totally different
+structures \code{a} and \code{b} containing a member \code{void *x}, this
+analysis considers them to be the same and updates \code{x}'s points-to set
+any time \code{a.x} or \code{b.x} is set to point to a new object. The other
+analysis, the true \emph{field-sensitive} one, properly handles members of
+structures in the natural sense, but for a higher computation price, of
+course.
 
 For more information about pointer analysis, see for example Hind's
 discussion~\cite{ptr_solved}.

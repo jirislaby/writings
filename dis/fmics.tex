@@ -7,14 +7,14 @@ finite state automata (FSA).  This formalism is simple and still flexible
 enough to describe many often studied program properties including locking
 policy in concurrent programs, null-pointer dereferences, resource
 allocations, and resource leaks. FSA specification is therefore used in many
-static program analysis tools like \textsc{xgcc}~\cite{metal},
+static program analysis tools like \xgcc~\cite{metal},
 \textsc{Slam}~\cite{slam_decade, slam2}, \textsc{Sdv}~\cite{sdv},
 \textsc{Blast}~\cite{blast}, \textsc{Esp}~\cite{esp}, or \stan~\cite{stanse}.
 All the mentioned tools produce \emph{false positives}, i.e.\ they report
 errors that do not correspond to any real error. We showed an example of such
 a false positive in the previous chapter. This lead us to use of the symbolic
-execution, which we extensively described in Section~\ref{sec:se}. But
-the symbolic execution is known to suffer from slowness on large programs or
+execution, which we extensively described in Section~\ref{sec:se}. But the
+symbolic execution is known to suffer from slowness on large programs or
 programs with loops. So we had to overcome this issue. The idea is that we can
 find suspicious places in analyzed code by cheap analyses like abstract
 interpretation. Then we can take a symbolic executor and verify the problem
@@ -49,48 +49,36 @@ Section~\ref{sec:fmics_conclusion}.
 
 \section{Running Example}\label{sec:fmics_example}
 We now roughly sum up the basic principle of a static analysis implemented
-in \textsc{xgcc}, \textsc{Esp}, and \textsc{Stanse} and show an example where
-it does not work. The example will accompany us through the following sections
-to demonstrate each part of the technique. So let us consider the automaton
-$\SA(x)$ of Figure~\ref{fig:sm}.
-\begin{figure}[htb]
-  \begin{center}
-    \tikzstyle{loc} = [circle,thick,draw,minimum size=8mm]
-    \tikzstyle{err} = [loc, fill=red!10, draw=red]
-    \tikzstyle{pre} = [<-, shorten <=1pt, >=stealth', semithick]
-    \tikzstyle{post} = [pre, ->]
-    \begin{tikzpicture}[node distance=8mm]
-        \node (S) {};
-        \node [loc] (U) [right=6mm of S] {\code{U}}
-          edge [pre] node {} (S);
-        \node [loc] (L) [right=18mm of U] {\code{L}}
-          edge [pre,bend left=20] node [label=below:\code{lock($x$)}] {} (U)
-          edge [post,bend right=20] node [label=above:\code{unlock($x$)}] {} (U);
-        \node [err] (DU) [below=of U] {\code{DU}}
-          edge [pre] node [label=left:\code{unlock($x$)}] {} (U);
-        \node [err] (DL) [below=of L] {\code{DL}}
-          edge [pre,near start] node [label=left:\code{lock($x$)}] {} (L);
-        \node [err] (RL) [right=6mm of DL] {\code{RL}}
-          edge [pre,bend right=10,near start] node [label=above right:\code{return}] {} (L);
-    \end{tikzpicture}
-  \end{center}
-    \caption{The state automaton $\SA(x)$ describing errors in manipulation
-    with the lock $x$. The nodes \code{U} and \code{L} refer to states
-    \emph{unlocked} and \emph{locked}, respectively. The other three nodes
-    refer to error states: \code{DU} to \emph{double unlock}, \code{DL} to
-    \emph{double lock}, and \code{RL} to \emph{return in locked state}. The
-    initial node is \code{U}.}
-  \label{fig:sm}
-\end{figure}
-It describes a lock manipulation including malign transitions. Intuitively,
-the automaton represents possible courses of states of a lock referenced by
-$x$ along an execution of a program.  The state of the lock is changed
-according to the program behaviour.  Whenever the program contains a statement
-syntactically subsuming the label of a transition, the transition is fired in
-the state automaton. We would like to decide whether there exists any program
-execution where an instance of the automaton $\SA(x)$ reaches an error state
-for some lock in the program.  Unfortunately, this is not feasible due to
-potentially unbounded number of executions and unbounded execution length.
+in \xgcc, \textsc{Esp}, and \textsc{Stanse} and show an example where it does
+not work. The example will accompany us through the following sections to
+demonstrate each part of the technique. So let us consider the automaton
+$\SA(x)$ of Figure~\ref{fig:sm}.  \begin{figure}[htb] \begin{center}
+\tikzstyle{loc} = [circle,thick,draw,minimum size=8mm] \tikzstyle{err} = [loc,
+fill=red!10, draw=red] \tikzstyle{pre} = [<-, shorten <=1pt, >=stealth',
+semithick] \tikzstyle{post} = [pre, ->] \begin{tikzpicture}[node distance=8mm]
+\node (S) {}; \node [loc] (U) [right=6mm of S] {\code{U}} edge [pre] node {}
+(S); \node [loc] (L) [right=18mm of U] {\code{L}} edge [pre,bend left=20] node
+[label=below:\code{lock($x$)}] {} (U) edge [post,bend right=20] node
+[label=above:\code{unlock($x$)}] {} (U); \node [err] (DU) [below=of U]
+{\code{DU}} edge [pre] node [label=left:\code{unlock($x$)}] {} (U); \node
+[err] (DL) [below=of L] {\code{DL}} edge [pre,near start] node
+[label=left:\code{lock($x$)}] {} (L); \node [err] (RL) [right=6mm of DL]
+{\code{RL}} edge [pre,bend right=10,near start] node [label=above
+right:\code{return}] {} (L); \end{tikzpicture} \end{center} \caption{The state
+automaton $\SA(x)$ describing errors in manipulation with the lock $x$. The
+nodes \code{U} and \code{L} refer to states \emph{unlocked} and \emph{locked},
+respectively. The other three nodes refer to error states: \code{DU} to
+\emph{double unlock}, \code{DL} to \emph{double lock}, and \code{RL} to
+\emph{return in locked state}. The initial node is \code{U}.} \label{fig:sm}
+\end{figure} It describes a lock manipulation including malign transitions.
+Intuitively, the automaton represents possible courses of states of a lock
+referenced by $x$ along an execution of a program.  The state of the lock is
+changed according to the program behaviour.  Whenever the program contains a
+statement syntactically subsuming the label of a transition, the transition is
+fired in the state automaton. We would like to decide whether there exists any
+program execution where an instance of the automaton $\SA(x)$ reaches an error
+state for some lock in the program.  Unfortunately, this is not feasible due
+to potentially unbounded number of executions and unbounded execution length.
 Hence, static analysis tools over-approximate the set of reachable automaton
 states.
 
@@ -153,22 +141,22 @@ infeasible except the one that performs zero iterations of the
 \code{while}-loop, which is the only real execution leading to the only real
 locking error in the program.
 
-To sum up, static analysis tools like \textsc{xgcc}, \textsc{ESP}, and \stan
-are highly flexible, fast and thus applicable to extremely
-large software projects like the Linux kernel. The tools examine whole code
-and find many error reports. Unfortunately, many of the reports are false
-positives. So the tools have to use many techniques for partial elimination of
-false positives.  The main source of false positives is related to the fact
-that the analysis does not work with data values. In particular, the analysis
-does not track connections between variable values and states of automata.
-Therefore, when a branching statement is processed, the analysis cannot decide
-which states of automata are reachable on the positive branch and which on the
-negative one.  It may be illustrated by the \emph{double unlock} false
-positive detected in the function of Figure~\ref{fig:copy} because the
-analysis does not know that the condition on line~\ref{line:copy_if2} holds
-only if the automaton $\SA(\var{L})$ is in state $L$. As manual sorting of
-error reports containing a pile of false positives is tedious work, the
-practical applicability of such tools is limited.
+To sum up, static analysis tools like \xgcc, \textsc{Esp}, and \stan are
+highly flexible, fast and thus applicable to extremely large software projects
+like the Linux kernel. The tools examine whole code and find many error
+reports. Unfortunately, many of the reports are false positives. So the tools
+have to use many techniques for partial elimination of false positives.  The
+main source of false positives is related to the fact that the analysis does
+not work with data values. In particular, the analysis does not track
+connections between variable values and states of automata.  Therefore, when a
+branching statement is processed, the analysis cannot decide which states of
+automata are reachable on the positive branch and which on the negative one.
+It may be illustrated by the \emph{double unlock} false positive detected in
+the function of Figure~\ref{fig:copy} because the analysis does not know that
+the condition on line~\ref{line:copy_if2} holds only if the automaton
+$\SA(\var{L})$ is in state $L$. As manual sorting of error reports containing
+a pile of false positives is tedious work, the practical applicability of such
+tools is limited.
 
 \section{Our Contribution}
 
@@ -211,8 +199,8 @@ parts of the code (for example by exploring each program loop at most twice),
 we may use the technique as a general error-finding technique reporting only
 real errors.  On the contrary, if we use a symbolic executor exploring all
 execution paths, we may use our technique for classification of error reports
-produced by other tools (e.g.\ \textsc{xgcc} or \stan). For each such an error
-report, we may instrument the corresponding code only with the state machine
+produced by other tools (e.g.\ \xgcc or \stan). For each such an error report,
+we may instrument the corresponding code only with the state machine
 describing the reported error. If our technique finds the same error, it is a
 real one.  If our technique explores all execution paths of the sliced code
 without detecting the error, it is a false positive. If our technique runs out
@@ -621,21 +609,15 @@ slicing procedure is presented in Figures~\ref{fig:fmics_const},
 \ref{fig:fmics_getm}, \ref{fig:fmics_fire}, and~\ref{fig:copy_sliced} (the
 code in the first three figures shall not be changed by the slicing). Note
 that the sliced code contains neither the \code{while}-loop nor the
-\code{lock()} and \code{unlock()} commands.
+calls to \code{lock} and \code{unlock} functions.
 
 It is important to note that some slicing techniques, including the one
 of Weiser~\cite{slicing} which we use, do not consider inputs for which the
-original program does not halt.
-% The problem arises when the sliced code contains an error, such that all
-% executions exhibiting the error do not reach the error in the original
-% code as they loop in some code that sliced.
-As a result, an input causing an infinite run of the original program can
-induce a finite run in the sliced program. Moreover, the finite run can
-contain locations not visited by the infinite run.
-% Therefore, there is no way to guarantee that a sliced program would fail
-% to halt whenever the original program fails to halt.
-This is the only principal source of potential false positives in our
-technique.
+original program does not halt.  As a result, an input causing an infinite run
+of the original program can induce a finite run in the sliced program.
+Moreover, the finite run can contain locations which would not be visited by
+the infinite run.  This is the only principal source of potential false
+positives in our technique.
 
 %}}}
 %{{{ Symbolic Execution
@@ -933,15 +915,16 @@ parameters and adds it to the offset member of the pointed pair.
 \subsection{Kleerer}
 The module \code{Kleerer} performs a final processing of the sliced bytecode
 before it is passed to \klee. In particular, the module adds to the bytecode a
-function \code{main} that calls a starting function.  The \code{main}
-function also allocates a symbolic memory for each parameter of the starting
-function. Size of the allocated memory is determined by the parameter type.
-More problematic is a pointer as an argument of the starting function. We have
-no way to find out whether the pointer points to a single value in memory or
-whole array. To overcome the problem, we assume there are at most 4096 members
-in the array. So for example, 4 bytes are allocated for an integer and 16384
-bytes for an integer pointer. The idea behind the array allocations is taken
-over from the paper introducing \ucklee~\cite{ucklee}.
+function \code{main} that calls a particular starting function.  The
+\code{main} function also allocates a symbolic memory for each parameter of
+the starting function. Size of the allocated memory is determined by the
+parameter type.  More problematic is a pointer as an argument of the starting
+function. We have no way to find out whether the pointer points to a single
+value in memory or to a whole array. To overcome the problem, we assume there
+are at most 4096 members in the array. So for example, four bytes are
+allocated for an integer and $4\cdot4096=16384$ symbolic bytes for a pointer
+to an integer. The idea behind the array allocations is taken over from the
+paper introducing \ucklee~\cite{ucklee}.
 
 We still had to extend the approach by two means. First, we enumerate some
 known structures which are never passed as arrays. An example of such
@@ -1112,10 +1095,10 @@ a machine with an Intel E6850 dual-core processor at 3\,GHz and 6\,GiB of
 memory, running Linux. We specified \klee parameters to time out after
 10 seconds spent in an SMT solver and after 300 seconds of an overall running
 time. Increasing these times brings no real effect in our environment. We do
-not pass optimize option for \klee because it causes \klee to
-crash for most of the input.
-% The optimization might
-% further speed the analysis up. The crashes are yet to be investigated.
+not pass optimize option for \klee because it causes \klee to crash for most
+of the input.
+% The optimization might further speed the analysis up. The crashes are yet to
+% be investigated.
 
 % At this early stage of the tool, the evaluation is not performed on the whole
 % kernel. It is because it still does not scale that much. We plan to extend
@@ -1133,7 +1116,7 @@ code.  The last two columns specify the results of our analysis and the real
 state confirmed by kernel developers. The table clearly shows that the
 bottleneck of our technique is the symbolic execution. However, if we did not
 slice the code, the only function completely executed in time would be
-\code{sisusbcon\_set\_palette}, computed in 20.64s.
+\code{sisusbcon_set_palette}, computed in 20.64\,s.
 % , i.e. slower by 17 per cent. As a demonstration, slicer reduces 2936
 % \textsc{Llvm} instructions to 705 there.
 
@@ -1166,100 +1149,44 @@ error mentioned above.
 %}}}
 %{{{ Related Work
 
-%\subsection{Related Work} \label{sec:related}
-%
-%% A description of program properties in \textsc{Metal} language and
-%% meta-level compilation is discussed in~\cite{CEH02,metacomp,ECC00,metal}. 
-%
-%There are many tools checking properties described by finite state
-%machines. They produce both kinds of reports, real error as well as false
-%positives. The technique of \textsc{xgcc} presented
-%in~\cite{CEH02,metacomp,ECC00,metal} found a thousands of bugs in real system
-%code. It provides a language \textsc{Metal} for easy description of properties
-%to be checked.  \textsc{xgcc} suffers from false positives despite usage of
-%false positive suppression algorithms like killing
-%variables and expressions, synonyms, false path pruning, and others. Besides
-%the suppression algorithms, bug-reports from the tool are further ranked
-%according to their probability of being real errors. There are generic and
-%statistical ranking algorithms ordering bug-reports. An extension introduced
-%in~\cite{ECH01} provides an automatic inference of some temporal properties
-%based on statistical analysis of assumed programmer's beliefs. The
-%\textsc{ESP}~\cite{esp} technique uses a similar language to
-%\textsc{Metal} for properties description. It implements an interprocedural
-%dataflow algorithm based on~\cite{RHS95} for error detection and an abstract
-%simulation pruning algorithm for false positives
-%suppression. \textsc{Stanse}~\cite{stanse}, a static analysis tool also uses
-%state machines for description of checked program properties. The
-%description is based on parametrised abstract syntax trees.  Finally,
-%\textsc{CEGAR}~\cite{cegar} based tools like \textsc{SLAM}~\cite{slam_decade},
-%\textsc{SDV}~\cite{slam2}, or \textsc{Blast}~\cite{blast}, do not produce
-%false positives, in theory. However, to achieve an appropriate efficiency
-%and scalability for a practical use, the implementation of the
-%\textsc{CEGAR} loop is typically unsound.
-%%Although this
-%%tool found hundreds of real bugs in the Linux kernel, it suffers from a high
-%%false positive rate since its false positive suppression algorithms are
-%%very limited.
-%
-%Program analysis tools based on symbolic execution~\cite{se} mainly discover
-%low-level bugs like division by zero, illegal memory access, assertion
-%failure etc. These tools typically do not have problems with false
-%positives, but they have problems with scalability to large programs. There
-%has been developed a lot of techniques improving the scalability to programs
-%used in practice.
+\section{Related Work} \label{sec:fmics_related}
 
-%There are also hybrid techniques combining symbolic execution with a
-%complementary static
-%analysis~\cite{GNRT10,NRTT09}. % Beckmanetal08,GMR09,Gulavanietal06,
-%Symbolic execution can be accelerated by a compositional approach based on
-%function summaries~\cite{AGT08,G07}. Another approach to effective symbolic
-%execution introduced in~\cite{BCE08,klee,Cadar08} is based on recording of
-%already seen behavior and pruning its repetition.
-%% The followng techniques
-%%focus on reaching a specific program location. Fitnex~\cite{XTHS09}, a
-%%search strategy implemented in \textsc{Pex}~\cite{TdH08}, guides a path
-%%exploration to a particular target location using fitness function. The
-%%function measures how close an already discovered feasible path is to the
-%%target. The LESE~\cite{SPmCS09} approach introduces symbolic variables for
-%%the number of times each loop was executed. The symbolic variables are
-%%linked with features of a known grammar generating inputs. Using these
-%%links, the grammar can control the numbers of loop iterations performed on a
-%%generated input. A technique presented in~\cite{GL11} analyses loops
-%%on-the-fly, i.e.~during simultaneous concrete and symbolic executions of a
-%%program for a concrete input. The loop analysis infers variables that are
-%%modified by a constant value in each loop iteration. These variables are
-%%used to build loop summaries expressed in a form of pre and post
-%%conditions. An algorithm in~\cite{ST11} constructs a nontrivial necessary
-%%condition on input values to drive the program execution to a given
-%%location. A technique presented in~\cite{OT11} introduces a pair of counters
-%%for two different paths around loop for each recurrent variable. Each
-%%counter keeps an information about the number of iterations around one path
-%%since the last iteration around the other one. Finally, 
-%There is an orthogonal line of research which tries to improve the symbolic
-%execution for programs with some special types of inputs. Some techniques
-%deal with programs manipulating strings~\cite{BTV09,XGM08}, and some other
-%techniques reduce input space using a given input
-%grammar~\cite{grammar3,SPmCS09}.
-%
-%The interprocedural static slicing was introduced by Weiser~\cite{slicing}. But
-%nowadays, there are many different approaches to program slicing. They are
-%surveyed by several authors~\cite{BG,L01,T95}. Applications of slicing include
-%program debugging, reverse engineering and regression testing~\cite{GHS92}.
+There are many tools checking properties described by finite state machines.
+The technique of \xgcc~\cite{metacomp} found a thousands of errors in real
+system code.  The \textsc{Esp}~\cite{esp} technique uses a similar language as
+\xgcc for properties description.  It implements an inter-procedural data-flow
+algorithm based on the approach by Reps et al.~\cite{dataflow_large} for error
+detection and an abstract simulation pruning algorithm for false positives
+suppression.  \stan~\cite{stanse} (Chapter~\ref{sec:stanse}), a static
+analysis tool also uses state machines for description of checked program
+properties. The description is based on parametrised abstract syntax trees.
+Finally, \textsc{CEGAR}~\cite{cegar} based tools like
+\textsc{SLAM}~\cite{slam_decade, slam2}, \textsc{SDV}~\cite{sdv}, or
+\textsc{Blast}~\cite{blast}, do not produce false positives, in theory.
+However, to achieve an appropriate efficiency and scalability for a practical
+use, the implementation of the \textsc{CEGAR} loop is typically unsound.
+
+Program analysis tools based on the symbolic execution~\cite{se_king} mainly
+discover low-level bugs like division by zero, illegal memory access,
+assertion failure etc. These tools typically do not have problems with false
+positives, but they have problems with scalability to large programs. There
+were developed a lot of techniques improving the scalability to programs used
+in practice. There are techniques coping with the scalability as we discussed
+in Section~\ref{sec:se}. But neither of those is really related to our
+technique implemented in \symbio.
 
 %}}}
 %{{{ Future Work
 
 \section{Future Work}\label{sec:fmics_future}
-Our future work has basically three independent directions.
-
-First, we plan to run our tool to classify all lock-related error reports
-produced by \textsc{Stanse} on the Linux kernel. The results should provide
-a better image of practical applicability of the technique. To get a
-relevant data, we should solve some practical issues like a correct
-detection of starting functions, automatic replacement of assembler,
-treatment of external function calls, etc. We should also implement an
-on-demand memory allocation to \klee as discussed in
-Section~\ref{sec:fmics_impl} or use a different executor.
+Our future work has basically three independent directions.  First, we plan to
+run our tool to classify all lock-related error reports produced by
+\textsc{Stanse} on the Linux kernel. The results should provide a better image
+of practical applicability of the technique. To get a relevant data, we should
+solve some practical issues like a correct detection of starting functions,
+automatic replacement of assembler, treatment of external function calls, etc.
+We should also implement an on-demand memory allocation to \klee as discussed
+in Section~\ref{sec:fmics_impl} or use a different executor.
 
 The second direction is to adopt or design some convenient way for
 specification of arbitrary state machines. It may be a dedicated language

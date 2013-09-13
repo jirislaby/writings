@@ -113,19 +113,20 @@ and \code{b}, because all of them can reach line~\ref{lst:state_rd_ref}.
 %was re-set later on both paths to line~\ref{lst:reach_use}.
 
 Now we derive the information algorithmically using the data-flow analysis by
-constructing the equations and computing their fixed point. We can simply hold
-the reaching definitions in the transform equations.  That is, initially at
-the beginning of a function, the first equation holds an empty set. Then the
-equation is gradually transformed according to statements and the definitions
-are filled in. Since we need to propagate information about definitions, the
-transform equation mangles the contents coming from predecessors only on
-assignment statements.  Other equations simply copy data from predecessors.
-On assignments, the equation takes the set of statements from the
-predecessors, removes all statements that set the same variable and adds
-itself. If there are more predecessors, we use set union as we want to know
-definitions from both branches. The transform equations $f_s$ for each
-statement $s$ in the example are shown in the third column of
-Table~\ref{tab:state_df_eq}.
+constructing the transfer equations and computing their fixed point. In the
+case of the reaching definitions analysis, we can simply hold the definitions
+in the equations.  That is, initially at the beginning of a function, the
+equation there holds an empty set. Then this empty equation is gradually
+transformed according to statements and the definitions are filled in. Since
+we need to propagate information about definitions, the transfer equation
+mangles the contents coming from predecessors only on assignment statements.
+Other equations simply copy data from predecessors.  On assignments, the
+equation takes the set of statements from the predecessors, removes all
+statements that assign to the same variable and adds itself. If there are more
+predecessors, we use the set union as we want to propagate definitions from
+both branches. The transfer equation $f_s$ for each statement $s$ in the
+example of Table~\ref{tab:state_df_eq} are shown in the third column of the
+same table.
 \begin{table}[htb]
 \begin{center}
 \begin{tabular}{|r|l||p{0.2em}lp{0.3em}r|} \hline
@@ -175,13 +176,16 @@ $f_7$ & $= \emptyset$ & $\cup$ & $(f_3 \,\setminus\, \emptyset)$ \\ \hline
   \caption{Reaching definitions data-flow analysis example.}
   \label{tab:state_df_eq}
 \end{table}
-The equation is in the form of $f_s = gen_s \cup (pred_s \setminus kill_s)$.
-$gen_s$ is a set $\{s\}$ that \emph{generates} $s$ if it is an assignment,
-otherwise $gen_s$ is empty.  $pred_s$ is a union of $f_{s-1}$ for each
-predecessor $s-1$.  Finally, if $s$ is an assignment to $\var{x}$, $kill_s$ is
-a set that \emph{kills} other assignments to \code{x}. Otherwise $kill_s$ is
-empty. Establishing a fixed point as defined in Definition~\ref{def:fixpoint}
-is shown in Table~\ref{tab:state_df_fp}.
+The equation is of this form:
+\begin{equation*}
+f_s = gen_s \cup (pred_s \setminus kill_s)
+\end{equation*}
+$gen_s$ is the set $\{s\}$ that \emph{generates} $s$ if it is an
+assignment, otherwise $gen_s$ is empty for that particular equation.  $pred_s$
+is a union of $f_{s-1}$ for each predecessor $s-1$.  Finally, if $s$ is an
+assignment to \code{x}, $kill_s$ is a set that contains other assignments to
+\code{x}.  Otherwise $kill_s$ is empty. Establishing a fixed point as defined
+in Definition~\ref{def:fixpoint} is shown in Table~\ref{tab:state_df_fp}.
 
 \begin{dfn}[Fixed point]\label{def:fixpoint}
 A \emph{fixed point} of a function $f : D \rightarrow D$ is an element $x \in
@@ -224,19 +228,19 @@ out_s & = trans_s(in_s) \\
 in_s & = join_{p\in pred_s}(out_p)
 \end{aligned}
 \end{equation}
-We define a transfer function $trans_s$ to transform input set $in_s$ of a
+We define a transfer function $trans_s$ to transform the input set $in_s$ of a
 statement $s$ to the output set $out_s$ according to the effect of $s$ in a
 particular analysis. The join operator $join$ takes output sets of all
-predecessors and combines it together. It is usually a set intersection or
+predecessors and combines them together. It is usually a set intersection or
 union depending whether the analysis is may or must (cf.\
-Section~\ref{sec:types_anal}). Further, whether an analysis is forwards
-or backwards (Section~\ref{sec:types_anal}), the $in$ set is bound to an
-incoming or outgoing control flow graph edge respectively. Analogously for the
-$out$ set.  These two sets are the \emph{result} of the analysis before and
-after applying the effect of the statement.
+Section~\ref{sec:types_anal}). Further, whether an analysis is forwards or
+backwards (Section~\ref{sec:types_anal}), the $in$ set is bound to an incoming
+or outgoing control flow graph edge respectively. Analogously for the $out$
+set.  These two sets are the \emph{result} of the analysis before and after
+applying the effect of the statement.
 
-For the reaching definitions example above, we define the join operator as a
-set union ($\bigcup$) and the transfer function in this notation to hold
+For the reaching definitions example above, we define the join operator as
+the set union ($\bigcup$) and the transfer function in this notation to hold
 statement line numbers as follows ($S$ is the set of all statements in the
 analysed program):
 \begin{align*}
@@ -254,9 +258,9 @@ kill_s & =
 \end{cases} \\
 \end{align*}
 
-For the simplicity nature of the data-flow analysis, there are many diverse
-data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest some
-examples of other well-known basic data-flow analyses as they are defined
+Thanks to the simplicity nature of the data-flow analysis, there are many
+diverse data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest
+some examples of other well-known basic data-flow analyses as they are defined
 according to the forward/backward and may/must criteria.
 \begin{table}[htb]
 \begin{center}
@@ -274,67 +278,73 @@ according to the forward/backward and may/must criteria.
     forward/backward rules.}
   \label{tab:data_flow_examples}
 \end{table}
-For curious readers, they are defined in every superior literature about
-compilers~\cite{dragon, muchnick}. Thanks to the simplicity, the data-flow
-analysis is also used in many tools including checkers.  The very common place
-of extensive use are compilers. Apart from generating code, they generate
-warnings or errors when some suspicious code is found. A good example is
-\clang~\cite{clang}. It is a C/C++ compiler from the \llvm toolkit~\cite{llvm}
-and contains also a static checker framework.  There are checkers for finding
-errors in memory handling, locking, or pointer operations. Nonetheless mostly
-the results are imprecise and contain many false reports.
-\textsc{Cppcheck}~\cite{cppcheck} works on the same principles so it checks
-for very similar set of errors.  When compilers were still not so evolved,
-other data-flow analyzers were used to fulfill this role. One of the most
-known analyzers at that time was \textsc{Lint}~\cite{lint}. It was capable of
-finding errors like division by zero, constant conditions which always
-evaluate either to true or false, or use of uninitialized variables.  Later,
-\textsc{Lint} resulted in some clones like \textsc{LCLint}~\cite{lclint} which
-were augmented to catch errors like buffer overflows. \textsc{LCLint} was
-later renamed to \textsc{Splint}.  These tools mostly have a support for
-annotations so more speculative checks can be enabled. In that case, the code
-has to be heavily annotated, otherwise the false positive rate is unbearable.
-Nonetheless \textsc{Splint} is not developed for more than a decade due to
-obvious reasons: the most errors it reports are reported by modern compilers
-nowadays.  There exist also analyzers that are not so powerful to handle large
-code bases or require high user intervention to annotate the checked code. As
-an example we give \textsc{Aspect}~\cite{aspect} which compares a program
-specification of input-output behaviour provided by a user to data-flow models
-extracted from the code. This was only a short introduction to the data-flow
-analysis, more information and many examples are available in the
-literature~\cite{dragon, muchnick}.
+These are the most known analyses which we believe the reader knows. If not,
+they are defined in every superior literature about compilers~\cite{dragon,
+muchnick}.
+
+The simplicity is also a reason, that the data-flow analysis is also used in
+many tools including checkers.  The very common place of extensive use are
+compilers. Apart from generating code, they generate warnings or errors when
+some suspicious code is found. A good example is \clang~\cite{clang}. It is a
+C/C++ compiler from the \llvm toolkit~\cite{llvm} and contains also a static
+checker framework.  There are checkers for finding errors in memory handling,
+locking, or pointer operations. Sadly, the results are mostly imprecise
+and contain many false reports.  \textsc{Cppcheck}~\cite{cppcheck} works on
+the same principles so it checks for very similar set of errors. Earlier,
+while compilers were still not so evolved, other data-flow analyzers were used
+to fulfill this role. One of the most known analyzers at that time was
+\textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
+zero, constant conditions which always evaluate either to true or false, or
+use of uninitialized variables.  Later, \textsc{Lint} resulted in some clones
+like \textsc{LCLint}~\cite{lclint} which were augmented to catch errors like
+buffer overflows. \textsc{LCLint} was later renamed to \textsc{Splint}.  These
+tools mostly have a support for annotations so more speculative checks can be
+enabled. In that case, the code has to be heavily annotated, otherwise the
+false positive rate is unbearable.  Nonetheless, the development of
+\textsc{Splint} stagnated over the past decade due to obvious reasons: the
+most errors and warnings \textsc{Splint} was used to report are reported by
+modern compilers nowadays. It was also thanks to the work of Reps et
+al.~\cite{dataflow_large}. They showed that it is possible to compute the
+data-flow sets precisely for the whole program inter-procedurally in
+polynomial time. They presented that on finding possibly uninitialized
+variables.  There exist also analyzers that are not so powerful to handle
+large code bases or require high user intervention to annotate the checked
+code. We give as an example \textsc{Aspect}~\cite{aspect}, which compares a
+program specification of input-output behaviour provided by a user to
+data-flow models extracted from the code. This section is only a short
+introduction to the data-flow analysis, more information and many examples are
+available in the literature~\cite{dragon, muchnick}.
 
 
 
-\section{Abstract Interpretation}\label{sec:ai}\todo{transfer vs
-transformation vs transfer function. Fight!}
+\section{Abstract Interpretation}\label{sec:ai}
 The data-flow analysis is only a limited tool. It only collects information
 about data and how they propagate through the control flow of a program.
 Therefore it is not as useful for designing more complex analyses which are
-usual for code checking. There was a call to formalize the process for a
-convenient design of more complex analyses. Cousots' work on this topic
-stretches back to the 1970s. Back then, they described a framework called
-\emph{abstract interpretation}~\cite{cousot}. It is designed to allow users of
-the formalism to easily design an analysis, decide whether it is correct and
-sound, to formulate more precision levels of the analysis consistently and
-more.  The formalism was designed in a way that we can also interpret analyses
-like data-flow as an abstract interpretation~\cite{ai_intro}.
+usual for code checking and possibly elsewhere. There was a call to formalize
+the process for a convenient design of more complex analyses. Cousots' work on
+this topic stretches back to the 1970s. Back then, they described a framework
+called \emph{abstract interpretation}~\cite{cousot}. It is designed to allow
+users of the formalism to easily design an analysis, decide whether it is
+correct and sound, to formulate more precision levels of the analysis
+consistently and more.  The formalism was designed in a way that we can also
+interpret analyses like the data-flow as an abstract
+interpretation~\cite{ai_intro}.
 
 As the name of the analysis suggests, the data domains used in analyzed code
 are replaced by abstract ones. The abstract domain is a \emph{complete
 lattice}~\cite{lattice1,lattice2} as defined in
-Definition~\ref{def:colattice}. Since the program works on a new (abstract)
-domain, we have to provide a new semantics of the program over the domain.
-There are no limits, the semantics can be arbitrary. We define a
-\emph{monotone function} for all instructions in the analyzed code to
-transform the program states over the instructions.  Thanks to the work of
+Definition~\ref{def:colattice}. Since the analyzed program is re-defined to
+work on a new (abstract) domain, we have to provide a new semantics of the
+program over the domain.  There are no limits, the semantics can be arbitrary.
+We define a \emph{monotone function} for all instructions in the analyzed code
+to transform the program states over the instructions.  Thanks to the work of
 Tarski~\cite{tarski} and Kleene~\cite[Pages 348--349]{kleene}, we can always
-compute fixed points of monotone functions which transform states over
+compute fixed points of monotone functions which transfer states over
 lattices.  Further, using lattices is effective. Their operators join and meet
 can be used when an analyzer is interpreting a program.  For example, when a
-branching
-occurs, the branch join operator simply takes the values present on the
-outputs of both branches and performs the lattice join ($\sqcup$).
+branching occurs, the branch join operator simply takes the values present on
+the outputs of both branches and performs the lattice join ($\sqcup$).
 
 \begin{dfn}[Complete lattice]\label{def:colattice}
 A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
@@ -344,44 +354,44 @@ $\sqcap X$. In particular, $L$ has a least element $\bot = \sqcup \emptyset$
 and a greatest element $\top = \sqcap L$.
 \end{dfn}
 
-Let us demonstrate the abstract interpretation on an example the same as the
-data-flow analysis and then generalize it again. We take the same example as
-is in Table~\ref{tab:state_df_eq} and reachable definitions analysis again.
-First, we have to define the abstract set which the abstract interpretation
-works with.  Since the analysis works with lines where is an assignment and
-there can be more reachable definitions assigned to a single line, the complete
-lattice will consists of a powerset of all assignments in the program:
-$A=\{1,2,4,5\}$.  The abstract domain is therefore lattice $L_a =
-(\mathcal{P}(A),\, \subseteq,\, \emptyset,\, A,\, \cap,\, \cup)$. Now we would
-have to define the transform function over the lattice. But it is the same as
-in Table~\ref{tab:state_df_eq}. So computing the least fixed point is the same
-as is shown in Table~\ref{tab:state_df_fp} too.
+Let us demonstrate the abstract interpretation on an example, the same we did
+for the data-flow analysis and then generalize it again. We take the same
+example as is in Table~\ref{tab:state_df_eq} and reachable definitions
+analysis again.  First, we have to define the abstract domain which the
+abstract interpretation works with.  Since the analysis works with lines where
+is an assignment and there can be more reachable definitions assigned to a
+single line, the complete lattice will consists of a powerset of all
+assignments in the program: $A=\{1,2,4,5\}$.  The abstract domain is therefore
+the lattice $L_a = (\mathcal{P}(A),\, \subseteq,\, \emptyset,\, A,\, \cap,\,
+\cup)$. Now we would have to define the transfer function over the lattice.
+But it is the same as in Table~\ref{tab:state_df_eq}. So computing the least
+fixed point is the same as is shown in Table~\ref{tab:state_df_fp} too.
 
 As we see, the abstract interpretation is defined by the complete lattice,
-and a transform function. Formally, it is a tuple $I=\langle L,\, \circ,\,
+and a transfer function. Formally, it is a tuple $I=\langle L,\, \circ,\,
 \leq,\, \top,\, \bot,\, F\rangle$, where $(L,\, \leq,\, \bot,\, \top,\,
 \sqcup,\, \sqcap)$ is a complete lattice, $\circ$ is either supremum
-($\sqcup$) or infimum ($\sqcap$) operator, and $F$ is a monotone function
-defining the interpretation on a program. The definition can be loosened to
-require only a semi-lattice, as we need only one operator.
+($\sqcup$) or infimum ($\sqcap$) lattice operator, and $F$ is a monotone
+function defining the interpretation of a program. Obviously, the definition
+can be loosened to require only a semi-lattice, as we need only one operator.
 
-It is not yet obvious how to define the transform function of a program. We
-can define a transform function $F_a$ working directly on the abstract domain.
-It obtains a new abstract state corresponding to the effect of a statement
-applied to the original state. The same as we showed in the example, this is
-usually defined on an intuitive level as a composition of simple
-transformations performed on single statements of a program. For complex
-analyses it need not be easy to design such $F_a$, so there is also another
-option.  First, we define two functions: \emph{abstraction} denoted $\alpha$
-and \emph{concretization} denoted $\gamma$, both accepting one parameter.
-$\alpha$ returns an abstract value corresponding to the concrete value on
-input and $\gamma$ does the opposite. Now, we can jump back to the concrete
-values, perform the transformation on the concrete values using a concrete
-transform function $F_c$ and switch back to the abstract values.  $F_a$ is
-then defined as $F_a = \alpha \circ F_c \circ \gamma$. To retain soundness of
-the analysis, the resulting abstract value must be less than or equal to the
-one computed by a direct $F_a$. We depict these two options in
-Figure~\ref{fig:state_ai_square}.
+It is not yet obvious how to define the transfer function of a program. We can
+define a transfer function $F_a$ working directly on the abstract domain.  It
+obtains a new abstract state with respect to the original state and counting
+in the effect of a program which is evaluated. Simply the same as we showed in
+the example of reaching definitions, where the transfer function is defined on
+an intuitive level as a composition of simple transfer functions performed on
+single statements of a program.  For complex analyses it need not be so easy
+to design such $F_a$, so there is also another option.  First, we define two
+functions: \emph{abstraction} denoted $\alpha$ and \emph{concretization}
+denoted $\gamma$, both accepting one parameter.  $\alpha$ returns an abstract
+value corresponding to the concrete value on input and $\gamma$ does the
+opposite. Now, we can jump back to the concrete values, perform the
+transformation on the concrete values using a concrete transfer function $F_c$
+and switch back to the abstract values.  $F_a$ is then defined as $F_a =
+\alpha \circ F_c \circ \gamma$. To retain soundness of the analysis, the
+resulting abstract value must be less than or equal to the one computed by a
+direct $F_a$. We depict these two options in Figure~\ref{fig:state_ai_square}.
 \begin{figure}[htb]
 \begin{center}
     \begin{tikzpicture}[circle, <-, >=stealth', minimum size=2mm, inner sep=0pt]
@@ -397,12 +407,12 @@ Figure~\ref{fig:state_ai_square}.
       \node [rotate=65,below=5mm of A1,yshift=5.5mm] {$\leq$ };
     \end{tikzpicture}
 \end{center}
-\caption{Computation of abstract transform function.}
+\caption{Computation of an abstract transfer function $F_a$ using concrete
+transfer function $F_c$ and concretization ($\gamma$) with abstraction
+($\alpha$).}
 \label{fig:state_ai_square}
 \end{figure}
 
-Now consider two lattices in Figures~\ref{fig:state_lat_concrete}
-and~\ref{fig:state_lat_int}.
 \begin{figure}[tb]
 \begin{center}
   \tikzstyle{invisible} = [minimum size=12mm]
@@ -517,13 +527,15 @@ and~\ref{fig:state_lat_int}.
 \label{fig:state_lat_int}
 \caption{Lattice for intervals.}
 \end{figure}
-Both are used for abstracting numbers in programs. One is capable to remember
-only a single value of a variable and is therefore useful for analyses like
-constant propagation~\cite[Chapter 9.4]{dragon}. The other lattice uses
-intervals to remember possible bounds of some variable's value.  This is very
-useful domain especially when analyzing bounded loops. When indices, and
-probably other variables in the body of the loop are bounded, we can run some
-optimizations like loop unrolling~\cite[page 735]{dragon}.
+Now consider two lattices in Figures~\ref{fig:state_lat_concrete}
+and~\ref{fig:state_lat_int}. Both are used for abstracting numbers in
+programs. One is capable to remember only a single value of a variable and is
+therefore useful for analyses like constant propagation~\cite[Chapter
+9.4]{dragon}. The other lattice uses intervals to remember possible bounds of
+some variable's value.  This is very useful domain especially when analyzing
+bounded loops. When indices, and probably other variables in the body of the
+loop are bounded, we can run some optimizations like loop unrolling~\cite[page
+735]{dragon}.
 
 There is a difference to be spotted between these two lattices. Although they
 both contain an infinite number of elements (in theory), the latter lattice
@@ -557,15 +569,23 @@ abstract interpretation is in an overview~\cite{cousot_progress}, where is the
 progress in the area of the abstract interpretation over 25 years. A not so
 usual use of the abstract interpretation can be found too~\cite{ai_unusual1,
 ai_unusual2, ai_unusual3}.  Engler et al.\ brought the abstract interpretation
-to the attention in 2000 by a technique based on meta
-compilation~\cite{metacomp}. There, program developers specify properties of
-the checked system in \textsc{Metal} language~\cite{metal}, compile it into an
+to the attention in 2000 by a technique based on meta compilation in
+\xgcc~\cite{metacomp}. There, program developers specify properties of the
+checked system in \textsc{Metal} language~\cite{metal}, compile it into an
 internal representation and the tool applies the specification on all
 executable paths in a particular function.  Violation of the specification on
-a path is then reported as an error.  On the similar base is built
-\stan~\cite{stanse} which is discussed in Chapter~\ref{sec:stanse}. It is
-uncertain, whether some industrial tool adopts the abstract interpretation
-too, see the discussion in Section~\ref{sec:industrial}.
+a path is then reported as an error.  \xgcc suffers from false positives
+despite the use of false positive suppression algorithms like killing
+variables and expressions, synonyms, false path pruning, and others.  Besides
+the suppression algorithms, error reports from the tool are further ranked
+according to their probability of being real errors. There are generic and
+statistical ranking algorithms ordering error reports.  An extension
+introduced later~\cite{lockchecker} provides an automatic inference of some
+temporal properties based on statistical analysis of assumed programmer's
+beliefs.  On the similar base as \xgcc is built \stan~\cite{stanse} which is
+discussed in Chapter~\ref{sec:stanse}.  It is uncertain, whether some
+industrial tool adopts the abstract interpretation too, see the discussion in
+Section~\ref{sec:industrial}.
 
 The correctness and soundness (cf.\ Section~\ref{sec:theor_props}) of an
 analyzer based on the abstract interpretation is very prone to selection of
@@ -1113,16 +1133,18 @@ can see, the intersection of relevant and set variables is never empty.
 
 To extend the slicer to be inter-procedural, we have to change the slicer to
 pass the relevant variables among functions: down to a called function at
-every call instruction and back up from the called function. As relevant
+every \emph{call} instruction and back up from the called function. As relevant
 variables propagate from the bottom up, the slicer has to pass the variables
 from a call site to return points of the called function and when the slicer
 is done with the transfer of the variables through the whole function to its
 beginning, the variables are transferred back to the call instruction. Of
 course the slicer has to take care of actual with formal parameters binding
 and of the relationship between return value and the variable where the result
-is stored into.  The same as above, the process repeats until a fixed point is
-reached.  Inter-procedural slicers were discussed by Horwitz et
-al.~\cite{slic_inter1} and Gallagher~\cite{slic_inter2}.
+is stored into. Finally, we have to ensure that the set variables of the call
+instruction proper are those which the called function modifies, so that the
+call instruction is not sliced.  The same as above, the process repeats until
+a fixed point is reached.  Inter-procedural slicers were discussed by Horwitz
+et al.~\cite{slic_inter1} and Gallagher~\cite{slic_inter2}.
 
 Originally, there were only slicers implementing the technique as described
 above. These are \emph{static} slicers and they slice such that any possible
@@ -1196,8 +1218,8 @@ slic_overview01a, slic_overview01b, slic_overview05, slic_overview12}.
 %Combining Static and Dynamic Analysis;
 
 We use slicing extensively to reduce code size of the code that is
-symbolically executed by our tool. See Chapters~\ref{sec:fmics}
-and~\ref{sec:svcomp} for more information.
+symbolically executed by our tool. More insight can be seen in
+Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
 
 \section{Model Checking}
 This is a bit different technique from static analysis we are dealing in this
@@ -1289,19 +1311,20 @@ modelling and verifying Java programs like
 As this thesis does not deal with the model checking, curious readers are
 pointed to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model
 checking.  There is also a survey about bounded model
-checking~\cite{bmc_survey} available.
+checking~\cite{bmc_survey} available. To the best of our knowledge, there are
+no later surveys or books covering the topics in that scale as these three do.
 
 \section{Industrial Tools}\label{sec:industrial}
-There are many successful tools based on static analysis. Unfortunately for
-some of them, it is not really known what technique they are based on.  It is
-due to secrets the companies hold to not let their competitors know. What can
-be found in the reference materials, the tools often use combination of the
-techniques we have already described. They work on the top of various pattern
-matching, data-flow analyses, and some maybe use the abstract interpretation.
-Even though the internals are not known exactly, we at least try to summarize
-the tools and the little about what their providers make available about them.
-Mostly the tools below are capable to handle C, some of them C++ and other
-languages like C\# or Java.
+There are many successful industrial tools based on the static analysis.
+Unfortunately for some of them, it is not really known what technique they are
+based on.  It is due to secrets the companies want to hold to not let their
+competitors find out. From what can be found in the reference materials, the
+tools often use combination of the techniques we have already described. They
+work on the top of various pattern matching, data-flow analyses, and some
+maybe use the abstract interpretation.  Even though the internals are not
+known exactly, we at least try to summarize the tools and the little which
+their providers make available.  Prevalently, the tools below are capable to
+handle C, some of them C++ and other languages like C\# or Java.
 
 The data-flow analyzer \textsc{Lint} was an inspiration for Gimpel's
 \textsc{PC Lint/FlexeLint}~\cite{pclint} and Cleanscape's
@@ -1309,18 +1332,17 @@ The data-flow analyzer \textsc{Lint} was an inspiration for Gimpel's
 finding suspicious code constructs. MathWorks'
 \textsc{PolySpace}~\cite{polyspace} was one of the first abstract interpreters
 capable of handling real code. But according to the authors, the tool's upper
-limit is still approximately 50 thousand lines of code that can be analyzed.
-The tool was inspired by the crash of Ariane~5 (see introduction). Another
-abstract interpreter which can handle large scale programs is AbsInt's
-\textsc{Astree}~\cite{astree}. It can be tuned to be sound, i.e.\ to produce
-no false positives.  \textsc{Astree} also combines several abstractions to
-perform more accurate analysis~\cite{astree_combine}.
+limit is still approximately fifty thousand lines of code that can be
+analyzed.  The tool was inspired by the crash of Ariane~5 (see the
+introduction).  Another abstract interpreter which can handle large scale
+programs is AbsInt's \textsc{Astree}~\cite{astree}. It can be tuned to be
+sound, i.e.\ to produce no false positives.  \textsc{Astree} also combines
+several abstractions to perform more accurate analysis~\cite{astree_combine}.
 
-\textsc{xgcc} was a predecessor of Coverity's
-\textsc{Prevent}~\cite{coverity}, and \textsc{Metal} for Coverity's
-\textsc{Extend}. \textsc{Prevent} is run regularly to check the Linux kernel
-and the results are provided to kernel developers.  KlocWork's
-\textsc{Insight}~\cite{klocwork} and GrammaTech's
+\xgcc was a predecessor of Coverity's \textsc{Prevent}~\cite{coverity}, and
+\textsc{Metal} for Coverity's \textsc{Extend}. \textsc{Prevent} is run
+regularly to check the Linux kernel and the results are provided to kernel
+developers.  KlocWork's \textsc{Insight}~\cite{klocwork} and GrammaTech's
 \textsc{CodeSonar}~\cite{codesonar} are specialized to finding security and
 reliability issues. \textsc{Insight} was originally intended as an optimizer
 for C code. IBM's \textsc{Apollo}~\cite{apollo} aims at checking web
@@ -1353,7 +1375,8 @@ inter-procedural integer overflows.
 \section{Summary of the Linux Kernel Checkers}
 Some of the tools above can analyze kernels or only drivers of operating
 systems. In this sections we specifically sum those which are capable to
-handle the Linux kernel.
+handle the Linux kernel. We discuss or use many of them in the following
+chapters, hence it makes sense to mention them here explicitly.
 
 One of the basic ones is based on the pattern matching and every developer
 is supposed to use it before sending patches to the kernel maintainers. It is
@@ -1380,9 +1403,9 @@ and errors reported are getting fixed constantly~\cite{linux_faults}.
 
 There are also tools that can be used, but are not used that massively by so
 many developers. These include \clang~\cite{clang} and
-\textsc{Cppcheck}~\cite{cppcheck}.  Historically, \textsc{xgcc} was used to
-find errors in the kernel~\cite{metal_kernel}, mainly for errors like if there
-are proper checks of untrusted data coming from the network or an user to the
+\textsc{Cppcheck}~\cite{cppcheck}.  Historically, \xgcc was used to find
+errors in the kernel~\cite{metal_kernel}, mainly for errors like if there are
+proper checks of untrusted data coming from the network or an user to the
 kernel. It found over one hundred of such errors. As \stan~\cite{stanse} is a
 tool based on a similar technique, it was used the same way and found over one
 hundred another errors.
