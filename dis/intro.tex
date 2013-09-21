@@ -121,105 +121,211 @@ their will, they often get results with much higher unreal reports rate than
 results of a commercial tool.
 
 \section{Motivation}
-In an ideal world, every code checking tool is capable to parse and check any
-project. Unfortunately, this is not true in the real world.  The tools are
-often incomplete in some sense. First, they often cannot even read source
-codes of such large project. This problem stems from the languages projects
-are written in.  Even though there are standards for languages, there are many
+In an ideal world, every code checking tool is capable to handle and check any
+project. Unfortunately, this is not true in the real world we live in. What
+are the difficulties we can hit when analyzing large software projects? And
+why do we should care? Those are exactly the questions which this section
+gives answers for. First, specifics of large projects are enumerated. Later,
+we explain why it is important to find as many errors as possible in them.
+
+\subsection{Requirements for Analyzers}
+If code analysis tools were perfect, we could probably skip this section.
+But this is not true, the tools are often incomplete in some sense when it
+comes to analyzing real large-size code.  We can likely conclude that every
+problem in handling of large software projects stems from a single source:
+\emph{complex code}. Now let us split the source into several categories and
+comment each of those. An observing reader may notice that not all of the
+categories are specific solely to large projects. But we understand the list
+rather as an enumeration of items which are a must for a code analyzer
+evaluating large projects.
+%This will happen from the most abstract level to simple code constructs.
+
+\begin{description}
+\item[Organization of Files] Source code with project's functionality is often
+divided into files and files are organized in directories. It is important to
+know where the analyzer can find all those files which constitute the project.
+Should a checker just recursively crawl a specified directory and check all
+sources in there?  What if some source file includes another one and the inner
+is not compilable on its own as happens in the Linux kernel?  Even if a user
+would specify the files manually, large projects tend to pass special
+directives to a compiler. The directives often pass paths to header files,
+definitions of some macros from the command line, or pre-inclusion of specific
+files.  And since the user of the analysis tool need not be a developer of the
+project, writing the options down by hand is infeasible for large projects.
+Checking tools which work on the source level definitely need to support
+\emph{build systems} and infer the files and compiler options automatically.
+They cannot depend on the user's input.
+
+\item[Source Code Language] It is not often easy to read and parse source
+code of a large project. This is due to languages used for writing code of
+such projects.  Even though there are standards for languages, there are many
 language offshoots that ``evolved'' with respective compilers. Let us consider
 C with the last standard issued in 1999~\cite{ansi_c}. There are many
 deviations from the standard introduced by \gcc~\cite{gcc}, \textsc{Intel
 CC}~\cite{intel_cc}, \textsc{MSVC}~\cite{msvc}, and possibly others.  Every
 single of them supports a different superset of the standard.  Thus it is very
 hard for analyzers to implement a parser which would be universally capable of
-parsing whichever program with sources in a specified language.  Second, the
-tools are not applicable to real software due to high computation time needs
-(cf.~symbolic execution started being used almost 30 years after being
-introduced). Further, the tools need not find any errors in large projects.
-This happens when the tools, or the projects, are highly specialized for
-example.  In this thesis we aim at mapping and investigation of current
-techniques used for code analysis and their application on real, large
-software projects.
+parsing whichever program with sources in a specified language. This causes
+problems when analyzing large projects since there is a high probability of
+using many features of some offshoot implemented in some default used
+compiler.
+%code written by diverse people+large chance to hit something unusual in the
+%large code: all diverse kind of code, whatever one can think of
 
-\subsection{Specifics of Large Projects}
-A compiler support, fast analysis, and a wide range of analyzed properties is
-a must. There are still other open question when it comes to analyzing large
-source base. One of those is where to find all those files which constitute
-the large project.  Should a checker just recursively crawl a specified
-directory and check all sources in there? What if some source file includes
-another one and the inner is not compilable on its own as happens in the Linux
-kernel?  Even if a user would specify the files manually, large projects tend
-to pass special directives to a compiler such as paths where are header files,
-to define some macros on the command line, or to pre-include specific files.
-And since the user of the checking tool need not be a developer of the
-project, writing the options down by hand is infeasible for large projects.
-The checking tools definitely need to \emph{support build systems} and infer
-the files and flags automatically.
+\item[Much Parsed Information] When a checking tool is able to parse some
+project's code, intermediate code structures are created from the code. But
+information about all these structures barely fits into the memory for large
+projects. We have to think how and which information to store and where. For
+example dumping the information into files and restoring them later. Or
+computing only minimal data which sum the effect of the parsed code and
+dropping the large structures afterwards.
 
-When a checking tool infers the options, it knows what to check and how to
-correctly obtain an intermediate code structure from the source code. But this
-is still not the final phase. Information about all these sources barely fits
-into the memory. In other words, when parsing a large project, we have to
-think twice how and which information to store and where. And yet large
-projects use some external library for reusability purposes.  So to have
-complete and self-contained sources for them, these libraries has to be
-analyzed too. And what if they are in a different language, or there are no
-sources available at all? Fortunately there are also large projects that do
-not depend on any other code. These include kernels of operating systems.
+\item[High Computation Cost] Some techniques cannot be applied to real
+software due to a high computation cost.  When developers of large project
+analyzers choose techniques to implement in their analyzer, they must have in
+mind the large amount of code which needs to be handled. The state space to
+be explored can be larger by many orders of magnitude in comparison to an
+analysis of small programs. Although computers are fast enough to deal with
+more precise analyses today, we are still not there to fully prove there is no
+error in some large project. The increase of computation power can be
+demonstrated on the symbolic execution~\cite{se_king}. It started being used
+almost thirty years after its introduction because the computers were not so
+powerful and nobody could really use it for anything real.
 
-The best code practices suggest to split functionality among smaller logical
-pieces for better readability and maintainability. Programmers usually put
-these pieces into separate functions. Nonetheless these pieces alone are not
-useful when checking for errors. They are potential sources of false
-positives.  For example one function can lock a lock, another one unlocks it
-and they are called in a sequence from some other one. When analyzing the two
-which change the lock state alone, we would get false positives. But when the
-three are analyzed together, no false report is reported. This drags in the
-need of inter-procedural variants of analyses used by the checking tools.
-There are many such requirements, inter-procedural analysis is one of those.
-The analyzers have to be as much precise as possible but still reasonably fast
-to finish the analysis still in this century.  And this is indeed a challenge!
+\item[Higher Level Analysis] The best code practices suggest to split
+functionality among smaller logical pieces for better readability and
+maintainability. Programmers usually put these pieces into separate functions.
+But these pieces alone are not useful when finding errors. They are potential
+sources of invalid reports. Consider the example of
+Figure~\ref{fig:intro_need_context}.
+\begin{figure}[htb]
+\begin{center}
+\begin{tabular}{c}
+\begin{lstlisting}
+DEFINE_LOCK(some_lock);
+
+void my_lock() {
+  lock(&some_lock);
+}
+void my_unlock() {
+  unlock(&some_lock);
+}
+void fun() {
+  my_lock();
+  my_unlock();
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\caption{Code to demonstrate the need of analyses to work on a higher level
+than functions.}
+\label{fig:intro_need_context}
+\end{figure}
+There, \code{my_lock} locks the lock \code{some_lock}, \code{my_unlock}
+unlocks it and they are called in a sequence from \code{fun}.
+If we analyzed \code{my_lock} and \code{my_unlock} alone, we would receive two
+invalid reports. First, that \code{my_lock} is left with \code{some_lock}
+still held. Second, unlock of an unlocked lock in \code{my_unlock}. But when
+all three are analyzed together, no such report is generated. This drags in
+the need of more complex analyses which look at code from a higher level.
+
+\item[External Dependencies] Large projects tend to use some external library
+very heavily, e.g.\ for reusability purposes. So to have a complete analysis
+these libraries have to be analyzed too. But there is a slight problem when
+the libraries are written in a different language. The analyzer still can be
+taught to understand that. But it can be worse, when no sources are available
+at all.  There are still some possible solutions. First, we can develop an
+analyzer working on the binary level where no sources are needed. This was
+demonstrated in \textsc{Sage}~\cite{sage} for example. Second, we can ignore
+calls to unknown code. But we lose precision of course. Finally, we can solely
+aim at projects that are self-contained. They do not depend on any other code.
+These are kernels of operating systems for example.
+
+\item[Wide Range of Properties] Large projects usually contain diverse parts,
+which contain a handful variety of errors. Not necessarily, but analyzers are
+desired to report as many various reports as possible during a single run.
+Even if a project is highly specialized, i.e.\ there is some class of errors
+missing, the tools still should find some other classes of errors. Running
+several tools is possible and often performed, but it is much easier to run a
+single tool which covers more error types.
+
+\item[No Manual Annotations] Annotations are used sometimes to suppress
+invalid reports from the output. They give clues to the analyzer about the
+code which is analyzed. But unlike code of smaller projects, code of large
+projects cannot be annotated manually. First, because nobody really knows all
+interactions fully as the projects are usually developed by independent groups
+of people.  Second, it is not trivial to annotate such a large project
+manually. The burden posed on developers would be unbearable.
+
+\item[Concurrency] It is of high probability, that large projects support
+creation of threads which can run in parallel. This adds another class of
+errors to them: concurrency errors. These are errors that result from an
+unexpected scheduling of threads, mostly because invalid or missing critical
+sections (locking).  Many checked properties like invalid pointer dereferences
+do not necessarily need to be thread-aware. But tracking complex locking
+errors or deadlocks using code analysis needs an analyser, that can handle
+threads creation and scheduling of processes.
+
+\item[Complex Environment] Usually, implementations of projects run in an
+environment that is somehow initialized. It is a running kernel which serves
+system calls, disk content, input of a user, etc. The larger a project, the
+more complex environment. Analyzers have to cope with that, usually by
+modelling the environment. But it is not an easy task.  If modelled
+incorrectly, especially precise analyzers relying on the precision would
+produce invalid reports.
+
+\end{description}
+
+There are perhaps more requirements like those listed above, we tried to list
+especially the important ones.  We can sum up with an overall view: the
+analyzers have to be as much precise as possible, without much user
+intervention, but still reasonably fast to finish the analysis in the
+foreseeable future. A research and implementation of such an analyzer is
+indeed a challenge!
 
 \subsection{Picking the Project}
-There exist hundreds of software projects of large size which we could
-consider for our purposes. Let us first divide the projects roughly into two
-categories. According to the design of operating systems there are two basic
-privilege levels applications run in~\cite[pages 21--23]{os_concepts}.
-Kernels of the operating systems often run at the level with no limitations,
-i.e.~in the \emph{kernel mode}.  There, the kernel can touch any memory in a
-machine and can also change other possible resources the kernel is able to
-reach. User space programs on the other hand tend to be restricted, i.e.~they
-run in the \emph{user mode}. There, a process cannot change any system
-resource or memory of others, if not explicitly allowed to, e.g.~by shared
-memory~\cite[pages 124--126]{os_concepts} or special system calls~\cite[pages
-62--73]{os_concepts}.  In particular, whether some code runs in the kernel or
-user mode has a direct impact on the effect caused by a potential error in the
-code. A crash of the kernel means the machine cease production any new
-actions, whereas a crash of a user space application causes mostly only pain
-to its user.  So at the first glance it looks like we should specifically aim
-at kernels of operating systems. But think about a vulnerability in a random
-web browser or database system (which consist of millions lines of code too).
-It could indeed lead to stolen user's personal data or even money from their
-bank accounts. The same as a problem in the kernel.
+Since this thesis wants to deal with analysis of large projects, we have to
+select some project for those purposes.  There exist hundreds of software
+projects of large size which we could consider. Let us first divide the
+projects roughly into two categories.  According to the design of operating
+systems there are two basic privilege levels in which programs run~\cite[pages
+21--23]{os_concepts}.  Kernels of the operating systems often run at the level
+with no limitations, i.e.\ in the \emph{kernel mode}.  There, the kernel can
+touch any memory in a machine and can also change other possible reachable
+resources.  On the other hand, user space programs tend to be restricted,
+i.e.~they run in the \emph{user mode}. There, a process cannot change any
+system resource or memory of others, if not explicitly allowed to, e.g.~by
+shared memory~\cite[pages 124--126]{os_concepts} or special system
+calls~\cite[pages 62--73]{os_concepts}.  In particular, whether some code runs
+in the kernel or user mode has a direct impact on the effect caused by a
+potential error in the code. A crash of the kernel means that the machine
+ceases production any further actions, whereas a crash of a user space
+application causes mostly only pain to its user.
 
-On the other hand operating system kernels should generally be error-free more
-than the others, because even a minor error would allow an arbitrary attacker
-to obtain administrator privileges on a machine running such a vulnerable
-system, or simply crash it. For a \emph{denial of service} (DoS)~\cite{dos}
-caused by a crash, it sometimes suffices to write a ``killer'' string to a
-special file locally or even send a packet with a specific structure over the
-network. Note the attacker can do it remotely from a place thousands miles
-away.  Instances of such errors were already reported~\cite{exploit_vmsplice,
-exploit_proto_ops, exploit_userns}\cite[page 256]{hacking}, and more to be
-found in the National Vulnerability Database~\cite{nvd}. If the attacker
-succeeds beyond crashing a machine and is able to get a login there, they are
-very close to stealing whatever data they want from that machine since it is
-much easier to gain an administrator shell when logged on as a casual user
-already.  Sometimes simply because remote administrator logins are not
-allowed. And yet it is often easier to gain an access to other machines in the
-same subnetwork than attacking them from the outside. One of the reasons is
-that there are usually no managed firewalls for the traffic flowing among
-computers inside the subnetwork~\cite{insider_attack}.
+At the first glance it looks like we should specifically aim at kernels of
+operating systems. But think about a vulnerability in a random web browser or
+database system.  It could indeed lead to stolen user's personal data or even
+money from their bank accounts. The same as a problem in the kernel. And such
+projects consist of millions lines of code too. But operating system kernels
+should generally be error-free more than user space programs, because even a
+minor error would allow an arbitrary attacker to obtain administrator
+privileges on a machine running such a vulnerable system, or simply crash it.
+For a \emph{denial of service} (DoS)~\cite{dos} caused by a crash, it
+sometimes suffices to write a ``killer'' string to a special file locally or
+even send a packet with a specific structure over the network. Note the
+attacker can do it remotely from a place thousands miles away.  Instances of
+such errors were already reported to the Linux kernel
+developers~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}, in a
+book about hacking~\cite[page 256]{hacking}, and more to be found in the
+National Vulnerability Database~\cite{nvd}. If the attacker succeeds beyond
+crashing a machine and is able to get a login there, they are very close to
+stealing whatever data they want from that machine since it is much easier to
+gain an administrator shell when logged on as a casual user already (sometimes
+simply because remote administrator logins are not allowed). And yet it is
+often easier to gain an access to other machines in the same subnetwork than
+attacking them from the outside. One of the reasons is that there are usually
+no managed firewalls for the traffic flowing among computers inside the
+subnetwork~\cite{insider_attack}.
 
 The arguments stated above persuaded us to aim at operating system kernels.
 But we can choose from many. There are kernels of BSDs (NetBSD, FreeBSD,
@@ -228,19 +334,23 @@ OS, Solaris, Windows, and many others. Nonetheless, we limited ourselves to
 the Linux kernel. The main reasons are that the kernel:
 \begin{itemize}
 \item is an open source,
+
 \item is a large code base consisting of more than fifteen millions lines of
 code (version 3.10),
-\item is developed so fast that each version released every 2--3 months
+
+\item is developed so fast that each version released every two--three months
 contains over 700'000 changed lines of code which are across more than eleven
 thousand files (averaged for all releases between 3.5 and 3.10), and
+
 \item is used widely, reportedly on 42\,\% of consumer computing
 devices in 2012~\cite{linux_42_percent}.
+
 \end{itemize}
-Aside from the aspects of large projects stated above, the Linux kernel has
-another positive aspect like it is self-contained code.  And yet there is the
-author of this thesis who is always biased when choosing a project for
-checking. He constantly spends some time by Linux kernel development, so he
-knows the processes and has some considerable knowledge about the code too.
+Let us emphasize that the Linux kernel, the same as other kernels, has another
+positive aspect: it is self-contained.  And there is still the author of this
+thesis who is always biased when choosing a project for code analysis. He
+constantly spends some time by Linux kernel development, so he knows the
+processes and has some considerable knowledge about the code too.
 
 \section{Background}
 This section introduces the reader into the terms we use throughout the
@@ -341,7 +451,7 @@ void fun2(void) {
 \end{lstlisting}
 \end{tabular}
 \end{center}
-\caption{Code used for demonstration of analyses sensitivity}
+\caption{Code used for demonstration of analyses sensitivity.}
 \label{fig:lst_sens}
 \end{figure}
 Given the example, we describe the following three basic properties which we
