@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{II.}
-\date{27. 9. 2012}
+\date{24. 9. 2013}
 
 \begin{document}
 
@@ -15,37 +15,36 @@
 
 \begin{frame}
   \frametitle{Důležité informace}
+
   \begin{itemize}
+
   \item Kolokvium za DÚ
   \begin{itemize}
   \item DÚ do příštího cvičení
   \end{itemize}
+
   \item Login/heslo
   \begin{itemize}
   \item vyvoj/vyvoj
   \end{itemize}
-  \item GIT: \texttt{git://github.com/jirislaby/pb173.git}
+
+  \item GIT: \url{http://github.com/jirislaby/pb173}
   \begin{itemize}
-  \item \texttt{git pull -\,-rebase}
+  \item \cmd{git pull --rebase}
   \end{itemize}
-  \item Qemu obraz: \texttt{/home/local/centos.img}
-  \begin{itemize}
-  \item 2 účty: root/toor, user/user
-  \item \texttt{./qemu\_start} z GITu
-  \end{itemize}
+
+  \item Studijní materiály v \href{https://is.muni.cz/auth/el/1433/podzim2013/PB173/index.qwarp?prejit=2957735}{\nolinkurl{ISu}}
+
+%  \item Qemu obraz: \texttt{/home/local/centos.img}
+%  \begin{itemize}
+%  \item 2 účty: root/toor, user/user
+%  \item \texttt{./qemu\_start} z GITu
+%  \end{itemize}
   \end{itemize}
 \end{frame}
 
-\begin{frame}
-  \frametitle{Dnešní téma}
-
-  {\Large
-  \begin{center}
-  \heading{Komunikace\\ jádro $\leftrightarrow$ uživatelský prostor}
-  \end{center}
-  }
-
-\end{frame}
+\part{Komunikace jádro $\leftrightarrow$ uživatelský prostor}
+\frame{\partpage}
 
 \begin{frame}
   \frametitle{Komunikace I.}
@@ -53,24 +52,24 @@
   \item Voláním funkce: system call (syscall)
   \pause
   \begin{itemize}
-  \item Skok do jádra speciální instrukcí (x86\_64: \texttt{syscall})
+  \item Skok do jádra speciální instrukcí (x86\_64: \code{syscall})
     \begin{itemize}
-    \item O skok se stará libc (\texttt{fwrite}$\rightarrow$\texttt{write}$\rightarrow$\texttt{syscall}$\rightarrow$instrukce)
+    \item O skok se stará libc (\code{fwrite}$\rightarrow$\code{write}$\rightarrow$\code{syscall}$\rightarrow$instrukce)
     \item Drahá operace (přepnutí kontextu)
     \end{itemize}
   \item Do registru se uloží číslo operace
     \begin{itemize}
     \item V jádře: tabulka číslo-funkce
     \end{itemize}
-  \item \texttt{syscall(\_\_NR\_fork)}
-  \item Demo: lxr $\rightarrow$ \texttt{\_\_NR\_fork}; příklady
+  \item \code{syscall(__NR_fork)}
+  \item Demo: lxr $\rightarrow$ \code{__NR_fork}; příklady
   \end{itemize}
 
   \pause
 
   \item Speciální syscall
   \begin{itemize}
-  \item \texttt{vdso.so}
+  \item \file{vdso.so}
   \end{itemize}
   \end{enumerate}
 
@@ -85,16 +84,16 @@
 
 \begin{frame}
   \frametitle{Úkol}
-  \heading{V userspace: pomocí \texttt{syscall} vypsat nějakou informaci}
+  \heading{V userspace: pomocí \code{syscall} vypsat nějakou informaci}
   \begin{enumerate}
-  \item \texttt{syscall} a \texttt{\_\_NR\_write}
+  \item \code{syscall} a \code{__NR_write}
   \end{enumerate}
 
   \medskip
 
   Je třeba znát prototypy funkcí.
   \begin{itemize}
-  \item Většinou jsou dokumentované: \texttt{man write}
+  \item Většinou jsou dokumentované: \cmd{man write}
   \item Jinak použít lxr
   \end{itemize}
 
@@ -104,13 +103,13 @@
   \frametitle{Komunikace II.}
   \begin{enumerate}
   \setcounter{enumi}{2}
-  \item Speciální soubory v \texttt{/dev}
+  \item Speciální soubory v \file{/dev}
   \begin{itemize}
   \item Komunikace přes soubor (není nutný nový syscall)
-  \item Seznam v \doc{Documentation/devices.txt} a \texttt{/proc/devices}
+  \item Seznam v \doc{Documentation/devices.txt} a \file{/proc/devices}
   \item Identifikované jako major a minor čísla
     \begin{itemize}
-    \item Většinou major=ovladač, minor=zařízení (tty: 4, 0-63)
+    \item Většinou major=ovladač, minor=zařízení (tty: 4, 0--63)
     \end{itemize}
   \item Blokové (disky apod.)
     \begin{itemize}
@@ -126,91 +125,38 @@
 
   \pause
 
-  \item Sockety, roury, \ldots
+  \item Sockety, roury, \dots
   \end{enumerate}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Znaková zařízení I.}
-  \begin{itemize}
-  \item LDD3 3. a 6. kapitola
-  \item 2-3 kroky
-  \begin{enumerate}
-  \item Registrace rozsahu major+minor (v \texttt{module\_init})
-    \begin{itemize}
-    \item \texttt{alloc\_chrdev\_region}, \texttt{register\_chrdev\_region},
-      \texttt{unregister\_chrdev\_region} (\header{linux/fs.h})
-    \item Přidání záznamu do \texttt{/proc/devices}
-    \end{itemize}
-  \pause
-  \item Registrace jednotlivých minorů (při objevení zařízení)
-    \begin{itemize}
-    \item \texttt{cdev\_add}, \texttt{cdev\_del} (\header{linux/cdev.h})
-    \item Po odpovídajícím \texttt{mknod} lze zařízení používat
-    \end{itemize}
-  \pause
-  \item Podat zprávu \texttt{udev} (vytvoření \texttt{/dev/*}) -- nepovinné
-    \begin{itemize}
-    \item \texttt{device\_create}, \texttt{device\_destroy}
-      (\header{linux/device.h})
-    \item Předem je potřeba vytvořit \texttt{class} (\texttt{module\_init})
-    \end{itemize}
-  \end{enumerate}
-
-%  \pause
-
-%  \item Implementuje \texttt{open}, \texttt{close}, \texttt{read},
-%    \texttt{write}, \texttt{ioctl}, \texttt{mmap}, \ldots
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Znaková zařízení II.}
-  \heading{Misc vrstva} \\
-  Stačí-li 1 zařízení (1 minor), lze použít vrstvu \texttt{misc}
-  \begin{itemize}
-  \item Dělá všechnu práci z předchozího slidu
-  \item Potřebujeme
-    \begin{itemize}
-    \item Definici misc zařízení (\texttt{struct miscdevice})
-    \item Seznam implementovaných funkcí (např. \texttt{open}, \texttt{read}
-    apod.)
-    \end{itemize}
-  \item \texttt{misc\_register}, \texttt{misc\_deregister}
-  \item Objeví se v \texttt{/proc/misc} a \texttt{/dev}
-  \item \header{linux/miscdevice.h}
-  \end{itemize}
-
-\end{frame}
+\part{Znaková zařízení}
+\frame{\partpage}
 
 \begin{frame}[fragile]
   \frametitle{Obsluhované funkce}
 
-  \heading{Seznam implementovaných funkcí}
+  \code{struct file_operations} (\header{linux/fs.h})
   \begin{itemize}
   \item Funkce jako:
-  \begin{lstlisting}[language=C]
-ssize_t (*write)(struct file *filp, const char __user *buf, size_t count, loff_t *offp)
+  \begin{lstlisting}
+ssize_t (*write)(struct file *file, const char __user *buf, size_t count, loff_t *offp)
   \end{lstlisting}
-
-  \item \texttt{struct file\_operations} (\header{linux/fs.h})
-  \item Parametr pro \texttt{cdev\_add}, součást \texttt{miscdevice} apod.
 
   \pause
 
-  \item \texttt{filp->private\_data} slouží programátorovi (libovolně)
-  \item \texttt{offp} slouží programátorovi (k poznamenání průběhu)
-  \item \texttt{\_\_user} značí ukazatel od uživatele (tomu nevěříme)
+  \item \code{file->private\_data} slouží programátorovi (libovolně)
+  \item \code{offp} slouží programátorovi (k poznamenání průběhu)
+  \item \code{\_\_user} značí ukazatel od uživatele (tomu nevěříme)
 
   \pause
 
   \item Návratové hodnoty
   \begin{itemize}
-  \item \texttt{int} -- záporné = \texttt{-Echyba}, jinak 0
-  \item \texttt{ssize\_t} -- záporné = \texttt{-Echyba}, jinak počet
-    zpracovaných znaků
+    \item \code{int} -- záporné = \texttt{-Echyba}, jinak 0
+    \item \code{ssize\_t} -- záporné = \texttt{-Echyba}, jinak počet
+      zpracovaných znaků
+    \item Vždy podle standardu (např.\ POSIX)
   \end{itemize}
   \end{itemize}
 \end{frame}
@@ -221,25 +167,26 @@ ssize_t (*write)(struct file *filp, const char __user *buf, size_t count, loff_t
   \begin{enumerate}
   \item Najděte všechny možné funkce, které lze obsluhovat
   \begin{itemize}
-  \item Najděte \texttt{struct file\_operations} v lxr
-  \item Projděte strukturu
+    \item Najděte \code{struct file_operations} v lxr
+    \item Projděte strukturu
   \end{itemize}
+
   \item Najděte možné chybové návratové hodnoty
   \begin{itemize}
-  \item Najděte \texttt{EPERM} v lxr
-  \item Projděte ostatní
+    \item Najděte \code{EPERM} v lxr
+    \item Projděte ostatní
+    \item Podívejte se do \cmd{man write} na možné návratové hodnoty
   \end{itemize}
   \end{enumerate}
 \end{frame}
 
 \begin{frame}[fragile]
   \frametitle{Příklad operací}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct file_operations my_fops = {
   .owner = THIS_MODULE,
   .open = my_open,
   .write = my_write,
-  .release = my_release,
 };
 
 int my_open(struct inode *inode, struct file *filp) {
@@ -260,50 +207,163 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 \begin{frame}
   \frametitle{Úkol}
 
-  Vytvořit misc (znakové) zařízení s obsluhou \texttt{open}, \texttt{read},
-  \texttt{write}, \texttt{release} (tj. close).
+  \heading{Obsluha \code{open}, \code{read}, \code{write}, \code{release} (tj.
+    close)}
 
   \begin{enumerate}
-  \item Definice \texttt{struct file\_operations}
-  \item Vytvoření funkcí dle prototypu z \texttt{file\_operations} (lxr)
+  \item Definice \code{struct file_operations}
+  \item Vytvoření funkcí dle prototypu z \code{file_operations} (lxr)
   \begin{itemize}
-  \item Open a release s nějakým \texttt{printk}
-  \item Read a write prozatím prázdná těla
-  \item Open a release vracejí 0 (žádná chyba), read též (0 = EOF), write
-    \texttt{count} (zapsáno vše)
+    \item Open a release s nějakým \code{printk}
+    \item Read a write prozatím prázdná těla
+    \item Návratové hodnoty
+    \begin{itemize}
+      \item Open a release vracejí 0 (žádná chyba)
+      \item Read též (0 = EOF)
+      \item Write vrací \code{count} (zapsáno vše)
+    \end{itemize}
   \end{itemize}
-  \item Definice \texttt{struct miscdevice}
+  \end{enumerate}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Vytvoření znakového zařízení}
+
   \begin{itemize}
-  \item \texttt{minor = MISC\_DYNAMIC\_MINOR}, \texttt{name},
-    \texttt{fops}
+  \item LDD3 3. a 6. kapitola
+  \item 2--3 kroky
+
+  \begin{enumerate}
+  \item Registrace rozsahu major+minor (v \code{module_init})
+    \begin{itemize}
+    \item \code{alloc_chrdev_region}, \code{register_chrdev_region},
+      \code{unregister_chrdev_region} (\header{linux/fs.h})
+    \item Přidání záznamu do \file{/proc/devices}
+    \end{itemize}
+
+  \pause
+
+  \item Registrace jednotlivých minorů (při objevení zařízení)
+    \begin{itemize}
+    \item \code{cdev_init}, \code{cdev_add}, \code{cdev_del}
+      (\header{linux/cdev.h})
+    \item Parametr pro \code{cdev_init} je \code{struct file_operations}
+    \item Po odpovídajícím \cmd{mknod} lze zařízení používat
+    \end{itemize}
+
+  \pause
+
+  \item Podat zprávu \cmd{udev} (vytvoření \file{/dev/*}) -- nepovinné
+    \begin{itemize}
+    \item \code{device_create}, \code{device_destroy}
+      (\header{linux/device.h})
+    \item Předem je potřeba vytvořit \code{class} (\code{module_init})
+    \end{itemize}
+  \end{enumerate}
+
   \end{itemize}
-  \item \texttt{misc\_register/deregister} do \texttt{module\_init/exit}
-  \item \texttt{make}, \texttt{insmod}
-  \item Vyzkoušení \texttt{cat /dev/name} (\texttt{name} je z
-    \texttt{miscdevice})
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření znakového zařízení}
+  \begin{enumerate}
+  \item Globální \code{struct cdev}
+
+  \item V \code{module_init}
+  \begin{itemize}
+    \item \code{alloc_chrdev_region(&dev, 0, 1, "jmeno")}
+    \item Výpište \code{MAJOR(dev)} a \code{MINOR(dev)}
+    \item \code{cdev_init}
+    \item \code{cdev_add}
+  \end{itemize}
+
+  \item V \code{module_exit}
+  \begin{itemize}
+    \item \code{cdev_del}
+    \item \code{unregister_chrdev_region}
+  \end{itemize}
+
+  \item \cmd{insmod}
+  \item Ověřte vytvoření v \file{/proc/devices}
+  \item Podle výpisu shora: \cmd{mknod soubor c MAJ MIN}
+  \item Vyzkoušejte \cmd{cat soubor}
+
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Vytvoření znakového zařízení pomocí misc}
+
+  \heading{Misc vrstva}
+  \begin{itemize}
+  \item Stačí-li 1 minor
+  \item Dělá všechnu práci včetně volání \cmd{udev}
+
+  \pause
+
+  \item Potřebujeme
+    \begin{itemize}
+    \item Definici misc zařízení (\code{struct miscdevice})
+    \item Opět \code{struct file_operations}
+    \end{itemize}
+  \item \code{misc_register}, \code{misc_deregister}
+  \item Objeví se v \file{/proc/misc} a \file{/dev}
+  \item \header{linux/miscdevice.h}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvořit misc zařízení}
+  \begin{enumerate}
+  \item Definice \code{struct miscdevice}
+  \begin{itemize}
+    \item \code{minor = MISC_DYNAMIC_MINOR}
+    \item \code{name} -- jméno vytvářeného zařízení
+    \item \code{fops} -- předchozí
+  \end{itemize}
+  \item \code{misc_register/deregister} do \code{module_init/exit}
+  \item \cmd{insmod}
+  \item Ověřte vytvoření v \file{/proc/misc}
+  \item Vyzkoušejte \cmd{cat /dev/name} (\code{name} je shora)
   \end{enumerate}
 \end{frame}
 
 \begin{frame}
   \frametitle{Uživatelská paměť}
+
   \begin{itemize}
-  \item Něco, čemu nelze věřit (NULL, ukazatel to tabulek oprávnění, \ldots)
-  \item Nutnost kontroly
-  \item \texttt{copy\_from\_user}, \texttt{copy\_to\_user}
+  \item Něco, čemu nelze věřit (NULL, ukazatel do tabulek oprávnění, \dots)
+  \item Nutnost kontroly \emph{POZOR}
+
+  \pause
+
+  \item \code{copy_from_user}, \code{copy_to_user}
   \begin{itemize}
-  \item ,,\texttt{memcpy}'' s kontrolou
-  \item Vracejí počet NEzkopírovaných znaků (0=OK)
+    \item ,,\code{memcpy}'' s kontrolou
+    \item Vracejí počet \emph{NEzkopírovaných} znaků (0 = OK)
   \end{itemize}
-  \item \texttt{get\_user}, \texttt{put\_user}
+
+  \pause
+
+  \item \code{get_user}, \code{put_user}
   \begin{itemize}
-  \item Jen primitiva (\texttt{char}, \texttt{short}, \texttt{int},
-    \texttt{long})
-  \item ,,\texttt{var = *(type *)buf}'' a ,,\texttt{*(type *)buf = var}'' s
-  kontrolou
-  \item Vracejí 0 nebo chybu (záporná hodnota)
+    \item Jen primitiva (\code{char}, \code{short}, \code{int},
+      \code{long})
+    \item ,,\code{var = *buf}'' a ,,\code{*buf = var}'' s kontrolou
+    \item Vracejí 0 nebo chybu (záporná hodnota)
   \end{itemize}
+
   \item Definované v \header{linux/uaccess.h}
   \end{itemize}
+
+  \pause
 
   Demo: pb173/02
 
@@ -312,19 +372,24 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 \begin{frame}
   \frametitle{Úkol}
 
-  Dopsat těla funkcí \texttt{read} a \texttt{write} tak, aby zpracovávala data.
+  \heading{Dopsat těla funkcí \code{read} a \code{write} tak, aby zpracovávala
+    data}
 
   \begin{enumerate}
-  \item \texttt{write} vypíše uživatelský buffer pomocí \texttt{printk}
+
+  \item \code{write} vypíše uživatelský buffer pomocí \code{printk}
   \begin{itemize}
-  \item \texttt{copy\_from\_user} (chyba = return -EFAULT)
-  \item Ukončit zkopírovaný řetězec pomocí \textbackslash 0
+    \item \code{copy_from_user} (při chybě \code{return -EFAULT})
+    \item Ukončit zkopírovaný řetězec použitím \code{\\0}
   \end{itemize}
-  \item \texttt{read} bude vracet "Ahoj"
+
+  \item \code{read} bude vracet ,,Ahoj''
   \begin{itemize}
-  \item \texttt{copy\_to\_user}
+    \item \code{copy\_to\_user}
   \end{itemize}
+
   \end{enumerate}
+
 \end{frame}
 
 \begin{frame}[fragile]
@@ -362,21 +427,21 @@ struct my {
 
   \begin{itemize}
   \item \header{linux/types.h}
-  \item \texttt{\_\_u8}, \texttt{\_\_u16}, \texttt{\_\_u32}, \texttt{\_\_u64}
-  \item \texttt{\_\_s8}, \texttt{\_\_s16}, \texttt{\_\_s32}, \texttt{\_\_s64}
-  \item Ukazatele musí být v union s \texttt{\_\_u64}
+  \item \code{__u8}, \code{__u16}, \code{__u32}, \code{__u64}
+  \item \code{__s8}, \code{__s16}, \code{__s32}, \code{__s64}
+  \item Ukazatele musí být v \code{union} s \code{__u64}
   \end{itemize}
 
   \begin{center}
   \begin{tabular}{ccc}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct bad {
   unsigned long flags;
   short index;
   void *data;
 } my;
   \end{lstlisting} & $\Rightarrow$ &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct good {
   __u64 flags;
   __s16 index;
@@ -388,7 +453,8 @@ struct good {
   \end{lstlisting}
   \end{tabular}
   \end{center}
-  \begin{lstlisting}[language=C]
+
+  \begin{lstlisting}[columns=fullflexible]
 read(fd, &my, sizeof(my));
 ioctl(fd, DO_SOMETHING, &my);
   \end{lstlisting}
