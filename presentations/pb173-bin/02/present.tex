@@ -1,0 +1,409 @@
+% vim: ai sw=2
+
+\input{../header.tex}
+
+\newcommand{\ant}{\textsc{Antlr}\xspace}
+
+\subtitle{II.}
+\date{24. 9. 2013}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Důležité informace}
+
+  \begin{itemize}
+
+  \item Kolokvium za DÚ
+  \begin{itemize}
+  \item DÚ do příštího cvičení
+  \end{itemize}
+
+  \item Login/heslo
+  \begin{itemize}
+  \item vyvoj/vyvoj
+  \end{itemize}
+
+  \item GIT: \url{http://github.com/jirislaby/pb173-bin}
+  \begin{itemize}
+  \item \cmd{git pull --rebase}
+  \end{itemize}
+
+  \item Studijní materiály v \href{https://is.muni.cz/auth/el/1433/podzim2013/PB173/index.qwarp?prejit=2957736}{ISu}
+
+  \end{itemize}
+\end{frame}
+
+\part{Parsery}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Parsery}
+
+  \begin{itemize}
+  \item Analyzátor jazyka
+  \begin{itemize}
+    \item Přirozeného, \emph{programovacího}, \dots
+  \end{itemize}
+
+  \item Výstupem je nějaký lepší popis jazyka
+  \begin{itemize}
+    \item Např.\ informace v grafu nebo stromu
+    \item Několik mezifází, jak toho dosáhnout
+    \item Projdeme si na dalších slajdech
+  \end{itemize}
+
+  \pause
+
+  \item Získané informace se dále využijí
+  \begin{itemize}
+    \item K překladu do jiného jazyka (např.\ strojového)
+    \item K interpretaci
+    \item \dots
+  \end{itemize}
+
+  \item Detailněji o jazycích a parserech např.\ v ,,Dragon book''
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Výroba parseru}
+
+  \begin{itemize}
+
+  \item Ručně psané
+    \begin{itemize}
+    \item Rychlost parseru a explicita
+    \item \textsc{gcc} (Demo)
+    \end{itemize}
+
+  \pause
+  \medskip
+
+  \item Generované nástroji
+    \begin{itemize}
+    \item Rychlost napsání parseru a přehlednost
+    \item \textsc{Lex}+\textsc{Yacc}
+    \item \textsc{Flex}+\textsc{Bison}
+    \item \emph{\ant}
+    \item A další
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\ant}
+
+  \begin{itemize}
+  \item Nástroj ke generování parserů
+  \item Psaný v Javě
+  \item Vstup je LL(\textasteriskcentered) gramatika (shora-dolů, čitelná)
+
+  \item Generuje parsery do různých jazyků
+  \begin{itemize}
+    \item Java, C, C++, C\#, \dots
+    \item Podpora pro C jen ve verzi 3 (pro 4 se připravuje)
+  \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Stáhněte a zprovozněte si \ant 3}
+  \begin{enumerate}
+  \item \url{http://www.antlr3.org/download.html}
+    \begin{itemize}
+    \item Ukládejte do \file{pb173-bin/02/}
+    \item \textsc{AntlrWorks}: ,,Version 1.5''
+    \item \ant: ,,Complete \ant 3.5 Java binaries jar''
+    \end{itemize}
+
+  \item Knihovna pro C (\file{libantlr3c})
+    \begin{itemize}
+    \item RPM: \href{http://software.opensuse.org/package/libantlr3c2}{\nolinkurl{http://software.opensuse.org}}
+    \item Zdroje: \url{http://www.antlr3.org/download/C/}
+    \end{itemize}
+
+  \item Vyzkoušejte generovat \file{Parser.g} z \file{pb173-bin/02/test/}
+    \begin{itemize}
+    \item \cmd{make}
+    \end{itemize}
+
+  \item Pusťte jej
+    \begin{itemize}
+    \item \cmd{./parser test_input}
+    \item Změnte \file{test_input} a zkuste znovu
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Struktura parseru}
+
+  \input{parser.tex}
+
+  \begin{enumerate}
+  \item Lexikální analýza
+  \begin{itemize}
+  \item Převod sekvence znaků na sekvenci ,,tokenů''
+  \begin{itemize}
+    \item Např.\ ,,\code{int a}'' převede na ,,\code{KEYWORD:int ID:a}''
+  \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \item Syntaktická analýza
+  \begin{itemize}
+  \item Převod sekvence tokenů na strom\dots
+  \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Abstraktní syntaktický strom (AST)}
+
+  \begin{center}
+  \begin{tabular}{ccc}
+    \begin{lstlisting}[columns=fullflexible]
+  void fun(int a)
+  { /* comment */
+    int b = 0;
+    if (a)
+      b = 5;
+    a = 3 * b;
+  }
+    \end{lstlisting} & $\Rightarrow$ &
+    \begin{lstlisting}[columns=fullflexible]
+key:void id:fun LPAR key:int id:a RPAR
+LCUR
+  key:int id:b EQ num:0 SEMIC
+  key:if LPAR id:a RPAR
+    id:b EQ num:5 SEMIC
+  id:a EQ num:3 MULT id:b SEMIC
+RCUR
+    \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{center}
+    \tikzset{ast/.style={thick,draw,minimum size=5mm}}
+    \tikzset{ast_hl/.style={ast, bottom color=black!10, top color=black!10}}
+    \begin{tikzpicture}[level/.style={sibling distance = 2.5cm/#1,
+    level distance = 1cm}, font=\small]
+      \node [ast] {\code{fun}}
+	  child [sibling distance=1.8cm] { node [ast] {\code{void}} }
+	  child { node [ast_hl] {param}
+	    child { node [ast] {\code{int}} }
+	    child { node [ast] {\code{a}} }
+	  }
+	  child [sibling distance=4.5cm] { node [ast_hl] {body}
+	    child [sibling distance=2cm] { node [ast_hl] {decl}
+	      child [sibling distance=1.3cm] { node [ast] {\code{int}} }
+	      child { node [ast_hl] (L_1) {var}
+		child { node [ast] {\code{b}} }
+		child { node [ast] {\code{0}} }
+	      }
+	    }
+	    child [sibling distance=2cm] { node [ast] {\code{if}}
+	      child { node [ast] (L_2) {\code{a}} }
+	      child { node [ast] (L_3) {\code{=}}
+		child { node [ast] {\code{b}} }
+		child { node [ast] {\code{5}} }
+	      }
+	    }
+	    child [sibling distance=2cm] { node [ast] (L_4) {\code{=}}
+	      child { node [ast] {\code{a}} }
+	      child { node [ast] {\code{*}}
+		child { node [ast] {\code{3}} }
+		child { node [ast] {\code{b}} }
+	      }
+	    }
+	  }
+	  ;
+    \end{tikzpicture}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Analýzy v \ant}
+  
+  \heading{\ant obsahuje obě části v jednom souboru}
+  \begin{itemize}
+    \item 2 typy pravidel
+    \begin{itemize}
+      \item Počáteční velké písmeno -- lexikální
+      \item Počáteční malé písmeno -- syntaktická
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{lstlisting}[language=XML, columns=fullflexible]
+helloWorld
+  : AHOJ SVETE // 2 tokeny v jednom syntaktickem pravidle
+  | SVETE AHOJ { puts("Nepise se to obracene?"); }
+  ;
+
+AHOJ
+  : 'Ahoj' // vytvori token Ahoj z retezce "Ahoj"
+  ;
+
+SVETE
+  : 'Svete'
+  ;
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Formát \ant}
+
+  \heading{Formát celého souboru pro \ant}
+  \begin{lstlisting}[language=XML, columns=fullflexible]
+grammar Jmeno; // shoda s nazvem souboru
+options {
+  language = C; // vystupni jazyk parseru
+}
+tokens {
+  STATEMENT; // uvidime dale
+}
+@header{
+#define X	10
+  // vlozi se na zacatek generovaneho parseru
+}
+@members{
+  static void moje_funkce() { ... }
+  // vlozi se za hlavicku parseru
+}
+
+pravidlo1
+  : pravidlo2
+  | pravidlo3;
+...
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Akce v \ant}
+  \begin{enumerate}
+  \item Dopište akce pro obě pravidla \code{helloWorld} v \file{test/Parser.g}
+  \item Vyzkoušejte oba vstupy
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Tvorba AST}
+
+  \begin{itemize}
+    \item Do \code{options}: \code{ASTLabelType = pANTLR3_BASE_TREE;}
+    \item Speciální přepisovací syntaktická pravidla
+    \begin{itemize}
+      \item Explicitně: \code{pravidlo -> uzel_stromu}
+      \item Implicitně: \code{pravidlo} (vytvoří uzel \code{pravidlo})
+      \item \code{^} -- kořen (pod)stromu
+      \item \code{!} -- nevkládat do stromu
+    \end{itemize}
+  \end{itemize}
+
+  \begin{lstlisting}[language=XML, columns=fullflexible]
+statement
+  : expression ';'!
+  | e1=expression '+' e2=expression ';' -> ^(BINARY_OP '+' e1 e2)
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Dopište tvorbu stromu do gramatiky \file{test/Parser.g}}
+  \begin{enumerate}
+  \item Definujte tokeny \code{A} a \code{S}
+    \begin{itemize}
+    \item V sekci \code{tokens}
+    \end{itemize}
+
+  \item Vytvořte explicitně podstrom v \code{helloWorld}
+    \begin{itemize}
+    \item \code{AHOJ} přepište na \code{A}
+    \item \code{SVETE} přepište na \code{S}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Co s AST?}
+
+  \begin{itemize}
+    \item Vypsat
+    \begin{itemize}
+      \item \code{puts((char *)parseTree.tree-> toStringTree(parseTree.tree)->chars);}
+    \end{itemize}
+
+    \pause
+
+    \item Vytvořit další soubor s gramatikou (stromovou)
+      \begin{itemize}
+	\item Načte AST
+	\item Provádí akce na podstromech
+	\begin{itemize}
+	  \item Interpretuje je
+	  \item Překládá
+	  \item Vytváří graf toku řízení
+	  \item \dots
+	\end{itemize}
+
+	\pause
+
+	\item \code{tree grammar JmenoAST;} v hlavičce
+	\item \code{tokenVocab = JmenoGramatiky;} v \code{options}
+
+	\pause
+
+	\item Pravidla podle generovaných: \code{^(BINARY_OP '+' e1 e2)}
+	\item Za nimi akce: \code{\{ printf("\\\%s + \\\%s\\n", \$e1.text->chars, \$e2.text->chars);\ \}}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Napište stromovou gramatiku pro \file{test/Parser.g}}
+  \begin{enumerate}
+  \item A vypište si ke každému pravidlu jeho jednotlivé části
+    \begin{itemize}
+    \item \code{text->chars}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
+
