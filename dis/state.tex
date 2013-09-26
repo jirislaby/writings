@@ -1,37 +1,43 @@
 % vim: textwidth=78 ai spell spelllang=en filetype=tex sw=2
 
 \chapter{State of the Art}\label{sec:state}
-This section is describes the current state of the art of the code analysis.
-We especially describe techniques which are referred to later in the text.  In
+This section describes the current state of the art of the code analysis.  We
+especially describe techniques which are referred to later in the text.  In
 this overview we mostly limit ourselves to analyzers of C code.
 
 \paragraph{Static Analysis} In our understanding, the term \emph{static
 analysis} is analyzing code without directly executing it on a processor.
-In other words to perform exactly the opposite of the dynamic analysis where a
+In other words, it performs exactly the opposite of the dynamic analysis where a
 program is executed and either automatically fed by some input in some form or
-tested manually by testers. This approach has the nice side-effect that the
-implementation need not be finished when we want to analyze it statically.  So
-the static analysis is not as limited as the dynamic one, it can be used
-whenever we want in the development cycle. Static analysis is thus used in
-several fields of the computer science.
+tested manually by testers. The static analysis approach has a nice
+side-effect that a checked program need not be finished when we want to
+analyze it statically.  So the static analysis is not as limited as the
+dynamic one, it can be used whenever we want in the development cycle. Static
+analysis is standardly used in several fields of the computer science aside
+from the code checking:
 \begin{itemize}
-\item \emph{Optimizing compilers} can eliminate unused code, propagate
-constants where variables would have to be left otherwise, or remove
-implicitly added runtime out-of-bounds checks from the code if it knows the
-bounds (as it happens in Java).
-\item \emph{Debuggers} can limit themselves only to code that is relevant to
-variables a programmer is interested in, or print possible sources of the
-value currently stored in a tracked variable.
-\item \emph{Program tests} can be generated based on the analysis
-of a program to cover more code paths.
-\item \emph{Static analyzers} can exist in the first place of course.
+\item \emph{Optimizing compilers} use results of the static analysis to
+eliminate unused code, propagate constants where variables would have to be
+used otherwise, or to remove implicitly added runtime out-of-bounds checks if
+the compiler knows that the bounds are never exceeded (this is implemented in
+a Java compiler).
+
+\item \emph{Debuggers} use results of the static analysis to limit themselves
+only to code that is relevant to variables a programmer is interested in.
+Debuggers can also print possible sources of the value currently stored in a
+tracked variable for example.
+
+\item \emph{Program tests} can be generated using the static analysis to cover
+more code. The analysis can establish some knowledge about the code and help
+to find inputs that exercise more code.
+
 \end{itemize}
 
-Moreover if the static analysis is well-defined according to some rules
+Moreover, if the static analysis is well-defined according to some rules
 defined e.g.\ by Cousot's framework~\cite{cousot} described later, we are able
 to decide whether the analysis is sound, complete, and whether it terminates.
 This is useful for example when building an optimizing compiler to prove it
-does not generate invalid code, i.e.\ it is sound.
+does not generate invalid code.
 
 %the most ready/useful\todo{XXX}
 
@@ -41,17 +47,17 @@ does not generate invalid code, i.e.\ it is sound.
 The simplest automatic analysis we can think of is to find some predefined
 patterns in code of a program.  We can take an instance of a regular
 expression pattern matcher like \texttt{grep}, give it a pattern ``/ 0'' and
-see if we did zero division error somewhere in the code. However this
-primitive approach may be a source of false reports. This happens when
-developers comment their code with comments similar to ``/ 0 happened here''.
-But there of course exist more robust techniques based on pattern matching.
-They, in some way, parse the code (which also removes the problem with the
-comments like the above) and do pattern matching on some internal
-structure. If we recall the abstract syntax tree from
-Figure~\ref{fig:intro_parsing_ast}, we can design a checker which would
-match AST subtrees for instance. Then to match division by zero errors, we
-simply try to find a subtree in an AST like of Figure~\ref{fig:ast_to_match}.
-The left leaf is left intentionally blank to express a wildcard.
+see if we did a primitive zero division error somewhere in the code. But this
+approach may be a source of false reports. This happens when developers
+comment their code with comments similar to ``/ 0 happened here''.  But there
+of course exist more robust techniques based on pattern matching.  They, in
+some way, parse the code (which also removes the problem with the comments
+like the one above) and do pattern matching on some internal structure. If we
+recall the abstract syntax tree from Figure~\ref{fig:intro_parsing_ast}, we
+can design a checker which would match AST subtrees for instance. Then to
+match division by zero errors, we simply try to find a subtree in an AST like
+of Figure~\ref{fig:ast_to_match}.  The left leaf is left intentionally blank
+to express a wildcard.
 \begin{figure}[h]
 \begin{center}
     \begin{tikzpicture}[level/.style={sibling distance = 1cm/#1,
@@ -62,7 +68,7 @@ The left leaf is left intentionally blank to express a wildcard.
 	  ;
     \end{tikzpicture}
 \end{center}
-    \caption{Subtree of an AST to match for division by zero.}
+    \caption{A subtree of an AST to match for a primitive division by zero.}
   \label{fig:ast_to_match}
 \end{figure}
 
@@ -74,18 +80,18 @@ and precision. It is able to prioritize the reports according to their weight
 so that it usually puts real errors on the top of the list in favor of false
 reports.
 
-\textsc{Coccinelle}~\cite{coccinelle} is another pattern matcher, better to
-write a semantic patcher. It uses a special language SmPL for declaring a
-semantic patch. It is utilized for matching against control flow graph nodes
-and changing them arbitrarily. The graph is then converted back to source
-code.  \textsc{Coccinelle} is used mainly for modifying code to use newer
-interfaces like replacing two calls to \code{kmalloc} and \code{memset}
-functions by a single call to \code{kzalloc} which does the same as the two
-together.  Since it is able to match the control flow graph, it can be used
-for error pattern matching too~\cite{wysiwib}. As an example, we can pick
-missing checks for allocations: a call to an allocation function with no
-condition to check the return value afterwards. If such a call is found, it
-can be replaced by the allocation with the check.
+\textsc{Coccinelle}~\cite{coccinelle} is another pattern matcher. The authors
+call it rather a semantic patcher, because it can understand the semantics of
+the checked code. It uses a special language SmPL for declaring a semantic
+patch. The patch is utilized for matching against control flow graph nodes and
+changing them arbitrarily. The graph is then converted back to source code.
+\textsc{Coccinelle} is used mainly for modifying code to use newer interfaces
+like replacing two calls to \code{kmalloc} and \code{memset} functions by a
+single call to \code{kzalloc} which does the same as the two together.  Since
+it is able to match the control flow graph, it can be used for error pattern
+matching too~\cite{wysiwib}. As an example, we can pick missing checks for
+allocations: a call to an allocation function with no condition to check the
+return value afterwards.
 
 \section{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
@@ -195,25 +201,27 @@ D$ such that $f(x) = x$. The set $fp(f)$ of fixed points of $f$ is $\{x \in D
 
 \begin{table}[htb]
 \begin{center}
-\begin{tabular}{|c||c|c|c|c|c|c|} \hline
-\multirow{2}{*}{\textbf{Equation}} &
-  \multicolumn{6}{c|}{\textbf{Fixed Point Iteration}} \\ \cline{2-7}
-& 1 & 2 & 3 & 4 & 5 & 6 \\ \hline\hline
+\begin{tabular}{|c||c|c|c|c|c|c|c|} \hline
+\multirow{2}{2.7em}{\textbf{Equa\-tion}} &
+  \multicolumn{7}{c|}{\textbf{Iterations of Fixed Point Computation}}
+  \\ \cline{2-8}
+& 1 & 2 & 3 & 4 & 5 & 6 & 7 (fixed) \\ \hline\hline
 $f_0$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\emptyset$ &
-  $\emptyset$ \\ \hline
-$f_1$ & $\emptyset$ & $\{1\}$ & $\{1\}$ & $\{1\}$ & $\{1\}$ & $\{1\}$\\ \hline
+  $\emptyset$ & $\emptyset$ \\ \hline
+$f_1$ & $\emptyset$ & $\{1\}$ & $\{1\}$ & $\{1\}$ & $\{1\}$ & $\{1\}$ &
+  $\{1\}$ \\ \hline
 $f_2$ & $\emptyset$ & $\{2\}$ & $\{1,2\}$ & $\{1,2\}$ & $\{1,2\}$ &
-  $\{1,2\}$ \\ \hline
+  $\{1,2\}$ & $\{1,2\}$ \\ \hline
 $f_3$ & $\emptyset$ & $\emptyset$ & $\{2\}$ & $\{1,2,5\}$ & $\{1,2,4,5\}$ &
-  $\{1,2,4,5\}$ \\ \hline
+  $\{1,2,4,5\}$ & $\{1,2,4,5\}$ \\ \hline
 $f_4$ & $\emptyset$ & $\{4\}$ & $\{4\}$ & $\{2,4\}$ & $\{2,4,5\}$ &
-  $\{2,4,5\}$ \\ \hline
+  $\{2,4,5\}$ & $\{2,4,5\}$ \\ \hline
 $f_5$ & $\emptyset$ & $\{5\}$ & $\{4,5\}$ & $\{4,5\}$ & $\{4,5\}$ &
-  $\{4,5\}$ \\ \hline
+  $\{4,5\}$ & $\{4,5\}$ \\ \hline
 $f_6$ & $\emptyset$ & $\emptyset$ & $\{5\}$ & $\{4,5\}$ & $\{4,5\}$ &
-  $\{4,5\}$ \\ \hline
+  $\{4,5\}$ & $\{4,5\}$ \\ \hline
 $f_7$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\{2\}$ & $\{1,2,5\}$ &
-  $\{1,2,4,5\}$ \\ \hline
+  $\{1,2,4,5\}$ & $\{1,2,4,5\}$ \\ \hline
 \end{tabular}
 \end{center}
   \caption{Reaching definitions fixed point computation.}
