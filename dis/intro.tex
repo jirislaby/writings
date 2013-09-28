@@ -362,100 +362,126 @@ program. Finally, there is also a small introduction to the code parsing as we
 deal with source code in this thesis and the code needs to be parsed first.
 
 \subsection{Classes of Reports}\label{sec:intro_reports_cls}
-While code analyzers are finding errors in some project, they produce reports.
-Not all the reports are useful. Some of them tend to be invalid with respect
-to the specification. Imprecise analyses can report errors that are found in
-analyzed code, but will never occur when the code is really executed. The
-reports have to be somehow classified into the classes which we describe
-below.
+During code analysis of some project, code analyzers produce reports about
+found errors.  Not every report is equally useful. Some of the reports may be
+invalid with respect to some specified property which the analyzers try to
+verify in code. For example, imprecise static analyzers may flag a property
+violation somewhere in the analyzed code, but the property is never violated
+when the code is really executed. This led to a classification of the reports
+according to their usefulness. As we use the classification throughout the
+thesis, it is settled down below.
 
 \begin{itemize}
-\item \textbf{Errors} -- This is obviously a correct report. When a tool
-reports it and we conclude it can really happen in the analyzed code, we
-classify it as an error.
+\item \textbf{Errors} -- Reports in this category are useful. We put reports
+in this category, when we conclude that such a report is genuine and can
+really cause a problem in the analyzed code. It obviously requires a fix in
+the code.
 
-\item \textbf{False reports} -- This includes two classes which we describe
-below. Both of them are invalid and should be minimized in real code
-analyzers as they bother users. When we mean both of them, we use this term.
+\item \textbf{False reports} -- This category is further split into two
+classes which we describe below. Both of them are invalid and should be
+minimized in real code analyzers as they bother users. When we mean both
+classes in the thesis, we use the term \emph{false reports}.
 
 \begin{itemize}
-\item \textbf{False positives} -- This is an error reported by an analyzer,
-which can never happen when the analyzed code is really executed.
+\item \textbf{False positives} -- These are errors reported by an analyzer
+about a property violation, but it can never happen when the analyzed code is
+really executed. The analyzer should be tuned to not produce such reports.
 
-\item \textbf{False negatives} -- These are only imaginary reports as they do
-not exist. These are errors present in code which an analyzer left unnoticed,
-i.e.\ it missed real errors.
+\item \textbf{False negatives} -- These are only imaginary reports as they are
+not reported by analyzers. These are errors present in analyzed code which an
+analyzer left unnoticed even though they violate a specified property.
+Analyzers should be tuned to report as many property violations as possible
+(but not false positives).
 
 \end{itemize}
 
 \end{itemize}
 
 \subsection{Theoretical Properties}\label{sec:theor_props}
-Usually, the most important aspect for users of an analyzer is to know whether
-the produced output of the analyzer makes some sense according to what is
-expected, i.e.\ if the results are \emph{correct} (sometimes called
-\emph{sound}). Next, we usually care whether all possible errors are reported,
-i.e.\ whether the output is \emph{complete}. And perhaps if there will be any
-output in finite time at all, if the analyzer will \emph{terminate}. Below, we
-took the definitions over from Cousot et al.~\cite{soundness} and modified
-them for our needs. Furthermore, we provide examples of soundness and
-completeness in Table~\ref{fig:theor_props} for better understanding.
+Analyzers produce some reports to users. As we described in the previous
+section, the reports are classified to different categories. But it still
+remains to describe how we can recognize whether an analyzer produces reports
+in in the false categories or only reals errors. This information would be
+interesting for users to know which report categories are produced by their
+favourite checker. In this section, we define a few properties which
+characterize analyzers and mainly their analyses with respect to the specified
+(checked) properties. Note that these are not the only possible definitions of
+these terms. This is how we understand them in this thesis.
+
+\begin{figure}[tb]
+  \begin{center}
+    \tikzstyle{el_node}=[draw, ellipse, align=left]
+    \begin{tikzpicture}[node distance=8mm]
+      \node [el_node, fill=blue!10, minimum width=11.5cm,
+	minimum height=5cm] (EL1) {};
+      \node [below=0.8em of EL1.north] {Sound Analysis};
+
+      \node [el_node, fill=red!10, minimum width=8.5cm, minimum height=3.5cm,
+	xshift=-8mm, yshift=-3mm] (EL2) {};
+      \node [below=0.8em of EL2.north] {All Program Errors};
+
+      \node [el_node, fill=green!10, minimum width=5cm, minimum height=1.5cm,
+	xshift=-20mm, yshift=-6mm] (EL3) {Complete Analysis};
+
+      \node [circle, inner sep=0pt, minimum size=1.5mm, fill=black,
+	below left=4mm and 12mm of EL1.east] (FP) {};
+      \node [above=0.5mm of FP, align=center] {False \\ Positive};
+
+      \node [circle, inner sep=0pt, minimum size=1.5mm, fill=black,
+	below left=5mm and 15mm of EL2.east] (FN) {}
+	edge [dashed, >=stealth', <-] (EL3);
+      \node [above=0.5mm of FN, align=center] {False \\ Negative};
+    \end{tikzpicture}
+  \end{center}
+  \caption{Theoretical properties of analyzers demonstrated. There is also a
+    false positive of a complete analysis and a false positive of a sound
+    analysis.}
+  \label{fig:intro_theor_props}
+\end{figure}
 
 \begin{description}
 \item[Soundness]
-A program analyzer is sound when it can \emph{never} omit to signal an error
-that can appear at runtime in some execution environment. Sound analyzers are
-error eradicators since they find all bugs in a well-defined class (that of
-runtime errors). Unsound analyzers are only error finders aiming at finding
-some of the errors in the well-defined class. Their main defect is
-unreliability, being subject to false negatives thus claiming that they can no
-longer find any error while many may be left in the considered class.
+A program analyzer is \emph{sound} when it finds no error in a program and
+there is really none. In other words, it cannot omit to report an error that
+can appear at runtime in some execution environment. Since sound analyzers
+often over-approximate a checked property, they suffer from \emph{false
+positives}. On the other hand, since sound analyzers find all errors of a
+defined class, they are error eradicators.
 
 \item[Completeness]
-A static analyzer is complete when it \emph{never} produces false reports on
-any program. This terminology is justified by the fact that such an analyzer,
-when queried whether or not some true property holds on the program (for
-instance: ``the program never ends with an overflow''), will never issue an
-alarm. Never producing any report, or only a few definite ones, would be
-complete (but useless). So this completeness requirement should be understood
-in the context of soundness.
+A program analyzer is \emph{complete} when it never produces false positives.
+Complete analyzers are prone to missing errors, i.e.\ they produce \emph{false
+negatives}. So obviously, complete analyzers are also those which produce only
+a few definite reports or no reports at all. Although complete, these
+analyzers would be useless in practice. So complete analyzers should be
+understood in the context of soundness.
 
 \item[Termination]
-Some static analyzers are subject to non termination, running forever until
-exhaustion of resources. This is the case of model checking for
-example~\cite{soundness}.
+A program analyzer \emph{terminates} when it finishes computation in a finite
+time. A subject to non-termination is some form of simulation or the symbolic
+execution described in Section~\ref{sec:se} for example. When a program
+contains an endless loop, analyzers based on these two techniques simply run
+forever. As a side note, some definitions require complete analyzers to
+terminate.
 
 \end{description}
 
-\begin{table}[tb]
-\begin{center}
-\begin{tabular}{|l||c|c|c|} \hline
-\multicolumn{1}{|l||}{\multirow{2}{*}{\textbf{Code}}} &
-  \multicolumn{3}{c|}{\textbf{Value Analysis of \code{a}}} \\ \cline{2-4}
-  & \textbf{Sound} & \textbf{Complete} & \textbf{Sound and Complete} \\ \hline\hline
-\code{a = 1;}    & 1           & 1        & 1    \\ \hline
-\code{if (x)}    & 1           & 1        & 1    \\ \hline
-~~\code{a = 2;}  & 2           & 2        & 2    \\ \hline
-\code{return a;} & $\emptyset$ & 1, 2     & $((x = 0) \Rightarrow 1) \vee ((x
-					\neq 0) \Rightarrow 2)$  \\ \hline
-\end{tabular}
-\end{center}
-    \caption{Example to demonstrate soundness and completeness of analyzers.}
-  \label{fig:theor_props}
-\end{table}
+We provide an illustration of soundness and completeness in
+Figure~\ref{fig:intro_theor_props} for better understanding. We depict also a
+false negative of a complete (but unsound) analysis and a false positive of a
+sound (but incomplete) analysis.
 
-In an ideal world, we would have sound and complete analyzers. They would
-return only results without false positives and false negatives. But
-computation time of such analyzers tend to be high as well as memory
-consumption. This stems from the need of too much precise computation and
-precise results which would have to be stored somewhere. So it is very common
-to implement analyses that are only complete, but unsound. They report
-everything which is possibly an error, but sometimes, we have to await
-false positives. There also exist analyzers which are only sound, but
-incomplete, or the third option: analyzers that are neither sound, nor
-complete. The latter may help in reducing both false positives and false
-negatives for the price of potentially hiding errors, i.e.~adding
-false negatives.
+Ideally, we would have sound, complete and terminating analyzers. They would
+return only real errors with no false positives or negatives. But computation
+time as well as memory consumption of such analyzers tend to be high. This
+stems from the need of too much precise computation along with precise results
+which would have to be stored somewhere. So it is very common to use analyzers
+that are only terminating and sound, but incomplete. They report everything
+which is possibly an error, but often, we have to await false positives.
+Many analyzers are only terminating and complete, but unsound. They are
+precise, but do not find all errors. And finally, many commercial tools are
+terminating, but neither sound, nor complete. They are good at finding some
+errors without introducing many false positives.
 
 \subsection{Sensitivity of Analyzers}\label{sec:sensitivity}
 Another interesting property of many analyzers is how they are handling
