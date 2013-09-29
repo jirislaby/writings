@@ -95,26 +95,30 @@ return value afterwards.
 
 \section{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
-information about possible values of variables at specified points in code. We
-usually analyze each program line separately to see what are the effects of
-the line and then put this information to a transfer equation of what holds
-before and after the execution of the line. Next, we stabilize this set of of
-equations, usually by computing the least fixed point of the equations. Such
-computed analysis can be utilized for various code optimizations or code
-analysis.
+information about some data flowing through points in code. The data can be
+some information about values of variables, about statements etc. We usually
+analyze each program line separately to see what are the effects of the line
+and then put this information to a transfer equation. It describes relations
+between what holds before and after the execution of a particular line. Next,
+we stabilize this set of equations, usually by computing the fixed
+point of the equations. The fixed point is either the least or greatest
+solution to the equations, depending on the performed analysis. Data computed
+using the data-flow analysis can be utilized for various code optimizations or
+program analysis.
 
-Let us demonstrate data-flow analysis on an example and then generalize that
-approach. We chose one of the basic data-flow analyses: \emph{reaching
+Let us demonstrate the data-flow analysis on an example and then generalize
+that approach. We chose one of the basic data-flow analyses: \emph{reaching
 definitions}~\cite[Section 9.2.4]{dragon}. At some point $p$ in code, we are
-interested in all assignments where some variable $\var{a}$ was set and was
+interested in all assignments where some variable $\var{x}$ was set and was
 not re-set during the control flow to the point $p$. This lets us reason about
-many questions like whether a variable was set already before it is used or if
-we should report an uninitialized access. We will show the analysis on the
-code which is in the second column of Table~\ref{tab:state_df_eq}.
-Intuitively, the reaching definition set on line~\ref{lst:state_rd_ref} is a
-set of four labels $\{\ref{lst:state_rd_def1}, \ref{lst:state_rd_def2},
-\ref{lst:state_rd_def3}, \ref{lst:state_rd_def4}\}$, where we define \code{a}
-and \code{b}, because all of them can reach line~\ref{lst:state_rd_ref}.
+many questions like whether a variable can be replaced by a constant as an
+optimization.  We show the analysis on the code which is in the second
+column of Table~\ref{tab:state_df_eq}.  Intuitively, the reaching definition
+set on line~\ref{lst:state_rd_ref} is a set of four labels
+$\{\ref{lst:state_rd_def1},\, \ref{lst:state_rd_def2},\,
+\ref{lst:state_rd_def3},\, \ref{lst:state_rd_def4}\}$, where we define
+\code{a} and \code{b}, because all of those definitions can reach
+line~\ref{lst:state_rd_ref}.
 %Note that line~\ref{lst:reach_def0} does not belong there because \code{a}
 %was re-set later on both paths to line~\ref{lst:reach_use}.
 
@@ -122,18 +126,24 @@ Now we derive the information algorithmically using the data-flow analysis by
 constructing the transfer equations and computing their fixed point. In the
 case of the reaching definitions analysis, we can simply hold the definitions
 in the equations.  That is, initially at the beginning of a function, the
-equation there holds an empty set. Then this empty equation is gradually
-transformed according to statements and the definitions are filled in. Since
-we need to propagate information about definitions, the transfer equation
-mangles the contents coming from predecessors only on assignment statements.
-Other equations simply copy data from predecessors.  On assignments, the
-equation takes the set of statements from the predecessors, removes all
-statements that assign to the same variable and adds itself. If there are more
-predecessors, we use the set union as we want to propagate definitions from
-both branches. The transfer equation $f_s$ for each statement $s$ in the
-example of Table~\ref{tab:state_df_eq} are shown in the third column of the
-same table.
-\begin{table}[htb]
+equation there holds an empty set. Then this empty set is gradually
+transformed according to statements and the definitions are put into the set.
+Since we need to propagate information about definitions, there are two
+types of propagations:
+\begin{enumerate}
+\item On statements which are assignments, the contents of incoming sets is
+mangled. The equation takes the set of statements from the predecessors,
+removes all statements that assign to the same variable as the current
+assignment and adds itself. If there are more predecessors, we use the set
+union as we want to propagate definitions from both branches.
+
+\item Equations for other statements simply copy data from predecessors.
+
+\end{enumerate}
+We constructed the transfer equation $f_s$ for each statement $s$ in the
+example of Table~\ref{tab:state_df_eq}. They are shown in the third column of
+the same table.
+\begin{table}[tb]
 \begin{center}
 \begin{tabular}{|r|l||p{0.2em}lp{0.3em}r|} \hline
 \textbf{\footnotesize \#} &
@@ -179,27 +189,35 @@ $f_7$ & $= \emptyset$ & $\cup$ & $(f_3 \,\setminus\, \emptyset)$ \\ \hline
 
 \end{tabular}
 \end{center}
-  \caption{Reaching definitions data-flow analysis example.}
+  \caption{A reaching definitions data-flow analysis example.}
   \label{tab:state_df_eq}
 \end{table}
-The equation is of this form:
+We can notice, that every equation is of this form:
 \begin{equation*}
 f_s = gen_s \cup (pred_s \setminus kill_s)
 \end{equation*}
-$gen_s$ is the set $\{s\}$ that \emph{generates} $s$ if it is an
+where $gen_s$ is the set $\{s\}$ that \emph{generates} $s$ if it is an
 assignment, otherwise $gen_s$ is empty for that particular equation.  $pred_s$
-is a union of $f_{s-1}$ for each predecessor $s-1$.  Finally, if $s$ is an
+is a union of $f_{s'}$ for each predecessor $s'$.  Finally, if $s$ is an
 assignment to \code{x}, $kill_s$ is a set that contains other assignments to
-\code{x}.  Otherwise $kill_s$ is empty. Establishing a fixed point as defined
-in Definition~\ref{def:fixpoint} is shown in Table~\ref{tab:state_df_fp}.
+\code{x}.  Otherwise $kill_s$ is empty.
+
+Now, we would like to compute the least fixed point of the equation. We can
+use Definition~\ref{def:fixpoint} for that purpose, but we need a single
+composite function $F$. We achieve that by rewriting the transform equations
+to functions taking as parameters all others functions. For all $x \in [0,
+7]$, the functions look like $f_x=F_x(f_0,\, f_1,\, \dots,\, f_8)$. The
+composite function is then $F=\lambda x . (F_0(x),\, F_1(x),\, \dots,\,
+F_7(x))$. The fixed point computation for our example of
+Table~\ref{tab:state_df_eq} is shown in Table~\ref{tab:state_df_fp}.
 
 \begin{dfn}[Fixed point]\label{def:fixpoint}
-A \emph{fixed point} of a function $f : D \rightarrow D$ is an element $x \in
-D$ such that $f(x) = x$. The set $fp(f)$ of fixed points of $f$ is $\{x \in D
-\mid f(x) = x \}$.
+A \emph{fixed point} of a function $F : D \rightarrow D$ is an element $x \in
+D$ such that $F(x) = x$. The set $fp(f)$ of fixed points of $F$ is $\{x \in D
+\mid F(x) = x \}$.
 \end{dfn}
 
-\begin{table}[htb]
+\begin{table}[tb]
 \begin{center}
 \begin{tabular}{|c||c|c|c|c|c|c|c|} \hline
 \multirow{2}{2.7em}{\textbf{Equa\-tion}} &
@@ -224,12 +242,20 @@ $f_7$ & $\emptyset$ & $\emptyset$ & $\emptyset$ & $\{2\}$ & $\{1,2,5\}$ &
   $\{1,2,4,5\}$ & $\{1,2,4,5\}$ \\ \hline
 \end{tabular}
 \end{center}
-  \caption{Reaching definitions fixed point computation.}
+  \caption{The fixed point computation of reaching definitions for example of
+    Table~\ref{tab:state_df_eq}.}
   \label{tab:state_df_fp}
 \end{table}
 
-Now we generalize the approach. In the data-flow analysis, we have a pair of
-equations for each statement $s$ of a program:
+There is another requirement to ensure a fixed point exists and that some
+data-flow analysis finds one and terminates. The function $F$ has to be
+monotone and has to work on an ordered set, lattice in particular.  Since we
+have not defined lattices yet, this is described in more detail later in
+Section~\ref{sec:ai}. The requirement stems from works of Kleene~\cite[pages
+348--349]{kleene} and Tarski~\cite{tarski}.
+
+Now we generalize the approach of the data-flow analysis. In the data-flow
+analysis, we have a pair of equations for each statement $s$ of a program:
 \begin{equation} \label{eq:data_flow}
 \begin{aligned}
 out_s & = trans_s(in_s) \\
@@ -238,14 +264,14 @@ in_s & = join_{p\in pred_s}(out_p)
 \end{equation}
 We define a transfer function $trans_s$ to transform the input set $in_s$ of a
 statement $s$ to the output set $out_s$ according to the effect of $s$ in a
-particular analysis. The join operator $join$ takes output sets of all
-predecessors and combines them together. It is usually a set intersection or
-union depending whether the analysis is may or must (cf.\
-Section~\ref{sec:types_anal}). Further, whether an analysis is forwards or
-backwards (Section~\ref{sec:types_anal}), the $in$ set is bound to an incoming
-or outgoing control flow graph edge respectively. Analogously for the $out$
-set.  These two sets are the \emph{result} of the analysis before and after
-applying the effect of the statement.
+particular analysis. The join operator $join$ takes output sets from all
+previous nodes $pred_s$ and combines them together. The previous edges are
+either predecessors or successors, depending whether an analysis is forward or
+backward (Section~\ref{sec:types_anal}). For forward analysis, $in_s$ set is
+bound to an incoming control flow graph edge(s) of the node $s$ and $out_s$
+set to the outgoing one(s).  Other way round for a backward analysis. Further,
+$join$ is usually a set union or intersection depending whether the analysis
+is may or must (cf.\ Section~\ref{sec:types_anal}).
 
 For the reaching definitions example above, we define the join operator as
 the set union ($\bigcup$) and the transfer function in this notation to hold
@@ -260,8 +286,9 @@ gen_s & =
 \end{cases} \\
 kill_s & =
 \begin{cases}
-\{x \in S \mid x \text{ assigns to \code{a}} \} & s \text{ assigns to
-\code{a}} \\
+\{x \in S \mid x \text{ assigns to \code{a}} \} & s \text{ is an assignment}
+  \\
+& \text{(let } s \text{ assign to \code{a})} \\
 \emptyset & \text{otherwise}
 \end{cases} \\
 \end{align*}
@@ -290,7 +317,7 @@ These are the most known analyses which we believe the reader knows. If not,
 they are defined in every superior literature about compilers~\cite{dragon,
 muchnick}.
 
-The simplicity is also a reason, that the data-flow analysis is also used in
+The simplicity is also a reason, that the data-flow analysis is used in
 many tools including checkers.  The very common place of extensive use are
 compilers. Apart from generating code, they generate warnings or errors when
 some suspicious code is found. A good example is \clang~\cite{clang}. It is a
