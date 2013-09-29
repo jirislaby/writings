@@ -13,7 +13,7 @@ $(PROJ).dvi: $(PROJ).tex $(CHAPTERS_SRC) FORCE
 $(PROJ).tex: $(PROJ).bbl revision.txt
 
 revision.txt: FORCE
-	git rev-list --all . | wc -l >$@
+	git rev-list master . | wc -l >$@
 
 %.bbl: %.bib
 	latex $(patsubst %.bib,%.tex,$<)
