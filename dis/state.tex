@@ -205,8 +205,8 @@ assignment to \code{x}, $kill_s$ is a set that contains other assignments to
 Now, we would like to compute the least fixed point of the equation. We can
 use Definition~\ref{def:fixpoint} for that purpose, but we need a single
 composite function $F$. We achieve that by rewriting the transform equations
-to functions taking as parameters all others functions. For all $x \in [0,
-7]$, the functions look like $f_x=F_x(f_0,\, f_1,\, \dots,\, f_8)$. The
+to functions taking as parameters all others functions. For all statement
+labels $s$, the functions look like $f_s=F_s(f_0,\, f_1,\, \dots,\, f_8)$. The
 composite function is then $F=\lambda x . (F_0(x),\, F_1(x),\, \dots,\,
 F_7(x))$. The fixed point computation for our example of
 Table~\ref{tab:state_df_eq} is shown in Table~\ref{tab:state_df_fp}.
@@ -264,14 +264,15 @@ in_s & = join_{p\in pred_s}(out_p)
 \end{equation}
 We define a transfer function $trans_s$ to transform the input set $in_s$ of a
 statement $s$ to the output set $out_s$ according to the effect of $s$ in a
-particular analysis. The join operator $join$ takes output sets from all
+particular analysis.  The join operator $join$ takes output sets from all
 previous nodes $pred_s$ and combines them together. The previous edges are
 either predecessors or successors, depending whether an analysis is forward or
-backward (Section~\ref{sec:types_anal}). For forward analysis, $in_s$ set is
-bound to an incoming control flow graph edge(s) of the node $s$ and $out_s$
-set to the outgoing one(s).  Other way round for a backward analysis. Further,
-$join$ is usually a set union or intersection depending whether the analysis
-is may or must (cf.\ Section~\ref{sec:types_anal}).
+backward (Section~\ref{sec:types_anal}). For forward analysis, the $in_s$ set
+is bound to an incoming control flow graph edge(s) of the node $s$ and the
+$out_s$ set to the outgoing one(s).  Other way round for a backward analysis.
+Further, $join$ is usually a set union or intersection depending whether the
+analysis is may or must (cf.\ Section~\ref{sec:types_anal}).  As we can
+imagine, $trans_s(in_s)$ is exactly the transfer function $f_s$.
 
 For the reaching definitions example above, we define the join operator as
 the set union ($\bigcup$) and the transfer function in this notation to hold
@@ -293,9 +294,9 @@ kill_s & =
 \end{cases} \\
 \end{align*}
 
-Thanks to the simplicity nature of the data-flow analysis, there are many
-diverse data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest
-some examples of other well-known basic data-flow analyses as they are defined
+Thanks to the simplicity of the data-flow analysis, there are many diverse
+data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest some
+examples of other well-known basic data-flow analyses as they are defined
 according to the forward/backward and may/must criteria.
 \begin{table}[htb]
 \begin{center}
@@ -314,28 +315,28 @@ according to the forward/backward and may/must criteria.
   \label{tab:data_flow_examples}
 \end{table}
 These are the most known analyses which we believe the reader knows. If not,
-they are defined in every superior literature about compilers~\cite{dragon,
-muchnick}.
+they are defined in every superior literature about compilers like of Aho et
+al.~\cite{dragon} or Muchnick~\cite{muchnick}.
 
 The simplicity is also a reason, that the data-flow analysis is used in
 many tools including checkers.  The very common place of extensive use are
-compilers. Apart from generating code, they generate warnings or errors when
-some suspicious code is found. A good example is \clang~\cite{clang}. It is a
-C/C++ compiler from the \llvm toolkit~\cite{llvm} and contains also a static
-checker framework.  There are checkers for finding errors in memory handling,
-locking, or pointer operations. Sadly, the results are mostly imprecise
-and contain many false reports.  \textsc{Cppcheck}~\cite{cppcheck} works on
-the same principles so it checks for very similar set of errors. Earlier,
-while compilers were still not so evolved, other data-flow analyzers were used
-to fulfill this role. One of the most known analyzers at that time was
-\textsc{Lint}~\cite{lint}. It was capable of finding errors like division by
-zero, constant conditions which always evaluate either to true or false, or
+compilers. Apart from generating binaries, they generate warnings or errors
+when some suspicious code is found. A good example is \clang~\cite{clang}. It
+is a C/C++ compiler from the \llvm toolkit~\cite{llvm} and it contains also a
+static checker framework.  There are checkers for finding errors in memory
+handling, locking, or pointer operations. Sadly, the results are mostly
+imprecise and contain many false reports.  \textsc{Cppcheck}~\cite{cppcheck}
+works on the same principles so it checks for a very similar set of errors.
+Earlier, while compilers were still not so evolved, other data-flow analyzers
+were used to fulfill this role. One of the most known analyzers at that time
+was \textsc{Lint}~\cite{lint}. It was capable of finding errors like division
+by zero, constant conditions which always evaluate either to true or false, or
 use of uninitialized variables.  Later, \textsc{Lint} resulted in some clones
 like \textsc{LCLint}~\cite{lclint} which were augmented to catch errors like
 buffer overflows. \textsc{LCLint} was later renamed to \textsc{Splint}.  These
 tools mostly have a support for annotations so more speculative checks can be
 enabled. In that case, the code has to be heavily annotated, otherwise the
-false positive rate is unbearable.  Nonetheless, the development of
+false positive rate is unbearable. Nonetheless, the development of
 \textsc{Splint} stagnated over the past decade due to obvious reasons: the
 most errors and warnings \textsc{Splint} was used to report are reported by
 modern compilers nowadays. It was also thanks to the work of Reps et
@@ -345,17 +346,19 @@ polynomial time. They presented that on finding possibly uninitialized
 variables.  There exist also analyzers that are not so powerful to handle
 large code bases or require high user intervention to annotate the checked
 code. We give as an example \textsc{Aspect}~\cite{aspect}, which compares a
-program specification of input-output behaviour provided by a user to
-data-flow models extracted from the code. This section is only a short
-introduction to the data-flow analysis, more information and many examples are
-available in the literature~\cite{dragon, muchnick}.
+program specification of an input-output behaviour provided by a user to
+data-flow models extracted from the code.
+
+This section is only a short introduction to the data-flow analysis, more
+information and many examples are available in the literature~\cite{dragon,
+muchnick}.
 
 
 
 \section{Abstract Interpretation}\label{sec:ai}
-The data-flow analysis is only a limited tool. It only collects information
+The data-flow analysis is only a limited tool. It just collects information
 about data and how they propagate through the control flow of a program.
-Therefore it is not as useful for designing more complex analyses which are
+Therefore it is not that useful for designing more complex analyses which are
 usual for code checking and possibly elsewhere. There was a call to formalize
 the process for a convenient design of more complex analyses. Cousots' work on
 this topic stretches back to the 1970s. Back then, they described a framework
