@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{III.}
-\date{3. 10. 2012}
+\date{1. 10. 2013}
 
 \begin{document}
 
@@ -25,9 +25,9 @@
   \item Ladicími výpisy
   \item Výstupem přes soubor (obsah velkých bufferů apod.)
   \item Pád $\Rightarrow$ analýza Oops
-  \item Regrese $\Rightarrow$ \texttt{git bisect}
+  \item Regrese $\Rightarrow$ \cmd{git bisect}
   \item Automatické nástroje
-  \item (Debugger -- \texttt{kgdb} a další)
+  \item (Debugger -- \cmd{kgdb} a další)
   \item \ldots
   \end{itemize}
 \end{frame}
@@ -35,8 +35,8 @@
 \begin{frame}
   \frametitle{Výpisy}
   \begin{itemize}
-  \item \texttt{printk} již známe
-  \item Před formátovací řetězec se vkládá \texttt{KERN\_*}
+  \item \code{printk} již známe
+  \item Před formátovací řetězec se vkládá \code{KERN_*}
   \begin{itemize}
   \item Řetězec ve formě \texttt{<číslo>} nebo \texttt{\textbackslash 001číslo}
   \item Sděluje úroveň (důležitost) zprávy
@@ -46,11 +46,11 @@
 
   \begin{center}
   \begin{tabular}{|l|l|l|l|} \hline
-  Důležitost & Konzole & \texttt{/var/log/*} & \texttt{dmesg} \\ \hline\hline
-  vysoká     & ANO     & ANO                 & ANO            \\ \hline
-  normální   & NE      & ANO                 & ANO            \\ \hline
-  ladicí     & NE      & NE                  & ANO            \\ \hline\hline
-  zapisuje   & jádro   & syslog*             & jádro          \\ \hline
+  Důležitost & Konzole & \file{/var/log/*}   & \cmd{dmesg} \\ \hline\hline
+  vysoká     & ANO     & ANO                 & ANO         \\ \hline
+  normální   & NE      & ANO                 & ANO         \\ \hline
+  ladicí     & NE      & NE                  & ANO         \\ \hline\hline
+  zapisuje   & jádro   & syslog*             & jádro       \\ \hline
   \end{tabular} \\[2mm]
   \emph{Obvyklé nastavení}
 
@@ -65,7 +65,7 @@
   \frametitle{Nastavení výpisů}
 
   \begin{itemize}
-  \item \texttt{dmesg} nastavit nelze
+  \item \cmd{dmesg} nastavit nelze
   \begin{itemize}
     \item Obsahuje vždy všechno
   \end{itemize}
@@ -82,11 +82,11 @@
     \item \emph{Zprávy s vyšší úrovní se objeví na konzoli}
     \item Hodnota 8 $\Rightarrow$ všechno dění
     \begin{itemize}
-      \item Např. při ,,hard-locku''
+      \item Např.\ při ,,hard-locku''
     \end{itemize}
   \end{itemize}
   \pause
-  \item Demo: \texttt{pb173/03} + \texttt{dmesg -n}
+  \item Demo: \file{pb173/03} + \cmd{dmesg -n}
   \end{itemize}
 
 \end{frame}
@@ -95,26 +95,36 @@
   \frametitle{Úkol}
 
   \heading{Práce s úrovněmi}
-  \begin{enumerate}
-  \item Přidejte do kódu \texttt{WARN\_ON(1)}
-  \item Zjistěte s jakou úrovní se varování vypisuje
-  \item (Pomocí postupného nastavovaní \texttt{dmesg -n})
+    \begin{enumerate}
+    \item Přidejte si do kódu modulu \code{WARN_ON(1)}
+    \item Zjistěte s jakou úrovní se varování vypisuje
+    \begin{itemize}
+      \item Pomocí postupného nastavování \cmd{dmesg -n}
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
 
-
 \begin{frame}[fragile]
   \frametitle{Úrověň výpisů}
 
+  \heading{Volba úrovně}
   \begin{itemize}
-  \item Nechceme 10G \texttt{/var/log/messages} (DEBUG)
-  \item Nechceme spoustu hlášek na konzoli (WARNING, ERR)
+    \item Nechceme 10G \file{/var/log/messages}
+    \begin{itemize}
+      \item Ladicí výpisy: \code{DEBUG}
+    \end{itemize}
+    \item Nechceme spoustu hlášek na konzoli
+    \begin{itemize}
+      \item Obvyklé chyby: \code{WARNING}, \code{ERR}
+    \end{itemize}
   \end{itemize}
 
   \pause
+  \bigskip
 
-  \begin{lstlisting}{language=C}
+  \heading{Příklady}
+  \begin{lstlisting}
 printk(KERN_EMERG "Thread overran stack, or stack corrupted\n");
 printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n", ...
 printk(KERN_CRIT "Invalid DMA channel for ata\n");
@@ -132,10 +142,10 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
 
   \heading{Co vše může být konzole pro výpisy}
   \begin{itemize}
-  \item \texttt{tty0-tty*} (co když stroj umře?)
-  \item Sériová konzole (\texttt{ttyS*})
+  \item \file{tty0-tty*} (co když stroj umře?)
+  \item Sériová konzole (\file{ttyS*})
   \item Síťová konzole (\texttt{netconsole})
-  \item Všechno, co se zaregistruje pomocí \texttt{register\_console}
+  \item Všechno, co se zaregistruje pomocí \code{register_console}
   \end{itemize}
 
   \medskip
@@ -159,40 +169,44 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \frametitle{Úkol}
   \heading{Použití netconsole ve virtuálním stroji}
   \begin{enumerate}
-  \item Na hostitelovi: \texttt{nc -ul 0.0.0.0 60000}
-  \item \texttt{dhclient}, je-li třeba
-  \item \texttt{dmesg -n 8} (vypisovat vše)
-  \item \texttt{modinfo netconsole}
-  \item \texttt{modprobe netconsole netconsole=@/,60000@10.0.2.2/}
-  \item Např. \texttt{echo h >/proc/sysrq-trigger}
+  \item Na hostitelovi: \cmd{nc -ul 0.0.0.0 60000}
+  \item \cmd{dmesg -n 8} (vypisovat vše)
+  \item \cmd{modinfo netconsole}
+  \item \cmd{modprobe netconsole netconsole=@/,60000@10.0.2.2/}
+  \item Např.\ \cmd{echo h >/proc/sysrq-trigger}
   \end{enumerate}
 
   Více informací v \doc{Documentation/networking/netconsole.txt}
 
 \end{frame}
 
-\begin{frame}
+\begin{frame}[fragile]
   \frametitle{Nevýhody výpisů}
 
   \begin{itemize}
-  \item Mnoho dat
-  \begin{itemize}
-  \item Znepřehlednění (typické pro ACPI, iwlwifi)
-  \item Nestíhá se posílat na konzoli (ztráta informací)
-  \item \emph{Řešení} (částečné): \texttt{if (printk\_ratelimit()) printk();}
-  \end{itemize}
+    \item Mnoho dat
+    \begin{itemize}
+      \item Znepřehlednění (typické pro ACPI, iwlwifi)
+      \item Nestíhá se posílat na konzoli (ztráta informací)
+      \item \emph{Částečné řešení} (\header{linux/printk.h}):
+      \begin{lstlisting}
+if (printk_ratelimit())
+  printk(...);
+      \end{lstlisting}
+    \end{itemize}
 
   \pause
 
-  \item Binární data
-  \begin{itemize}
-  \item \texttt{dmesg} zobrazuje jen textová data
-  \item \emph{Řešení} (částečné): \texttt{print\_hex\_dump\_bytes}
-    (\header{linux/kernel.h})
-  \end{itemize}
+    \item Binární data
+    \begin{itemize}
+      \item \cmd{dmesg} zobrazuje jen textová data
+      \item \emph{Částečné řešení} (\header{linux/kernel.h}):
+      \begin{lstlisting}
+print_hex_dump_bytes(...)
+      \end{lstlisting}
+    \end{itemize}
   \end{itemize}
 
-  \medskip
   \pause
 
   \begin{center}
@@ -205,19 +219,20 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \frametitle{debugfs}
 
   \begin{itemize}
-  \item Většinou v /sys/kernel/debug/
-  \begin{itemize}
-  \item Pokud ne: \texttt{mount -t debugfs none /sys/kernel/debug/}
-  \end{itemize}
-  \item \doc{Documentation/filesystems/debugfs.txt}
-  \item \header{linux/debugfs.h}
-  \item \texttt{debugfs\_create\_dir},\\
-    \texttt{debugfs\_create\_file} (\texttt{file\_operations}),\\
-    \texttt{debugfs\_create\_symlink},\\
-    \texttt{debugfs\_create\_u\{8,16,32,bool\}},\\
-    \texttt{debugfs\_remove}
-  \item Lze si předat \texttt{data}, jsou pak v \texttt{inode->i\_private} v
-    open
+    \item Předávání ladicích dat přes soubor
+    \item Většinou v \file{/sys/kernel/debug/}
+    \begin{itemize}
+      \item Pokud ne: \cmd{mount -t debugfs none /sys/kernel/debug/}
+    \end{itemize}
+    \item \doc{Documentation/filesystems/debugfs.txt}
+    \item \header{linux/debugfs.h}
+    \item \code{debugfs_create_dir}, \\
+      \code{debugfs_create_file} (\code{file_operations}), \\
+      \code{debugfs_create_symlink},\\
+      \code{debugfs_create_u\{8,16,32,bool\}},\\
+      \code{debugfs_remove}
+    \item Lze si předat \code{data}, jsou pak v \code{inode->i_private} (v
+      \code{open})
   \end{itemize}
 
 \end{frame}
@@ -230,7 +245,7 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \item Vytvořit adresář
   \item Vytvořit v něm soubor (u16)
   \begin{itemize}
-  \item Vrací např. 11320
+  \item Vrací např.\ 11320
   \end{itemize}
   \item Přeložit, vložit do systému
   \item Přečíst soubor
@@ -242,10 +257,13 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \frametitle{SysRq}
 
   \begin{itemize}
-  \item System-request (Alt-PrintScreen)
+  \item System-request (\doc{Documentation/sysrq.txt})
+  \begin{itemize}
+    \item Klávesnicí: Alt-PrintScreen
+    \item Vzdáleně: \file{/proc/sysrq-trigger}
+  \end{itemize}
   \item Funguje (většinou) i po pádu systému
-  \item Zapnutí: \texttt{sysctl kernel.sysrq=1}
-  \item \doc{Documentation/sysrq.txt}
+  \item Zapnutí: \cmd{sysctl kernel.sysrq=1}
   \end{itemize}
 
   \pause
@@ -263,6 +281,21 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \emph{Příklady SysRq}
   \end{center}
 
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Sysrq}
+  \begin{enumerate}
+    \item Vypište si nápovědu (\cmd{sysrq-h})
+    \item Vypište si trasy procesů na CPU (\cmd{sysrq-p})
+    \item Vypište si informace o paměti (\cmd{sysrq-m})
+  \end{enumerate}
+
+  \bigskip
+
   Pozn.: v Qemu lze vyzkoušet v ovládací konzoli (Ctrl-Alt-2) příkazem
   \texttt{sendkey alt-sysrq-písmeno}
 
@@ -275,7 +308,7 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \item Chci-li znát komunikaci jádro $\leftrightarrow$ program
   \item \doc{man strace}
   \item Zachytává syscally
-  \item Vypisuje jejich parametry na STDOUT
+  \item Dekóduje a vypisuje jejich parametry na STDOUT
   \end{itemize}
 
   Demo: \texttt{strace -e open,read cat \ldots/debug/\ldots}
