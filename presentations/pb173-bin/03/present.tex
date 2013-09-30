@@ -1,0 +1,377 @@
+% vim: ai sw=2
+
+\input{../header.tex}
+
+\subtitle{III. Binární objektové soubory}
+\date{1. 10. 2013}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Objektové soubory}
+
+  \begin{itemize}
+    \item Vznikají při překladu i linkování
+    \begin{itemize}
+      \item Výstup překladače (\cmd{gcc -c})
+      \item Výstup linkeru jako:
+      \begin{itemize}
+	\item Dynamická knihovna
+	\item Spustitelná binárka
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Literatura
+    \begin{itemize}
+      \item System V Application Binary Interface (ELF)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Obsah objektových souborů}
+
+  \begin{itemize}
+    \item Obvykle
+    \begin{itemize}
+      \item Informace o souboru
+      \begin{itemize}
+	\item Cílová architektura, struktura, \dots
+      \end{itemize}
+      \item Kód
+      \item Data
+      \item Ostatní informace potřebné k běhu/linkování
+      \begin{itemize}
+	\item Relokace, informace o symbolech atd.
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Ale také např.
+    \begin{itemize}
+      \item Ladicí informace
+      \item Informace o překladači
+    \end{itemize}
+
+    \item Tyto informace v oddílech (sekcích)
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Formáty objektových souborů}
+
+  \begin{itemize}
+    \item Několik forem/standardů
+    \begin{itemize}
+      \item a.out (UNIX/starý Linux)
+      \item \emph{ELF} (Linux)
+      \item COM (DOS, čistě kód+data, nic víc)
+      \item COFF (UNIX, ELF ho převálcoval)
+      \item MZ (DOS .exe)
+      \item PE (Windows .exe, vychází z COFF)
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  Demo: \textsc{DosBox} a reboot přes COM (\code{ea f0 ff 00 f0})
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s PE}
+  \begin{enumerate}
+    \item Stáhněte si nějakou Windows aplikaci
+    \begin{itemize}
+      \item Cokoliv, co je .exe (PE)
+    \end{itemize}
+    \item Vypište si informace společné formátům (\cmd{objdump -f})
+    \item Vypište si informace závislé na formátu (\cmd{objdump -p})
+    \begin{itemize}
+      \item Zjistěte DLL, na kterých váš program závisí
+    \end{itemize}
+    \item Porovnejte sekce s nějakým ELFem (\cmd{objdump -h})
+    \begin{itemize}
+      \item Jakákoliv binárka z \file{/usr/bin}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{ELF}
+
+  \heading{Executable and Linkable Format}
+  \begin{itemize}
+    \item Hlavní souborový formát na Linuxu
+    \item Přenositelný, relokovatelný, rozšiřitelný
+
+    \pause
+
+    \item Struktura
+    \begin{itemize}
+      \item ELF hlavička
+      \item Hlavičky programové
+      \begin{itemize}
+	\item Při spouštění
+      \end{itemize}
+      \item Hlavičky sekcí
+      \begin{itemize}
+	\item Při linkování, ladění apod.
+      \end{itemize}
+      \item Sekce
+      \begin{itemize}
+	\item Odkazovány z obou typů hlaviček
+      \end{itemize}
+    \end{itemize}
+    \item \cmd{readelf} je speciální \cmd{objdump} pro ELF
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{ELF hlavička}
+
+  \begin{itemize}
+    \item \cmd{readelf -h}
+    \item Magické číslo (\code{0x7f 'E' 'L' 'F'})
+    \item Cílová architektura a stroj
+    \item Počty hlaviček
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  Úkol: výpis ELF hlavičky a zjištění počtu obou typů hlaviček
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Sekce}
+
+  \begin{itemize}
+    \item \cmd{readelf -S} (obsah sekce: \cmd{readelf -x})
+    \item Vytvářené překladačem/linkerem
+    \item Čtené překladačem/linkerem/interpretrem
+
+    \pause
+
+    \item Předdefinované sekce:
+    \begin{itemize}
+      \item \code{.text}: kód
+      \item \code{.data}: nekonstantní data (proměnné)
+      \item \code{.rodata}: konstantní data (řetězce apod.)
+      \item \code{.bss}: data, která se inicializují na 0
+      \item \code{.interp}: interpretr
+      \item \code{.symtab}: tabulka symbolů pro ladění (\cmd{strip})
+      \item \code{.dynsym}: tabulka symbolů pro dynamický linker
+      \item \code{.gnu_debuglink}: odkaz na soubor s ladicími informacemi
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+
+  Demo: ukázka sekcí
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Úkol}
+
+  \heading{Práce se sekcemi}
+  \begin{enumerate}
+    \item Vytvořte si soubor s \code{puts("hello")} a \code{puts("world")}
+    \item Vytvořte si vlastní sekci s daty
+    \begin{lstlisting}
+int __attribute__((section(".data.my_section"))) x = 3;
+    \end{lstlisting}
+    \item Vytvořte si vlastní sekci s funkcí (\code{.text.my_section})
+    \item Přeložte do \file{.o} a poté i slinkujte
+
+    \item Vypište si seznam sekcí v obou souborech (\cmd{readelf -S})
+    \item Vypište si obsah sekcí (\cmd{readelf -x})
+    \begin{itemize}
+      \item \code{.rodata} (zkuste i \cmd{readelf -p})
+      \item V \file{.o}: \code{.data.my_section}
+      \item V \file{.o}: \code{.text.my_section} (zkuste i \cmd{objdump -d})
+    \end{itemize}
+  \end{enumerate}
+
+  \medskip
+
+  Pozn.: tyto soubory nezahazujte.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\file{libbfd}}
+
+  \begin{itemize}
+    \item Knihovna pro práci s různými binárními formáty (\header{bfd.h})
+    \begin{itemize}
+      \item a.out, ELF, PE, binární, \dots
+      \item Seznam: \code{const char **bfd_target_list()}
+    \end{itemize}
+    \item A různými architekturami
+    \begin{itemize}
+      \item Seznam: \code{const char **bfd_arch_list()}
+    \end{itemize}
+
+    \pause
+
+    \item Dokumentace
+    \begin{itemize}
+      \item \url{https://sourceware.org/binutils/docs/bfd/}
+      \item \emph{Některá užitečná makra bez dokumentace} (jen v \header{bfd.h})
+    \end{itemize}
+
+    \pause
+
+    \item Knihovny při překladu: \cmd{gcc -lbfd -liberty -ldl -lz}
+    \item První je třeba volat \code{void bfd_init()}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\file{libbfd}: chyby}
+
+  \heading{Jak zjistit, co se stalo?}
+  \begin{itemize}
+    \item Poslední chyba: \code{bfd_error_type bfd_get_error()}
+    \item Převod na text: \code{const char *bfd_errmsg(bfd_error_type error_tag)}
+  \end{itemize}
+
+  \bigskip
+
+  Typicky:
+  \begin{lstlisting}
+if (!bfd_function(...))
+  errx(1, "bfd_function: %s", bfd_errmsg(bfd_get_error()));
+  \end{lstlisting}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vypište všechny formáty podporované vaší \file{libbfd}}
+  \begin{enumerate}
+    \item Nezapomeňte \code{bfd_init}
+    \item Zavolejte \code{bfd_target_list}
+    \item Vypište v cyklu
+    \item Zavolejte \code{bfd_arch_list}
+    \item Vypište v cyklu
+
+    \item Ověřujte návratové hodnoty podle manuálu
+    \begin{itemize}
+      \item Vypisujte chyby při neúspěchu
+    \end{itemize}
+
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\file{libbfd}: soubory}
+
+  \begin{itemize}
+    \item Otevření
+    \begin{itemize}
+      \item \code{bfd *bfd_openr(const char *file, const char *target)}
+      \item \code{bfd *bfd_openw(const char *file, const char *target)}
+      \item \code{target} je \code{NULL}
+    \end{itemize}
+    \item Ověření
+    \begin{itemize}
+      \item \emph{Nutné před prací se souborem}
+      \item \code{bfd_boolean bfd_check_format(bfd *abfd, bfd_format format)}
+      \item \code{format} je \code{bfd_object}
+    \end{itemize}
+    \item Zavření
+    \begin{itemize}
+      \item \code{bfd_boolean bfd_close(bfd *abfd)}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Bez ověření chyb:
+  \begin{lstlisting}
+abfd = bfd_openr(file, NULL);
+bfd_check_format(abfd, bfd_object);
+bfd_close(abfd);
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Doplňte otevírání souboru zadaného jako parametr}
+  \begin{enumerate}
+    \item Zavolejte \code{bfd_openr}
+    \item Zavolejte \code{bfd_check_format}
+    \item Zavolejte \code{bfd_close}
+    \item Ověřujte návratové hodnoty podle manuálu
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\file{libbfd}: sekce}
+
+  \begin{itemize}
+    \item Iterace: \code{bfd_map_over_sections}
+    \begin{itemize}
+      \item Velikost: \code{bfd_get_section_size}
+      \item Obsah: \code{bfd_get_section_contents}
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{bfd_make_section_with_flags}
+    \begin{itemize}
+      \item Nastavení velikosti: \code{bfd_set_section_size}
+      \item Nastavení obsahu: \code{bfd_set_section_contents}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Hexdump sekcí}
+  \begin{enumerate}
+    \item Iterujte přes sekce (\code{bfd_map_over_sections})
+    \item Vypište údaje o každé sekci
+    \begin{itemize}
+      \item Název
+      \item Velikosti
+      \item Flagy
+      \item Hexdump prvních 16 bytů obsahu
+    \end{itemize}
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+
+\end{document}
