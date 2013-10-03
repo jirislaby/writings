@@ -359,30 +359,29 @@ muchnick}.
 The data-flow analysis is only a limited tool. It just collects information
 about data and how they propagate through the control flow of a program.
 Therefore it is not that useful for designing more complex analyses which are
-usual for code checking and possibly elsewhere. There was a call to formalize
-the process for a convenient design of more complex analyses. Cousots' work on
-this topic stretches back to the 1970s. Back then, they described a framework
-called \emph{abstract interpretation}~\cite{cousot}. It is designed to allow
-users of the formalism to easily design an analysis, decide whether it is
-correct and sound, to formulate more precision levels of the analysis
-consistently and more.  The formalism was designed in a way that we can also
-interpret analyses like the data-flow as an abstract
-interpretation~\cite{ai_intro}.
+usual for program checking and possibly elsewhere. There was a call to
+formalize more complex analyses.  Cousots' work on this topic stretches back
+to the 1970s. Back then, they described a framework called \emph{abstract
+interpretation}~\cite{cousot}. It is designed to allow users of the formalism
+to easily design an analysis, prove whether it is correct and sound, to
+formulate more precision levels of the analysis consistently and more.  The
+formalism allows us to interpret analyses like the data-flow analysis as a
+special instance of the abstract interpretation~\cite{ai_intro}.
 
 As the name of the analysis suggests, the data domains used in analyzed code
-are replaced by abstract ones. The abstract domain is a \emph{complete
+are replaced by abstract ones. An abstract domain is a \emph{complete
 lattice}~\cite{lattice1,lattice2} as defined in
-Definition~\ref{def:colattice}. Since the analyzed program is re-defined to
-work on a new (abstract) domain, we have to provide a new semantics of the
-program over the domain.  There are no limits, the semantics can be arbitrary.
-We define a \emph{monotone function} for all instructions in the analyzed code
-to transform the program states over the instructions.  Thanks to the work of
+Definition~\ref{def:colattice}. Since the analyzed program is interpreted on a
+new (abstract) domain, we have to provide a new semantics of the program over
+the domain.  There are no limits, the semantics can be arbitrary.  We define a
+\emph{monotone function} for all instructions in the analyzed code to
+transform the program states over the instructions.  Thanks to the work of
 Tarski~\cite{tarski} and Kleene~\cite[pages 348--349]{kleene}, we can always
 compute fixed points of monotone functions which transfer states over
 lattices.  Further, using lattices is effective. Their operators join and meet
 can be used when an analyzer is interpreting a program.  For example, when a
-branching occurs, the branch join operator simply takes the values present on
-the outputs of both branches and performs the lattice join ($\sqcup$).
+branching occurs, the branch join operator can simply take the values present
+on the outputs of both branches and performs the lattice join ($\sqcup$).
 
 \begin{dfn}[Complete lattice]\label{def:colattice}
 A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
@@ -536,7 +535,7 @@ transfer function $F_c$ and concretization ($\gamma$) with abstraction
     \node (N_1A) at (-4,-5) {$[-2,-2]$}
       edge node {} (N_2A)
       edge[dashed] node {} (N_2X);
-    \node (N_1B) at (-2,-5) {$[-1,1]$}
+    \node (N_1B) at (-2,-5) {$[-1,-1]$}
       edge node {} (N_2A)
       edge node {} (N_2B);
     \node (N_1C) at (0,-5) {$[0,0]$}
@@ -571,9 +570,9 @@ programs. One is capable to remember only a single value of a variable and is
 therefore useful for analyses like constant propagation~\cite[Chapter
 9.4]{dragon}. The other lattice uses intervals to remember possible bounds of
 some variable's value.  This is very useful domain especially when analyzing
-bounded loops. When indices, and probably other variables in the body of the
-loop are bounded, we can run some optimizations like loop unrolling~\cite[page
-735]{dragon}.
+whether loops are bounded. When indices and probably other variables in the
+body of the loop are bounded, we can run some optimizations like loop
+unrolling~\cite[page 735]{dragon}.
 
 There is a difference to be spotted between these two lattices. Although they
 both contain an infinite number of elements (in theory), the latter lattice
@@ -620,17 +619,19 @@ according to their probability of being real errors. There are generic and
 statistical ranking algorithms ordering error reports.  An extension
 introduced later~\cite{lockchecker} provides an automatic inference of some
 temporal properties based on statistical analysis of assumed programmer's
-beliefs.  On the similar base as \xgcc is built \stan~\cite{stanse} which is
-discussed in Chapter~\ref{sec:stanse}.  It is uncertain, whether some
+beliefs.  \stan~\cite{stanse} is build on the similar base as \xgcc. We
+discuss \stan in Chapter~\ref{sec:stanse}.  It is uncertain, whether some
 industrial tool adopts the abstract interpretation too, see the discussion in
 Section~\ref{sec:industrial}.
 
 The correctness and soundness (cf.\ Section~\ref{sec:theor_props}) of an
 analyzer based on the abstract interpretation is very prone to selection of
 the abstract domain. While many employed abstractions are sound (produce all
-possible errors), they are not so often complete (false positive rate is
-high). For example, this was demonstrated on several abstractions of numbers
-which we discussed above~\cite{ai_octagons}.
+possible errors), they are not so often complete (false positives occur). For
+example, this was demonstrated on several abstractions of numbers which we
+discussed above~\cite{ai_octagons}. It is important to note that a properly
+selected abstract domain, possibly combined with the widening, ensures that
+the analysis always terminates.
 
 
 
