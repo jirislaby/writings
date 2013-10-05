@@ -373,13 +373,16 @@ are replaced by abstract ones. An abstract domain is a \emph{complete
 lattice}~\cite{lattice1,lattice2} as defined in
 Definition~\ref{def:colattice}. Since the analyzed program is interpreted on a
 new (abstract) domain, we have to provide a new semantics of the program over
-the domain.  There are no limits, the semantics can be arbitrary.  We define a
-\emph{monotone function} for all instructions in the analyzed code to
-transform the program states over the instructions.  Thanks to the work of
-Tarski~\cite{tarski} and Kleene~\cite[pages 348--349]{kleene}, we can always
-compute fixed points of monotone functions which transfer states over
-lattices.  Further, using lattices is effective. Their operators join and meet
-can be used when an analyzer is interpreting a program.  For example, when a
+the domain.  There are no limits in theory, the semantics can be arbitrary.
+We define \emph{monotone functions} over the abstract lattice. They are
+assigned to each instruction in an analyzed program to transform the program
+states over a particular instruction. We then compose these functions into
+a single monotone function over the whole program (over product lattice as we
+will see later).  Thanks to the work of Tarski~\cite{tarski} and
+Kleene~\cite[pages 348--349]{kleene}, we can always compute a fixed point of
+the monotone function which transfers states over the product lattice.
+Further, using lattices is effective. Their operators join and meet can be
+used when an analyzer is interpreting a program.  For example, when a
 branching occurs, the branch join operator can simply take the values present
 on the outputs of both branches and performs the lattice join ($\sqcup$).
 
@@ -387,108 +390,235 @@ on the outputs of both branches and performs the lattice join ($\sqcup$).
 A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
 a partially ordered set $(L,\, \leq)$ where every set $X \subseteq L$ has a
 least upper bound (supremum) $\sqcup X$ and a greatest lower bound (infimum)
-$\sqcap X$. In particular, $L$ has a least element $\bot = \sqcup \emptyset$
-and a greatest element $\top = \sqcap L$.
+$\sqcap X$. In particular, $L$ has a least element $\bot = \sqcap L$ and a
+greatest element $\top = \sqcup L$.
 \end{dfn}
 
-Let us demonstrate the abstract interpretation on an example, the same we did
-for the data-flow analysis and then generalize it again. We take the same
-example as is in Table~\ref{tab:state_df_eq} and reachable definitions
-analysis again.  First, we have to define the abstract domain which the
-abstract interpretation works with.  Since the analysis works with lines where
-is an assignment and there can be more reachable definitions assigned to a
-single line, the complete lattice will consists of a powerset of all
-assignments in the program: $A=\{1,2,4,5\}$.  The abstract domain is therefore
-the lattice $L_a = (\mathcal{P}(A),\, \subseteq,\, \emptyset,\, A,\, \cap,\,
-\cup)$. Now we would have to define the transfer function over the lattice.
-But it is the same as in Table~\ref{tab:state_df_eq}. So computing the least
-fixed point is the same as is shown in Table~\ref{tab:state_df_fp} too.
+Let us demonstrate the abstract interpretation on an example and then define
+the approach formally.  We chose the sign analysis for this purpose. The sign
+analysis is able to predict a sign of a variable \code{x} by looking only on
+signs of constants in an expression assigned to \code{x}.  Consider for
+example the expression $\var{y} = -123 \cdot (678 + 5298)$. Without really
+looking at the actual numbers, the analysis can conclude that the value stored
+in \code{y} is negative (in the usual understanding of the addition and
+multiplication operators). Note that the analysis is not able to answer every
+such query due to the abstraction. For example we cannot decide the sign of
+\code{z} in $\var{z} = 3 + -5$ when considering only signs (a negative number
+added to a positive one can generally give both a negative and positive
+number). In our further explanation, we limit ourselves only to addition and
+multiplication for easier understanding. We also consider only a single
+variable in a program.
 
-As we see, the abstract interpretation is defined by the complete lattice,
-and a transfer function. Formally, it is a tuple $I=\langle L,\, \circ,\,
-\leq,\, \top,\, \bot,\, F\rangle$, where $(L,\, \leq,\, \bot,\, \top,\,
-\sqcup,\, \sqcap)$ is a complete lattice, $\circ$ is either supremum
-($\sqcup$) or infimum ($\sqcap$) lattice operator, and $F$ is a monotone
-function defining the interpretation of a program. Obviously, the definition
-can be loosened to require only a semi-lattice, as we need only one operator.
-
-It is not yet obvious how to define the transfer function of a program. We can
-define a transfer function $F_a$ working directly on the abstract domain.  It
-obtains a new abstract state with respect to the original state and counting
-in the effect of a program which is evaluated. Simply the same as we showed in
-the example of reaching definitions, where the transfer function is defined on
-an intuitive level as a composition of simple transfer functions performed on
-single statements of a program.  For complex analyses it need not be so easy
-to design such $F_a$, so there is also another option.  First, we define two
-functions: \emph{abstraction} denoted $\alpha$ and \emph{concretization}
-denoted $\gamma$, both accepting one parameter.  $\alpha$ returns an abstract
-value corresponding to the concrete value on input and $\gamma$ does the
-opposite. Now, we can jump back to the concrete values, perform the
-transformation on the concrete values using a concrete transfer function $F_c$
-and switch back to the abstract values.  $F_a$ is then defined as $F_a =
-\alpha \circ F_c \circ \gamma$. To retain soundness of the analysis, the
-resulting abstract value must be less than or equal to the one computed by a
-direct $F_a$. We depict these two options in Figure~\ref{fig:state_ai_square}.
+First, we have to define the abstract domain which the abstract interpretation
+works with. There are five possible values which can occur.  Either an
+expression is positive ($\oplus$), negative ($\ominus$), zero ($0$), or the
+result is unknown as for \code{z} above ($\top$). Finally, there is a value to
+represent an uninitialized variable ($\bot$). If it appears in some
+subexpression, the analyzer should report an error. Therefore we do not
+consider it in further computation. The complete lattice for the set of these
+elements $\mathbf{Sign} = \{\oplus,\, \ominus,\, 0,\, \top,\, \bot \}$ is
+depicted in Figure~\ref{fig:state_ai_sign_lat}.
 \begin{figure}[htb]
-\begin{center}
-    \begin{tikzpicture}[circle, <-, >=stealth', minimum size=2mm, inner sep=0pt]
-      \node [fill=black] (A0) {};
-      \node [fill=black, right=4cm of A0] (A1) {}
-        edge node [label=above:$F_a$] {} (A0);
-      \node [fill=black, below=2cm of A0] (C0) {}
-        edge node [label=left:$\gamma$] {} (A0);
-      \node [fill=black, right=3.5cm of C0] (C1) {}
-        edge node [label=above:$F_c$] {} (C0);
-      \node [fill=black, above=10mm of C1] (A2) {}
-        edge node [label=right:$\alpha$] {} (C1);
-      \node [rotate=65,below=5mm of A1,yshift=5.5mm] {$\leq$ };
+  \begin{center}
+    \begin{tikzpicture}[node distance=5mm and 5mm]
+      \node (TOP) {$\top$};
+      \node [below right=of TOP] (PLUS) {$\oplus$}
+	edge node {} (TOP);
+      \node [below=of TOP] (ZERO) {$0$}
+	edge node {} (TOP);
+      \node [below left=of TOP] (MINUS) {$\ominus$}
+	edge node {} (TOP);
+      \node [below=of ZERO] (BOT) {$\bot$}
+	edge node {} (PLUS)
+	edge node {} (ZERO)
+	edge node {} (MINUS);
     \end{tikzpicture}
-\end{center}
-\caption{Computation of an abstract transfer function $F_a$ using concrete
-transfer function $F_c$ and concretization ($\gamma$) with abstraction
-($\alpha$).}
-\label{fig:state_ai_square}
+  \end{center}
+  \caption{A complete lattice used for the sign analysis.}
+  \label{fig:state_ai_sign_lat}
 \end{figure}
 
-\begin{figure}[tb]
-\begin{center}
-  \tikzstyle{invisible} = [minimum size=12mm]
-  \begin{tikzpicture}[sibling distance=12mm]
-    \node {$\top$}
-      child { node (N_2) {$-3$} }
-      child { node (N_3) {$-2$} }
-      child { node (N_4) {$-1$} }
-      child { node (ZERO) {$0$} }
-      child { node (N_5) {$1$} }
-      child { node (N_6) {$2$} }
-      child { node (N_7) {$3$} };
-    \node [invisible,left=of N_2] (N_1) {};
-    \node [invisible,right=of N_7] (N_8) {};
-    \node [below=of ZERO] {$\bot$}
-      edge[dashed] node {} (N_1)
-      edge node {} (N_2)
-      edge node {} (N_3)
-      edge node {} (N_4)
-      edge node {} (ZERO)
-      edge node {} (N_5)
-      edge node {} (N_6)
-      edge node {} (N_7)
-      edge[dashed] node {} (N_8);
-  \end{tikzpicture}
-\end{center}
-\label{fig:state_lat_concrete}
-\caption{Lattice for a single concrete value.}
-\end{figure}
+Next, we need to cope with subexpressions and compute a result of a whole
+expression assigned to a variable. For that purpose, we define two binary
+(overloaded) functions $+$ and $\cdot$ over two abstract values, for addition
+and multiplication respectively. Their type is obviously $\mathbf{Sign} \times
+\mathbf{Sign} \rightarrow \mathbf{Sign}$.  These two functions are defined in
+Table~\ref{tab:state_ai_addmult}.
+\begin{table}[tb]
+  \begin{center}
+    \begin{tabular}{|c||c|c|c|c|}\hline
+      $+$       & $0$       & $\ominus$ & $\oplus$ & $\top$ \\ \hline \hline
+      $0$       & $0$       & $\ominus$ & $\oplus$ & $\top$ \\ \hline
+      $\ominus$ & $\ominus$ & $\ominus$ & $\top$   & $\top$ \\ \hline
+      $\oplus$  & $\oplus$  & $\top$    & $\oplus$ & $\top$ \\ \hline
+      $\top$    & $\top$    & $\top$    & $\top$   & $\top$ \\ \hline
+    \end{tabular} ~~
+    \begin{tabular}{|c||c|c|c|c|}\hline
+      $\cdot$   & $0$ & $\ominus$ & $\oplus$  & $\top$ \\ \hline \hline
+      $0$       & $0$ & $0$       & $0$       & $0$    \\ \hline
+      $\ominus$ & $0$ & $\oplus$  & $\ominus$ & $\top$ \\ \hline
+      $\oplus$  & $0$ & $\ominus$ & $\oplus$  & $\top$ \\ \hline
+      $\top$    & $0$ & $\top$    & $\top$    & $\top$ \\ \hline
+    \end{tabular}
+  \end{center}
+  \caption{The behaviour of arithmetic addition and multiplication for the
+  sign analysis.}
+  \label{tab:state_ai_addmult}
+\end{table}
+Recalling the example above, $\var{y} = -123 \cdot (678 + 5298)$ is abstracted
+to $\var{y} = \ominus \cdot (\oplus + \oplus)$ and using the two functions, we
+can evaluate the sign of \code{y} to $\ominus$.
+
+We know how the values are computed in an expression, but we still need to
+define a \emph{transfer function} over lines of code. Similar to the data-flow
+analysis, transfer function $f_s$ for a statement $s$ updates the states
+incoming to $s$ according to the effect of $s$. In the following text, we
+demonstrate the interpretation on code from the second column of
+Table~\ref{tab:state_ai_sign_ex}.
+\begin{table}[htb]
+  \begin{center}
+  \begin{tabular}{|r|l||p{2em}l|} \hline
+\textbf{\footnotesize \#} &
+  \multicolumn{1}{c||}{\textbf{Code}} &
+  \multicolumn{2}{c|}{\textbf{Transfer Function}} \\ \hline\hline
+1 & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+void fun(int n) {
+\end{lstlisting} } &
+  $f_1(\overrightarrow{f})$ & $= \bot$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+  int x = 0;(*@ \label{lst:state_ai_x0} @*)
+\end{lstlisting} } &
+  $f_2(\overrightarrow{f})$ & $= 0$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+  x = x + 1;(*@ \label{lst:state_ai_xp1} @*)
+\end{lstlisting} } &
+  $f_3(\overrightarrow{f})$ & $= f_2 + \oplus$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+  while (--n)
+\end{lstlisting} } &
+  $f_4(\overrightarrow{f})$ & $= f_3 \sqcup f_5$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+    x = x * 5;(*@ \label{lst:state_ai_xm} @*)
+\end{lstlisting} } &
+  $f_5(\overrightarrow{f})$ & $= f_4 \cdot \oplus$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+  x = x + (-1);(*@ \label{lst:state_ai_xp2} @*)
+\end{lstlisting} } &
+  $f_6(\overrightarrow{f})$ & $= f_4 + \ominus$ \\ \hline
+
+\thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
+}
+\end{lstlisting} } &
+  $f_7(\overrightarrow{f})$ & $= f_6$ \\ \hline
+
+\end{tabular}
+  \end{center}
+  \caption{An example to demonstrate the sign abstract interpretation. We only
+  track the sign of the variable \code{x}.}
+  \label{tab:state_ai_sign_ex}
+\end{table}
+In the example, we want to track a sign of the variable \code{x} using the
+abstract interpretation. Transfer functions for this interpretation are
+shown in the third column for each of the lines.
+
+As we mentioned earlier, a single monotone function is needed for the fixed
+point calculation. The function is composed of the transfer functions and it
+works on a whole program using a \emph{product lattice}. A product lattice is
+the complete lattice $(L^n,\, \sqsubseteq)$, where $(L,\, \leq)$ is a complete
+lattice and
+\begin{equation*}
+(x_1,\, \dots,\, x_n) \sqsubseteq (y_1,\, \dots,\, y_n) \Leftrightarrow
+  (x_1 \leq y_1 \wedge \dots \wedge x_n \leq y_n).
+\end{equation*}
+Given the product lattice $(L^n,\, \sqsubseteq)$, we define the composed
+function $F: L^n \rightarrow L^n$ of monotone functions $f_1,\, \dots,\, f_n$
+as
+\begin{equation*}
+F(\overrightarrow{f}) =
+  (f_1(\overrightarrow{f}),\, \dots,\, f_n(\overrightarrow{f})).
+\end{equation*}
+Note that $F$ is also a monotone function in $(L^n,\, \sqsubseteq)$. Thanks
+that, the least fixed point exists~\cite{kleene, tarski} and is the least
+solution of the transfer functions $f_1,\, \dots,\, f_n$. We compute the least
+fixed point in Table~\ref{tab:state_ai_sign_fp} for our example of
+Table~\ref{tab:state_ai_sign_ex}.
+\begin{table}[tb]
+  \begin{center}
+\begin{tabular}{|c||c|c|c|c|c|c|} \hline
+\textbf{Transfer} &
+  \multicolumn{6}{c|}{\textbf{Iterations of Fixed Point Computation}}
+  \\ \cline{2-7}
+\textbf{Function} &
+  ~~~1~~~ & ~~~2~~~ & ~~~3~~~ & ~~~4~~~ & ~~~5~~~ & 6 (fixed) \\ \hline\hline
+$f_1$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\bot$   & $\bot$ \\ \hline
+$f_2$ & $\bot$ & $0$      & $0$      & $0$      & $0$      & $0$ \\ \hline
+$f_3$ & $\bot$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
+$f_4$ & $\bot$ & $\bot$   & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
+$f_5$ & $\bot$ & $\bot$   & $\bot$   & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
+$f_6$ & $\bot$ & $\bot$   & $\bot$   & $\top$   & $\top$   & $\top$ \\ \hline
+$f_7$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\top$   & $\top$ \\ \hline
+\end{tabular}
+  \end{center}
+  \caption{Fixed point computation for example of
+  Table~\ref{tab:state_ai_sign_ex}.}
+  \label{tab:state_ai_sign_fp}
+\end{table}
+We can see that the analysis can definitely decide about the sign of a value
+in \code{x} until assignment on line~\ref{lst:state_ai_xp2}. There, we lose
+precision due to the abstraction.
+
+As we proceeded with the example, we informally defined the abstract
+interpretation by:
+\begin{enumerate}
+\item A complete lattice $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$
+which describes abstract values.
+
+\item A transfer monotone function $F$ which defines the interpretation
+of a program.
+
+\end{enumerate}
+Formally, the abstract interpretation is a tuple $I=\langle L,\, \circ,\,
+\leq,\, \top,\, \bot,\, F\rangle$. $\circ$ is either supremum ($\sqcup$)
+or infimum ($\sqcap$) lattice operator depending whether computing the least
+or greatest fixed point, respectively. Obviously, the definition can be
+loosened to require only a semi-lattice, as we need only one operator.
+
+The abstract interpretation is a very flexible tool for designing analyses. It
+does not require the lattices to have a finite height. Even if the lattice is
+infinitely high, the fixed point still can be computed in a finite time.
+Consider the lattice of Figure~\ref{fig:state_lat_int}. It is used for
+abstracting reachable values of integer variables in programs.  The lattice
+uses intervals to remember possible bounds of some variable's value.  This is
+very useful domain especially when analyzing whether loops are bounded. When
+indices and probably other variables in the body of the loop are bounded, we
+can run some optimizations like loop unrolling~\cite[page 735]{dragon}.
 \begin{figure}[tb]
 \begin{center}
   \tikzstyle{invisible} = [minimum size=6mm]
   \begin{tikzpicture}
-    \node[invisible] (N_6X) at (-1,0) {};
-    \node[invisible] (N_6Y) at (1,0) {};
+    \node (N_7) at (0,1) {$[-\infty,\infty]$};
+
+    \node[invisible] (N_6X) at (-3,0) {}
+      edge[dashed] node {} (N_7);
+    \node[invisible] (N_6A) at (-2,0) {}
+      edge[dashed] node {} (N_7);
+    \node[invisible] (N_6B) at (-1,0) {}
+      edge[dashed] node {} (N_7);
+    \node[invisible] (N_6C) at (1,0) {}
+      edge[dashed] node {} (N_7);
+    \node[invisible] (N_6D) at (2,0) {}
+      edge[dashed] node {} (N_7);
+    \node[invisible] (N_6Y) at (3,0) {}
+      edge[dashed] node {} (N_7);
 
     \node (N_5) at (0,-1) {$[-2,2]$}
-      edge[dashed] node {} (N_6X)
-      edge[dashed] node {} (N_6Y);
+      edge[dashed] node {} (N_6B)
+      edge[dashed] node {} (N_6C);
 
     \node[invisible] (N_5X) at (-2,-1) {};
     \node[invisible] (N_5Y) at (2,-1) {};
@@ -562,64 +692,51 @@ transfer function $F_c$ and concretization ($\gamma$) with abstraction
   \end{tikzpicture}
 \end{center}
 \label{fig:state_lat_int}
-\caption{Lattice for intervals.}
+\caption{A lattice for intervals.}
 \end{figure}
-Now consider two lattices in Figures~\ref{fig:state_lat_concrete}
-and~\ref{fig:state_lat_int}. Both are used for abstracting numbers in
-programs. One is capable to remember only a single value of a variable and is
-therefore useful for analyses like constant propagation~\cite[Chapter
-9.4]{dragon}. The other lattice uses intervals to remember possible bounds of
-some variable's value.  This is very useful domain especially when analyzing
-whether loops are bounded. When indices and probably other variables in the
-body of the loop are bounded, we can run some optimizations like loop
-unrolling~\cite[page 735]{dragon}.
 
-There is a difference to be spotted between these two lattices. Although they
-both contain an infinite number of elements (in theory), the latter lattice
-has infinite height.  The Kleene's sequence is not necessarily finite there,
-so the computation of a fixed point may not finish. There is a mechanism
-suggested by Cousots~\cite{cousot} to overcome the problem. It is a
-\emph{widening} operator $\triangledown$. Informally, the sequence is sped up
-by widening, so that it converges eventually.  Imagine we have an intervals
-lattice and an infinite loop where we increment a variable that was initially
-set to zero. The infinite sequence of intervals computed for that variable
-would be: $[0, 0],\, [0,1],\, \dots,\, [0,\infty]$. We can define the widening
-operator to set one of the interval bounds to infinity after some time to
-force the sequence finite: $[0, 0],\, [0,1],\, [0,\infty]$. The opposite of
-the widening operator is a \emph{narrowing} operator $\vartriangle$. The
-narrowing can help to make the abstract values more precise. When our widening
-operator put an $\infty$ in an interval, we can narrow it back to some
-abstract value which we know will never cause an increase. This is of course
-not possible for our simple loop, but the reader is pointed to Cortesi and
-Zanioli~\cite{ai_widening} or Cousots~\cite{cousot_galois} who demonstrate
-widening and narrowing on more concise examples.
+Obviously, the Kleene's sequence is not necessarily finite for this lattice.
+Therefore, the computation of a fixed point may not finish. To overcome the
+problem, Cousots~\cite{cousot} introduced a \emph{widening} operator
+$\triangledown$. Informally, the sequence is sped up by widening, so that it
+converges eventually.  Imagine we have an interval lattice and an infinite
+loop where we increment a variable that was initially set to zero. The
+infinite sequence of intervals computed for that variable would be: $[0,0],\,
+[0,1],\, \dots,\, [0,\infty]$. We can define the widening operator to set one
+of the interval bounds to infinity after some time to force the sequence to be
+finite: $[0,0],\, [0,1],\, [0,\infty]$. This makes the Kleene's sequence
+finite. There is also a \emph{narrowing} operator $\vartriangle$ which is used
+to make abstract values more precise. The reader is pointed to Cortesi and
+Zanioli~\cite{ai_widening} or Cousots~\cite{cousot_galois} who explain 
+widening and narrowing formally and demonstrate the operators on more concise
+examples.
 
 Intervals are not the only shapes to represent abstract values of numbers.
-Octagons, elipses, polyhedra and other shapes are used too~\cite{ai_octagons,
-ai_polyhedra, astree}. Several abstractions can be also combined to
-communicate with each other and improve thus accuracy or any other aspect of
-the analysis~\cite{ai_product}. This was utilized in tools like
-\textsc{Astree}~\cite{astree} and \textsc{Clousot}~\cite{clousot}.
-Strings~\cite{ai_strings1, ai_strings2} and foating point
-numbers~\cite{ai_float1} can be abstracted too.  Further reading on the
-abstract interpretation is in an overview~\cite{cousot_progress}, where is the
-progress in the area of the abstract interpretation over 25 years. A not so
-usual use of the abstract interpretation can be found too~\cite{ai_unusual1,
-ai_unusual2, ai_unusual3}.  Engler et al.\ brought the abstract interpretation
-to the attention in 2000 by a technique based on meta compilation in
-\xgcc~\cite{metacomp}. There, program developers specify properties of the
-checked system in \textsc{Metal} language~\cite{metal}, compile it into an
-internal representation and the tool applies the specification on all
-executable paths in a particular function.  Violation of the specification on
-a path is then reported as an error.  \xgcc suffers from false positives
-despite the use of false positive suppression algorithms like killing
-variables and expressions, synonyms, false path pruning, and others.  Besides
-the suppression algorithms, error reports from the tool are further ranked
-according to their probability of being real errors. There are generic and
-statistical ranking algorithms ordering error reports.  An extension
+Octagons, elipses, polyhedra, and other shapes are used to represent relations
+between two or more values~\cite{ai_octagons, ai_polyhedra, astree}. Several
+abstractions can be also combined to communicate with each other and improve
+thus accuracy or any other aspect of the analysis~\cite{ai_product}. This was
+utilized in tools like \textsc{Astree}~\cite{astree} and
+\textsc{Clousot}~\cite{clousot}.  Strings~\cite{ai_strings1, ai_strings2} and
+foating point numbers~\cite{ai_float1} can be abstracted too.  Further reading
+on the abstract interpretation is in an overview~\cite{cousot_progress}, where
+is the progress in the area of the abstract interpretation over 25 years. A
+not so usual use of the abstract interpretation can be found
+too~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.  Engler et al.\ brought the
+abstract interpretation to the attention in 2000 by a technique based on a
+meta compilation in \xgcc~\cite{metacomp}. There, program developers specify
+properties of the checked system in \textsc{Metal} language~\cite{metal},
+compile it into an internal representation and the tool applies the
+specification on all executable paths in a particular function.  Violation of
+the specification on a path is then reported as an error.  \xgcc suffers from
+false positives despite the use of false positive suppression algorithms like
+killing variables and expressions, synonyms, false path pruning, and others.
+Besides the suppression algorithms, error reports from the tool are further
+ranked according to their probability of being real errors. There are generic
+and statistical ranking algorithms ordering error reports.  An extension
 introduced later~\cite{lockchecker} provides an automatic inference of some
 temporal properties based on statistical analysis of assumed programmer's
-beliefs.  \stan~\cite{stanse} is build on the similar base as \xgcc. We
+beliefs.  \stan~\cite{stanse} is built on the similar base as \xgcc. We
 discuss \stan in Chapter~\ref{sec:stanse}.  It is uncertain, whether some
 industrial tool adopts the abstract interpretation too, see the discussion in
 Section~\ref{sec:industrial}.
@@ -1041,7 +1158,7 @@ dynamically to verify the test.  There are also overviews where is a
 summarization of some symbolic execution techniques we mention
 above~\cite{se_review88, se_review09, se_review10, se_review13}. And we also
 employ the symbolic execution in our tool described in
-Chapters~\ref{sec:fmics} and~\ref{sec:svcomp}.
+Chapter~\ref{sec:fmics}.
 
 % SADAT and IVS are missing
 %EL1~\cite{se_el1}
@@ -1212,17 +1329,18 @@ can be improved such that it works with more than one input~\cite{slic_quasi,
 slic_union}, which can be generalized as describing input as
 constraints~\cite{slic_constraint, slic_constraint_bw}.
 
-There is also an orthogonal method to the static slicing.  We may be
+There is also an orthogonal method to the static slicing. We may be
 interested in all program statements which \emph{are affected} by some
 variable at some line. Since the standard slicing is sometimes called
 \emph{backward} slicing, the orthogonal approach was named \emph{forward}
-slicing~\cite{slic_forw} and is used for dead code removal for example. The
-forward and backward slicing can be generalized as
+slicing~\cite{slic_forw}. The forward slicing is used for dead code removal
+or to show subsequent uses for debugging purposes for example. Both the
+forward and backward slicing together can be generalized as
 \emph{chopping}~\cite{slic_chopping}. The chopping requires two distinct sets
 of slicing criteria: one about what a variable affects (forward slicing), the
 other about what affects that variable (backward slicing). The slicing can be
-abstracted a bit more~\cite{slic_abstract}, such that it can answer what
-values in a variable affect statements from the slicing criteria.
+abstracted a bit more~\cite{slic_abstract}: it can answer what \emph{values}
+in a variable affect statements given as slicing criteria.
 
 When taking over and reusing a library, a programmer can reduce the library
 code size using slicers. Programmers just need to specify the parts of the
