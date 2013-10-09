@@ -293,47 +293,85 @@ while ((scn = elf_nextscn(elf, scn))) {
 
 \end{frame}
 
+\begin{frame}
+  \frametitle{\file{libelf}: programové hlavičky}
+
+  \begin{itemize}
+    \item Počet: \code{int elf_getphdrnum(Elf *elf, size_t *dst)}
+
+    \item x-tá hlavička: \\
+      \code{GElf_Phdr *gelf_getphdr(Elf *elf, int index, GElf_Phdr *dst)}
+
+    \pause
+
+    \item Hlavička: \code{GElf_Phdr}
+    \begin{itemize}
+      \item \code{p_type}: \code{PT_NULL}, \code{PT_LOAD}, \code{PT_INTERP},
+        \dots
+      \item \code{p_offset}: offset v souboru
+      \item \code{p_filesz}: velikost v souboru
+      \item \code{p_memsz}: velikost v paměti (po načtení)
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis programových hlaviček}
+  \begin{enumerate}
+    \item Otevřete ELF soubor pro čtení
+    \item Vypište programové hlavičky
+    \item Přeložte a vyzkoušejte
+    \item Porovnejte s \cmd{readelf -l}
+  \end{enumerate}
+
+\end{frame}
+
 \begin{frame}[fragile]
   \frametitle{\file{libelf}: úpravy ELFu}
 
   \begin{itemize}
-    \item Otevření s \code{ELF_C_WRITE}
+    \item Otevření s \code{ELF_C_WRITE}/\code{ELF_C_RDWR}
     \item Nová sekce: \code{Elf_Scn *elf_newscn(Elf *elf)}
     \begin{itemize}
-      \item Potom \code{gelf_getshdr} a \code{elf_newdata}
+      \item \code{gelf_getshdr} jako předtím a naplnění
+      \item Po naplnění: \code{int gelf_update_shdr(Elf_Scn *scn, GElf_Shdr *src)}
+      \item Vytvoření dat: \code{Elf_Data *elf_newdata(Elf_Scn *scn)}
+    \end{itemize}
+    \item Zápis do souboru
+    \begin{itemize}
+      \item \code{loff_t elf_update(Elf *elf, Elf_Cmd cmd)}
+      \item \code{cmd}: \code{ELF_C_WRITE}
     \end{itemize}
   \end{itemize}
 
-%  \pause
-%
-%  \begin{lstlisting}
-%Elf_Scn *scn = NULL;
-%while ((scn = elf_nextscn(elf, scn))) {
-%  GElf_Shdr shdr_data, *shdr;
-%  Elf_Data *data = NULL;
-%
-%  shdr = gelf_getshdr(scn, &shdr_data);
-%  /* shdr */
-%
-%  while ((data = elf_getdata(scn, data)))
-%    /* data */;
-%}
-%  \end{lstlisting}
-
 \end{frame}
 
-%\begin{frame}
-%  \frametitle{Úkol}
-%
-%  \heading{Přidání sekce do ELFu}
-%  \begin{enumerate}
-%    \item Otevřete ELF soubor pro čtení a zápis
-%    \item Vytvořte novou sekci \code{.comment.my}
-%    \item Vložte do ní nějaká data
-%    \item Přeložte a vyzkoušejte
-%    \item Zobrazte obsah sekce \code{.comment.my} pomocí \cmd{readelf -x}
-%  \end{enumerate}
-%
-%\end{frame}
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Přidání sekce do ELFu/ověření (ne)funkčnosti \file{libelf}}
+  \begin{enumerate}
+    \item Otevřete ELF soubor pro čtení a zápis
+    \item Vytvořte novou sekci \code{.comment.my}
+    \begin{itemize}
+      \item Typu \code{SHT_NOTE}
+    \end{itemize}
+    \item Vložte do ní nějaká data
+    \begin{itemize}
+      \item Typu \code{ELF_T_BYTE}
+    \end{itemize}
+    \item Zavolejte \code{elf_update}
+    \begin{itemize}
+      \item S parametrem \code{ELF_C_WRITE}
+    \end{itemize}
+    \item Přeložte a vyzkoušejte
+    \item Zobrazte obsah sekce \code{.comment.my} pomocí \cmd{readelf -x}
+  \end{enumerate}
+
+\end{frame}
 
 \end{document}
