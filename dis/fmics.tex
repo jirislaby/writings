@@ -1080,21 +1080,22 @@ information.
 \section{Experimental Results}\label{sec:fmics_experiments}
 
 We have performed our experiments on several functions of the Linux kernel
-2.6.28, where the static analyzer \stan reported something. More precisely,
+2.6.28, where the static analyzer \stan reported an error. More precisely,
 \stan reported an error trace starting in these functions. We consulted the
-reports with kernel developers to sort out which are false positives and which
-are real errors. All the selected functions (and all functions transitively
-called from them) contain no assembler (in some cases, it has been replaced by
-equivalent C code) and no external function calls after slicing.
+reports with kernel developers to figure out which are false positives and
+which are real errors. All the selected functions (and all functions
+transitively called from them) contain no assembler (in some cases, it has
+been replaced by equivalent C code) and no external function calls after
+slicing.
 
-We ran our experimental tool on these functions. All tests were performed on
-a machine with an Intel E6850 dual-core processor at 3\,GHz and 6\,GiB of
-memory, running Linux. We specified \klee parameters to time out after
+We ran \symbio on these functions. All tests were performed on a machine with
+an Intel E6850 dual-core processor at 3\,GHz and with 6\,GiB of memory. The
+machine was running Linux. We specified parameters to \klee to time out after
 10 seconds spent in an SMT solver and after 300 seconds of an overall running
 time. Increasing these times brings no real effect in our environment. We do
-not pass optimize option for \klee because it causes \klee to crash for most
-of the input. The optimization might further speed the analysis up. The
-crashes inside \klee are yet to be investigated.
+not pass the optimize parameter to \klee, because it causes \klee to crash for
+many input files. The optimization might further speed the analysis up, but
+the crashes inside \klee are a run for a longer time.
 
 \begin{table}[tb]
 \begin{center}
@@ -1102,13 +1103,12 @@ crashes inside \klee are yet to be investigated.
 \renewcommand*\arraystretch{1.2}
 %\scriptsize
 \begin{tabular}{|l|c|c|c|c|c|c|c|c|} \hline
-  {\textbf{File}}&
+  \multirow{2}{*}{\textbf{Function}}&
   \multicolumn{5}{c|}{\textbf{Running Time} (s)} & 
   \multirow{2}{*}{\textbf{Sliced}} &
   \multirow{2}{*}{\textbf{Res.}} & \textbf{Factual} \\ \cline{2-6}
-  {\textbf{Function}} & \textbf{Co.} & \textbf{Inst.} &
-   \textbf{Slic.} & \textbf{SE} & \textbf{Total} & &
- & \textbf{State} \\ \hline \hline
+& \textbf{Co.} & \textbf{Inst.} & \textbf{Slic.} & \textbf{SE} &
+  \textbf{Total} & & & \textbf{State} \\ \hline \hline
 
 %  \begin{minipage}{3cm}
 %    \smallskip\scriptsize{\code{fs/jfs/super.c}} \\[-1pt]
@@ -1169,7 +1169,7 @@ crashes inside \klee are yet to be investigated.
   \textbf{Sliced} presents the ratio of instructions sliced away from the
   instrumented \textsc{Llvm} code and the exact number of instructions
   before/after slicing. The column \textbf{Res.} specifies the
-  result of our tool: E means that the tool found a real error, FP means
+  result of \symbio: E means that the tool found a real error, FP means
   that the analysis finished without error found (i.e.~the original error
   report is a false positive), TO that the symbolic execution did not finish in
   time and ME denotes an occurrence of memory error. The last column specifies
@@ -1192,48 +1192,41 @@ crashes inside \klee are yet to be investigated.
 % kernel/kprobes.c pre_handler_kretprobe (mem err) 202 / 68 (66.34% is gone)
 % no slicing: timeout
 % klee -max-stp-time=10 -max-time=300
-Table~\ref{tab:results_fmics} presents results of our tool on selected
-functions.  The table shows compilation, instrumentation, slicing, symbolic
-execution, and the overall running time. Further, the table presents the ratio
-of instructions that were sliced away from the instrumented \textsc{Llvm}
-code.  The last two columns specify the results of our analysis and the real
-state confirmed by kernel developers. The table clearly shows that the
-bottleneck of our technique is the symbolic execution. However, if we did not
-slice the code, the only function completely executed in time would be
-\code{sisusbcon_set_palette}, computed in 20.64\,s.
-% , i.e. slower by 17 per cent. As a demonstration, slicer reduces 2936
-% \textsc{Llvm} instructions to 705 there.
+Table~\ref{tab:results_fmics} presents results of \symbio on selected
+functions.  The table shows a compilation, instrumentation, slicing, symbolic
+execution, and overall running time. Further, the table presents the ratio
+of instructions that were sliced away from the instrumented \llvm code.  The
+last two columns specify the results of our analysis and the real state
+confirmed by kernel developers. The table clearly shows that the bottleneck of
+our technique is mostly the symbolic execution. Note there are exceptions in
+the kernel like the function \code{qlge_set_mac_address}. There, the slicing
+is more expensive due to circular inter-procedural dependencies of the slicing
+criteria. Many states have to be transferred over calls until the fixed point
+is reached. In any case, the time of slicing was not more than a minute.
+Moreover, if we did not slice the code, the only function completely executed
+in time would be \code{sisusbcon_set_palette}, computed in 20.64\,s. With the
+slicing, we still see some timeouts caused by unbounded loops that had to
+remain in place as they affect slicing criteria.
 
 Although the results have no statistical significance, it is clear that the
 technique can in principle classify error reports produced by other tools like
-\textsc{Stanse}. If our technique reports an error, it is a real one. If it
-finishes the analysis without any error detected, the original error report is
-a false positive. The analysis may also not finish in a given time, which is
-usually caused by loops in the sliced code. Finally, it may report a memory
-error mentioned above.
-
-
-% In most cases with our experiments, the time spent by compilation,
-% instrumentation and slicing may be silently ignored with respect to the SE.
-% In the kernel, there are few exception like \texttt{qlge\_set\_mac\_address}
-% presented here.  Slicing in this case is a bit expensive due to circular
-% inter-procedural dependencies of the slicing criteria. So that many states are
-% transferred over calls until the fixed point is reached. In any case, the time
-% of slicing was not more than a minute.
-
-% Other than that, the vast majority of the analysis time is spent with the SE.
-% In some cases, the time limit is hit. In both functions in
-% Table~\ref{tab:results} it it because of unbounded loops which depend on
-% locks.
-
-% Table~\ref{tab:results} also sketches an effect of the slicing. It can be seen
-% that it is effective as it allows, in average, 66 per cent of the code to be
-% removed.
+\stan. If our technique reports an error, it is a real one. If it finishes the
+analysis without any error detected, the original error report is a false
+positive. The analysis may also not finish in a given time, which is usually
+caused by loops in the sliced code. Finally, it may report a memory error
+mentioned above.
 
 %}}}
 %{{{ Related Work
 
 \section{Related Work} \label{sec:fmics_related}
+
+We feel the closest relation to the approach of
+\textsc{Sante}~\cite{slic_sante} which emerged in almost the same as our idea.
+\textsc{Sante} takes the output of a static analyzer and tries to check
+whether the reported errors can be reached in real environment. The tool takes
+the analyzed program, slices it and runs it dynamically. The slicing speeds up
+the dynamic run and reduces the time needed for verification of genuineness.
 
 There are many tools checking properties described by finite state machines.
 The technique of \xgcc~\cite{metacomp} found a thousands of errors in real
