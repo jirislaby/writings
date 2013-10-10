@@ -96,18 +96,19 @@ return value afterwards.
 \section{Data-flow Analysis}\label{sec:data-flow}
 One of the basic static analyses is \emph{data-flow analysis}. It collects
 information about some data flowing through points in code. The data can be
-some information about values of variables, about statements etc. We usually
-analyze each program line separately to see what are the effects of the line
-and then put this information to a transfer equation. It describes relations
-between what holds before and after the execution of a particular line. Next,
-we stabilize this set of equations, usually by computing the fixed
-point of the equations. The fixed point is either the least or greatest
-solution to the equations, depending on the performed analysis. Data computed
-using the data-flow analysis can be utilized for various code optimizations or
-program analysis.
+some information about values of variables, about statements, and so on. We
+usually look at each program line separately to see what are effects of the
+line and then encode the desired information into a \emph{transfer equation}.
+It describes relations between what holds before and after the execution of a
+particular line. Next, we stabilize a full set of program equations, usually
+by computing a point where the equations no longer change. This state is
+called \emph{fixed point}. The fixed point is chosen either to be the least or
+greatest solution of the equations, depending on the performed analysis. When
+we have final data computed by the data-flow analysis, the data can be
+utilized for various code optimizations or program analyses.
 
 Let us demonstrate the data-flow analysis on an example and then generalize
-that approach. We chose one of the basic data-flow analyses: \emph{reaching
+the approach. We chose one of the basic data-flow analyses: \emph{reaching
 definitions}~\cite[Section 9.2.4]{dragon}. At some point $p$ in code, we are
 interested in all assignments where some variable $\var{x}$ was set and was
 not re-set during the control flow to the point $p$. This lets us reason about
@@ -132,23 +133,25 @@ Since we need to propagate information about definitions, there are two
 types of propagations:
 \begin{enumerate}
 \item On statements which are assignments, the contents of incoming sets is
-mangled. The equation takes the set of statements from the predecessors,
-removes all statements that assign to the same variable as the current
-assignment and adds itself. If there are more predecessors, we use the set
-union as we want to propagate definitions from both branches.
+mangled. First, the equation takes the set of statements from the
+predecessors. If there are multiple predecessors, we use the set union as we
+want to propagate definitions from all branches. Second, the equation reduces
+the predecessors' set by all statements that assign to the variable assigned
+in the current statement. Finally, the equation adds the current statement.
 
-\item Equations for other statements simply copy data from predecessors.
+\item Equations for other statements simply copy data from predecessors (with
+a use of the set union, if there are more than one).
 
 \end{enumerate}
-We constructed the transfer equation $f_s$ for each statement $s$ in the
-example of Table~\ref{tab:state_df_eq}. They are shown in the third column of
+We constructed the transfer equation $f_s$ for each statement $s$ of the
+example in Table~\ref{tab:state_df_eq}. They are shown in the third column of
 the same table.
 \begin{table}[tb]
 \begin{center}
 \begin{tabular}{|r|l||p{0.2em}lp{0.3em}r|} \hline
 \textbf{\footnotesize \#} &
   \multicolumn{1}{c||}{\textbf{Code}} &
-  \multicolumn{4}{c|}{\textbf{Transform Equations}} \\ \hline\hline
+  \multicolumn{4}{c|}{\textbf{Transfer Equations}} \\ \hline\hline
 && $f_0$ & $= \emptyset$ && \\ \hline
 
 1 & {\begin{lstlisting}[name=state_df_comp,numbers=none,frame=none]
@@ -192,7 +195,8 @@ $f_7$ & $= \emptyset$ & $\cup$ & $(f_3 \,\setminus\, \emptyset)$ \\ \hline
   \caption{A reaching definitions data-flow analysis example.}
   \label{tab:state_df_eq}
 \end{table}
-We can notice, that every equation is of this form:
+If we look closer at the example, it suggests that all the equations have one
+predefined form:
 \begin{equation*}
 f_s = gen_s \cup (pred_s \setminus kill_s)
 \end{equation*}
@@ -202,13 +206,16 @@ is a union of $f_{s'}$ for each predecessor $s'$.  Finally, if $s$ is an
 assignment to \code{x}, $kill_s$ is a set that contains other assignments to
 \code{x}.  Otherwise $kill_s$ is empty.
 
-Now, we would like to compute the least fixed point of the equation. We can
-use Definition~\ref{def:fixpoint} for that purpose, but we need a single
-composite function $F$. We achieve that by rewriting the transform equations
-to functions taking as parameters all others functions. For all statement
-labels $s$, the functions look like $f_s=F_s(f_0,\, f_1,\, \dots,\, f_8)$. The
-composite function is then $F=\lambda x . (F_0(x),\, F_1(x),\, \dots,\,
-F_7(x))$. The fixed point computation for our example of
+Now, we would like to compute a fixed point of the equations. Since the
+reaching definitions analysis starts with an empty set and gradually augments
+that, we need to compute the least fixed point. We can use
+Definition~\ref{def:fixpoint} for that purpose, but we need a single composite
+function $F$. We achieve that by rewriting the transfer equations to functions
+taking all others functions as parameters. For all statement labels $s$, the
+functions look like $f_s=F_s(f_0,\, \dots,\, f_8)$. The composite function is
+then $F(\overrightarrow{f})=(F_0(\overrightarrow{f}),\, \dots,\,
+F_7(\overrightarrow{f}))$. With the function $F$, we can iteratively compute
+the least fixed point. The computation for our example of
 Table~\ref{tab:state_df_eq} is shown in Table~\ref{tab:state_df_fp}.
 
 \begin{dfn}[Fixed point]\label{def:fixpoint}
@@ -254,7 +261,7 @@ have not defined lattices yet, this is described in more detail later in
 Section~\ref{sec:ai}. The requirement stems from works of Kleene~\cite[pages
 348--349]{kleene} and Tarski~\cite{tarski}.
 
-Now we generalize the approach of the data-flow analysis. In the data-flow
+Now, we generalize the approach of the data-flow analysis. In the data-flow
 analysis, we have a pair of equations for each statement $s$ of a program:
 \begin{equation} \label{eq:data_flow}
 \begin{aligned}
@@ -263,23 +270,29 @@ in_s & = join_{p\in pred_s}(out_p)
 \end{aligned}
 \end{equation}
 We define a transfer function $trans_s$ to transform the input set $in_s$ of a
-statement $s$ to the output set $out_s$ according to the effect of $s$ in a
-particular analysis.  The join operator $join$ takes output sets from all
-previous nodes $pred_s$ and combines them together. The previous edges are
-either predecessors or successors, depending whether an analysis is forward or
-backward (Section~\ref{sec:types_anal}). For forward analysis, the $in_s$ set
-is bound to an incoming control flow graph edge(s) of the node $s$ and the
-$out_s$ set to the outgoing one(s).  Other way round for a backward analysis.
-Further, $join$ is usually a set union or intersection depending whether the
-analysis is may or must (cf.\ Section~\ref{sec:types_anal}).  As we can
-imagine, $trans_s(in_s)$ is exactly the transfer function $f_s$.
+statement $s$ to the output set $out_s$. $trans_s$ is defined according to the
+effect of $s$ in a particular analysis.  The join operator $join$ takes output
+sets from all nodes $pred_s$ and combines them together. $join$ is usually a
+set union or intersection depending whether the analysis is may or must (cf.\
+Section~\ref{sec:types_anal}). The nodes $pred_s$ are either predecessors or
+successors, depending whether the analysis is forward or backward
+(Section~\ref{sec:types_anal}).  The direction of the analysis also affects
+the position where we put $in_s$ and $out_s$ sets. For a forward analysis, the
+$in_s$ set is bound to an incoming control flow graph edge(s) of the node $s$
+and the $out_s$ set to the outgoing one(s). It is other way round for a
+backward analysis. As we can imagine, $trans_s(in_s)$ is exactly the transfer
+equation $f_s$.
 
-For the reaching definitions example above, we define the join operator as
-the set union ($\bigcup$) and the transfer function in this notation to hold
-statement line numbers as follows ($S$ is the set of all statements in the
-analysed program):
+Now we can define our example of the reaching definitions above using the
+notion of Equation~\ref{eq:data_flow}. The join operator can be defined as the
+set union over all incoming sets ($\bigcup$). The transfer function can be set
+up to hold line numbers of statements. Therefore, if we let $S$ be the set of
+all statements in an analysed program, the transfer function can be as is
+depicted in Figure~\ref{fig:st_rdef_trans}.
+
+\begin{figure}[tb]
 \begin{align*}
-trans_s(in) & = gen_s \cup (in - kill_s) \\
+trans_s(in_s) & = gen_s \cup (in_s - kill_s) \\
 gen_s & =
 \begin{cases}
 \{s\}     & \text{$s$ is an assignment} \\
@@ -291,14 +304,19 @@ kill_s & =
   \\
 & \text{(let } s \text{ assign to \code{a})} \\
 \emptyset & \text{otherwise}
-\end{cases} \\
+\end{cases}
 \end{align*}
+
+  \caption{The transfer function defined for the reaching definitions
+  data-flow analysis.}
+  \label{fig:st_rdef_trans}
+\end{figure}
 
 Thanks to the simplicity of the data-flow analysis, there are many diverse
 data-flow analyses. In Table~\ref{tab:data_flow_examples}, we suggest some
 examples of other well-known basic data-flow analyses as they are defined
 according to the forward/backward and may/must criteria.
-\begin{table}[htb]
+\begin{table}[tb]
 \begin{center}
 \begin{tabular}{|c||c|c|} \hline
 \textbf{Analysis}& \textbf{May}& \textbf{Must} \\ \hline\hline
@@ -314,9 +332,9 @@ according to the forward/backward and may/must criteria.
     forward/backward rules.}
   \label{tab:data_flow_examples}
 \end{table}
-These are the most known analyses which we believe the reader knows. If not,
-they are defined in every superior literature about compilers like of Aho et
-al.~\cite{dragon} or Muchnick~\cite{muchnick}.
+These are the most known analyses which we believe the reader knows. If this
+is not the case, the analyses are defined in every superior literature about
+compilers like of Aho et al.~\cite{dragon} or Muchnick~\cite{muchnick}.
 
 The simplicity is also a reason, that the data-flow analysis is used in
 many tools including checkers.  The very common place of extensive use are
@@ -341,15 +359,16 @@ false positive rate is unbearable. Nonetheless, the development of
 most errors and warnings \textsc{Splint} was used to report are reported by
 modern compilers nowadays. It was also thanks to the work of Reps et
 al.~\cite{dataflow_large}. They showed that it is possible to compute the
-data-flow sets precisely for the whole program inter-procedurally in
-polynomial time. They presented that on finding possibly uninitialized
-variables.  There exist also analyzers that are not so powerful to handle
-large code bases or require high user intervention to annotate the checked
-code. We give as an example \textsc{Aspect}~\cite{aspect}, which compares a
-program specification of an input-output behaviour provided by a user to
-data-flow models extracted from the code.
+data-flow sets precisely for a whole program inter-procedurally in polynomial
+time. They presented their discovery on an analysis that finds possibly
+uninitialized variables.  There exist also analyzers that are not so powerful
+to handle large code bases or require high user intervention to annotate the
+checked code. As an example, we give \textsc{Aspect}~\cite{aspect}, which
+compares a program specification of an input-output behaviour provided by a
+user to data-flow models extracted from analyzed code.
 
-This section is only a short introduction to the data-flow analysis, more
+As we use the data-flow analysis only as a support for more complex analyses,
+this section is only a short introduction to the data-flow analysis.  More
 information and many examples are available in the literature~\cite{dragon,
 muchnick}.
 
@@ -359,32 +378,35 @@ muchnick}.
 The data-flow analysis is only a limited tool. It just collects information
 about data and how they propagate through the control flow of a program.
 Therefore it is not that useful for designing more complex analyses which are
-usual for program checking and possibly elsewhere. There was a call to
-formalize more complex analyses.  Cousots' work on this topic stretches back
-to the 1970s. Back then, they described a framework called \emph{abstract
+usual for program checking and possibly elsewhere. There was a desire to
+formalize the process of designing more complex analyses. Cousots have been
+dealing with this for a long time. Their work on this topic stretches back to
+the 1970s. Back then, they described a framework called \emph{abstract
 interpretation}~\cite{cousot}. It is designed to allow users of the formalism
 to easily design an analysis, prove whether it is correct and sound, to
-formulate more precision levels of the analysis consistently and more.  The
-formalism allows us to interpret analyses like the data-flow analysis as a
-special instance of the abstract interpretation~\cite{ai_intro}.
+consistently formulate more precision levels of the analysis and more. The
+formalism is so generic, that it allows us to interpret analyses like the
+data-flow analysis as a special instance of the abstract interpretation
+too~\cite{ai_intro}.
 
 As the name of the analysis suggests, the data domains used in analyzed code
-are replaced by abstract ones. An abstract domain is a \emph{complete
-lattice}~\cite{lattice1,lattice2} as defined in
+are replaced by abstract ones. The approach requires an abstract domain to be
+a \emph{complete lattice}~\cite{lattice1,lattice2}. We formally define it
 Definition~\ref{def:colattice}. Since the analyzed program is interpreted on a
 new (abstract) domain, we have to provide a new semantics of the program over
 the domain.  There are no limits in theory, the semantics can be arbitrary.
-We define \emph{monotone functions} over the abstract lattice. They are
-assigned to each instruction in an analyzed program to transform the program
-states over a particular instruction. We then compose these functions into
-a single monotone function over the whole program (over product lattice as we
-will see later).  Thanks to the work of Tarski~\cite{tarski} and
+It is defined by \emph{monotone functions} over the abstract lattice. The
+functions are assigned to each instruction in an analyzed program to transform
+the program states over a particular instruction. We then compose these
+functions into a single monotone function over the whole program (over product
+lattice as we will see later).  Thanks to the work of Tarski~\cite{tarski} and
 Kleene~\cite[pages 348--349]{kleene}, we can always compute a fixed point of
-the monotone function which transfers states over the product lattice.
-Further, using lattices is effective. Their operators join and meet can be
-used when an analyzer is interpreting a program.  For example, when a
-branching occurs, the branch join operator can simply take the values present
-on the outputs of both branches and performs the lattice join ($\sqcup$).
+the single monotone function transferring states over the product lattice.
+The use of lattice(s) was not a random choice. Lattices are effective, their
+join and meet operators can be used when an analyzer is interpreting a
+program.  For example, when a branching occurs, the branch join operator can
+simply take the values present on the outputs of both branches and performs
+the lattice join ($\sqcup$).
 
 \begin{dfn}[Complete lattice]\label{def:colattice}
 A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
@@ -395,29 +417,31 @@ greatest element $\top = \sqcup L$.
 \end{dfn}
 
 Let us demonstrate the abstract interpretation on an example and then define
-the approach formally.  We chose the sign analysis for this purpose. The sign
-analysis is able to predict a sign of a variable \code{x} by looking only on
-signs of constants in an expression assigned to \code{x}.  Consider for
-example the expression $\var{y} = -123 \cdot (678 + 5298)$. Without really
-looking at the actual numbers, the analysis can conclude that the value stored
-in \code{y} is negative (in the usual understanding of the addition and
-multiplication operators). Note that the analysis is not able to answer every
-such query due to the abstraction. For example we cannot decide the sign of
-\code{z} in $\var{z} = 3 + -5$ when considering only signs (a negative number
-added to a positive one can generally give both a negative and positive
-number). In our further explanation, we limit ourselves only to addition and
-multiplication for easier understanding. We also consider only a single
-variable in a program.
+the approach formally.  We work with the \emph{sign analysis} for
+demonstration purposes.  The sign analysis is able to predict a sign of a
+variable \code{x} by looking only on signs of constants in an expression
+assigned to \code{x}.  Consider for example the expression $\var{y} = -123
+\cdot (678 + 5298)$.  Without really looking at the actual numbers, the
+analysis can conclude that the value stored in \code{y} is negative (in the
+usual understanding of the addition and multiplication operators). Note that
+the analysis is not able to answer every such query due to the abstraction.
+For example, we cannot decide the sign of \code{z} in the expression $\var{z}
+= 3 + -5$ when considering only signs (a negative number added to a positive
+one can generally give both a negative and positive result). In our further
+explanation, we limit ourselves only to the addition and multiplication
+operators for easier understanding. We also consider only a single variable in
+a program.
 
-First, we have to define the abstract domain which the abstract interpretation
-works with. There are five possible values which can occur.  Either an
-expression is positive ($\oplus$), negative ($\ominus$), zero ($0$), or the
-result is unknown as for \code{z} above ($\top$). Finally, there is a value to
-represent an uninitialized variable ($\bot$). If it appears in some
-subexpression, the analyzer should report an error. Therefore we do not
-consider it in further computation. The complete lattice for the set of these
-elements $\mathbf{Sign} = \{\oplus,\, \ominus,\, 0,\, \top,\, \bot \}$ is
-depicted in Figure~\ref{fig:state_ai_sign_lat}.
+First in our example, we have to establish an abstract domain which the
+abstract interpretation works with. There are five possible values which can
+occur in the sign analysis.  Either an expression is positive ($\oplus$),
+negative ($\ominus$), zero ($0$), or the result is unknown as for \code{z}
+above ($\top$). Finally, there is a value to represent an uninitialized
+variable ($\bot$). If it appears in some subexpression, the analyzer should
+report an error. Therefore we do not consider it in further computation. The
+complete lattice for the set of these elements $\mathbf{Sign} = \{\oplus,\,
+\ominus,\, 0,\, \top,\, \bot \}$ is depicted in
+Figure~\ref{fig:state_ai_sign_lat}.
 \begin{figure}[htb]
   \begin{center}
     \begin{tikzpicture}[node distance=5mm and 5mm]
@@ -473,9 +497,9 @@ We know how the values are computed in an expression, but we still need to
 define a \emph{transfer function} over lines of code. Similar to the data-flow
 analysis, transfer function $f_s$ for a statement $s$ updates the states
 incoming to $s$ according to the effect of $s$. In the following text, we
-demonstrate the interpretation on code from the second column of
+demonstrate the interpretation on example code from the second column of
 Table~\ref{tab:state_ai_sign_ex}.
-\begin{table}[htb]
+\begin{table}[tb]
   \begin{center}
   \begin{tabular}{|r|l||p{2em}l|} \hline
 \textbf{\footnotesize \#} &
@@ -542,11 +566,11 @@ as
 F(\overrightarrow{f}) =
   (f_1(\overrightarrow{f}),\, \dots,\, f_n(\overrightarrow{f})).
 \end{equation*}
-Note that $F$ is also a monotone function in $(L^n,\, \sqsubseteq)$. Thanks
+Note that $F$ is also a monotone function in $(L^n,\, \sqsubseteq)$. Thanks to
 that, the least fixed point exists~\cite{kleene, tarski} and is the least
-solution of the transfer functions $f_1,\, \dots,\, f_n$. We compute the least
-fixed point in Table~\ref{tab:state_ai_sign_fp} for our example of
-Table~\ref{tab:state_ai_sign_ex}.
+solution of the transfer functions $f_1,\, \dots,\, f_n$. We iteratively
+compute the least fixed point in Table~\ref{tab:state_ai_sign_fp} for our
+example of Table~\ref{tab:state_ai_sign_ex}.
 \begin{table}[tb]
   \begin{center}
 \begin{tabular}{|c||c|c|c|c|c|c|} \hline
@@ -569,8 +593,8 @@ $f_7$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\top$   & $\top$ \\ \hline
   \label{tab:state_ai_sign_fp}
 \end{table}
 We can see that the analysis can definitely decide about the sign of a value
-in \code{x} until assignment on line~\ref{lst:state_ai_xp2}. There, we lose
-precision due to the abstraction.
+in \code{x} until assignment on line~\ref{lst:state_ai_xp2}. After that line,
+we lose precision due to the abstraction.
 
 As we proceeded with the example, we informally defined the abstract
 interpretation by:
@@ -582,18 +606,18 @@ which describes abstract values.
 of a program.
 
 \end{enumerate}
-Formally, the abstract interpretation is a tuple $I=\langle L,\, \circ,\,
+Formally, the abstract interpretation is the tuple $I=\langle L,\, \circ,\,
 \leq,\, \top,\, \bot,\, F\rangle$. $\circ$ is either supremum ($\sqcup$)
-or infimum ($\sqcap$) lattice operator depending whether computing the least
-or greatest fixed point, respectively. Obviously, the definition can be
-loosened to require only a semi-lattice, as we need only one operator.
+or infimum ($\sqcap$) lattice operator depending whether the results should be
+the least or greatest fixed point, respectively. Obviously, the definition can
+be loosened to require only a semi-lattice, as we need only one operator.
 
 The abstract interpretation is a very flexible tool for designing analyses. It
 does not require the lattices to have a finite height. Even if the lattice is
 infinitely high, the fixed point still can be computed in a finite time.
 Consider the lattice of Figure~\ref{fig:state_lat_int}. It is used for
-abstracting reachable values of integer variables in programs.  The lattice
-uses intervals to remember possible bounds of some variable's value.  This is
+abstracting values of integer variables in programs.  The lattice is composed
+of intervals to remember possible bounds of some variable's value.  This is
 very useful domain especially when analyzing whether loops are bounded. When
 indices and probably other variables in the body of the loop are bounded, we
 can run some optimizations like loop unrolling~\cite[page 735]{dragon}.
@@ -697,19 +721,19 @@ can run some optimizations like loop unrolling~\cite[page 735]{dragon}.
 
 Obviously, the Kleene's sequence is not necessarily finite for this lattice.
 Therefore, the computation of a fixed point may not finish. To overcome the
-problem, Cousots~\cite{cousot} introduced a \emph{widening} operator
+problem, Cousots~\cite{cousot} introduced the \emph{widening} operator
 $\triangledown$. Informally, the sequence is sped up by widening, so that it
 converges eventually.  Imagine we have an interval lattice and an infinite
 loop where we increment a variable that was initially set to zero. The
 infinite sequence of intervals computed for that variable would be: $[0,0],\,
 [0,1],\, \dots,\, [0,\infty]$. We can define the widening operator to set one
-of the interval bounds to infinity after some time to force the sequence to be
-finite: $[0,0],\, [0,1],\, [0,\infty]$. This makes the Kleene's sequence
-finite. There is also a \emph{narrowing} operator $\vartriangle$ which is used
-to make abstract values more precise. The reader is pointed to Cortesi and
-Zanioli~\cite{ai_widening} or Cousots~\cite{cousot_galois} who explain 
-widening and narrowing formally and demonstrate the operators on more concise
-examples.
+of the interval bounds to infinity after some time (e.g.\ 100 iterations) to
+force the sequence to be finite like: $[0,0],\, [0,1],\, \dots,\, [0, 99],\,
+[0,\infty]$. This makes the Kleene's sequence finite. There exists also the
+\emph{narrowing} operator $\vartriangle$ which is used to make abstract values
+more precise. The reader is pointed to Cortesi and Zanioli~\cite{ai_widening}
+or Cousots~\cite{cousot_galois} who explain widening and narrowing formally
+and demonstrate the operators on more concise examples.
 
 Intervals are not the only shapes to represent abstract values of numbers.
 Octagons, elipses, polyhedra, and other shapes are used to represent relations
@@ -755,18 +779,18 @@ the analysis always terminates.
 
 \section{Symbolic Execution}\label{sec:se}
 In the previous section we described the abstract interpretation which is a
-framework for fast, but typically imprecise analyses. As a result of
-incomplete abstract analyzers, we often get a pile of false positives on their
-output.  There also exist techniques which cannot formally generate false
-positives, but are often slower than abstract interpreters or sometimes even
-unsound.  One of such techniques is the \emph{symbolic execution}. The
-technique was introduced in 1970's and described by several authors
-concurrently~\cite{se_king, se_select, se_dissect, se_clarke}. The symbolic
-execution represents program inputs by symbols. Therefore it does not need to
-analyze the program many times with concrete, initialized, data. The program
-is then executed and program expressions are manipulated including the
-symbolic values. Let us demonstrate this on an example of
-Figure~\ref{fig:se_example}. The example is two-fold.
+framework for fast, but typically imprecise analyses. As a result of sound,
+but incomplete abstract analyzers, we often get a pile of false positives on
+their output.  There also exist techniques which cannot formally generate
+false positives, but are often slower than abstract interpreters or sometimes
+even unsound.  One of precise and sound techniques is the \emph{symbolic
+execution}. The technique was introduced in 1970's and described by several
+authors concurrently~\cite{se_king, se_select, se_dissect, se_clarke}. The
+symbolic execution represents program inputs by symbols. Therefore it does not
+need to analyze the program many times with concrete, initialized, data. The
+program is then executed and program expressions are manipulated including the
+symbolic values. Let us demonstrate this on an example depicted in
+Figure~\ref{fig:se_example}.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -790,63 +814,80 @@ int fun(void) {
   \label{fig:se_example}
 \end{figure}
 
-First, there is a read from the user. How long it would take to exercise the
-program to get to the true branch of the \code{if}s with dynamic testing?
-With \code{int} being usual 32 bits, there is only one successful attempt out
-of $2^{32}$ overall. Of course, with a static analyzer based on the data-flow
-analysis or abstract interpretation, those true branches would be analyzed
-quite quickly.  This brings us to the second point nonetheless. Many complete
-analyzers generate a report about division by zero possible at
-line~\ref{line:se_ex_div}. This is indeed a false positive because \code{b} is
-set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
+The example is two-fold. First, there is a read from a user. It would take a
+long time to exercise the program to get to the true branch of the \code{if}s
+with dynamic testing.  With \code{int} being usual 32 bits, there is only one
+successful attempt out of $2^{32}$ overall. Of course, with a static analyzer
+based on the data-flow analysis or abstract interpretation, those true
+branches would be analyzed quite quickly. But this brings us to the second
+point. Many complete analyzers generate a report about division by zero
+possible on line~\ref{line:se_ex_div}. This is indeed a false positive because
+\code{b} is set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
 \code{0x12345678}. The source of the false positive is that the analyzers do
 not often remember conditions on branchings.
 
-The symbolic execution tackles this problem. All inputs from the user are
-replaced by \emph{symbols}. For a variable \code{a}, we denote the symbol
+The symbolic execution tackles these two problems. All inputs from the user
+are replaced by \emph{symbols}. For a variable \code{a}, we denote the symbol
 corresponding to \code{a} as $\sym{a}$. We allow symbols to be assigned to
 variables similar to constants and other expressions. In our example, the
 assignment on line~\ref{line:se_ex_sset} would set $\sym{a}+1$ to \code{a}.
 Obviously we have to teach the symbolic executor to deal with symbols in
-arithmetic operations and branching statements.  In the first place, the
-symbolic executor needs to remember the currently evaluated program location
-$l$ in a control flow graph.  Next, we need a storage. Symbolic executors
-contain a \emph{symbolic memory} $\theta$ which assigns to each variable its
-current symbolic value. So after evaluating the statement on
-line~\ref{line:se_ex_sset}, $\theta(\var{a}) = \sym{a}+1$. To be precise in
-the execution of code, the executor also has to remember the branches which it
-chose to jump to at branching points. This information is stored in a
-\emph{path condition} $\varphi$. It is a first-order formula~\cite{fol}
+arithmetic operations and branching statements.
+
+A symbolic executor, to be fully working, has to remember a \emph{program
+state}. The executor represents the state as a triple and updates its members
+while executing a program. The triple is $(l,\, \theta,\, \varphi)$ and is
+constituted by the following items:
+\begin{itemize}
+\item \emph{Location} $l$: the symbolic executor needs to remember the
+currently evaluated program location in a control flow graph.
+
+\item \emph{Symbolic memory} $\theta$: the executor needs a storage. The
+memory $\theta$ is a function that assigns to each variable its current
+symbolic value. So after evaluating the statement on
+line~\ref{line:se_ex_sset}, $\theta(\var{a}) = \sym{a}+1$.
+
+\item \emph{Path condition} $\varphi$: to be precise in the execution of code,
+the executor also has to remember the branches which it chose to jump to at
+branching points. The path condition is a first-order formula~\cite{fol}
 representing a necessary and sufficient condition over symbols to drive the
 execution along the currently executed path to the actually evaluated point.
 $\varphi$ is set initially to $\true$ and is evaluated and potentially updated
-at every branch.  This happens on lines~\ref{line:se_ex_if1}
-and~\ref{line:se_ex_if2} in our example. On line~\ref{line:se_ex_if1}, we
-check whether $\varphi$ implies validity of the condition instantiated by the
-current state of $\theta$. More concretely, the executor checks whether either
-of the following two implications hold (at most one~\cite{se_king}):
+at every branch.
+
+\end{itemize}
+
+In our example, the path condition is used and possibly updated on
+lines~\ref{line:se_ex_if1} and~\ref{line:se_ex_if2}.  On
+line~\ref{line:se_ex_if1}, we check whether $\varphi$ implies validity of the
+condition instantiated by the current state of $\theta$. More concretely, the
+executor checks whether either of the following two implications hold (at most
+one can~\cite{se_king}):
 \begin{align}
 \varphi & \rightarrow \left( \theta(\var{a}) = \var{0x12345678} \right) \label{equ:se_fi} \\
 \varphi & \rightarrow \left( \theta(\var{a}) \neq \var{0x12345678} \right) \label{equ:se_se}
 \end{align}
 There are three possibilities that can happen:
-\begin{description}
-\item[Implication \ref{equ:se_fi} is valid] The executor simply continues
-execution by jumping directly to the \emph{true} branch.
-\item[Implication \ref{equ:se_se} is valid] The executor simply continues
-execution by jumping directly to the \emph{false} branch.
-\item[Neither is valid] This means that both branches are possible, depending
-on the symbolic input.  So to retain soundness, the symbolic executor has to
-fork the execution of the whole program to explore both branches. In that
-case, the path condition $\varphi$ has to be augmented in the respective
-branches. For the true branch, $\varphi \wedge (\sym{a}+\var{1} =
-\var{0x12345678})$ is a new path condition, for the other branch $\varphi
+\begin{itemize}
+\item \textbf{Implication \ref{equ:se_fi} is valid:} the executor simply
+continues execution by jumping directly to the \emph{true} branch.
+
+\item \textbf{Implication \ref{equ:se_se} is valid:} The executor simply
+continues execution by jumping directly to the \emph{false} branch.
+
+\item \textbf{Neither is valid:} This means that both branches are possible,
+depending on the symbolic input.  So to retain soundness, the symbolic
+executor has to fork the execution of the whole program to explore both
+branches. In that case, the path condition $\varphi$ has to be augmented in
+the respective branches. For the true branch, $\varphi \wedge (\sym{a}+\var{1}
+= \var{0x12345678})$ is a new path condition, for the other branch $\varphi
 \wedge (\sym{a}+\var{1} \neq \var{0x12345678})$.
-\end{description}
+
+\end{itemize}
 In our example, on line~\ref{line:se_ex_if1} neither implication is valid, as
 $\theta(\var{a})=\sym{a}+1$ cannot prove validity of $\theta(\var{a}) =
 \var{0x12345678}$. So the execution forks.  The situation is different on
-line~\ref{line:se_ex_if2} nonetheless. There, we can get into two states, by
+line~\ref{line:se_ex_if2}, nonetheless. There, we can get into two states, by
 the two previous forked executions. In one, the path condition contains
 $\theta(\var{a}) = \var{0x12345678}$ and symbolic memory is holding \code{1}
 for \code{b}. In the other $\theta(\var{a}) \neq \var{0x12345678}$ and
@@ -855,12 +896,9 @@ Implication~\ref{equ:se_fi}, so it continues by jumping into the true branch.
 And since $\theta(\var{b}) = 1$, no division by zero can happen.  Similarly
 for the second fork: the executor jumps to the false branch of the \code{if},
 i.e.~it skips the \code{if} completely. Note that this is one of the very
-cases where other types of analyses like the abstract interpretation produce
-false positives.
+cases where other types of analyses including the abstract interpretation
+produce false positives.
 
-The three information above constitute the \emph{program state}. It is a
-triple $(l,\, \theta,\, \varphi)$.  The executor works with these triples when
-executing a program and updates the members accordingly as described above.
 Due to the forks, the execution of a program is usually depicted as a
 \emph{symbolic execution tree}. Nodes of the tree are labeled by program
 states computed during the execution.  Edges of the tree correspond to
@@ -1099,23 +1137,22 @@ respect to error conditions like division by zero. \textsc{Klee} and
 \textsc{UC-Klee} are put into concolic executors since they allow to invoke
 library functions dynamically.
 
-Instead of generating only a single input, \textsc{Sage}~\cite{active_props,
-sage} defines the term \emph{generational search} to generate as many inputs
-as possible in a single symbolic run. This is unimportant for cases, where the
+Instead of generating only a single input, \sage~\cite{active_props, sage}
+defines the term \emph{generational search} to generate as many inputs as
+possible in a single symbolic run. This is unimportant for cases, where the
 whole state space is explored. But this is not the case as real programs are
 barely covered fully. So generating more inputs often helps more coverage. As
 it is a concolic executor, it records branching conditions from the first
 dynamic run.  But it negates \emph{all} of them one by one and asks a solver
-for a solution.  For each positive reply the solver gives, \textsc{Sage}
-generates a separate input. The whole tool does not use any intermediate
-language, it symbolically executes directly the x86 binary code. So it can be
-used also in cases where source code is not known.  The whole approach in
-\textsc{Sage} is called \emph{automated whitebox fuzz testing}.
-\textsc{SmartFuzz}~\cite{smartfuzz} works very similarly, but the set of
-errors the tool aims at is limited only to integer errors. That is,
-\textsc{SmartFuzz} captures signed/unsigned conversions for example. The
-generated inputs are filtered, so more eager heuristics that allow more inputs
-generation are allowed.
+for a solution.  For each positive reply the solver gives, \sage generates a
+separate input. The whole tool does not use any intermediate language, it
+symbolically executes directly the x86 binary code. So it can be used also in
+cases where source code is not known.  The whole approach in \sage is called
+\emph{automated whitebox fuzz testing}.  \textsc{SmartFuzz}~\cite{smartfuzz}
+works very similarly, but the set of errors the tool aims at is limited only
+to integer errors. That is, \textsc{SmartFuzz} captures signed/unsigned
+conversions for example. The generated inputs are filtered, so more eager
+heuristics that allow more inputs generation are allowed.
 
 None of the above support automatic bi-directional conversion across the
 boundary of the symbolic and concrete execution. This was one of the two
@@ -1137,22 +1174,25 @@ for performance analysis too.  \textsc{S${}^2$e}'s parallel engine works on
 the top of \textsc{Ddt${}^+$}, which is a reimplementation of a closed source
 tool \textsc{Ddt}~\cite{ddt}. A very similar to \textsc{S${}^2$e}, but less
 generic framework is \textsc{BitBlaze}~\cite{bitblaze}. It analyses binary
-files and creates intermediate code with a reduced instruction set. That is
-executed symbolically.  One of unusual uses is generating exploits by a
-comparison of unpatched and patched versions.  \textsc{BitBlaze} was used for
-checking HTTP and NTP protocol servers~\cite{bitblaze_net}.
-\textsc{Bitscope}~\cite{bitscope} is built on the same cornerstone as
-\textsc{BitBlaze}, but provides understanding of dependencies between program
-inputs and outputs. Both were used for recognizing malware in software.
-Another true concolic executor is \textsc{Sjpf}~\cite{sjpf} stemming from
-\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference between them is
-that \textsc{Sjpf} symbolically executes the Java bytecode, therefore performs
-the symbolic execution more directly. Nevertheless its downside is that it
-still does not track constraints in both directions as the ones above, only
-when switching from concrete execution to symbolic.
+files and creates intermediate code with a reduced instruction set. The
+instructions are executed symbolically.  One of unusual uses is generating
+exploits by a comparison of an unpatched and patched version.
+\textsc{BitBlaze} was used for checking HTTP and NTP protocol
+servers~\cite{bitblaze_net}.  \textsc{Bitscope}~\cite{bitscope} is built on
+the same cornerstone as \textsc{BitBlaze}, but provides understanding of
+dependencies between program inputs and outputs. Both were used for
+recognizing malware in software.  Another true concolic executor is
+\textsc{Sjpf}~\cite{sjpf} stemming from
+\textsc{PathFinder-SE}~\cite{pathfinder_se}. The difference between
+\textsc{Sjpf} and \textsc{PathFinder-SE} is that \textsc{Sjpf} symbolically
+executes the Java bytecode instead of source code, therefore performs the
+symbolic execution more directly. Nevertheless, a \textsc{Sjpf}'s downside is
+that it still does not track constraints in both directions as the executors
+above, it tracks the constraints only when switching from the concrete
+execution to the symbolic one.
 
 \textsc{Check 'n' Crash}~\cite{check_crash} does quite the opposite to
-\textsc{Cute}. First, it runs coarse symbolic execution to find a suspicious
+\textsc{Cute}. First, it runs a coarse symbolic execution to find a suspicious
 location in code, then the tool generates a test case and runs the program
 dynamically to verify the test.  There are also overviews where is a
 summarization of some symbolic execution techniques we mention
@@ -1503,23 +1543,24 @@ for C code. IBM's \textsc{Apollo}~\cite{apollo} aims at checking web
 applications, \textsc{PHP} scripts more precisely.
 
 Microsoft developed many tools based on the symbolic execution.  Even though
-\textsc{PREfix}~\cite{prefix} explicitly does not mention it, it is used there
-to find errors in memory management for example. \textsc{PREfix} has no
-problems analyzing large projects thanks to computation of function summaries,
-but needs user intervention to model library functions. This was improved in
-\textsc{Archer} of Xie et al.~\cite{archer}. A similar use as IBM's
-\textsc{Apollo} above has \textsc{Pex}~\cite{pex}. It is a symbolic executor
-intended for checking .NET web applications. They developed also a fuzz tester
-\textsc{SAGE}~\cite{sage}.  It is a symbolic executor working directly on the
-x86 assembly code. It is therefore able to work also with libraries whose
-source code was not made public.  \textsc{YOGI}~\cite{yogi} is a tool which
-combines symbolic execution with dynamic execution. It was experimentally used
-to replace \textsc{SLAM}~\cite{slam_decade} in \textsc{Sdv}~\cite{sdv} with
-comparable better results. Microsoft also released \textsc{PREfast}, a tool
+\textsc{PREfix}~\cite{prefix} explicitly does not mention the symbolic
+execution., it is used there to find errors in memory management for example.
+\textsc{PREfix} has no problems analyzing large projects thanks to a
+computation of function summaries, but needs user intervention to model
+library functions.  This was improved in \textsc{Archer} of Xie et
+al.~\cite{archer}. A similar use as IBM's \textsc{Apollo} above has
+Microsoft's \textsc{Pex}~\cite{pex}. It is a symbolic executor intended for
+checking of .NET web applications. Microsoft developed also a fuzz tester
+\sage~\cite{sage}.  It is a symbolic executor working directly on the x86
+assembly code. It is therefore able to work also with libraries whose source
+code was not made public.  \textsc{Yogi}~\cite{yogi} is a tool which combines
+symbolic execution with dynamic execution. It was experimentally used to
+replace \textsc{Slam}~\cite{slam_decade} in \textsc{Sdv}~\cite{sdv} with
+comparably better results. Microsoft also released \textsc{PREfast}, a tool
 that contains a set of rules that a code should fulfill and with a use of
-annotations, it checks code against the rules. Its main use is to disallows
-developers to commit changes that contain certain classes of errors such as
-inter-procedural integer overflows.
+annotations, \textsc{PREfast} checks code against the rules. Its main use is
+to disallow developers to commit changes that contain certain classes of
+errors such as inter-procedural integer overflows.
 
 %\url{http://spinroot.com/static/}
 %\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
