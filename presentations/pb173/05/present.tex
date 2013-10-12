@@ -2,8 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{V.}
-\date{18. 10. 2012}
+\subtitle{V. Paměť}
+\date{15. 10. 2013}
 
 \begin{document}
 
@@ -60,7 +60,7 @@
   \begin{itemize}
   \item Různé na každé architektuře
   \end{itemize}
-  \item Dané mapování mezi VP a FP
+  \item Dané mapování mezi FP a VP
   \item Nutná podpora HW (MMU), jinak mapování 1:1
   \end{itemize}
 
@@ -79,18 +79,18 @@
   \frametitle{Fyzický prostor}
 
   \begin{itemize}
-  \item To, co vidí MMU
+  \item To, co je za MMU
   \item RAM, časovače, řadiče přerušení, ACPI tabulky, zařízení
-  \item Co kde je $\Rightarrow$ otázka na BIOS
+  \item Co kde je $\Rightarrow$ otázka na BIOS/(U)EFI/\dots
   \item Jak který prostor vypadá $\Rightarrow$ specifikace bridge, ACPI, PCI,
     \ldots
   \item I hierarchický prostor
   \begin{itemize}
-  \item Např. rozsah 100-1ff $\rightarrow$ ChipXY
+  \item Např. rozsah \code{100}--\code{1ff} $\rightarrow$ ChipXY
     \begin{itemize}
     \item ChipXY směruje dále:
-    \item Adresa 100-18f $\rightarrow$ řadič klávesnice
-    \item Adresa 190-1ff $\rightarrow$ časovač
+    \item Adresa \code{100}--\code{18f} $\rightarrow$ řadič klávesnice
+    \item Adresa \code{190}--\code{1ff} $\rightarrow$ časovač
     \end{itemize}
   \end{itemize}
   \end{itemize}
@@ -114,16 +114,17 @@
   \heading{Práce s fyzickou adresou -- přečtení signatury a délky nějaké ACPI
     tabulky z fyzické adresy}
   \begin{enumerate}
-  \item Najít fyzickou adresu nějaké ACPI tabulky v \texttt{dmesg}
+  \item Najít fyzickou adresu nějaké ACPI tabulky v \cmd{dmesg}
   \begin{itemize}
-  \item Řádky formátu \texttt{ACPI: XSDT 00000000af5b0100 00064}
-  \item Jeden si zvolit a zapamatovat adresu (\texttt{0x00000000af5b0100})
+  \item Řádky formátu \code{ACPI: XSDT 00000000af5b0100 00064}
+  \item Jeden si zvolit (kromě \code{RSDP})
+  \item Zapamatovat adresu (\code{0x00000000af5b0100})
   \end{itemize}
-  \item Získat virtuální adresu (\texttt{u32 *virt = ioremap\_cache(phys, 8)})
-  \item Vypsat signaturu (text, 4B -- \texttt{virt[0]})
-  \item Vypsat délku tabulky (4B -- \texttt{virt[1]})
-  \item Odmapovat (\texttt{iounmap(virt)})
-  \item Porovnejte délku s výpisem (tj. \texttt{0x00064} nahoře)
+  \item Získat virtuální adresu (\code{u32 *virt = ioremap_cache(phys, 8)})
+  \item Vypsat signaturu (text, 4B -- \code{virt[0]})
+  \item Vypsat délku tabulky (4B -- \code{virt[1]})
+  \item Odmapovat (\code{iounmap(virt)})
+  \item Porovnejte délku s výpisem (tj. \code{0x00064} nahoře)
   \item Můžete si přemapovat a vypsat celou tabulku a porovnat položky se
     specifikací ACPI
   \end{enumerate}
@@ -164,7 +165,7 @@
   \pause
 
   \begin{itemize}
-  \item Každá stránka má svoji \texttt{struct page}
+    \item Každá stránka má svoji \code{struct page}
   \begin{itemize}
   \item Informace o stránce (nikdy nevyswapovat, špinavá, počet uživatelů)
   \end{itemize}
@@ -187,16 +188,28 @@
   \frametitle{Operace s adresami}
 
   \begin{itemize}
-  \item \header{linux/mm.h}, \header{linux/io.h}
-  \item Např. \texttt{void *virt=\_\_get\_free\_page}
-  \item \texttt{phys\_addr\_t phys=virt\_to\_phys(virt)}
-  \item \texttt{void *virt = phys\_to\_virt(phys)}
-  \item \texttt{struct page *page=virt\_to\_page(virt)}
-  \item \texttt{void *virt=page\_to\_virt(page)}
-  \item \texttt{unsigned long pfn=virt\_to\_pfn(virt)}
-  \item \texttt{void *virt=pfn\_to\_virt(pfn)}
-  \item \texttt{unsigned long pfn=phys >> PAGE\_SHIFT}
-  \item \texttt{phys\_addr\_t phys=pfn << PAGE\_SHIFT}
+    \item \header{linux/mm.h}, \header{linux/io.h}
+    \item Např. \code{void *virt = __get_free_page}
+  \end{itemize}
+
+  \heading{Fyzická adresa}
+  \begin{itemize}
+    \item \code{phys_addr_t phys = virt_to_phys(virt)}
+    \item \code{void *virt = phys_to_virt(phys)}
+  \end{itemize}
+
+  \heading{Struktura \code{page}}
+  \begin{itemize}
+    \item \code{struct page *page = virt_to_page(virt)}
+    \item \code{void *virt = page_to_virt(page)}
+  \end{itemize}
+
+  \heading{PFN}
+  \begin{itemize}
+    \item \code{unsigned long pfn = virt_to_pfn(virt)}
+    \item \code{void *virt = pfn_to_virt(pfn)}
+    \item \code{unsigned long pfn = phys >> PAGE_SHIFT}
+    \item \code{phys_addr_t phys = pfn << PAGE_SHIFT}
   \end{itemize}
 
 \end{frame}
@@ -207,35 +220,35 @@
   \heading{Práce s virtuální adresou}
   \begin{enumerate}
   \item \header{linux/mm.h}
-  \item Naalokujte stránku (\texttt{virt=\_\_get\_free\_page(GFP\_KERNEL)})
+  \item Naalokujte stránku (\code{virt = __get_free_page(GFP_KERNEL)})
   \item Nakopírujte do ní řetězec
-  \item Zjistěte fyzickou adresu (\texttt{phys=virt\_to\_phys(virt)})
-  \item Zjistěte adresu {struct page} (\texttt{page=virt\_to\_page(virt)})
-  \item Zarezervujte stránku (\texttt{SetPageReserved(page)})
-  \item Přemapujte fyzickou stránku (\texttt{map=ioremap(phys, \ldots)})
-  \item Vypište \texttt{virt}, \texttt{phys}, \texttt{page}, \texttt{map} a
-    \texttt{page\_to\_pfn(page)}
-  \item Vypište obsah (\texttt{\%s}) \texttt{virt} a \texttt{map}
-  \item Změňte obsah \texttt{map} a vypište obsah \texttt{virt}
-  \item \texttt{iounmap}, \texttt{ClearPageReserved} a \texttt{free\_page}
+  \item Zjistěte fyzickou adresu (\code{phys = virt_to_phys(virt)})
+  \item Zjistěte adresu {struct page} (\code{page = virt_to_page(virt)})
+  \item Zarezervujte stránku (\code{SetPageReserved(page)})
+  \item Přemapujte fyzickou stránku (\code{map = ioremap(phys, ...)})
+  \begin{itemize}
+    \item Varování v \cmd{dmesg} ignorujte
+  \end{itemize}
+  \item Vypište \code{virt}, \code{phys}, \code{page}, \code{map} a
+    \code{page_to_pfn(page)}
+  \item Vypište obsah (\code{\%s}) \code{virt} a \code{map}
+  \item Změňte obsah \code{map} a vypište obsah \code{virt}
+  \item \code{iounmap}, \code{ClearPageReserved} a \code{free_page}
   \item Zkonzultujte s \doc{Documentation/x86/x86\_64/mm.txt}
   \end{enumerate}
 \end{frame}
 
 \part{Alokace paměti}
-
-\begin{frame}
-\partpage
-\end{frame}
+\frame{\partpage}
 
 \begin{frame}
   \frametitle{Alokace paměti}
 
   \heading{Základní typy alokací}
   \begin{itemize}
-  \item Malé bloky až souvisle po stránkách (\texttt{kmalloc})
-  \item Souvisle po stránkách (\texttt{\_\_get\_free\_pages})
-  \item Nesouvisle po stránkách a namapovat (\texttt{vmalloc})
+  \item Malé bloky až souvisle po stránkách (\code{kmalloc})
+  \item Souvisle po stránkách (\code{__get_free_pages})
+  \item Nesouvisle po stránkách a namapovat (\code{vmalloc})
   \end{itemize}
 
   \pause
@@ -244,80 +257,121 @@
   \heading{GFP\_*}
   \begin{itemize}
   \item Parametr pro alokátory
-  \item \texttt{GFP\_ATOMIC} -- nespi (např. uvnitř spinlocků)
-  \item \texttt{GFP\_TEMPORARY} -- uvolním během pár příštích instrukcí
-  \item \texttt{GFP\_KERNEL} -- obyčejné alokace všude jinde
-  \item a další: \texttt{GFP\_NOFS}, \texttt{GFP\_NOIO}, \ldots
+  \item \code{GFP_ATOMIC} -- nespi (např. uvnitř spinlocků)
+  \item \code{GFP_TEMPORARY} -- uvolním během pár příštích instrukcí
+  \item \code{GFP_KERNEL} -- obyčejné alokace všude jinde
+  \item a další: \code{GFP_NOFS}, \code{GFP_NOIO}, \dots
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{\texttt{kmalloc}}
+  \frametitle{\code{kmalloc}}
 
+  \heading{SLAB alokátor}
   \begin{itemize}
-  \item Vnitřně alokuje po stránkách, ale rozděluje stránky na menší kusy
-  \begin{itemize}
-  \item Výhýbá se fragmentaci paměti
-  \end{itemize}
-  \item \header{linux/slab.h}
-  \item \texttt{kmalloc}, \texttt{kzalloc} (= \texttt{kmalloc} +
-  \texttt{memset}), \texttt{kfree}
+    \item Vnitřně alokuje po stránkách
+    \begin{itemize}
+      \item Stránka má velikost \code{PAGE_SIZE} (x86: 4K)
+    \end{itemize}
+    \item Rozděluje stránky na menší kusy
+    \begin{itemize}
+    \item Výhýbá se fragmentaci paměti
+    \end{itemize}
+    \item \header{linux/slab.h}
+    \item \code{kmalloc}, \code{kzalloc} (= \code{kmalloc} +
+      \code{memset}), \code{kfree}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{\texttt{\_\_get\_free\_pages}}
+  \frametitle{Úkol}
 
+  \heading{Alokace pomocí \code{kmalloc}}
+
+  \begin{enumerate}
+    \item Alokujte 32 stránek (jednou alokací)
+    \item Vypište jejich pfn
+    \begin{itemize}
+      \item Skákejte po \code{PAGE_SIZE}
+      \item Použijte \code{virt_to_pfn}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\code{__get_free_pages}}
+
+  \heading{Stránkový alokátor}
   \begin{itemize}
-  \item \header{linux/mm.h}
-  \item Stránka má velikost \texttt{PAGE\_SIZE} (x86: 4K)
-  \item Velikost alokace se udává řádem, \texttt{order} ($2^{order}$ = počet
-    stránek)
-  \begin{itemize}
-  \item \texttt{get\_order}, \texttt{MAX\_ORDER} (na x86 = 11 $=$ 8M)
-  \end{itemize}
   \item Musí najít souvislý blok volných stránek
   \begin{itemize}
-  \item Může být problém najít větší bloky (řádu $>=$ 2) kvůli fragmentaci
+    \item Může být problém najít větší bloky (řádu $>=$ 2) kvůli fragmentaci
   \end{itemize}
+
+  \item Rychlejší než \code{kmalloc}
+
   \item Používá tzv. \emph{buddy} systém
   \begin{itemize}
-  \item Snižuje fragmentaci
-  \item Podrobnosti viz wiki
+    \item Snižuje fragmentaci
+    \item Podrobnosti viz wiki
   \end{itemize}
-  \item Rychlejší než \texttt{kmalloc}
-  \item \texttt{\_\_get\_free\_pages}, \texttt{free\_pages}
-  \item \texttt{\_\_get\_free\_page}, \texttt{free\_page} (order 0)
+
+  \pause
+
+  \item \header{linux/mm.h}
+  \item Velikost alokace se udává řádem, \code{order} ($2^{order}$ = počet
+    stránek)
+  \begin{itemize}
+    \item \code{get_order}, \code{MAX_ORDER} (na x86 = 11 $=$ 8M)
   \end{itemize}
+
+  \item \code{__get_free_pages}, \code{free_pages}
+  \item \code{__get_free_page}, \code{free_page} (order 0)
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  Úkol: alokace 32 stránek a výpis pfn
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{\texttt{vmalloc}}
+  \frametitle{\code{vmalloc}}
 
+  \heading{Virtuální alokátor}
   \begin{itemize}
-  \item \header{linux/vmalloc.h}
-  \item Podobný \texttt{kmalloc}
-  \item Neatomický (předpokládá \texttt{GFP\_KERNEL})
-  \item Maximální velikost daná omezením architektury
+  \item Použitím podobný \code{kmalloc}
+  \item Neatomický (vnitřně používá \code{GFP_KERNEL})
+  \item Maximální velikost alokace daná omezením architektury
   \begin{itemize}
-  \item x86: 128M (lze zvýšit parametrem, ne o moc)
-  \item x86\_64: 30T
+    \item x86: 128\,MiB (lze zvýšit parametrem, ne o moc)
+    \item x86\_64: 30\,TiB
   \end{itemize}
+
   \item Alokuje po stránkách a mapuje je souvisle
   \begin{itemize}
-  \item Tj. (opět) alokuje po stránkach
-  \item Fyzické stránky jsou umístěné různě po RAM
+    \item Fyzické stránky jsou umístěné různě po RAM
+    \item Dražší
   \end{itemize}
-  \item Dražší
-  \item \texttt{vmalloc}, \texttt{vfree}
-  \item \emph{Odlišná práce s adresami}
+
+  \pause
+
+  \item \header{linux/vmalloc.h}
+  \item \code{vmalloc}, \code{vfree}
+  \item Odlišná práce s adresami (\emph{POZOR})
   \begin{itemize}
-  \item \texttt{vmalloc\_to\_page}, \texttt{vmalloc\_to\_pfn}
+  \item \code{vmalloc_to_page}, \code{vmalloc_to_pfn}
   \end{itemize}
   \end{itemize}
+
+  \medskip
+  \pause
+
+  Úkol: alokace 32 stránek a výpis pfn
 
 \end{frame}
 
@@ -327,13 +381,12 @@
   \begin{itemize}
   \item Vše, co může číst uživatel se musí nejprve vymazat
   \begin{itemize}
-  \item \texttt{kzalloc}, \texttt{get\_zeroed\_page}, \texttt{\_\_GFP\_ZERO},
-    \texttt{vzalloc}
-  \item Nejlépe vymazat všechno, co alokuji a není kritické
+    \item \code{kzalloc}, \code{get_zeroed_page}, \code{vzalloc}
+    \item Nejlépe vymazat všechno, co alokuji a není kritické
   \end{itemize}
-  \item Používat správné \texttt{GFP\_*}
+  \item Používat správné \code{GFP_*}
   \begin{itemize}
-  \item \texttt{GFP\_ATOMIC} funguje všude, ale ubírá vzácné prostředky
+    \item \code{GFP_ATOMIC} funguje všude, ale ubírá vzácné prostředky
   \end{itemize}
   \end{itemize}
 
@@ -347,16 +400,17 @@
   \begin{enumerate}
   \item Zjistěte, kolikrát za sebou lze naalokovat pamět:
   \begin{itemize}
-  \item řádu 10 jako \texttt{GFP\_ATOMIC}
-  \item řádu 10 jako \texttt{GFP\_ATOMIC} (znovu po 5 vteřinách)
-  \item řádu 10 jako \texttt{GFP\_KERNEL}
-  \item řádu 10 jako \texttt{GFP\_KERNEL} po uvolnění předešlé paměti
+  \item řádu 10 jako \code{GFP_ATOMIC}
+  \item řádu 10 jako \code{GFP_ATOMIC} (znovu po 5 vteřinách)
+  \item řádu 10 jako \code{GFP_KERNEL}
+  \item řádu 10 jako \code{GFP_KERNEL} po uvolnění předešlé paměti
   \item Pozn.: $2^{10} \cdot 4096 = 4\,\text{M}$, jak velké pole na ukazatele?
   \end{itemize}
 
   \item Zkuste ve smyčce alokovat paměť s řádem $\leq$
-    \texttt{PAGE\_ALLOC\_COSTLY\_ORDER}, co se stane? \pause Přijde OOM
-    killer\ldots
+    \code{PAGE_ALLOC_COSTLY_ORDER}, co se stane?
+    \pause
+    Přijde OOM killer\dots
   \end{enumerate}
 
   Demo: pb173/05
