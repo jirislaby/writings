@@ -286,11 +286,11 @@ foreseeable future. A research and implementation of such an analyzer is
 indeed a challenge!
 
 \subsection{Picking the Project}
-Since this thesis wants to deal with analysis of large projects, we have to
-select some project for those purposes.  There exist hundreds of software
-projects of large size which we could consider. Let us first divide the
-projects roughly into two categories.  According to the design of operating
-systems there are two basic privilege levels in which programs run~\cite[pages
+Since this thesis deals with an analysis of large projects, we have to select
+some project for those purposes.  There exist hundreds of software projects of
+large size which we can consider. Let us first divide the projects roughly
+into two categories.  According to the design of operating systems there are
+two basic privilege levels in which programs run~\cite[pages
 21--23]{os_concepts}.  Kernels of the operating systems often run at the level
 with no limitations, i.e.\ in the \emph{kernel mode}.  There, the kernel can
 touch any memory in a machine and can also change other possible reachable
@@ -304,48 +304,49 @@ potential error in the code. A crash of the kernel means that the machine
 ceases production any further actions, whereas a crash of a user space
 application causes mostly only pain to its user.
 
-At the first glance it looks like we should specifically aim at kernels of
-operating systems. But think about a vulnerability in a random web browser or
-database system.  It could indeed lead to stolen user's personal data or even
-money from their bank accounts. The same as a problem in the kernel. And such
-projects consist of millions lines of code too. But operating system kernels
-should generally be error-free more than user space programs, because even a
-minor error would allow an arbitrary attacker to obtain administrator
-privileges on a machine running such a vulnerable system, or simply crash it.
-For a \emph{denial of service} (DoS)~\cite{dos} caused by a crash, it
-sometimes suffices to write a ``killer'' string to a special file locally or
-even send a packet with a specific structure over the network. Note the
-attacker can do it remotely from a place thousands miles away.  Instances of
-such errors were already reported to the Linux kernel
-developers~\cite{exploit_vmsplice, exploit_proto_ops, exploit_userns}, in a
-book about hacking~\cite[page 256]{hacking}, and more to be found in the
-National Vulnerability Database~\cite{nvd}. If the attacker succeeds beyond
-crashing a machine and is able to get a login there, they are very close to
-stealing whatever data they want from that machine since it is much easier to
-gain an administrator shell when logged on as a casual user already (sometimes
-simply because remote administrator logins are not allowed). And yet it is
-often easier to gain an access to other machines in the same subnetwork than
-attacking them from the outside. One of the reasons is that there are usually
-no managed firewalls for the traffic flowing among computers inside the
-subnetwork~\cite{insider_attack}.
+Despite the urge for error-free operating system kernels, we also bear
+in mind the importance of errors in user space programs. Think about a
+vulnerability in a random web browser or database system.  It could indeed
+lead to stolen user's personal data or even money from user's bank accounts.
+The same as a problem in the kernel. And such user programs consist of millions
+lines of code too, so perfectly fits our size requirements. But in our
+opinion, operating system kernels still should generally be error-free more
+than user space programs. We think so, because even a minor error would allow
+an arbitrary attacker to obtain administrator privileges on a machine running
+such a vulnerable system, or simply crash it.  For a \emph{denial of service}
+(DoS)~\cite{dos} caused by a crash, it sometimes suffices to write a
+``killer'' string to a special file locally or even send a packet with a
+specific structure over the network. Note the attacker can do it remotely from
+a place thousands miles away.  Instances of such errors were already reported
+to the Linux kernel developers~\cite{exploit_vmsplice, exploit_proto_ops,
+exploit_userns}, in a book about hacking~\cite[page 256]{hacking}, and more to
+be found in the National Vulnerability Database~\cite{nvd}. If the attacker
+succeeds beyond crashing a machine and is able to get a login there, they are
+very close to stealing whatever data they want from that machine since it is
+much easier to gain an administrator shell when logged on as a casual user
+already (sometimes simply because remote administrator logins are not
+allowed). And yet it is often easier to gain an access to other machines in
+the same subnetwork than attacking them from the outside. One of the reasons
+is that there are usually no managed firewalls for the traffic flowing among
+computers inside the subnetwork~\cite{insider_attack}.
 
 The arguments stated above persuaded us to aim at operating system kernels.
 But we can choose from many. There are kernels of BSDs (NetBSD, FreeBSD,
 OpenBSD, \dots), GNU Hurd, GNU Mach, Linux, Mac OS, Minix, NetWare, OS/2, Sun
-OS, Solaris, Windows, and many others. Nonetheless, we limited ourselves to
-the Linux kernel. The main reasons are that the kernel:
-\begin{itemize}
-\item is an open source project,
+OS, Solaris, Windows, and many others. Nonetheless, we limited ourselves
+specifically to the Linux kernel. The main reasons are that the kernel:
+\begin{itemize} \item is an open source project,
 
 \item is a large code base consisting of more than fifteen millions lines of
 code (version 3.10),
 
+\item is used widely, reportedly on 42\,\% of consumer computing
+devices in 2012~\cite{linux_42_percent}, and
+
 \item is developed so fast that each version released every two--three months
 contains over 700'000 changed lines of code which are across more than eleven
-thousand files (averaged for all releases between 3.5 and 3.10), and
-
-\item is used widely, reportedly on 42\,\% of consumer computing
-devices in 2012~\cite{linux_42_percent}.
+thousand files (averaged for all releases between 3.5 and 3.10). This means a
+relatively high probability of introducing new errors.
 
 \end{itemize}
 Let us emphasize that the Linux kernel, the same as other kernels, has another
@@ -355,45 +356,48 @@ constantly spends some time by Linux kernel development, so he knows the
 processes and has some considerable knowledge about the code too.
 
 \section{Background}
-This section introduces the reader into terms we use throughout this thesis.
-First, we enumerate important terms that describe classes of reports. Next,
-since every implemented analysis has some properties, we describe properties
-which we consider important. Such properties are usually looked at when
-deciding which of the available code analyzers to choose for a developed
+This section introduces the reader into terms which we use throughout this
+thesis.  First, we enumerate important terms that describe classes of reports.
+Next, since every implemented analysis has some properties, we describe
+properties which we consider important. Such properties are usually looked at
+when deciding which of the available code analyzers to choose for a developed
 program. Finally, there is also a small introduction to the code parsing as we
-deal with source code in this thesis and the code needs to be parsed first.
+deal with source code in this thesis and the code needs to be parsed in our
+tools first.
 
 \subsection{Classes of Reports}\label{sec:intro_reports_cls}
-During code analysis of some project, code analyzers produce reports about
+During a code analysis of some project, code analyzers produce reports about
 found errors.  Not every report is equally useful. Some of the reports may be
 invalid with respect to some specified property which the analyzers try to
-verify in code. For example, imprecise static analyzers may flag a property
+check in code. For example, imprecise static analyzers may flag a property
 violation somewhere in the analyzed code, but the property is never violated
 when the code is really executed. This led to a classification of the reports
 according to their usefulness. As we use the classification throughout the
-thesis, it is settled down below.
+thesis, it is settled down here.
 
 \begin{itemize}
 \item \textbf{Errors} -- Reports in this category are useful. We put reports
-in this category, when we conclude that such a report is genuine and can
-really cause a problem in the analyzed code. It obviously requires a fix in
-the code.
+from some tool to this category, when we conclude that such reports are
+genuine and can really cause a problem in the analyzed code. They obviously
+require an action to be taken, e.g.\ a fix of the code.
 
 \item \textbf{False reports} -- This category is further split into two
-classes which we describe below. Both of them are invalid and should be
-minimized in real code analyzers as they bother users. When we mean both
-classes in the thesis, we use the term \emph{false reports}.
+classes which we describe below. Both of them mean incorrect output and such
+output should be minimized in real code analyzers as it bothers users. When
+we mean both classes in the thesis, we use the term \emph{false reports}.
 
 \begin{itemize}
 \item \textbf{False positives} -- These are errors reported by an analyzer
-about a property violation, but it can never happen when the analyzed code is
-really executed. The analyzer should be tuned to not produce such reports.
+about a property violation. But when such error can never happen when the
+analyzed code is really executed, it is false. The analyzer should be tuned to
+not produce such reports.
 
 \item \textbf{False negatives} -- These are only imaginary reports as they are
 not reported by analyzers. These are errors present in analyzed code which an
 analyzer left unnoticed even though they violate a specified property.
-Analyzers should be tuned to report as many property violations as possible
-(but not false positives).
+Analyzers should be tuned to minimize false negatives, i.e.\ to report as many
+property violations as possible (but not many false positives, if some at
+all).
 
 \end{itemize}
 
@@ -402,13 +406,14 @@ Analyzers should be tuned to report as many property violations as possible
 \subsection{Theoretical Properties}\label{sec:theor_props}
 Analyzers produce some reports to users. As we described in the previous
 section, the reports are classified to different categories. But it still
-remains to describe how we can recognize whether an analyzer produces reports
-in in the false categories or only reals errors. This information would be
-interesting for users to know which report categories are produced by their
-favourite checker. In this section, we define a few properties which
-characterize analyzers and mainly their analyses with respect to the specified
-(checked) properties. Note that these are not the only possible definitions of
-these terms. This is how we understand them in this thesis.
+remains to describe how we can recognize from an analyzer description whether
+the analyzer produces reports in any of the false categories or only real
+errors. The information about the analyzer's output is interesting for users
+to know which report categories are produced by their favourite checker.  In
+this section, we define a few properties which characterize analyzers and
+mainly their analyses with respect to the specified (checked) properties. Note
+that these are not the only possible definitions of these terms. This
+description reflects how we understand the terms in this thesis.
 
 \begin{figure}[tb]
   \begin{center}
@@ -462,9 +467,9 @@ understood in the context of soundness.
 A program analyzer \emph{terminates} when it finishes computation in a finite
 time. A subject to non-termination is some form of simulation or the symbolic
 execution described in Section~\ref{sec:se} for example. When a program
-contains an endless loop, analyzers based on these two techniques simply run
-forever. As a side note, some definitions require complete analyzers to
-terminate.
+contains an endless loop, analyzers based on these two techniques can simply
+run forever. As a side note, some definitions also require complete analyzers
+to terminate.
 
 \end{description}
 
@@ -481,15 +486,17 @@ which would have to be stored somewhere. So it is very common to use analyzers
 that are only terminating and sound, but incomplete. They report everything
 which is possibly an error, but often, we have to await false positives.
 Many analyzers are only terminating and complete, but unsound. They are
-precise, but do not find all errors. And finally, many commercial tools are
+precise, but do not find all errors. Further, many commercial tools are
 terminating, but neither sound, nor complete. They are good at finding some
-errors without introducing many false positives.
+errors without introducing many false positives. Other combinations of the
+properties are possible too, but only the common ones are mentioned here.
 
 \subsection{Sensitivity of Analyzers}\label{sec:sensitivity}
 Another interesting property of many analyzers is how they are handling
-separate commands and functions present in code. Consider the example of
-Figure~\ref{fig:lst_sens} and also consider an analysis that is watching
-values stored into variables and is thus able to report this to the user.
+separate statements and functions present in analyzed code. Consider the
+example of Figure~\ref{fig:lst_sens} and also consider an analysis that is
+watching values stored into variables. The analysis is able to report to the
+user what value can be held in a variable during an execution.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -513,95 +520,96 @@ void fun2(void) {
 \end{figure}
 Given the example, we describe the following three basic properties which we
 usually consider when choosing an analyzer:
-\begin{itemize}
-\item When an analyzer analyzes some code, it may take into account the order
-of program statements and remember what is followed by what.  For the code in
-our example this would mean the analyzer will report that the only possible
-value in \code{x} at line~\ref{lst:sens_ret} is simply 3 (the last store to
-\code{x} before \code{return} proper). The other option is to completely
-ignore the order and with considerably less precision report that \code{x} at
-line~\ref{lst:sens_ret} can be any of 1, value of \code{a}, or 3 (the analyzer
-is not aware of what precedes the \code{return}, hence it has to report all
-the set commands).  This is called \emph{flow sensitivity} or
-\emph{insensitivity}, respectively. We often speak about this property when
-dealing with one particular function.
+\begin{description}
+\item[Flow sensitivity] When an analyzer analyzes some code, it may take into
+account the order of program statements and remember what is followed by what.
+For the code in our example this would mean the analyzer will report that the
+only possible value in \code{x} at line~\ref{lst:sens_ret} is simply 3 (the
+last store to \code{x} before \code{return} proper). The other option is to
+completely ignore the order and with considerably less precision report that
+\code{x} at line~\ref{lst:sens_ret} can be any of 1, value of \code{a}, or 3
+(the analyzer is not aware of what precedes the \code{return}, hence it has to
+report all the set commands).  This is called \emph{flow sensitivity} or
+\emph{insensitivity}, respectively. We often speak about this property only
+when dealing with one particular function.
 
-\item When an analyzer is flow sensitive, it may or may not remember
-conditions used for branching. If it does, in our example, \code{x} is then
-reported to be one of 1, 2, or 3 on line~\ref{lst:sens_ret}, because \code{a}
-was noted to be 2 before the assignment on line~\ref{lst:sens_xa}. In the
-other case, \code{x} is announced to be 1, 3, or whatever value the analyzer
-previously computed \code{a} can be. We have just described \emph{path
-sensitivity}.
+\item[Path sensitivity] When an analyzer is flow sensitive, it may or may not
+remember conditions used for branching. If it does, in our example, \code{x}
+is then reported to be one of 1, 2, or 3 on line~\ref{lst:sens_ret}, because
+\code{a} was noted to be 2 before the assignment on line~\ref{lst:sens_xa}. In
+the other case, \code{x} is announced to be 1, 3, or whatever value the
+analyzer previously computed \code{a} can be. We have just described
+\emph{path sensitivity}.
 
-\item An analyzer is called to be \emph{context-sensitive}, or
-\emph{inter-procedural} if it considers a calling context (call-stack).  In
-our example, a context-sensitive analyzer would say \code{x} can be 1 or 3
-(on line~\ref{lst:sens_ret} for flow-sensitive analyses) since the condition
-\code{a == 2} is false on line~\ref{lst:sens_cond}. The insensitive
-counterpart would say \code{x} can be any value due to the assignment on
-line~\ref{lst:sens_xa} (the analyzer has to assume \code{a} can contain
-whatever value to remain sound).
+\item[Context sensitivity] An analyzer is called to be
+\emph{context-sensitive}, or \emph{inter-procedural} if it considers a calling
+context (call-stack).  In our example, a context-sensitive analyzer would say
+\code{x} can be 1 or 3 (on line~\ref{lst:sens_ret} for flow-sensitive
+analyses) since the condition \code{a == 2} is false on
+line~\ref{lst:sens_cond}. The insensitive counterpart would say \code{x} can
+be any value due to the assignment on line~\ref{lst:sens_xa} (the analyzer has
+to assume \code{a} can contain whatever value to remain sound).
 
-\end{itemize}
+\end{description}
 
 \subsection{Types of Analyses}\label{sec:types_anal}
 Depending on information provided and the way to compute it, analyses may be
-categorized into sets. In this respect, there are four possible categories
-which are described here. \emph{May/must} says how much definitive an answer
-about some property is. The definition provided here is how it is understood
-by many compilers and analyzers. That way it is defined by
-Muchnick~\cite{muchnick} and possibly others.  We present some examples of
-analyses for each of the categories in Section~\ref{sec:data-flow}.
+categorized into sets. In this respect, there are four possible combinations
+of categories described here. We present some examples of analyses for each of
+the categories in Section~\ref{sec:data-flow}.
 
 \begin{description}
-\item[May/must] Sometimes we are interested whether some result given by an
+\item[May/must] This property says how much definitive an answer about some
+property is. Sometimes we are interested whether some result given by an
 analysis must hold definitely or may hold sometimes. If we get back to the
 example of Figure~\ref{fig:lst_sens}, when an analysis says \code{x}
-\emph{must} be a constant at line~\ref{lst:sens_ret}, we can just return that
+\emph{must} be a constant on line~\ref{lst:sens_ret}, we can just return that
 constant and eliminate all the preceding code. This would not be possible with
 an answer ``maybe'' given by the \emph{may} analysis. Nonetheless, may
 analysis is useful for example if we are interested whether a divisor in a
 division may be zero sometimes, in which case we would report an error.  Must
 analysis does not necessarily find this bug.
 
-\item[Backward/forward] For flow-sensitive analyses, the way of propagation of
-the information is important.  For example, we may want to know at each line
-of a program what variables are used further in the code (to see whether we
-need to hold their values still in registers for example). This information is
-often propagated backwards from the end to the beginning of a function where
-the variable is defined.  Contrary, to see at each line which variables are
-already set to some value, analyzers usually propagate the information
-forwards.
-
-\end{description}
-
-There exists also another loosened definition of may/must analyses. The
-analyses may be understood only as super/sub-sets of real behaviour. Hence
+The definition provided here is how it is understood by many compilers and
+analyzers. That way it is defined by Muchnick~\cite{muchnick} and possibly
+others.  There exists also another loosened definition of may/must analyses.
+The analyses may be understood only as super/sub-sets of real behaviour. Hence
 must analysis are an under-approximation of some property, i.e.\ a must
 analysis describes behaviour that definitely must hold on \emph{some} path.
 Similarly for may analysis, an over-approximation of some property is
 computed.
 
+\item[Backward/forward] For flow-sensitive analyses, the way of propagation of
+the information is important.  For example, we may want to know at each line
+of a program, what variables are used further in the code (to see whether we
+need to hold their values still in registers for example). This information is
+often propagated backwards from the end towards the beginning of a function
+to the point where the variable is defined.  Contrary, to see at each line,
+what variables are already set to some value at that line, analyzers usually
+propagate the information forwards.
+
+\end{description}
+
 \subsection{Other Views}
 Of course the list above is not complete. There are many other categorizations
-we do not list in here. In short, we can mention white-box versus black-box
-where the algorithm either knows the internals of the checked projects or not.
-The black-box testing has no or little knowledge about checked code and does
-not really care about the internals.  Hence it will most likely cover less
-code than a white-box analyzer which cares about the internals of the checked
-code.  An analogy might be seen in checking an engine prior buying a car.
-Asking a seller for taking a ride, check whatever we see and check whether an
-output from that is as expected (speedup after pressing the throttle pedal for
-illustration) is black-box because we are unaware about the internals. Asking
-a technician to inspect the engine of the car is white-box, because he has a
-knowledge about the internals and will check them. There is a mid-way called
-grey-box testing. The technique requires only an overview of the checked code,
-but not full understanding of what is going on in there.
+we do not list in here. In short, we can mention the white-box versus
+black-box approach of analyzers. The algorithm either knows the internals of
+the checked projects or not.  The black-box approach has no or little
+knowledge about checked code and does not really care about the internals.
+Hence it will most likely cover less code than a white-box analyzer which
+cares about the internals of the checked code.  An analogy might be seen in
+checking an engine prior buying a car.  Asking a seller for taking a ride,
+check whatever we see and check whether an output from that is as expected
+(speedup after pressing the throttle pedal for illustration) is the black-box
+approach, because we are unaware about the internals. Asking a technician to
+inspect the engine of the car is the white-box approach, because he has a
+knowledge about the internals and will check them.  There is a mid-way called
+the grey-box approach. This approach requires only an overview of the checked
+code, but not full understanding of what is going on in there.
 
 Another angle of view might be hunting functional versus performance issues.
 Once a project is working nicely with respect to the demanded functionality,
-we may still want to look where we can speed the implementation up. This is
+we may still want to look where we can speed up the implementation. This is
 often seen in operating system kernels development as behaviour of a kernel
 has to be transparent and as fast as possible.
 
@@ -610,28 +618,28 @@ We illustrated some terms above directly on code written in programming
 languages. This is a form understandable by people when reading, but it is not
 so easy to work with when writing an analyzer. Analyzers are used to work on
 more convenient structures representing the source code.  There are several
-structures used in code analysis and compilation.  This section covers the
+structures used in code analysis and compilers.  This section covers the
 process of creating these structures from source code, including a description
 of the created structures proper.
 
-First, to be able to understand source code on input, we must know how to
-interpret it. For each programming language, we have a set of rules. They
-define allowed \emph{characters} (usually basic alphabet with parenthesis,
-curly braces, and other symbols), how to build words from them and their
-meaning: what are identifiers, reserved words etc. Finally, the rules specify
-how a well-defined sentence looks like, i.e.\ how to build expressions and
-statements, functions and whole files. This is accompanied with
-\emph{semantics} which is an explanation what each such block means. So when
-we write for example ``\code{char X;}'' in C, we know we have declared a
+First, to be able to understand source code on the input, an analyzer must
+know how to interpret it. For each programming language, we have a set of
+rules. They define allowed \emph{characters} (usually basic alphabet with
+parenthesis, curly braces, and other symbols), how to build words from them
+and a meaning of the words: what are identifiers, reserved words etc. Finally,
+the rules specify how a well-defined sentence looks like, i.e.\ how to build
+expressions and statements, functions and whole files. This is accompanied
+with \emph{semantics} which is an explanation what each such block means. So
+when we write for example ``\code{char X;}'' in C, we know we have declared a
 variable which is capable to hold at least 8 bits (an ASCII character).  The
-rules are defined for most languages in the form of a \emph{standard}. For
+rules are defined for most languages in the form of \emph{standard}. For
 instance, for both C and C++, ISO standards exist~\cite{ansi_c, ansi_cpp},
 whereas for Java, the rules are defined by the Sun's implementation. Despite
 Sun tried to standardize Java twice, they withdrew the drafts both
 times~\cite{java_non_std}. So Java is a \emph{de facto} standard established
 by its implementation.  Remember that even if a standard exists, there is no
 force to push compiler implementors to adhere to that standard. This is seen
-in the C family and its compilers. What is compilable by GNU's C
+in the C family and its compilers. What is compilable by the GNU's C
 compiler~\cite{gcc} is not necessarily understood by the Intel's
 compiler~\cite{intel_cc} for example.
 
@@ -699,8 +707,8 @@ RCUR
 
 %Some standards also contain a \emph{formal grammar}.
 
-First, the input is read by \emph{lexical analyzer} (lexer) character by
-character. It consults with language rules what the input means and starts
+First, the input is read character by character by the \emph{lexical analyzer}
+(lexer).  It consults with language rules what the input means and starts
 creating so-called \emph{tokens}. Tokens are character sequences that are
 marked by information whether they are a string, number, reserved keyword
 (\code{int}, \code{const}, \dots), identifier (\code{some_variable}), or any
@@ -710,12 +718,13 @@ are prefixed by type, braces, parenthesis, and operators are converted to
 special names, and so on (depending on the language rules). Comments and other
 similar information are dropped.
 
-A list of these tokens is then passed to the input of an \emph{syntactic
+A list of these tokens is then passed on the input of the \emph{syntactic
 analyzer}. Again, it implements the language rules and looks whether the token
-sequences are correct. In case they are, syntactic analyzers usually build an
+sequences are correct. In case they are, syntactic analyzers usually build the
 \emph{abstract syntax tree} (AST). All irrelevant information is forgotten
-there (abstracted from the original language) and the rest is stored in a tree
-as is depicted in Figure~\ref{fig:intro_parsing_ast}.
+there (abstracted from the original language) and the relevant part is stored
+in a tree as is depicted in Figure~\ref{fig:intro_parsing_ast} for our
+example.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -762,20 +771,21 @@ as is depicted in Figure~\ref{fig:intro_parsing_ast}.
     Figure~\ref{fig:intro_parsing_codes}.}
   \label{fig:intro_parsing_ast}
 \end{figure}
-At this abstract point we have no clue what the original language was.
+At this abstract point, we have no clue what the original language was.
 Compilers usually have separate modules for different languages, called
 \emph{frontends}. They parse the input and create one pre-defined form of the
 AST. Every frontened does so, hence we have one type of the AST for all
 diverse languages the frontends support.  Then, the rest of the compiler
-pipeline can be the same for all of the languages and can run the same
-optimization passes for them all.  The tree is held in the compiler through
-the whole compilation process. It is usual that further passes in the pipeline
-add more information to the nodes of this tree. The very common one is a
-position of the nodes in the source code for debugging purposes. Even though
-ASTs usually hold information about the whole parsed input, we omitted for
-simplicity other functions, global variable declarations and other constructs
-from Figure~\ref{fig:intro_parsing_ast}.  There is only a subtree
-corresponding to the function from Figure~\ref{fig:intro_parsing_codes}~(a).
+pipeline can be the same for all of the supported languages and the compiler
+can run the same optimization passes for all the languages. The AST is
+held mostly in the compiler through the whole compilation process. It is usual
+that further passes in the compiler pipeline add more information to the nodes
+of this tree.  The very common one is a position of the nodes in the source
+code for debugging purposes. Even though ASTs usually hold information about
+the whole parsed source file, we omitted for simplicity from
+Figure~\ref{fig:intro_parsing_ast} other functions, global variable
+declarations and other constructs.  There is only a subtree corresponding to
+the function from Figure~\ref{fig:intro_parsing_codes}~(a).
 
 From the AST, we can derive much information about the parsed code. For
 illustration, we can build a \emph{control flow graph} (CFG). CFG of a
@@ -787,7 +797,7 @@ function) is a predecessor of a triangle with an edge on the bottom. A
 \emph{branch} is a node with more than one successor.  As an example we built
 a CFG of the \code{fun} function in Figure~\ref{fig:intro_parsing_cfg}. Nodes
 of the CFG refer back to the to AST with numbers to see where the statements
-come from (every node or subtree in an AST have its rule to create nodes in a
+come from (every node or subtree in an AST has its rule to create nodes in a
 CFG).
 \begin{figure}[htb]
 \begin{center}
@@ -813,38 +823,42 @@ CFG).
     Figure~\ref{fig:intro_parsing_codes}.}
   \label{fig:intro_parsing_cfg}
 \end{figure}
-Alternatively, for easier explanation of some algorithms, statements can be
-put on edges instead of putting them into nodes.  The control flow graph is
-not the only structure that can be derived from the abstract syntax tree. We
-can derive symbol tables, type definitions, perform semantic analysis to
-verify more than syntactic rules etc.
+Alternatively some people put statements on edges instead of putting them into
+nodes for easier explanation of algorithms.  The control flow graph is not the
+only structure that can be derived from the abstract syntax tree. We can
+derive symbol tables, type definitions, perform semantic analysis to verify
+more than syntactic rules and so on.
 
 Even though, it is not easy to write a well-working parser by hand, some
-projects like \gcc do so. But there also exist tools that help to generate
-lexical and syntactic analyzers automatically from a specified formal grammar.
-Depending on the programmer's preference on the type of the grammar, there are
-various tools. For LL(\textasteriskcentered) grammars~\cite[Chapter
-4.4]{dragon}, one of the most known tools is \textsc{Antlr}~\cite{antlr4}.
-\textsc{Flex} and \textsc{Bison}~\cite{flex_bison} are used to generate LR
-parsers~\cite[Chapter 4.5]{dragon}. This introduction to parsing does not want
-to pretend it is complete, but we do not need more information for the
-purposes of this thesis.  More information on parsers can be learnt from
-various literature about compilers~\cite{dragon, muchnick}.
+projects like \gcc do so. Such parsers tend to be fast. But there also
+exist tools that help to generate lexical and syntactic analyzers
+automatically from a specified formal grammar.  Depending on the programmer's
+preference on the type of the grammar, there are various tools. For
+LL(\textasteriskcentered) grammars~\cite[Chapter 4.4]{dragon}, one of the most
+known tools is \textsc{Antlr}~\cite{antlr4}.  \textsc{Flex} and
+\textsc{Bison}~\cite{flex_bison} are used to generate LR parsers~\cite[Chapter
+4.5]{dragon}. This introduction to parsing does not want to pretend it is
+complete, but we do not need more information for the purposes of this thesis.
+More information on parsers can be learnt from various literature about
+compilers~\cite{dragon, muchnick}.
 
 \subsection{Pointer Analysis}\label{sec:pointer_analysis}
-For languages using pointers like C, it is important to know where these
-pointers can point to. Consider the integer variable \code{x} and the integer
-pointer \code{p} as are in the code of Figure~\ref{fig:lst_ptsto}.
+Some programming languages allow for more complicated code constructs. They
+require some advanced techniques to be used when analyzing code in these
+languages. An example of such constructs are pointers and operations over
+them. When pointers are used, it is important to know where they can point to.
+Consider the integer variable \code{x} and the integer pointer \code{p} as are
+in the code of Figure~\ref{fig:lst_ptsto}.
 \begin{figure}[htb]
   \begin{center}
   \begin{tabular}{c}
   \begin{lstlisting}[language=C]
-int fun(int a) {
+int fun(int z) {
   int x = 0;
   int y = 0;
   int *p = &x;
   int *q = &x;
-  *p = a;
+  *p = z;
   q = &y;(*@\label{line:intro_ptsto_q}@*)
   return x;
 }
@@ -856,18 +870,21 @@ int fun(int a) {
 \end{figure}
 Without knowing that \code{p} points to and actually changes \code{x}, we
 would conclude that \code{fun} always returns 0. But it returns whatever it
-gets on the input as the parameter \code{a}. To cope with this situation,
-algorithms known as \emph{pointer analyses} exist and have to be used.  There
-are two basic approaches to the pointer analysis widely used nowadays:
-Steensgard's~\cite{steensgaard} and Andersen's~\cite{andersen}. Both analyses
-are \emph{may}. But while the former is based on equalities of the
-sets of possible pointer targets, the other on their subsets. So the former
-makes the sets of targets equal whenever two pointers can point to a common
-target variable.  The latter only copies some (or all) members. Let us
-demonstrate it on the full example of Figure~\ref{fig:lst_ptsto}. We depict
-the relation between pointers and targets as directed graphs in
-Figure~\ref{fig:intro_ptsto_rel}. Nodes are both pointers and targets, but
-edges from pointers to targets mean the pointers point to the targets.
+gets on the input as the parameter \code{z}.
+
+Since pointers are used extensively in C and the main language we deal with in
+this thesis is C, we describe here an approach to cope with this situation. It
+is called \emph{pointer analysis}.  Nowadays, there are two basic and widely
+used approaches to the pointer analysis: Steensgard's~\cite{steensgaard} and
+Andersen's~\cite{andersen}. Both analyses are \emph{may}. But while the former
+is based on equalities of the sets of possible pointer targets, the other on
+their subsets. So the former makes the sets of targets equal whenever two
+pointers can point to a common target variable.  The latter only copies some
+(or all) members. Let us demonstrate it on the full example of
+Figure~\ref{fig:lst_ptsto}. We depict the relation between pointers and
+targets as directed graphs in Figure~\ref{fig:intro_ptsto_rel}. Nodes are both
+pointers and targets, but edges from pointers to targets mean the pointers
+point to the targets.
 \begin{figure}[tb]
   \begin{center}
   \begin{tabular}{cc} \adjustbox{valign=m}{
@@ -900,37 +917,41 @@ line~\ref{line:intro_ptsto_q} does not lose precision in Andersen's analysis
 in Figure~\ref{fig:intro_ptsto_rel}~(a), but puts the targets (\code{x} and
 \code{y}) to the equal set using Steensgaard's analysis in
 Figure~\ref{fig:intro_ptsto_rel}~(b). This would prevent optimizations to
-remove \code{p} and \code{y} from the code even though they are useless. In
-general, subset-based analyses are more precise than equality-based, but they
-are also slower. The slowness is a result of the count of nodes in graphs like
-the above.
+remove \code{p} and \code{y} from the code even though they are actually
+useless. In general, subset-based analyses are more precise than
+equality-based, but they are also slower. The slowness is a result of the
+count of nodes in graphs like those we have just presented.
 
 Shapiro and Horwitz investigated 61 C programs to verify the accuracy and
-speed of the earlier two approaches in their study~\cite{shapiro_horwitz}. And
-they came up with an approach that tries to speed up the Andersen's analysis
-while preserving its accuracy using parametrization. They allow each node of a
-pointer graph to have at most degree $k$. Obviously, if $k=1$, we are talking
-about Steensgaard's analysis, if $k$ is the number of possible targets, we
-have Andersen's. If $k$ is kept reasonably small, the results are often more
-accurate than Steensgaard's algorithm, but faster than Andersen's.
+speed of the two approaches of Andersen and Steensgaard. The findings were
+summarized in a Shapiro and Horwitz's study later~\cite{shapiro_horwitz}. And
+they also came up with an approach that tries to speed up the Andersen's
+analysis while preserving its accuracy using parametrization. They allow each
+node of a pointer graph to have at most degree $k$. Obviously, if $k=1$, we
+are talking about Steensgaard's analysis, if $k$ is the number of possible
+targets, we obtain Andersen's. If $k$ is kept reasonably small, the results are
+often more accurate than Steensgaard's algorithm, but much faster than
+Andersen's.
 
 \paragraph{Other Analyses} The \emph{alias analysis}, sometimes referred as
 the \emph{points-to analysis}~\cite{alias_anal} is somewhat different to the
 pointer analysis above in what it is able to tell about pointers.  The alias
-analysis can only conclude that two pointers either point to the same
-location, they point to a different location, or cannot tell anything about
-the pointers. It cannot report the set of possible targets as the true pointer
-analysis does.  This is sometimes sufficient and for example the compiler
-framework \llvm as of version 3.3 provides its optimization passes only with
-the alias analysis. For performance purposes, alias analyses are often
-computed as a \emph{may-alias} over-approximation or \emph{must-alias}
-under-approximation.  Another view to pointers suggests the \emph{shape
+analysis can either conclude that two pointers point to the same location,
+that they point to a different location, or the analysis cannot tell anything
+about the pointers when the knowledge is insufficient. It cannot report the
+set of possible targets as the true pointer analysis does. This is sometimes
+sufficient and for example the compiler framework \llvm as of version 3.3
+provides its optimization passes only with the alias analysis. For performance
+purposes, alias analyses are often computed as a \emph{may-alias}
+over-approximation or \emph{must-alias} under-approximation.
+
+Another view to pointers is suggested by the \emph{shape
 analysis}~\cite{ptr_shape}.  It is an analysis of dynamically created
 structures like lists. It is able to recognize operations like list creation
 and give this information to the analyzer. It can be used when finding memory
 leaks or tell whether the list is created properly.
 
-\paragraph{Field-sensitivity} There is also another property of pointer
+\paragraph{Field-sensitivity} There is also another property of a pointer
 analyzer to be considered for languages allowing structured constructs, like
 \code{struct} in C. We can either consider each of the members in such an
 object when computing the pointer sets or ignore the members and work on the
@@ -960,12 +981,12 @@ void fun() {
   \caption{A demonstration of field-sensitivity for the pointer analysis.}
   \label{fig:intro_pts_field}
 \end{figure}
-Even though the use of structures in the code is prevalent, there are only
+Even though the use of structures in the code is heavy, there are only
 disjunct assignments to pointers: all the pointers point to a different memory
-location. Hence a pointer analysis that does not consider members of
-structures, would give imprecise results. This can be seen in the graph of
-Figure~\ref{fig:intro_ptsto_rel2}~(a), which is a result of the
-field-insensitive pointer analysis.
+location (\code{s.x}, \code{s.y}, and \code{t.x}). Hence a pointer analysis
+that does not consider members of structures, would give imprecise results.
+This can be seen in the graph of Figure~\ref{fig:intro_ptsto_rel2}~(a), which
+is a result of the field-insensitive pointer analysis.
 \begin{figure}[b]
   \begin{center}
   \begin{tabular}{ccc}
@@ -1010,40 +1031,44 @@ field-insensitive pointer analysis.
     (a) field-insensitive, (b) field-based and (c) field-sensitive.}
   \label{fig:intro_ptsto_rel2}
 \end{figure}
-This is not only a theoretical problem as structures are used heavily in C.
-Therefore, field-insensitive analyzers are not of much use there due to
-imprecisions.  They are two-fold as we can notice in the first graph:
+Since structures are used heavily in C, this is definitely not only a
+theoretical problem.  Therefore, field-insensitive analyzers are not of much
+use there due to imprecisions. From the first graph of the illustrative
+example, we can see that the imprecisions are two-fold:
 \begin{enumerate}
-\item Each member can be itself a pointer and can have its own pointer target
-set. Storing this information only per each structure in field-insensitive
-sense introduces a big imprecision. In example of Figure~\ref{fig:lst_ptsto},
-there are two such pointers (\code{s.p} and \code{t.p}).
+\item Each member of a structure can be itself a pointer. This means it can
+have its own pointer target set. Storing this information in the
+field-insensitive sense only on the object level per each structure introduces
+a big imprecision. In example of Figure~\ref{fig:lst_ptsto}, there are two
+such members with their own pointer sets (\code{s.p} and \code{t.p}).
 
-\item Knowing exactly to which member of a structure a pointer points is
-indeed useful information. Like on lines~\ref{line:intro_field_1},
-\ref{line:intro_field_2}, and \ref{line:intro_field_3} in example of
-Figure~\ref{fig:lst_ptsto}. We are interested on exact members (\code{x} and
-\code{y}) where the pointers (\code{p}, \code{s.p}, and \code{t.p}) point to.
+\item Given some pointer, it is always useful information to know where it can
+point to exactly. Especially, if it can point to a member of some structure
+and we can decide which of the members in the structure is pointed at. This
+can be seen on lines~\ref{line:intro_field_1}, \ref{line:intro_field_2}, and
+\ref{line:intro_field_3} in the example of Figure~\ref{fig:lst_ptsto}. We are
+interested on exact members (\code{x} and \code{y}) where the pointers
+(\code{p}, \code{s.p}, and \code{t.p}) point to.
 
 \end{enumerate}
 
-We can consider either of those options or implement them both in a
-field-sensitive pointer analyzer. But even after we make that decision, the
-implementation is still possible in two ways, having an effect on precision.
-First, \emph{field-based} sensitivity have only one global information about
-structure members, per each member name. So when we consider again the example
-of Figure~\ref{fig:lst_ptsto}, we have two structures \code{s} and \code{t} of
-a totally different type. Since they both contain the member \code{int *p},
-this analysis considers them to be the same and updates \code{*.p}'s points-to
-set any time \code{s.x} or \code{t.x} is set to point to a new object. This
-situation is depicted for our example in
+These two options are not bound rigidly together. They can be combined or
+implemented separately in a \emph{field-sensitive} pointer analyzer. And yet,
+the field sensitivity can be implemented in two possible ways with impact on
+precision.  First, a \emph{field-based} sensitivity has only one global
+information about structure members, per each member name. So when we consider
+again the example of Figure~\ref{fig:lst_ptsto}, we have two structures
+\code{s} and \code{t} of a totally different type. Since they both contain the
+member \code{int *p}, the field-based analysis considers them to be the same
+and updates \code{*.p}'s points-to set any time \code{s.p} or \code{t.p} is
+set to point to a new target. This situation is depicted for our example in
 Figure~\ref{fig:intro_ptsto_rel2}~(b).
 
 The other way is a true \emph{field-sensitive} analysis. It properly handles
 members of structures in the natural sense, but for a higher computation
 price, of course. The pointer graph for this implementation is shown in
 Figure~\ref{fig:intro_ptsto_rel2}~(c). There is no imprecision as all three
-pointers are independent.
+pointers with their graphs are independent.
 
 For more information about pointer analysis, see for example Hind's
 discussion~\cite{ptr_solved}.
@@ -1051,21 +1076,30 @@ discussion~\cite{ptr_solved}.
 %\todo{emphasize that this thesis deals with practical aspects of using static
 %analyzers}
 \section{Thesis Goals}
-This thesis studies applications of contemporary automatic bug-finding
-techniques to large software projects. It specifically aims at techniques like
-abstract interpretation and symbolic execution. Both of them were designed in
-1970's and were adopted in many tools since then. The thesis summarizes
-the current state of the art of chosen techniques implemented in code
-analyzers which can handle large code bases, including a short description of
-some analyzers too.  On the top of the explored state of the art, the goal is
-to develop our techniques and tools able to handle the Linux kernel.  The
-tools produce only a low number of false positives.  Another aim is to help
-others with code analyzers development and evaluation. We established a
-test-bed with predefined categories of errors usually present in code such as
-the Linux kernel. For that purpose a publicly available benchmark should be
-designed. It should contain information about errors and false positives found
-by several bug-finding tools.  There is also a software competition tailored
-to code analyzers. So the goal is to compete with our analyzers.
+This thesis studies an application of contemporary automatic techniques for
+finding errors in large software projects. It specifically aims at more
+advanced techniques. These techniques include the abstract interpretation and
+symbolic execution which we deal with in this thesis. Both of them were
+designed in 1970's and were adopted in some tools since then. In the past
+decade they came to interest of code analyzers implementers thanks to the
+occurrence of fast computers. The thesis poses a claim to summarize the
+current state of the art of chosen techniques implemented in code analyzers
+which can handle large code bases. The aim of the thesis is also to include a
+short description of some analyzers. On the top of the explored state of
+the art, the goal is to develop our own techniques and tools which are capable
+of handling the Linux kernel.  The tools are asked to produce only a low
+number of false positives.
+
+Another aim is to help others with code analyzers development and evaluation.
+We established a test-bed with predefined categories of errors which are
+usually present in code of projects such as the Linux kernel. For that purpose
+a publicly available benchmark is to be designed. It should contain
+information about errors and false positives found by several tools finding
+errors in large projects.
+
+There is also a software competition tailored to exercise code analyzers. So
+another goal of this thesis is to contribute with our analyzers and compete
+with others.
 
 \section{Thesis Contribution}
 We implemented \stan, a framework for developers who wish to implement some
@@ -1082,28 +1116,28 @@ is to be checked. Second, a static slicer removes code irrelevant to the
 properties.  Finally, a symbolic executor evaluates the remaining code with
 low number of false positives produced on the output.
 
-We used reports of \stan and other checker to create a testbed for new code
-analysis tools. We started calling it \cdb.  Its intended use is evaluation of
-a newly implemented tool. In particular to see how good the reports from the
-tool are.
+We used reports of \stan and other available checkers to create a test-bed for
+comparing the output of newly implemented code analysis tools. In particular,
+it evaluates how good the reports from the tool are.  We started calling the
+test-bed \cdb.
 
-Finally, we took \symbio and tuned it. We used that version of \symbio on a
-software competition of code analyzers. We plan to participate next year
-again.
+Finally, we released \symbio. We used that version of \symbio on a software
+competition of code analyzers. We plan to participate with a tuned version of
+\symbio again next year.
 
 \section{Thesis Organization}
 Chapter~\ref{sec:state} deals with a description of the current state of the
 art of standard code analysis techniques and tools. In
-Chapter~\ref{sec:stanse}, we discuss the abstract interpretation, mainly its
-implementation in our tool \stan~\cite{stanse} and its pros and cons.  We
-continue in Chapter~\ref{sec:fmics} by an approach to eliminate false
-positives resulting from the abstract interpretation. This is implemented in
-a tool called \symbio~\cite{symbiotic}.  Chapter~\ref{sec:clabure} then
-introduces a database of known errors in large projects like the Linux kernel.
-The database is called \cdb~\cite{claburedb}.  Chapter~\ref{sec:svcomp} shows
-results of \symbio in a software competition~\cite{symbiotic-svcomp}.
-Finally, we conclude with summaries of what we have done and some plans for
-future research.
+Chapter~\ref{sec:stanse}, we discuss our tool \stan~\cite{stanse} and its pros
+and cons. The chapter also refers to the abstract interpretation as it is
+implemented in \stan.  We continue in Chapter~\ref{sec:fmics} by an approach
+to eliminate false positives resulting from other analyses like the abstract
+interpretation. This is implemented in a tool called \symbio~\cite{symbiotic}.
+Chapter~\ref{sec:clabure} then introduces a database of known errors in large
+projects like the Linux kernel.  The database is called \cdb~\cite{claburedb}.
+Chapter~\ref{sec:svcomp} presents results of \symbio in a software
+competition~\cite{symbiotic-svcomp}.  Finally, we conclude with summaries of
+what we have done and some plans for the future research.
 
 %TODO: nemela by v sekci 6 (nebo nekde jinde) byt nejaka evaluace \stan,
 %\symbio a dalsich na zaklade benchamrku z \cdb?
