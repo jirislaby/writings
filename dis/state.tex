@@ -392,10 +392,10 @@ muchnick}.
 The data-flow analysis is only a limited tool. It just collects information
 about data and how they propagate through the control flow of a program.
 Therefore it is not that useful for designing more complex analyses which are
-usual for program checking and possibly elsewhere. There was a desire to
-formalize the process of designing more complex analyses. Cousots have been
-dealing with this for a long time. Their work on this topic stretches back to
-the 1970s. Back then, they described a framework called \emph{abstract
+usual for program analysis and possibly elsewhere. There was a desire to
+formalize the process of designing such analyses. Cousots have been dealing
+with this for a long time: their work on this topic stretches back to the
+1970s. Back then, they described a framework called \emph{abstract
 interpretation}~\cite{cousot}. It is designed to allow users of the formalism
 to easily design an analysis, prove whether it is correct and sound, to
 consistently formulate more precision levels of the analysis and more. The
@@ -405,30 +405,32 @@ too~\cite{ai_intro}.
 
 As the name of the analysis suggests, the data domains used in analyzed code
 are replaced by abstract ones. The approach requires an abstract domain to be
-a \emph{complete lattice}~\cite{lattice1,lattice2}. We formally define it
+a \emph{complete lattice}~\cite{lattice1,lattice2}. We formally define it in
 Definition~\ref{def:colattice}. Since the analyzed program is interpreted on a
-new (abstract) domain, we have to provide a new semantics of the program over
-the domain.  There are no limits in theory, the semantics can be arbitrary.
-It is defined by \emph{monotone functions} over the abstract lattice. The
-functions are assigned to each instruction in an analyzed program to transform
-the program states over a particular instruction. We then compose these
-functions into a single monotone function over the whole program (over product
-lattice as we will see later).  Thanks to the work of Tarski~\cite{tarski} and
-Kleene~\cite[pages 348--349]{kleene}, we can always compute a fixed point of
-the single monotone function transferring states over the product lattice.
+new (abstract) domain, we have to provide a new semantics of the program
+instructions over the domain.  There are no limits in theory, the semantics
+can be given by arbitrary \emph{monotone functions} over the abstract lattice.
+The functions are assigned to each instruction in an analyzed program to
+transform the program states over a particular instruction. We then compose
+these functions into a single monotone function over the whole program (over a
+product lattice as we will see later).  Thanks to the work of
+Tarski~\cite{tarski} and Kleene~\cite[pages 348--349]{kleene}, we can always
+compute a fixed point of the single monotone function transferring states over
+the product lattice.
+
+\begin{dfn}[Complete lattice]\label{def:colattice}
+A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
+a partially ordered set $(L,\, \leq)$ where every set $X \subseteq L$ has the
+least upper bound (supremum) $\sqcup X$ and the greatest lower bound (infimum)
+$\sqcap X$. In particular, $L$ has the least element $\bot = \sqcap L$ and the
+greatest element $\top = \sqcup L$.
+\end{dfn}
+
 The use of lattice(s) was not a random choice. Lattices are effective, their
 join and meet operators can be used when an analyzer is interpreting a
 program.  For example, when a branching occurs, the branch join operator can
 simply take the values present on the outputs of both branches and performs
 the lattice join ($\sqcup$).
-
-\begin{dfn}[Complete lattice]\label{def:colattice}
-A \emph{complete lattice} $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$ is
-a partially ordered set $(L,\, \leq)$ where every set $X \subseteq L$ has a
-least upper bound (supremum) $\sqcup X$ and a greatest lower bound (infimum)
-$\sqcap X$. In particular, $L$ has a least element $\bot = \sqcap L$ and a
-greatest element $\top = \sqcup L$.
-\end{dfn}
 
 Let us demonstrate the abstract interpretation on an example and then define
 the approach formally.  We work with the \emph{sign analysis} for
@@ -440,21 +442,20 @@ analysis can conclude that the value stored in \code{y} is negative (in the
 usual understanding of the addition and multiplication operators). Note that
 the analysis is not able to answer every such query due to the abstraction.
 For example, we cannot decide the sign of \code{z} in the expression $\var{z}
-= 3 + -5$ when considering only signs (a negative number added to a positive
-one can generally give both a negative and positive result). In our further
-explanation, we limit ourselves only to the addition and multiplication
-operators for easier understanding. We also consider only a single variable in
-a program.
+= 3 + (-5)$ when considering only signs (a negative number added to a positive
+one can generally give all a negative, positive, or zero result). In our
+further explanation, we limit ourselves only to the addition and
+multiplication operators for easier understanding. We also consider only a
+single variable in a program.
 
-First in our example, we have to establish an abstract domain which the
+First, in our example, we have to establish an abstract domain which the
 abstract interpretation works with. There are five possible values which can
 occur in the sign analysis.  Either an expression is positive ($\oplus$),
 negative ($\ominus$), zero ($0$), or the result is unknown as for \code{z}
 above ($\top$). Finally, there is a value to represent an uninitialized
 variable ($\bot$). If it appears in some subexpression, the analyzer should
-report an error. Therefore we do not consider it in further computation. The
-complete lattice for the set of these elements $\mathbf{Sign} = \{\oplus,\,
-\ominus,\, 0,\, \top,\, \bot \}$ is depicted in
+report an error.  The complete lattice for the set of these elements
+$\mathbf{Sign} = \{\oplus,\, \ominus,\, 0,\, \top,\, \bot \}$ is depicted in
 Figure~\ref{fig:state_ai_sign_lat}.
 \begin{figure}[htb]
   \begin{center}
@@ -478,25 +479,27 @@ Figure~\ref{fig:state_ai_sign_lat}.
 
 Next, we need to cope with subexpressions and compute a result of a whole
 expression assigned to a variable. For that purpose, we define two binary
-(overloaded) functions $+$ and $\cdot$ over two abstract values, for addition
-and multiplication respectively. Their type is obviously $\mathbf{Sign} \times
+(overloaded) functions $+$ and $\cdot$ over abstract values, for addition and
+multiplication respectively. Their type is obviously $\mathbf{Sign} \times
 \mathbf{Sign} \rightarrow \mathbf{Sign}$.  These two functions are defined in
-Table~\ref{tab:state_ai_addmult}.
+Table~\ref{tab:state_ai_addmult}.\todo{check this}
 \begin{table}[tb]
   \begin{center}
-    \begin{tabular}{|c||c|c|c|c|}\hline
-      $+$       & $0$       & $\ominus$ & $\oplus$ & $\top$ \\ \hline \hline
-      $0$       & $0$       & $\ominus$ & $\oplus$ & $\top$ \\ \hline
-      $\ominus$ & $\ominus$ & $\ominus$ & $\top$   & $\top$ \\ \hline
-      $\oplus$  & $\oplus$  & $\top$    & $\oplus$ & $\top$ \\ \hline
-      $\top$    & $\top$    & $\top$    & $\top$   & $\top$ \\ \hline
+    \begin{tabular}{|c||c|c|c|c|c|}\hline
+      $+$       & $0$       & $\ominus$ & $\oplus$ & $\top$ & $\bot$ \\ \hline \hline
+      $0$       & $0$       & $\ominus$ & $\oplus$ & $\top$ & $\bot$ \\ \hline
+      $\ominus$ & $\ominus$ & $\ominus$ & $\top$   & $\top$ & $\bot$ \\ \hline
+      $\oplus$  & $\oplus$  & $\top$    & $\oplus$ & $\top$ & $\bot$ \\ \hline
+      $\top$    & $\top$    & $\top$    & $\top$   & $\top$ & $\bot$ \\ \hline
+      $\bot$    & $\bot$    & $\bot$    & $\bot$   & $\bot$ & $\bot$ \\ \hline
     \end{tabular} ~~
-    \begin{tabular}{|c||c|c|c|c|}\hline
-      $\cdot$   & $0$ & $\ominus$ & $\oplus$  & $\top$ \\ \hline \hline
-      $0$       & $0$ & $0$       & $0$       & $0$    \\ \hline
-      $\ominus$ & $0$ & $\oplus$  & $\ominus$ & $\top$ \\ \hline
-      $\oplus$  & $0$ & $\ominus$ & $\oplus$  & $\top$ \\ \hline
-      $\top$    & $0$ & $\top$    & $\top$    & $\top$ \\ \hline
+    \begin{tabular}{|c||c|c|c|c|c|}\hline
+      $\cdot$   & $0$ & $\ominus$ & $\oplus$  & $\top$ & $\bot$ \\ \hline \hline
+      $0$       & $0$ & $0$       & $0$       & $0$    & $\bot$ \\ \hline
+      $\ominus$ & $0$ & $\oplus$  & $\ominus$ & $\top$ & $\bot$ \\ \hline
+      $\oplus$  & $0$ & $\ominus$ & $\oplus$  & $\top$ & $\bot$ \\ \hline
+      $\top$    & $0$ & $\top$    & $\top$    & $\top$ & $\bot$ \\ \hline
+      $\bot$    & $\bot$    & $\bot$    & $\bot$   & $\bot$ & $\bot$ \\ \hline
     \end{tabular}
   \end{center}
   \caption{The behaviour of arithmetic addition and multiplication for the
@@ -557,10 +560,11 @@ void fun(int n) {
 \end{tabular}
   \end{center}
   \caption{An example to demonstrate the sign abstract interpretation. We only
-  track the sign of the variable \code{x}.}
+  track the sign of the variable \code{x}.  $\protect\overrightarrow{f}$ is
+  the tuple $f_1,\, \dots,\, f_7$.}
   \label{tab:state_ai_sign_ex}
 \end{table}
-In the example, we want to track a sign of the variable \code{x} using the
+In the example, we want to track the sign of the variable \code{x} using the
 abstract interpretation. Transfer functions for this interpretation are
 shown in the third column for each of the lines.
 
@@ -581,8 +585,7 @@ F(\overrightarrow{f}) =
   (f_1(\overrightarrow{f}),\, \dots,\, f_n(\overrightarrow{f})).
 \end{equation*}
 Note that $F$ is also a monotone function in $(L^n,\, \sqsubseteq)$. Thanks to
-that, the least fixed point exists~\cite{kleene, tarski} and is the least
-solution of the transfer functions $f_1,\, \dots,\, f_n$. We iteratively
+that, the least fixed point exists~\cite{kleene, tarski}.  We iteratively
 compute the least fixed point in Table~\ref{tab:state_ai_sign_fp} for our
 example of Table~\ref{tab:state_ai_sign_ex}.
 \begin{table}[tb]
@@ -592,7 +595,7 @@ example of Table~\ref{tab:state_ai_sign_ex}.
   \multicolumn{6}{c|}{\textbf{Iterations of Fixed Point Computation}}
   \\ \cline{2-7}
 \textbf{Function} &
-  ~~~1~~~ & ~~~2~~~ & ~~~3~~~ & ~~~4~~~ & ~~~5~~~ & 6 (fixed) \\ \hline\hline
+  ~~~0~~~ & ~~~1~~~ & ~~~2~~~ & ~~~3~~~ & ~~~4~~~ & 5 (fixed) \\ \hline\hline
 $f_1$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\bot$   & $\bot$ \\ \hline
 $f_2$ & $\bot$ & $0$      & $0$      & $0$      & $0$      & $0$ \\ \hline
 $f_3$ & $\bot$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
@@ -607,8 +610,8 @@ $f_7$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\top$   & $\top$ \\ \hline
   \label{tab:state_ai_sign_fp}
 \end{table}
 We can see that the analysis can definitely decide about the sign of a value
-in \code{x} until assignment on line~\ref{lst:state_ai_xp2}. After that line,
-we lose precision due to the abstraction.
+stored in \code{x} until the assignment on line~\ref{lst:state_ai_xp2}. After
+that line, we lose precision due to the abstraction.
 
 As we proceeded with the example, we informally defined the abstract
 interpretation by:
@@ -616,25 +619,26 @@ interpretation by:
 \item A complete lattice $(L,\, \leq,\, \bot,\, \top,\, \sqcup,\, \sqcap)$
 which describes abstract values.
 
+\item Operations over the lattice definining the behaviour on subexpressions.
+
 \item A transfer monotone function $F$ which defines the interpretation
 of a program.
 
 \end{enumerate}
 Formally, the abstract interpretation is the tuple $I=\langle L,\, \circ,\,
-\leq,\, \top,\, \bot,\, F\rangle$. $\circ$ is either supremum ($\sqcup$)
-or infimum ($\sqcap$) lattice operator depending whether the results should be
-the least or greatest fixed point, respectively. Obviously, the definition can
-be loosened to require only a semi-lattice, as we need only one operator.
+\leq,\, \top,\, \bot,\, F\rangle$. $\circ$ is either the supremum ($\sqcup$)
+or the infimum ($\sqcap$) lattice operator depending whether the results
+should be the least or the greatest fixed point, respectively.
 
 The abstract interpretation is a very flexible tool for designing analyses. It
 does not require the lattices to have a finite height. Even if the lattice is
-infinitely high, the fixed point still can be computed in a finite time.
-Consider the lattice of Figure~\ref{fig:state_lat_int}. It is used for
-abstracting values of integer variables in programs.  The lattice is composed
-of intervals to remember possible bounds of some variable's value.  This is
-very useful domain especially when analyzing whether loops are bounded. When
-indices and probably other variables in the body of the loop are bounded, we
-can run some optimizations like loop unrolling~\cite[page 735]{dragon}.
+infinitely high, a fixed point still can be computed in a finite time (but
+need not be the least).  Consider the lattice of
+Figure~\ref{fig:state_lat_int}. It is used for abstracting values of integer
+variables in programs.  The lattice is composed of intervals to remember
+possible bounds of some variable's value.  This is a very useful domain
+especially when analyzing indices of arrays to ensure they never exceed the
+length of the indexed array.
 \begin{figure}[tb]
 \begin{center}
   \tikzstyle{invisible} = [minimum size=6mm]
@@ -730,36 +734,38 @@ can run some optimizations like loop unrolling~\cite[page 735]{dragon}.
   \end{tikzpicture}
 \end{center}
 \label{fig:state_lat_int}
-\caption{A lattice for intervals.}
+\caption{Lattice for intervals.}
 \end{figure}
 
 Obviously, the Kleene's sequence is not necessarily finite for this lattice.
 Therefore, the computation of a fixed point may not finish. To overcome the
 problem, Cousots~\cite{cousot} introduced the \emph{widening} operator
 $\triangledown$. Informally, the sequence is sped up by widening, so that it
-converges eventually.  Imagine we have an interval lattice and an infinite
-loop where we increment a variable that was initially set to zero. The
-infinite sequence of intervals computed for that variable would be: $[0,0],\,
-[0,1],\, \dots,\, [0,\infty]$. We can define the widening operator to set one
-of the interval bounds to infinity after some time (e.g.\ 100 iterations) to
-force the sequence to be finite like: $[0,0],\, [0,1],\, \dots,\, [0, 99],\,
-[0,\infty]$. This makes the Kleene's sequence finite. There exists also the
-\emph{narrowing} operator $\vartriangle$ which is used to make abstract values
-more precise. The reader is pointed to Cortesi and Zanioli~\cite{ai_widening}
-or Cousots~\cite{cousot_galois} who explain widening and narrowing formally
-and demonstrate the operators on more concise examples.
+converges eventually.  Imagine that we have an interval lattice and an
+infinite loop where we increment a variable that was initially set to zero.
+The infinite sequence of intervals computed for that variable would be:
+$[0,0],\, [0,1],\, \dots,\, [0,\infty]$. We can define the widening operator
+to set one of the interval bounds to infinity after some time (e.g.\ 100
+iterations) to force the sequence to be finite like: $[0,0],\, [0,1],\,
+\dots,\, [0, 99],\, [0,\infty]$. This makes the Kleene's sequence finite.
+There exists also the \emph{narrowing} operator $\vartriangle$ which is used
+to make abstract values more precise. The reader is pointed to Cortesi and
+Zanioli~\cite{ai_widening} or Cousots~\cite{cousot_galois} who explain
+widening and narrowing formally and demonstrate the operators on more extended
+examples.
 
 Intervals are not the only shapes to represent abstract values of numbers.
 Octagons, elipses, polyhedra, and other shapes are used to represent relations
-between two or more values~\cite{ai_octagons, ai_polyhedra, astree}. Several
-abstractions can be also combined to communicate with each other and improve
-thus accuracy or any other aspect of the analysis~\cite{ai_product}. This was
-utilized in tools like \textsc{Astree}~\cite{astree} and
-\textsc{Clousot}~\cite{clousot}.  Strings~\cite{ai_strings1, ai_strings2} and
-foating point numbers~\cite{ai_float1} can be abstracted too.  Further reading
-on the abstract interpretation is in an overview~\cite{cousot_progress}, where
-is the progress in the area of the abstract interpretation over 25 years. A
-not so usual use of the abstract interpretation can be found
+between valuse of two or more variables~\cite{ai_octagons, ai_polyhedra,
+astree}. Several abstractions can be also combined to communicate with each
+other and improve thus accuracy or any other aspect of the
+analysis~\cite{ai_product}. This was utilized in tools like
+\textsc{Astree}~\cite{astree} and \textsc{Clousot}~\cite{clousot}.
+Strings~\cite{ai_strings1, ai_strings2} and foating point
+numbers~\cite{ai_float1} can be abstracted too.  Further reading on the
+abstract interpretation is an overview~\cite{cousot_progress} describing the
+progress in the area of the abstract interpretation over 25 years. A not so
+usual application of the abstract interpretation can be found
 too~\cite{ai_unusual1, ai_unusual2, ai_unusual3}.  Engler et al.\ brought the
 abstract interpretation to the attention in 2000 by a technique based on a
 meta compilation in \xgcc~\cite{metacomp}. There, program developers specify
@@ -774,9 +780,9 @@ ranked according to their probability of being real errors. There are generic
 and statistical ranking algorithms ordering error reports.  An extension
 introduced later~\cite{lockchecker} provides an automatic inference of some
 temporal properties based on statistical analysis of assumed programmer's
-beliefs.  \stan~\cite{stanse} is built on the similar base as \xgcc. We
-discuss \stan in Chapter~\ref{sec:stanse}.  It is uncertain, whether some
-industrial tool adopts the abstract interpretation too, see the discussion in
+beliefs.  \stan~\cite{stanse} is built on a similar base as \xgcc. We discuss
+\stan in Chapter~\ref{sec:stanse}.  It is uncertain whether some industrial
+tool adopts the abstract interpretation too, see the discussion in
 Section~\ref{sec:industrial}.
 
 The correctness and soundness (cf.\ Section~\ref{sec:theor_props}) of an
@@ -800,11 +806,11 @@ false positives, but are often slower than abstract interpreters or sometimes
 even unsound.  One of precise and sound techniques is the \emph{symbolic
 execution}. The technique was introduced in 1970's and described by several
 authors concurrently~\cite{se_king, se_select, se_dissect, se_clarke}. The
-symbolic execution represents program inputs by symbols. Therefore it does not
-need to analyze the program many times with concrete, initialized, data. The
-program is then executed and program expressions are manipulated including the
-symbolic values. Let us demonstrate this on an example depicted in
-Figure~\ref{fig:se_example}.
+symbolic execution represents program inputs by symbols.  The program is then
+executed by an executor which manipulates expressions over symbols rather than
+concrete values. Hence it does not need to execute the program many times with
+concrete, initialized, data.  Let us demonstrate the symbolic execution on an
+example depicted in Figure~\ref{fig:se_example}.
 \begin{figure}[htb]
 \begin{center}
 \begin{tabular}{c}
@@ -833,7 +839,7 @@ long time to exercise the program to get to the true branch of the \code{if}s
 with dynamic testing.  With \code{int} being usual 32 bits, there is only one
 successful attempt out of $2^{32}$ overall. Of course, with a static analyzer
 based on the data-flow analysis or abstract interpretation, those true
-branches would be analyzed quite quickly. But this brings us to the second
+branches are usually analyzed quite quickly. But this brings us to the second
 point. Many complete analyzers generate a report about division by zero
 possible on line~\ref{line:se_ex_div}. This is indeed a false positive because
 \code{b} is set to \code{1} on line~\ref{line:se_ex_set} in case \code{a} is
@@ -843,15 +849,14 @@ not often remember conditions on branchings.
 The symbolic execution tackles these two problems. All inputs from the user
 are replaced by \emph{symbols}. For a variable \code{a}, we denote the symbol
 corresponding to \code{a} as $\sym{a}$. We allow symbols to be assigned to
-variables similar to constants and other expressions. In our example, the
-assignment on line~\ref{line:se_ex_sset} would set $\sym{a}+1$ to \code{a}.
-Obviously we have to teach the symbolic executor to deal with symbols in
+variables, similar to constants and other expressions. In our example, the
+assignment on line~\ref{line:se_ex_sset} would set \code{a} to $\sym{a}+1$.
+Obviously, we have to teach the symbolic executor to deal with symbols in
 arithmetic operations and branching statements.
 
 A symbolic executor, to be fully working, has to remember a \emph{program
 state}. The executor represents the state as a triple and updates its members
-while executing a program. The triple is $(l,\, \theta,\, \varphi)$ and is
-constituted by the following items:
+while executing a program. The triple $(l,\, \theta,\, \varphi)$ contains:
 \begin{itemize}
 \item \emph{Location} $l$: the symbolic executor needs to remember the
 currently evaluated program location in a control flow graph.
@@ -893,25 +898,26 @@ continues execution by jumping directly to the \emph{false} branch.
 depending on the symbolic input.  So to retain soundness, the symbolic
 executor has to fork the execution of the whole program to explore both
 branches. In that case, the path condition $\varphi$ has to be augmented in
-the respective branches. For the true branch, $\varphi \wedge (\sym{a}+\var{1}
-= \var{0x12345678})$ is a new path condition, for the other branch $\varphi
-\wedge (\sym{a}+\var{1} \neq \var{0x12345678})$.
+the respective branches. Since we have $\theta(\var{a})=\sym{a}+1$, a new path
+condition in the true branch is $\varphi \wedge (\sym{a}+\var{1} =
+\var{0x12345678})$, for the other branch $\varphi \wedge (\sym{a}+\var{1} \neq
+\var{0x12345678})$.
 
 \end{itemize}
 In our example, on line~\ref{line:se_ex_if1} neither implication is valid, as
 $\theta(\var{a})=\sym{a}+1$ cannot prove validity of $\theta(\var{a}) =
-\var{0x12345678}$. So the execution forks.  The situation is different on
-line~\ref{line:se_ex_if2}, nonetheless. There, we can get into two states, by
-the two previous forked executions. In one, the path condition contains
-$\theta(\var{a}) = \var{0x12345678}$ and symbolic memory is holding \code{1}
-for \code{b}. In the other $\theta(\var{a}) \neq \var{0x12345678}$ and
-$\theta(\var{b}) = 0$. From the first one, the executor can induce
-Implication~\ref{equ:se_fi}, so it continues by jumping into the true branch.
-And since $\theta(\var{b}) = 1$, no division by zero can happen.  Similarly
-for the second fork: the executor jumps to the false branch of the \code{if},
-i.e.~it skips the \code{if} completely. Note that this is one of the very
-cases where other types of analyses including the abstract interpretation
-produce false positives.
+\var{0x12345678}$ or $\theta(\var{a}) \neq \var{0x12345678}$. So the execution
+forks.  The situation is different on line~\ref{line:se_ex_if2}, nonetheless.
+There, we can get into two states, by the two previous forked executions. In
+one, the path condition contains $\theta(\var{a}) = \var{0x12345678}$ and
+symbolic memory assigns \code{1} to \code{b}. In the other $\theta(\var{a})
+\neq \var{0x12345678}$ and $\theta(\var{b}) = 0$. From the first one, the
+executor can induce Implication~\ref{equ:se_fi}, so it continues by jumping
+into the true branch.  And since $\theta(\var{b}) = 1$, no division by zero
+can happen.  Similarly for the second state: the executor jumps to the false
+branch of the \code{if}, i.e.~it skips the \code{if} completely. Note that
+this is one of the very cases where other types of analyses including the
+abstract interpretation produce false positives.
 
 Due to the forks, the execution of a program is usually depicted as a
 \emph{symbolic execution tree}. Nodes of the tree are labeled by program
@@ -1037,8 +1043,8 @@ Figure~\ref{fig:state_se_tree}.
 \end{center}
   \caption{A symbolic execution tree of the control flow graph of
   Figure~\ref{fig:state_se_cfg}. The loop remained highlighted. Selected nodes
-  are depicted along with the symbolic memory (dashed) and path conditions
-  (dotted).}
+  are depicted along with the symbolic memory (dashed; after assignments) and
+  path conditions (dotted; after branchings).}
   \label{fig:state_se_tree}
 \end{figure}
 For readability of figures, nodes are not labeled by full program states, but
@@ -1061,21 +1067,21 @@ theories.  Second, the symbolic execution suffers from the \emph{path
 explosion problem}, i.e.\ an exponential growth of paths that need to be
 explored. Every branching in the code potentially multiplies the possible
 number of paths through the program by two. It is even worse for loops, where
-the symbolic execution tree can become huge or infinite, e.g.\ when analyzing
-loops.  Hence, for real-world programs, the symbolic execution is barely
-usable without incorporating other techniques to reduce the count of explored
-paths.  Some tools try to tackle this issue by traversing more paths at once
-to substantially reduce the size of the execution tree~\cite{cse_atva}.
+the symbolic execution tree can become huge or infinite.  Hence, for
+real-world programs, the symbolic execution is barely usable without
+incorporating other techniques to reduce the count of explored paths.  Some
+tools try to tackle this issue by traversing more paths at once to
+substantially reduce the size of the execution tree~\cite{cse_atva}.
 Others~\cite{pex_ddse, G07}, compose symbolic executions of several functions
-using summaries which results in an inter-procedural analysis. This
-approach limits the need of execution to separate functions only.
+using summaries which results in an inter-procedural analysis. This approach
+limits the need of execution to separate functions only.
 \textsc{Exe}~\cite{exe}, \textsc{Klee}~\cite{klee}, and
 \textsc{RWset}~\cite{rwset} are based on recording of already seen behavior
 and pruning its repetition. Tools like Girgis'~\cite{se_limited} and
-\ucklee~\cite{ucklee} also limit the tree depth by a hard-coded
-constant, to obtain finite tree for the price of unsoundness.  Some works aim
-at guessing the number of loops needed to reach some target location to help
-analyzing large programs with many nested loops~\cite{partial_loop}.
+\ucklee~\cite{ucklee} also limit the tree depth by a hard-coded constant, to
+obtain a finite tree for the price of unsoundness.  Some works aim at guessing
+the number of loops needed to reach some target location to help analyzing
+large programs with many nested loops~\cite{partial_loop}.
 
 Despite King originally introduced the symbolic execution for symbolic
 debugging~\cite{se_king}, the symbolic execution is currently widely used for
@@ -1092,8 +1098,8 @@ se_gener}, summarize effects of libraries~\cite{se_libs}, or to extract
 dependencies of outputs on inputs~\cite{se_output1}. It was used to find bugs
 in aircraft control and nuclear power systems~\cite{se_critical} or
 filesystems by generating malicious disks~\cite{exe_fs}. Even though, some do
-not explicitly mention the symbolic execution, they in fact implement it, to
-find errors in memory management~\cite{prefix} for example.
+not explicitly mention the symbolic execution, they in fact implement it, for
+example to find errors in memory management~\cite{prefix}.
 \textsc{PathFinder-SE}~\cite{pathfinder_se} is an extension to the model
 checker \textsc{PathFinder} which enables the model checker to perform the
 symbolic execution.  They further improved the tool to handle e.g.\ concurrent
@@ -1107,7 +1113,7 @@ symbolic execution to find integer overflows.
 Many modern tools combine the symbolic execution with dynamic (concrete)
 analysis. This combination of analyses is called \emph{concolic
 execution}. Tools implementing concolic execution achieve better scalability
-and higher coverage of analyzed code.  \textsc{PathCrawler}~\cite{pathcrawler}
+and higher coverage of analyzed code. \textsc{PathCrawler}~\cite{pathcrawler}
 was the first executor to combine symbolic and dynamic execution. It does not
 use concrete values in the symbolic execution to simplify complex constraints
 nonetheless. This was first performed only by \textsc{Dart}~\cite{dart}.  The
@@ -1118,7 +1124,7 @@ and a solver is then used to change the input so that it traverses another
 paths when executed dynamically again. This happens until the code is covered
 fully or an user stops the process.  \textsc{Dart} can propagate concrete
 values from the dynamic runs to the symbolic run when the solver is incapable
-to reason about some values. Especially, when pointer constrains are used,
+to reason about some values. Especially, when pointer constraints are used,
 \textsc{Dart} gives up the symbolic execution and switches to standard random
 testing. This was improved in another executor \textsc{Cute}~\cite{cute}. It
 handles pointers better and is able to analyze concurrent programs. So except
@@ -1127,12 +1133,12 @@ of individually spawn threads.  \textsc{Cute} cannot still handle symbolic
 offsets of pointers. Very close tool to \textsc{Cute} is
 \textsc{Crest}~\cite{crest}, except it is freely available, source
 codes inclusive. Since every concolic execution tool is prone to selected
-strategy that decides which states are explored next, the authors studied and
-compared the strategies too.  \textsc{Check 'n' Crash}~\cite{check_crash} does
-quite the opposite to \textsc{Cute}. First, it runs a coarse symbolic
-execution to find a suspicious location in code. Then the tool generates a
-test case and runs the program dynamically to verify whether the code location
-really contains an error.
+strategy that decides which states are explored next, the authors of
+\textsc{Crest} studied and compared the strategies too.  \textsc{Check 'n'
+Crash}~\cite{check_crash} does quite the opposite to \textsc{Cute}. First, it
+runs a coarse symbolic execution to find a suspicious location in code. Then
+the tool generates a test case and runs the program dynamically to verify
+whether the code location really contains an error.
 
 \paragraph{\textsc{Exe} and Derivatives}
 At the same time as \textsc{Dart} and \textsc{Cute} emerged, Cadar et al.\
@@ -1145,11 +1151,11 @@ optimizes solver queries, has better search heuristics, and other improvements
 like a model to simulate a filesystem without really involving it.  This
 allowed for a successful error finding in \textsc{Coreutils}, the basic set of
 utilities most Linux users work with. \textsc{Klee} can be used also for
-checking a tool equivalence. It takes two implementations of the same and
-symbolically compares the results. Several deviations from the standard
-behaviour of some utilities were found that way. This was later improved more
-in \ucklee~\cite{ucklee}. First, it compares memory contents of both
-implementations. Second, it makes the memory symbolic when accessed
+checking a tool equivalence. It takes two implementations of the same
+functionality and symbolically compares the results. Several deviations from
+the standard behaviour of some utilities were found that way. This was later
+improved more in \ucklee~\cite{ucklee}. First, it compares memory contents of
+both implementations. Second, it makes the memory symbolic when accessed
 (on-demand). Finally, it checks that both implementations behave the same with
 respect to error conditions like division by zero. \textsc{Klee} and
 \textsc{UC-Klee} are put into concolic executors since they allow to invoke
@@ -1158,22 +1164,23 @@ library functions dynamically.
 Instead of generating only a single input, \sage~\cite{active_props, sage}
 defines the term \emph{generational search} to generate as many inputs as
 possible in a single symbolic run. This is unimportant for cases, where the
-whole state space is explored. But this is not the case as real programs are
-barely covered fully. So generating more inputs often helps more coverage. As
-it is a concolic executor, it records branching conditions from the first
-dynamic run.  But it negates \emph{all} of them one by one and asks a solver
-for a solution.  For each positive reply the solver gives, \sage generates a
-separate input. The whole tool does not use any intermediate language, it
-symbolically executes directly the x86 binary code. So it can be used also in
-cases where source code is not known.  The whole approach in \sage is called
+whole state space is explored. But this is not the case of real programs as
+they are barely covered fully because the symbolic execution is very
+expensive. So generating more inputs often helps more coverage. As it is a
+concolic executor, it records branching conditions from the first dynamic run.
+But it negates \emph{all} of them one by one and asks a solver for a solution.
+For each positive reply the solver gives, \sage generates a separate input.
+The whole tool does not use any intermediate language, it symbolically
+executes directly the x86 binary code. So it can be used also in cases where
+source code is not known.  The whole approach of \sage is called
 \emph{automated whitebox fuzz testing}.  \textsc{SmartFuzz}~\cite{smartfuzz}
 works very similarly, but the set of errors the tool aims at is limited only
 to integer errors. That is, \textsc{SmartFuzz} captures signed/unsigned
 conversions for example. The generated inputs are filtered, so more eager
 heuristics that allow more inputs generation are allowed.
 
-None of the above support automatic bi-directional conversion across the
-boundary of the symbolic and concrete execution. This was one of the two
+None of the tools above supports automatic bi-directional conversion across
+the boundary of the symbolic and concrete execution. This was one of the two
 novelties in \textsc{S${}^2$e}~\cite{s2e}: \emph{selective symbolic
 execution}. It was published by some of the authors earlier to solve the
 problem of path explosion in libraries and system calls~\cite{se_selective}.
@@ -1184,17 +1191,17 @@ second novelty is a true concolic execution because it runs the \textsc{Klee}
 symbolic executor and a modified \textsc{Qemu} virtual machine in parallel.
 Those two communicate with each other and exchange information, especially the
 symbolic state is updated from the dynamic execution and concrete values
-instantiated from the symbolic run whenever needed. Converters in both
-directions from x86 code to \llvm have to be in place to have both executions
-running.  \textsc{S${}^2$e} was used to to find errors in Windows network
-drivers, and allegedly it was the first one to employ the symbolic execution
-for performance analysis too.  \textsc{S${}^2$e}'s parallel engine works on
-the top of \textsc{Ddt${}^+$}, which is a reimplementation of a closed source
-tool \textsc{Ddt}~\cite{ddt}. A very similar to \textsc{S${}^2$e}, but less
-generic framework is \textsc{BitBlaze}~\cite{bitblaze}. It analyses binary
-files and creates intermediate code with a reduced instruction set. The
-instructions are executed symbolically.  One of unusual uses is generating
-exploits by a comparison of an unpatched and patched version.
+instantiated from the symbolic run on the fly. Converters in both directions
+from x86 code to \llvm have to be in place to have both executions running.
+\textsc{S${}^2$e} was used to find errors in Windows network drivers, and
+allegedly it was the first one to employ the symbolic execution for
+performance analysis too.  \textsc{S${}^2$e}'s parallel engine works on the
+top of \textsc{Ddt${}^+$}, which is a reimplementation of a closed source tool
+\textsc{Ddt}~\cite{ddt}. A very similar to \textsc{S${}^2$e}, but less generic
+framework is \textsc{BitBlaze}~\cite{bitblaze}. It analyses binary files and
+creates intermediate code with a reduced instruction set. The instructions are
+executed symbolically.  One of unusual uses of the concolic execution is
+generating exploits by a comparison of an unpatched and patched version.
 \textsc{BitBlaze} was used for checking HTTP and NTP protocol
 servers~\cite{bitblaze_net}.  \textsc{Bitscope}~\cite{bitscope} is built on
 the same cornerstone as \textsc{BitBlaze}, but provides understanding of
@@ -1206,13 +1213,14 @@ recognizing malware in software.  Another true concolic executor is
 executes the Java bytecode instead of source code, therefore performs the
 symbolic execution more directly. Nevertheless, a \textsc{Sjpf}'s downside is
 that it still does not track constraints in both directions as the executors
-above, it tracks the constraints only when switching from the concrete
+above: it tracks the constraints only when switching from the concrete
 execution to the symbolic one.
 
-Besides the aforementioned papers, there are also overviews with a summary of
-some symbolic execution techniques we have mentioned~\cite{se_review88,
-se_review09, se_review10, se_review13}. And note that we also employ the
-symbolic execution in our tool described in Chapter~\ref{sec:fmics}.
+Besides the aforementioned papers, there are also overviews containing a
+summary of some symbolic execution techniques we have
+mentioned~\cite{se_review88, se_review09, se_review10, se_review13}. And note
+that we also employ the symbolic execution in our tool described in
+Chapter~\ref{sec:fmics}.
 
 % SADAT and IVS are missing
 %EL1~\cite{se_el1}
@@ -1221,23 +1229,24 @@ symbolic execution in our tool described in Chapter~\ref{sec:fmics}.
 
 \section{Program Slicing}\label{sec:slicing}
 As was described in the previous section, the symbolic execution is prone to
-slowness when analyzes programs with loops or many branchings. We mentioned
-some techniques to cope with this problem in that section too, but have not
-enumerated them all of course. There is another approach that can be used in
-an analyzer to help the symbolic execution. The requirement is to have a set
-of code locations, e.g.\ lines with potential bugs. In that case, the analyzer
-can simply remove all the code which does not affect the flow to those code
-locations in any way and the analyzer can evaluate only the relevant part.
-This is exactly a task that can be performed by \emph{program slicing}.  This
-is a technique that was described by Weiser in his PhD thesis in
-1979~\cite{slicing_phd} and later also published as an article~\cite{slicing}.
-As the slicing leaves only the code that really affects particular code
-locations, the slicing may bring a considerable speed-up to techniques working
-with code in general, not only to the symbolic execution.
+slowness when analyzing programs with loops or many branchings. We mentioned
+some techniques to cope with this problem in the previous section too, but we
+have not enumerated them all of course. There is another approach that can be
+used in an analyzer to help the symbolic execution. The requirement is to have
+a set of code locations, e.g.\ lines with potential bugs. In that case, the
+analyzer can simply remove all the code which does not affect the flow to
+those code locations in any way and the analyzer can evaluate only the
+relevant part.  This is exactly a task that can be performed by \emph{program
+slicing}.  This is a technique that was described by Weiser in his PhD thesis
+in 1979~\cite{slicing_phd} and later also published as an
+article~\cite{slicing}.  As the slicing leaves only the code that really
+affects particular code locations, the slicing may bring a considerable
+speed-up to techniques working with code in general, not only to the symbolic
+execution.
 
 \newcommand{\newsym}[1]{\ensuremath\boldsymbol{\mathsf{#1}}}
 
-When we want to slice a program we have to specify what behaviour we want to
+When we want to slice a program, we have to specify what behaviour we want to
 preserve in the program first. In the slicing, this is performed by defining
 \emph{slicing criteria}. These are chosen lines of the program accompanied
 with variables we are interested in at those lines. Note that there is no
@@ -1248,12 +1257,12 @@ loosen the requirement of ``any execution'' to ``a specified execution'' as we
 will see later nonetheless.  Thereafter, when a slicer is given the slicing
 criteria, it processes functions in a program independently, in an
 intra-procedural way. The slicer starts with some function and assigns a set
-of \emph{relevant variables} to each line of the function. For lines, where
-are some slicing criteria, relevant variables are filled by variables from the
-criteria. Otherwise the relevant sets are left empty.  Further, according to
-the semantics of program commands, the slicer propagates relevant variables
-among function lines and inserts discovered variables into relevant sets on
-corresponding lines. This happens as follows:
+of \emph{relevant variables} to each line of the function. For lines with
+some slicing criteria, the variables from the criteria are put into the
+relevant variables. Otherwise the relevant sets are left empty.  Further,
+according to the semantics of program commands, the slicer propagates relevant
+variables among function lines and inserts discovered variables into relevant
+sets on corresponding lines. This happens as follows:
 \begin{itemize}
 \item All relevant variables from a successive line are copied to the current
 line's set except for those which are set on the current line. This is a
@@ -1327,7 +1336,7 @@ use(a);(*@ \label{lst:state_sl_crit} @*)
 \end{tabular}
 \end{center}
 \caption{Program slicing of example in Table~\ref{tab:state_df_eq}. The fixed
-point computation is sped up.}
+point computation of relevant variables is sped up.}
 \label{tab:state_slicing}
 \end{table}
 Note that the particular iterations of the fixed point calculation are sped up
@@ -1346,41 +1355,42 @@ pass the relevant variables among functions: down to a called function at
 every \emph{call} instruction and back up from the called function. As relevant
 variables propagate from the bottom up, the slicer has to pass the variables
 from a call site to return points of the called function and when the slicer
-is done with the transfer of the variables through the whole function to its
-beginning, the variables are transferred back to the call instruction. Of
-course the slicer has to take care of actual with formal parameters binding
-and of the relationship between return value and the variable where the result
-is stored into. Finally, we have to ensure that the set variables of the call
-instruction proper are those which the called function modifies, so that the
-call instruction is not sliced.  The same as above, the process repeats until
-a fixed point is reached.  Inter-procedural slicers were discussed by Horwitz
-et al.~\cite{slic_inter1} and Gallagher~\cite{slic_inter2}.
+is done with the computation of the relevant variables through the whole
+function to its beginning, the variables are transferred back to the call
+instruction. Of course the slicer has bind actual parameters with formal ones
+and take care of the relationship between the return value and the variable
+where the result is stored into. Finally, we have to ensure that the set
+variables of the call instruction proper are those which the called function
+modifies, so that the call instruction is not sliced when the called function
+modifies some relevant variable.  The same as above, the process repeats until
+a fixed point is reached. The inter-procedural slicing was discussed by
+Horwitz et al.~\cite{slic_inter1} and Gallagher~\cite{slic_inter2}.
 
 Originally, there were only slicers implementing the technique as described
 above. These are \emph{static} slicers and they slice such that any possible
-input to a program is handled the same as in the original code. But slicing
-is often used for debugging purposes~\cite{slicing_debugging} and there, we
-are usually interested in a value of some particular variable only when some
-specific input was passed to the program.  Imagine we have a bug in the
-program and know what was passed on the input. We also know that a variable
-printed on the output has an invalid value. The slicer can be therefore
-limited to this input. In particular, the input need not trigger visiting all
-bodies of branches or loops, so this allows for much more code removal than
-static slicing.  This approach is called \emph{dynamic}
-slicing~\cite{slicing_dyn}. Note the slicer has to look at conditions and
-track a path condition and this is usually slow. So this obviously results in
-a drawback: computing a dynamic slice is more computationally expensive than
-computing static slices. Since control flow graphs are used to compute slices
-(not lines like in the original algorithm), there appeared techniques to
-overcome the problem by pruning of the control flow graphs. They can
-significantly decrease the computation time~\cite{slic_prunecfg1,
-slic_prunecfg2}, but the result is less precise.  \emph{Hybrid} slicing tries
-to tackle this problem by combining the dynamic slicing with dynamic runs.
-Using breakpoints, slicers record which code locations are visited with which
-input and compute the dynamic slice according to the locations.  It is both
-faster and less space consuming than the dynamic slicing.  The dynamic slicing
-can be improved such that it works with more than one input~\cite{slic_quasi,
-slic_union}, which can be generalized as describing input as
+input to a program is handled the same way. But slicing is often used for
+debugging purposes~\cite{slicing_debugging} and there, we are usually
+interested in a value of some particular variable only when some specific
+input was passed to the program.  Imagine we have a bug in the program and
+know what was passed on the input. We also know that a variable printed on the
+output has an invalid value. The slicer can be therefore limited to this
+input. In particular, the input need not trigger visiting all bodies of
+branches or loops, so this allows for much more code removal than static
+slicing.  This approach is called \emph{dynamic} slicing~\cite{slicing_dyn}.
+Note the slicer has to look at conditions and track a path condition and this
+is usually slow. So this obviously results in a drawback: computing a dynamic
+slice is more computationally expensive than computing static slices. Since
+control flow graphs are used to compute slices (not lines like in the original
+algorithm), there appeared techniques to overcome the problem by pruning of
+the control flow graphs. They can significantly decrease the computation time
+of dynamic slicing~\cite{slic_prunecfg1, slic_prunecfg2}, but the result is
+less precise.  \emph{Hybrid} slicing tries to tackle this problem by combining
+the dynamic slicing with dynamic runs.  Using breakpoints, slicers record
+which code locations are visited with which input and compute the dynamic
+slice according to the locations.  It is both faster and less space consuming
+than the dynamic slicing.  The dynamic slicing can be improved such that it
+works with more than one input value~\cite{slic_quasi, slic_union}, which can
+be generalized by describing input values via
 constraints~\cite{slic_constraint, slic_constraint_bw}.
 
 There is also an orthogonal method to the static slicing. We may be
@@ -1406,24 +1416,25 @@ unwanted in slices when debugging. They can be disabled to appear in the
 slice~\cite{slic_stop}. Similar is the \emph{barrier}
 slicing~\cite{slic_barrier}. Barriers are statements which should be ignored
 by a slicer including their successors.  So barriers are often at interfaces
-of massively used, and therefore likely error-free libraries.  The slicing can
+of massive use, and therefore likely error-free libraries.  The slicing can
 be also used for finding errors using \emph{dicing}. We have to know two
 locations in code. On one location, there is a variable which has a correct
 value. On the other there is a variable with a wrong value. We slice the code
 separately with those two variables and locations as criteria and the slices
 are compared. Intersection of the slices are lines of code which are likely
-correct. The error has to be in the rest of the incorrect slice. Slicers can
-work also on the semantic level, to not preserve syntax, but leave semantics
-with respect to criteria~\cite{slic_amorphous}. The slicing can reason about
-some paths in a program~\cite{slic_path} such as why a statement on a
-particular path is not executed? It can be used for proving
-correctness~\cite{slic_mc} and for concurrent programs too~\cite{slic_concur}.
-And finally, Weiser suggested to use the slicing for transfomation of a
-program to a couple of parallel programs: slices can run concurrently on
-separate processor without shared memory~\cite{slicing}.  More details about
-slicing and its variations and uses can be seen in various surveys and
-reviews~\cite{slic_overview95, slic_overview96, slic_overview98,
-slic_overview01a, slic_overview01b, slic_overview05, slic_overview12}.
+correct. The error has to be likely in the rest of the incorrect slice as this
+was not a part of the correct slice. Slicers can work also on the semantic
+level, to not preserve syntax, but leave semantics with respect to
+criteria~\cite{slic_amorphous}. The slicing can reason about some paths in a
+program~\cite{slic_path} such as why a statement on a particular path is not
+executed? It can be used for proving correctness~\cite{slic_mc} and for
+concurrent programs too~\cite{slic_concur}.  And finally, Weiser suggested to
+use the slicing for transfomation of a program to a couple of parallel
+programs: slices can run concurrently on separate processor without shared
+memory~\cite{slicing}.  More details about slicing and its variations and uses
+can be seen in various surveys and reviews~\cite{slic_overview95,
+slic_overview96, slic_overview98, slic_overview01a, slic_overview01b,
+slic_overview05, slic_overview12}.
 
 We use slicing extensively to reduce code size of the code that is
 symbolically executed by our tool. More insight can be seen in
@@ -1456,15 +1467,15 @@ we can represent it by a formula \code{a} $\Leftrightarrow$ \code{b} instead
 of storing all the values. The formulas can be represented in a space-saving
 way by \emph{Reduced Ordered Binary Decision Diagrams}~\cite{bdd} (ROBDD or
 simply BDD).  Despite the exponential complexity still persists (due to the
-path explosion problem), BDDs helped to limit the memory use a lot.  Both the
-symbolic model checking and BDDs allowed more complex systems to be checked on
-the same hardware (cf.~\cite{mc_symbolic1} again).  Symbolic model checking
-was later improved to defer the path explosion problem more by techniques like
-\textsc{Cegar}~\cite{cegar}. \textsc{Cegar} starts with an abstraction of the
-model and makes it more precise whenever a \emph{spurious} counterexample is
-produced.  And only in that part of the model which is too abstract. Examples
-of symbolic model checkers are \textsc{NuSmv}~\cite{nusmv} or
-\textsc{Bebop}~\cite{bebop}.
+path explosion problem), BDDs helped to push the model checking usability
+boundary a lot.  Both the symbolic model checking and BDDs allowed more
+complex systems to be checked on the same hardware (cf.~\cite{mc_symbolic1}
+again).  Symbolic model checking was later improved to defer the path
+explosion problem more by techniques like \textsc{Cegar}~\cite{cegar}.
+\textsc{Cegar} starts with an abstraction of the model and makes it more
+precise whenever a \emph{spurious} counterexample is produced.  And only in
+that part of the model which is too abstract. Examples of symbolic model
+checkers are \textsc{NuSmv}~\cite{nusmv} or \textsc{Bebop}~\cite{bebop}.
 
 In parallel to the BDDs-based model checking, \emph{bounded model checking}
 exists. Instead of exploring the whole state space of the system model, there
@@ -1476,7 +1487,7 @@ set the top bound for \textit{k} (the analysis is of course incomplete in that
 case), or the execution is infeasible, because it runs out of resources. Few
 representatives are \textsc{Esbmc}~\cite{esbmc} and
 \textsc{Llbmc}~\cite{llbmc}. Model checking and bounded model checking are
-orthogonal techniques, it was shown in~\cite{bmc_survey} that both of them
+orthogonal techniques. It was shown in~\cite{bmc_survey} that both of them
 reason about different class of properties. (Nonetheless there can be an
 intersection.)
 
@@ -1517,22 +1528,23 @@ modelling and verifying Java programs like
 \textsc{PathFinder}~\cite{pathfinder}.
 
 As this thesis does not deal with the model checking, curious readers are
-pointed to a survey~\cite{mc_survey} and a book~\cite{mc_book} about model
-checking.  There is also a survey about bounded model
+pointed to a survey~\cite{mc_survey} and books~\cite{mc_book1, mc_book2} about
+model checking.  There is also a survey about bounded model
 checking~\cite{bmc_survey} available. To the best of our knowledge, there are
-no later surveys or books covering the topics in that scale as these three do.
+no later surveys or books covering the topics in that scale as these four do.
 
 \section{Industrial Tools}\label{sec:industrial}
 There are many successful industrial tools based on the static analysis.
-Unfortunately for some of them, it is not really known what technique they are
-based on.  It is due to secrets the companies want to hold to not let their
-competitors find out. From what can be found in the reference materials, the
-tools often use combination of the techniques we have already described. They
-work on the top of various pattern matching, data-flow analyses, and some
-maybe use the abstract interpretation.  Even though the internals are not
-known exactly, we at least try to summarize the tools and the little which
-their providers make available.  Prevalently, the tools below are capable to
-handle C, some of them C++ and other languages like C\# or Java.
+Unfortunately, for some of them, it is not really known what technique they
+are based on. It is due to secrets the companies want to hold, so that their
+competitors will not find out. From what can be found in the reference
+materials, the tools often use combination of the techniques we have already
+described.  They work on the top of various pattern matching, data-flow
+analyses, and some of them maybe use the abstract interpretation.  Even though
+the internals are not known exactly, we at least try to summarize the tools
+and the little information which their providers make available.  Prevalently,
+the tools below are capable to handle C, some of them C++ and other languages
+like C\# or Java.
 
 The data-flow analyzer \textsc{Lint} was an inspiration for Gimpel's
 \textsc{PC Lint/FlexeLint}~\cite{pclint} and Cleanscape's
@@ -1548,13 +1560,13 @@ sound, i.e.\ to produce no false positives.  \textsc{Astree} also combines
 several abstractions to perform more accurate analysis~\cite{astree_combine}.
 
 \xgcc was a predecessor of Coverity's \textsc{Prevent}~\cite{coverity}, and
-\textsc{Metal} for Coverity's \textsc{Extend}. \textsc{Prevent} is run
+\textsc{Metal} preceded Coverity's \textsc{Extend}. \textsc{Prevent} is run
 regularly to check the Linux kernel and the results are provided to kernel
 developers.  KlocWork's \textsc{Insight}~\cite{klocwork} and GrammaTech's
 \textsc{CodeSonar}~\cite{codesonar} are specialized to finding security and
 reliability issues. \textsc{Insight} was originally intended as an optimizer
-for C code. IBM's \textsc{Apollo}~\cite{apollo} aims at checking web
-applications, \textsc{PHP} scripts more precisely.
+for C code. IBM's \textsc{Apollo} aims at checking web
+applications~\cite{apollo}, more precisely at \textsc{PHP} scripts.
 
 Microsoft developed many tools based on the symbolic execution.  Even though
 \textsc{PREfix}~\cite{prefix} explicitly does not mention the symbolic
@@ -1565,16 +1577,16 @@ library functions.  This was improved in \textsc{Archer} of Xie et
 al.~\cite{archer}. A similar use as IBM's \textsc{Apollo} above has
 Microsoft's \textsc{Pex}~\cite{pex}. It is a symbolic executor intended for
 checking of .NET web applications. Microsoft developed also a fuzz tester
-\sage~\cite{sage}.  It is a symbolic executor working directly on the x86
+\sage~\cite{sage}.  It is a concolic executor working directly on the x86
 assembly code. It is therefore able to work also with libraries whose source
 code was not made public.  \textsc{Yogi}~\cite{yogi} is a tool which combines
 symbolic execution with dynamic execution. It was experimentally used to
 replace \textsc{Slam}~\cite{slam_decade} in \textsc{Sdv}~\cite{sdv} with
 comparably better results. Microsoft also released \textsc{PREfast}, a tool
-that contains a set of rules that a code should fulfill and with a use of
-annotations, \textsc{PREfast} checks code against the rules. Its main use is
-to disallow developers to commit changes that contain certain classes of
-errors such as inter-procedural integer overflows.
+that contains a set of rules that a code should fulfill. \textsc{PREfast}
+checks code against the rules with a use of annotations. Its main use is to
+disallow developers to commit changes that contain certain classes of errors
+such as inter-procedural integer overflows.
 
 %\url{http://spinroot.com/static/}
 %\url{http://web.archive.org/web/20120316050109/http://www.testingfaqs.org/t-static.html}
@@ -1583,9 +1595,9 @@ errors such as inter-procedural integer overflows.
 
 \section{Summary of the Linux Kernel Checkers}
 Some of the tools above can analyze kernels or only drivers of operating
-systems. In this sections we specifically sum those which are capable to
+systems. In this section, we specifically sum those which are capable to
 handle the Linux kernel. We discuss or use many of them in the following
-chapters, hence it makes sense to mention them here explicitly.
+chapters, hence it we mention them here explicitly.
 
 One of the basic ones is based on the pattern matching and every developer
 is supposed to use it before sending patches to the kernel maintainers. It is
@@ -1620,9 +1632,9 @@ tool based on a similar technique, it was used the same way and found over one
 hundred another errors.
 
 There are also projects based on model checking which are successful to check
-the Linux kernel. \textsc{Ldv}~\cite{ldv} is one of those. The same as
-\textsc{Prevent}'s reports, \textsc{Ldv}'s reports are sent to the subsystem
-maintainers so that they can look at them and fix them.
+the Linux kernel. Linux Driver Verifier (\textsc{Ldv})~\cite{ldv} is one of
+those. The same as \textsc{Prevent}'s reports, \textsc{Ldv}'s reports are sent
+to the subsystem maintainers so that they can look at them and fix them.
 
 %\textsc{Herodotos}~\cite{herodotos} compares several version of checked
 %software and is able track errors how are they propagated over time.
