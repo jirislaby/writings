@@ -453,10 +453,10 @@ abstract interpretation works with. There are five possible values which can
 occur in the sign analysis.  Either an expression is positive ($\oplus$),
 negative ($\ominus$), zero ($0$), or the result is unknown as for \code{z}
 above ($\top$). Finally, there is a value to represent an uninitialized
-variable ($\bot$). If it appears in some subexpression, the analyzer should
-report an error.  The complete lattice for the set of these elements
-$\mathbf{Sign} = \{\oplus,\, \ominus,\, 0,\, \top,\, \bot \}$ is depicted in
-Figure~\ref{fig:state_ai_sign_lat}.
+variable ($\bot$). If it appears in some subexpression after the abstract
+interpretation is computed, the analyzer should report an error.  The complete
+lattice for the set of these elements $\mathbf{Sign} = \{\oplus,\, \ominus,\,
+0,\, \top,\, \bot \}$ is depicted in Figure~\ref{fig:state_ai_sign_lat}.
 \begin{figure}[htb]
   \begin{center}
     \begin{tikzpicture}[node distance=5mm and 5mm]
@@ -482,24 +482,24 @@ expression assigned to a variable. For that purpose, we define two binary
 (overloaded) functions $+$ and $\cdot$ over abstract values, for addition and
 multiplication respectively. Their type is obviously $\mathbf{Sign} \times
 \mathbf{Sign} \rightarrow \mathbf{Sign}$.  These two functions are defined in
-Table~\ref{tab:state_ai_addmult}.\todo{check this}
+Table~\ref{tab:state_ai_addmult}.
 \begin{table}[tb]
   \begin{center}
     \begin{tabular}{|c||c|c|c|c|c|}\hline
-      $+$       & $0$       & $\ominus$ & $\oplus$ & $\top$ & $\bot$ \\ \hline \hline
-      $0$       & $0$       & $\ominus$ & $\oplus$ & $\top$ & $\bot$ \\ \hline
-      $\ominus$ & $\ominus$ & $\ominus$ & $\top$   & $\top$ & $\bot$ \\ \hline
-      $\oplus$  & $\oplus$  & $\top$    & $\oplus$ & $\top$ & $\bot$ \\ \hline
-      $\top$    & $\top$    & $\top$    & $\top$   & $\top$ & $\bot$ \\ \hline
-      $\bot$    & $\bot$    & $\bot$    & $\bot$   & $\bot$ & $\bot$ \\ \hline
+      $+$       & $0$       & $\ominus$ & $\oplus$ & $\bot$    & $\top$ \\ \hline \hline
+      $0$       & $0$       & $\ominus$ & $\oplus$ & $0$       & $\top$ \\ \hline
+      $\ominus$ & $\ominus$ & $\ominus$ & $\top$   & $\ominus$ & $\top$ \\ \hline
+      $\oplus$  & $\oplus$  & $\top$    & $\oplus$ & $\oplus$  & $\top$ \\ \hline
+      $\bot$    & $0$       & $\ominus$ & $\oplus$ & $\bot$    & $\top$ \\ \hline
+      $\top$    & $\top$    & $\top$    & $\top$   & $\top$    & $\top$ \\ \hline
     \end{tabular} ~~
     \begin{tabular}{|c||c|c|c|c|c|}\hline
-      $\cdot$   & $0$ & $\ominus$ & $\oplus$  & $\top$ & $\bot$ \\ \hline \hline
-      $0$       & $0$ & $0$       & $0$       & $0$    & $\bot$ \\ \hline
-      $\ominus$ & $0$ & $\oplus$  & $\ominus$ & $\top$ & $\bot$ \\ \hline
-      $\oplus$  & $0$ & $\ominus$ & $\oplus$  & $\top$ & $\bot$ \\ \hline
-      $\top$    & $0$ & $\top$    & $\top$    & $\top$ & $\bot$ \\ \hline
-      $\bot$    & $\bot$    & $\bot$    & $\bot$   & $\bot$ & $\bot$ \\ \hline
+      $\cdot$   & $0$ & $\ominus$ & $\oplus$  & $\bot$    & $\top$ \\ \hline \hline
+      $0$       & $0$ & $0$       & $0$       & $0$       & $0$    \\ \hline
+      $\ominus$ & $0$ & $\oplus$  & $\ominus$ & $\ominus$ & $\top$ \\ \hline
+      $\oplus$  & $0$ & $\ominus$ & $\oplus$  & $\oplus$  & $\top$ \\ \hline
+      $\bot$    & $0$ & $\ominus$ & $\oplus$  & $\bot$    & $\top$ \\ \hline
+      $\top$    & $0$ & $\top$    & $\top$    & $\top$    & $\top$ \\ \hline
     \end{tabular}
   \end{center}
   \caption{The behaviour of arithmetic addition and multiplication for the
@@ -512,61 +512,64 @@ can evaluate the sign of \code{y} to $\ominus$.
 
 We know how the values are computed in an expression, but we still need to
 define a \emph{transfer function} over lines of code. Similar to the data-flow
-analysis, transfer function $f_s$ for a statement $s$ updates the states
-incoming to $s$ according to the effect of $s$. In the following text, we
-demonstrate the interpretation on example code from the second column of
-Table~\ref{tab:state_ai_sign_ex}.
+analysis, the transfer function $f_s$ for a statement $s$ takes the states
+incoming to $s$ and changes them according to the effect of $s$. The type of
+$f$ is $f^n \rightarrow \mathbf{Sign}$, where $n$ is the number of lines. In
+the following text, we demonstrate the interpretation on example code from the
+second column of Table~\ref{tab:state_ai_sign_ex}.
 \begin{table}[tb]
   \begin{center}
-  \begin{tabular}{|r|l||p{2em}l|} \hline
+  \begin{tabular}{|r|l||p{2.4em}l|} \hline
 \textbf{\footnotesize \#} &
   \multicolumn{1}{c||}{\textbf{Code}} &
   \multicolumn{2}{c|}{\textbf{Transfer Function}} \\ \hline\hline
 1 & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
 void fun(int n) {
 \end{lstlisting} } &
-  $f_1(\overrightarrow{f})$ & $= \bot$ \\ \hline
+  $f_1\left(\overrightarrow{f}\right)$ & $= \bot$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
   int x = 0;(*@ \label{lst:state_ai_x0} @*)
 \end{lstlisting} } &
-  $f_2(\overrightarrow{f})$ & $= 0$ \\ \hline
+  $f_2\left(\overrightarrow{f}\right)$ & $= 0$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
   x = x + 1;(*@ \label{lst:state_ai_xp1} @*)
 \end{lstlisting} } &
-  $f_3(\overrightarrow{f})$ & $= f_2 + \oplus$ \\ \hline
+  $f_3\left(\overrightarrow{f}\right)$ & $= f_2\left(\overrightarrow{f}\right) + \oplus$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
   while (--n)
 \end{lstlisting} } &
-  $f_4(\overrightarrow{f})$ & $= f_3 \sqcup f_5$ \\ \hline
+  $f_4\left(\overrightarrow{f}\right)$ & $= f_3\left(\overrightarrow{f}\right) \sqcup
+    f_5\left(\overrightarrow{f}\right)$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
     x = x * 5;(*@ \label{lst:state_ai_xm} @*)
 \end{lstlisting} } &
-  $f_5(\overrightarrow{f})$ & $= f_4 \cdot \oplus$ \\ \hline
+  $f_5\left(\overrightarrow{f}\right)$ & $= f_4\left(\overrightarrow{f}\right) \cdot \oplus$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
   x = x + (-1);(*@ \label{lst:state_ai_xp2} @*)
 \end{lstlisting} } &
-  $f_6(\overrightarrow{f})$ & $= f_4 + \ominus$ \\ \hline
+  $f_6\left(\overrightarrow{f}\right)$ & $= f_4\left(\overrightarrow{f}\right) + \ominus$ \\ \hline
 
 \thelstnumber & {\begin{lstlisting}[name=state_ai_comp,numbers=none,frame=none]
 }
 \end{lstlisting} } &
-  $f_7(\overrightarrow{f})$ & $= f_6$ \\ \hline
+  $f_7\left(\overrightarrow{f}\right)$ & $= f_6\left(\overrightarrow{f}\right)$ \\ \hline
 
 \end{tabular}
   \end{center}
-  \caption{An example to demonstrate the sign abstract interpretation. We only
+  \caption{Example to demonstrate the sign abstract interpretation. We only
   track the sign of the variable \code{x}.  $\protect\overrightarrow{f}$ is
   the tuple $f_1,\, \dots,\, f_7$.}
   \label{tab:state_ai_sign_ex}
 \end{table}
 In the example, we want to track the sign of the variable \code{x} using the
 abstract interpretation. Transfer functions for this interpretation are
-shown in the third column for each of the lines.
+shown in the third column for each of the lines. Note that we denote the tuple
+of all $f_s$ as $\overrightarrow{f}$.
 
 As we mentioned earlier, a single monotone function is needed for the fixed
 point calculation. The function is composed of the transfer functions and it
@@ -574,15 +577,17 @@ works on a whole program using a \emph{product lattice}. A product lattice is
 the complete lattice $(L^n,\, \sqsubseteq)$, where $(L,\, \leq)$ is a complete
 lattice and
 \begin{equation*}
-(x_1,\, \dots,\, x_n) \sqsubseteq (y_1,\, \dots,\, y_n) \Leftrightarrow
-  (x_1 \leq y_1 \wedge \dots \wedge x_n \leq y_n).
+\left(\left(x_1,\, \dots,\, x_n\right) \sqsubseteq \left(y_1,\, \dots,\,
+  y_n\right)\right) \Leftrightarrow
+  \left(x_1 \leq y_1 \wedge \dots \wedge x_n \leq y_n\right).
 \end{equation*}
 Given the product lattice $(L^n,\, \sqsubseteq)$, we define the composed
 function $F: L^n \rightarrow L^n$ of monotone functions $f_1,\, \dots,\, f_n$
 as
 \begin{equation*}
-F(\overrightarrow{f}) =
-  (f_1(\overrightarrow{f}),\, \dots,\, f_n(\overrightarrow{f})).
+F\left(\overrightarrow{f}\right) =
+  \left(f_1\left(\overrightarrow{f}\right),\, \dots,\,
+  f_n\left(\overrightarrow{f}\right)\right).
 \end{equation*}
 Note that $F$ is also a monotone function in $(L^n,\, \sqsubseteq)$. Thanks to
 that, the least fixed point exists~\cite{kleene, tarski}.  We iteratively
@@ -590,19 +595,27 @@ compute the least fixed point in Table~\ref{tab:state_ai_sign_fp} for our
 example of Table~\ref{tab:state_ai_sign_ex}.
 \begin{table}[tb]
   \begin{center}
-\begin{tabular}{|c||c|c|c|c|c|c|} \hline
-\textbf{Transfer} &
+\begin{tabular}{|c|c||c|c|c|c|c|c|} \hline
+\multicolumn{2}{|c||}{\textbf{Transfer}} &
   \multicolumn{6}{c|}{\textbf{Iterations of Fixed Point Computation}}
-  \\ \cline{2-7}
-\textbf{Function} &
+  \\ \cline{3-8}
+\multicolumn{2}{|c||}{\textbf{Function}} &
   ~~~0~~~ & ~~~1~~~ & ~~~2~~~ & ~~~3~~~ & ~~~4~~~ & 5 (fixed) \\ \hline\hline
-$f_1$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\bot$   & $\bot$ \\ \hline
-$f_2$ & $\bot$ & $0$      & $0$      & $0$      & $0$      & $0$ \\ \hline
-$f_3$ & $\bot$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
-$f_4$ & $\bot$ & $\bot$   & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
-$f_5$ & $\bot$ & $\bot$   & $\bot$   & $\oplus$ & $\oplus$ & $\oplus$ \\ \hline
-$f_6$ & $\bot$ & $\bot$   & $\bot$   & $\top$   & $\top$   & $\top$ \\ \hline
-$f_7$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\top$   & $\top$ \\ \hline
+\multirow{7}{*}{$F$} &
+  $f_1$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\bot$   & $\bot$ \\
+  \cline{2-8}
+& $f_2$ & $\bot$ & $0$      & $0$      & $0$      & $0$      & $0$ \\
+  \cline{2-8}
+& $f_3$ & $\bot$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\
+  \cline{2-8}
+& $f_4$ & $\bot$ & $\bot$   & $\oplus$ & $\oplus$ & $\oplus$ & $\oplus$ \\
+  \cline{2-8}
+& $f_5$ & $\bot$ & $\bot$   & $\bot$   & $\oplus$ & $\oplus$ & $\oplus$ \\
+  \cline{2-8}
+& $f_6$ & $\bot$ & $\bot$   & $\bot$   & $\top$   & $\top$   & $\top$ \\
+  \cline{2-8}
+& $f_7$ & $\bot$ & $\bot$   & $\bot$   & $\bot$   & $\top$   & $\top$ \\
+  \hline
 \end{tabular}
   \end{center}
   \caption{Fixed point computation for example of
@@ -1280,14 +1293,14 @@ The slicer continues the evaluation of the function statements repeatedly
 until the sets stop increasing in size, i.e.\ a fixed point is reached.  From
 the content of the sets and the program semantics we can safely claim, which
 program lines have no impact on the initial slicing criteria.
-Those are exactly the lines, where intersection between variables that are set
-on that line and relevant variables on the \emph{successive} line(s) is empty.
-Slicers also have to leave lines with branches or loop heads that affect some
-unsliced lines from the previous sentence. The rest can be removed from the
-body of the function.  Let us demonstrate the computation on the example of
-Table~\ref{tab:state_df_eq}.  Suppose we want to slice the program according
-to line~\ref{lst:state_sl_crit} and variable \code{a} there. The computation of
-relevant sets denoted as $R_{7,a}$ is demonstrated in
+Those are exactly the lines, where the intersection between variables that are
+set on that line and relevant variables on the \emph{successive} line(s) is
+empty.  Slicers also have to leave lines with branches or loop heads that
+affect some unsliced lines from the previous sentence. The rest can be removed
+from the body of the function.  Let us demonstrate the computation on the
+example of Table~\ref{tab:state_df_eq}.  Suppose we want to slice the program
+according to line~\ref{lst:state_sl_crit} and variable \code{a} there. The
+computation of relevant sets denoted as $R_{7,a}$ is demonstrated in
 Table~\ref{tab:state_slicing}.
 \newcommand{\eset}{$\emptyset$}
 \begin{table}[htb]
