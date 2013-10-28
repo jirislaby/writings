@@ -829,13 +829,14 @@ In the first place, it is the analyzed code complexity that causes headache to
 many developers of static analyzers. Analyzing simple and short sources is
 easy as was presented in many experimental tools. When it comes to real-world
 code with many inter-dependencies among files and complex inter-procedural
-flows of checked properties, experimental tools often stop working.  We also
-started naively with simple configurations for the \AC, similar to automaton
-for locking of Figure~\ref{fig:stan_automaton}. It turned out to be too naive
-as we ended up with tens thousands of reports with no useful information. We
+flows of checked properties among functions, experimental tools often choke
+and stop working.  We started also naively with simple configurations for the
+\AC, similar to the automaton for locking of Figure~\ref{fig:stan_automaton}.
+This approach turned out to be too naive as we ended up with tens thousands of
+reports with no useful information, i.e.\ false positives. To avoid them, we
 had to tune the automaton. The result is an automaton which, when its height
-fits on an A4 paper oriented landscape, would need 28 sheets for its width. A
-very simplified variant of the automaton is in
+fits on an A4 paper oriented landscape, would need 28 sheets for its width to
+be readable. A very simplified variant of the automaton is in
 Figure~\ref{fig:stan_big_automaton}.
 \begin{figure}[htb]
   \begin{center}
@@ -844,18 +845,18 @@ Figure~\ref{fig:stan_big_automaton}.
     \caption{A simplified automaton used for checking the kernel locking.}
     \label{fig:stan_big_automaton}
 \end{figure}
-It neither contains loops on final states, nor transitions as they make the
-picture totally unreadable. Nonetheless the transitions are easily
-conceivable. We mark locked states by a suffix \code{L} and unlocked states by
-a suffix \code{U}. The more \code{L}'s, the more nested a lock is. Finally, we
-have several lock categories like anonymous locks \code{A}. The picture is not
-complete also because we omitted parametrizations of states. \stan allows us
-to parametrize nodes and transitions to support named locks and model
-situations like nested locking (\code{lock(A); lock(B); unlock(B);
-unlock(A);}) without losing precision.
+It neither contains loops on final states, nor transition labels as they make
+the picture unreadable. Nonetheless the transitions are easily conceivable. We
+mark locked states by the suffix \code{L} and unlocked states by the suffix
+\code{U}. The more \code{L}'s, the more nested a lock is. Finally, we have
+several lock categories like anonymous locks \code{A}. The picture is reduced
+also because we omitted parametrizations of states which exponentially
+enlarges the state space. \stan allows us to parametrize nodes and transitions
+to support named locks and model situations like nested locking
+(\code{lock(A); lock(B); unlock(B); unlock(A);}) without losing precision.
 
 After months of tuning of the configurations we finally got some meaningful
-results. There finally started appearing real errors like those described
+results. Finally, there started appearing real errors like those described
 earlier in Section~\ref{sec:stan_imp_errors}. But there were still also false
 positives stemming from the limits of the abstract interpretation which the
 \AC is based upon. Let us demonstrate a typical false positive which we took
