@@ -44,7 +44,7 @@
   instrumentation, program slicing, and symbolic execution.  This paper
   briefly describes the approach of \tool~2 including its strengths,
   weaknesses, and particularly improvements implemented during the last
-  year.  Architecture and installation of the tool are described as well.
+  year. The architecture and installation of the tool are described as well.
 \end{abstract}
 
 %}}}
@@ -58,7 +58,7 @@
 program slicing, and symbolic execution in order to detect bugs described by
 finite state machines. More precisely, we instrument a given program with
 code that tracks runs of state machines representing various erroneous
-behaviors. If an instrumented state machine enters an error location during
+behaviours. If an instrumented state machine enters an error location during
 a program execution, then the original program contains a bug specified by
 the machine. After instrumentation, we slice~\cite{weiser} the program to
 reduce its size without affecting runs of state machines. Finally, we
@@ -84,31 +84,27 @@ taken care of in a simple scripted filter.
 
 The main improvements of \tool 2 compared to the original version of \tool
 competing in SV-COMP 2013 are in the Slicer. We have fixed several bugs in
-the original slicer (invalid treatment of several instructions and function
+the original slicer (invalid treatment of several instructions and functions
 with variable number of arguments). We have also substantially improved
-precision of the employed points-to analysis, which is a crucial part of
-slicing. In particular, we have switched from field-insesitive to
-field-sensitive points-to analysis.  This means that every field of a
+precision of the employed pointer analysis, which is a crucial part of
+slicing. In particular, we have switched from a field-insensitive to a
+field-sensitive pointer analysis.  This means that every field of a
 \texttt{struct} is now handled as a different pointer target. Similarly, we
-handle the first 64 elements of each array as various targets. Finally, we
-have added some type-filters that speed the points-to analysis up and make
-its results more accurate. All the improvements significantly reduce the
-number of incorrect answers produced by \tool.
+handle the first 64 elements of each array as distinct targets. Finally, we
+have added some type-filters that speed the pointer analysis up and make its
+results more accurate. All the improvements significantly reduce the number of
+incorrect answers produced by \tool.
  
-\todo{Chtelo by to nejakej relevantni odkaz na points-to analyzu (nebo lepe
-  na field-sensitive verzi). Mas nejakej?}
-
 %}}}
 %{{{ Software architecture
 
 \section{Software Architecture}
 \paragraph{Libraries/External Tools} For the code translation and for
-operations with the \textsc{Llvm} bitcode we use
-\textsc{Llvm}/\textsc{Clang} 3.1\footnote{\url{http://llvm.org}}.  \todo{Je
-  ta verze porad stejna?} The symbolic executor is \textsc{Klee}~\cite{klee}
-which itself uses the \textsc{Stp} constraint solver~\cite{stp}. We obtained
-both \textsc{Klee} and \textsc{Stp} from the respective GIT repositories and
-used the snapshots.
+operations with the \textsc{Llvm} bitcode we use \textsc{Llvm}/\textsc{Clang}
+3.2\footnote{\url{http://llvm.org}}.  The symbolic executor is
+\textsc{Klee}~\cite{klee} which itself uses the \textsc{Stp} constraint
+solver~\cite{stp}. We obtained both \textsc{Klee} and \textsc{Stp} from the
+respective GIT repositories and used the snapshots.
 
 \paragraph{Software Structure and Architecture} The architecture described
 in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
@@ -130,7 +126,7 @@ single script \texttt{runme}.
 \paragraph{Implementation Technology} The instrumentation is performed by a
 \texttt{bash} script using \texttt{sed}. The final filter also uses
 \texttt{bash} with the help of \texttt{grep}. The rest of the toolchain is
-written in C++ and compiled using \texttt{gcc}. \todo{Napsat sem nejakou verzi?}
+written in C++ and compiled using \texttt{gcc}.
 
 %}}}
 %{{{ Discussion
@@ -151,10 +147,10 @@ The main weakness of the tool is a high percentage of
 \texttt{UNKNOWN} results coming mainly from high computation
 cost of the symbolic execution of programs with loops or recursion. This
 problem is relieved by slicing, but there are still many cases where the
-sliced code remains complex and symbolic execution runs out of time or memory. 
-Other sources of \texttt{UNKNOWN} results are internal errors of
-\textsc{Klee} and general limitations of constraint solving.
-We plan to reduce this weakness by application of the compact symbolic
+sliced code remains complex and the symbolic execution runs out of time or
+memory.  Other sources of \texttt{UNKNOWN} results are internal errors of
+\textsc{Klee} and general limitations of constraint solving.  We plan to
+reduce this weakness by application of the compact symbolic
 execution~\cite{CSE} instead of the classic one.
 
 %}}}
@@ -163,20 +159,22 @@ execution~\cite{CSE} instead of the classic one.
 \section{Tool Setup and Configuration}
 \paragraph{Download and Installation Instructions}
 \begin{itemize}
-\item \emph{Requirements:} \texttt{llvm-3.1}, \texttt{clang-3.1}.
+\item \emph{Requirements:} \texttt{llvm-3.2}, \texttt{clang-3.2}.
 \item Download \tool 2 at: \url{https://sf.net/projects/symbiotic/}.
 \item Change the current directory to \texttt{/opt} (this location is
-	needed for \textsc{Klee}).
+	needed by \textsc{Klee}).
 \item Untar the archive with the tool.
 \item Change directory into \texttt{/opt/symbiotic}.
-\item Run \texttt{./runme <benchmark.c>} for each source file in the set.
+\item Run \texttt{./runme <benchmark.c>} for each source file in the set. Set
+\texttt{MFLAG=-m64} environment variable for 64-bit benchmarks.
 \end{itemize}
 
 \paragraph{Results Reported} \texttt{SAFE/UNSAFE/UNKWNOWN} answers match
 the competition rules. The counterexample for an error in some
 \texttt{<benchmark.c>} is generated for each error path in the benchmark to
-\texttt{<benchmark.c>-klee-out/}. There is also a sliced code referred by all
-the error paths.
+\texttt{<benchmark.c>-klee-out/}.
+
+%There is also a sliced code referred by all the error paths.
 
 %}}}
 %{{{ Software project and contributors
