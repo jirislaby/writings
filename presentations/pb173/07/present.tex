@@ -221,7 +221,7 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id)
   \item \header{linux/pci.h}
   \item Definice \code{struct pci_device_id}
   \begin{itemize}
-  \item \cmd{lspci -nn} a najít Combo a jeho vendor+device ID
+  \item \cmd{lspci -nn} a najít EDU a jeho vendor+device ID
   \end{itemize}
   \item Definice \code{struct pci_driver}
   \begin{itemize}
@@ -278,7 +278,7 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
   \heading{Většina ostatních sběrnic funguje stejně}
   \begin{itemize}
-  \item USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \ldots
+  \item USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \dots
   \item Nějaké probe/remove
   \item Seznam ID
   \item Registrace ,,ovladače''
@@ -287,29 +287,42 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 \end{frame}
 
 \begin{frame}
+  \frametitle{Specifikace baru 0 karty EDU}
+
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|} \hline
+Offset & Len & R/W & Meaning \\ \hline\hline
+0x0000 & 4B  & R   & ID \& Revision \\ \hline
+0x0004 & 4B  & R/W & Inverted value \\ \hline
+0x0008 & 4B  & R/W & Factorial \\ \hline
+0x0020 & 4B  & R   & Status    \\ \hline
+\end{tabular}
+\caption{Specifikace baru 0 karty EDU}
+\end{table}
+
+\begin{itemize}
+\item ID \& Revision: \code{0xRRrr00edu}, RR -- major, rr -- minor
+\item Inverted value: zapsané číslo se obrátí (operátor \code{\~})
+\item Faktoriál: vypočte se faktoriál (je nutné počkat na status bit)
+\item Status: 0. bit -- probíhá výpočet faktoriálu
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
   \frametitle{Úkol}
 
-  \heading{Vyčtení identifikace karty COMBO6}
+  \heading{Vyčtení identifikace karty EDU a práce s ní}
   \begin{enumerate}
   \item Povolení zařízení (\code{pci_enable_device})
   \item Rezervace baru 0 (\code{pci_request_region})
   \item Vypsat fyzickou adresu baru 0 a porovnat s \code{lspci}
   \item Přemapovat bar 0 (\code{ioremap})
-  \item Přečíst a rozkódovat identifikaci dole (\code{readX})
+  \item Přečíst a rozkódovat identifikaci a revizi (\code{readX})
+  \item Ověřit živost karty pomocí invertovacího registru
   \item Uklidit v remove (unmap, release, disable)
   \end{enumerate}
-
-\begin{table}
-\footnotesize
-\begin{tabular}{|l|l|l|l|l|} \hline
-Offset & Len & R/W & Contents   & Meaning \\ \hline\hline
-0x0000 & 4B  & R   & \code{0xC610RRrr} & Bridge ID \& Revision\\ \hline
-0x0004 & 4B  & R   & \code{0xYMDDhhmm} & Bridge build time \\ \hline
-\end{tabular}
-\caption{Specifikace baru 0 karet COMBO}
-\end{table}
-
-  Pozn.: součást domácího
 
 \end{frame}
 
