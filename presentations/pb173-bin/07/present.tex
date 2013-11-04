@@ -1,0 +1,257 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\input{../header.tex}
+
+\subtitle{VII. C bez libc}
+\date{5. 11. 2013}
+
+\begin{document}
+\shorthandoff{-}
+
+\frame{\titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{C a \file{libc}}
+
+  \begin{itemize}
+    \item \file{libc} se stará o komunikaci s OS (jádrem)
+    \begin{itemize}
+      \item Jádro poskytuje pouze ,,základní'' funkcionalitu
+    \end{itemize}
+
+    \pause
+
+    \item \file{libc} poskytuje spoustu nadstaveb
+    \begin{itemize}
+      \item Soubory: \code{fopen}, \code{fread}, \code{fwrite}, \code{fclose},
+	\dots
+      \item Síť: \code{getaddrinfo}, \code{ntoh*}, \code{hton*}
+      \item Více vláken (\file{libpthread}): \code{pthread_*} (včetně zamykání)
+      \item A spoustu dalšího (celý POSIX), \dots
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \begin{center}
+  \heading{Bez \file{libc} nic z toho nemáme}
+
+  \smallskip
+
+  Jak teď např.\ ale otevřu soubor?
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace s jádrem}
+
+  \begin{itemize}
+    \item Systémová volání
+    \begin{itemize}
+      \item Podobné jako zavolání funkce
+      \item Ale program a jádro běží v jiných kontextech
+      \item Přepnutí kontextu
+      \begin{itemize}
+	\item Uložení a změna stavu procesoru
+	\item Relativně drahá operace
+      \end{itemize}
+      \item Uvidíme dnes dále
+    \end{itemize}
+
+    \pause
+
+    \item Sdílená paměť
+    \begin{itemize}
+      \item Jádro zapisuje, uživatel čte a naopak
+      \item V jednom z dalších cvičení
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Systémová volání}
+
+  \begin{itemize}
+    \item Volání funkce
+
+    \item Instrukcí procesoru
+    \begin{itemize}
+      \item Závislé na architektuře
+      \item Softwarové přerušení (x86\_32: číslo \code{0x80})
+      \item Speciální instrukce (x86\_32: \code{sysenter},
+        x86\_64: \code{syscall})
+      \item Demo: implementace \code{syscall} z \file{glibc}
+    \end{itemize}
+
+    \pause
+
+    \item Systémová volání jsou očíslovaná
+    \begin{itemize}
+      \item Do jednoho registru číslo
+      \item Čísla \code{__NR_*} definovaná jádrem (pro každou architekturu)
+      \item \header{sys/syscall.h}
+      \item Např. (x86\_64): \code{__NR_write} (1), \code{__NR_exit} (60)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{\file{libc} o úroveň níže}
+  \begin{enumerate}
+    \item Zavolejte systémová volání
+    \begin{itemize}
+      \item \code{write} s nějakým textem
+      \item \code{exit}
+    \end{itemize}
+    \item Pomocí funkce \code{syscall} z \file{libc}
+    \begin{itemize}
+      \item První argument: číslo systémového volání
+      \item Další argumenty: odpovídají už danému volání
+      \item Např.\ \code{syscall(__NR_kill, -1, SIGKILL)}
+    \end{itemize}
+    \item Přeložte a vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Virtuální systémová volání}
+
+  \heading{\code{vsyscall}}
+  \begin{itemize}
+    \item Jen na některých architekturách
+    \item Neprobíhá přepnutí kontextu
+    \item Speciální stránka(y) s kódem namapovaným jádrem
+    \item Podpora jen 3 funkcí
+    \begin{itemize}
+      \item \code{getcpu}: číslo CPU a NUMA uzlu
+      \item \code{gettimeofday}: aktuální čas
+      \item \code{time}: čas v sekundách od Epochy
+    \end{itemize}
+
+    \item Demo: \cmd{ldd}
+
+    \pause
+
+    \item Adresa funkce se získá pomocí makra \code{VSYSCALL_ADDR()}
+    \begin{itemize}
+      \item \header{asm/vsyscall.h}
+      \item Parametr je název shora s předponou \code{__NR_v}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Volání \code{time} z \code{vsyscall}}
+  \begin{enumerate}
+    \item Zjistěte si adresu \code{time} z \code{vsyscall}
+    \item Zavolejte tento \code{time}
+    \item Vypište hodnotu
+    \item Přeložte a spusťte několikrát
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{C bez \file{libc}}
+
+  \begin{itemize}
+    \item Žádné hlavičkové soubory z \file{libc}
+    \item Jen to, co poskytuje jádro (\file{/usr/include/linux/})
+    \item Při linkování: \cmd{gcc -nostdlib ...}
+    \begin{itemize}
+      \item \cmd{gcc} stále může vkládat volání \code{memset} apod.
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Systémová volání bez \file{libc}}
+  \begin{enumerate}
+    \item Otevřete a projděte si \file{pb173-bin/07/}
+    \item Zavolejte
+    \begin{itemize}
+      \item \code{fork}
+      \item Z rodiče: \code{write}
+      \item Z potomka: \code{read} a \code{write} 16 bytů
+      \item Z obou potom: \code{exit}
+    \end{itemize}
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Volací konvence}
+
+  \begin{table}
+    \begin{tabular}{|l||c|c||c|c|} \hline
+      \multirow{3}{*}{Parametr} &
+        \multicolumn{4}{c|}{Registry} \\ \cline{2-5}
+         & \multicolumn{2}{c||}{Systémová volání} &
+         \multicolumn{2}{c|}{Uživatelský prostor} \\ \cline{2-5}
+         & i386 & x86\_64 & i386 & x86\_64 \\ \hline\hline
+      1. & EBX  & RDI & EAX      & RDI  \\ \hline
+      2. & ECX  & RSI & EDX      & RSI  \\ \hline
+      3. & EDX  & RDX & Zásobník & RDX  \\ \hline
+      4. & ESI  & R10 & Zásobník & RCX  \\ \hline
+      5. & EDI  & R8  & Zásobník & R8   \\ \hline
+      6. & EBP  & R9  & Zásobník & Zásobník \\ \hline
+      7. & \multicolumn{2}{c||}{Jen 6 parametrů}
+                      & Zásobník & R9   \\ \hline
+      8. & \multicolumn{2}{c||}{--}
+                      & Zásobník & Zásobník \\ \hline
+Návratová & EAX  & RAX & EAX  & \\ \hline
+    \end{tabular}
+    \caption{Volací konvence}
+  \end{table}
+
+  Pozn.: i386 a \texttt{-mregparm}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Virtuální dynamická knihovna}
+
+  \heading{\code{vdso}}
+  \begin{itemize}
+    \item Speciální knihovna přilinkovaná jádrem
+    \item Podpora také závislá na architektuře
+    \item Podobná \code{vsyscall}, ale více flexibilní
+    \begin{itemize}
+      \item Navíc obsahuje jen \code{clock_gettime}
+    \end{itemize}
+    \item Demo: \cmd{ldd} a \cmd{readelf}
+
+    \pause
+
+    \item Knihovna v ELF formátu
+    \begin{itemize}
+      \item Adresa začátku v auxv: \code{getauxval(AT_SYSINFO_EHDR)}
+      \item Dále se přečte ELF pomocí \file{libelf}
+      \item Ukázkový kód: \href{https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vDSO/parse_vdso.c}{\file{Documentation/vDSO/parse_vdso.c}}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  Úkol: domácí úkol
+
+\end{frame}
+
+\end{document}
