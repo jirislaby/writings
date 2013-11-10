@@ -2,8 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{VIII.}
-\date{22. 11. 2012}
+\subtitle{VIII. Přerušení}
+\date{12. 11. 2013}
 
 \begin{document}
 
@@ -12,57 +12,6 @@
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%
-
-% TBD
-
-\begin{frame}[fragile]
-  \frametitle{Spinlocky a přerušení}
-
-  \begin{center}
-  \begin{tabular}{c|c}
-  Vlákno & Přerušení \\ \hline
-  \begin{lstlisting}[language=C]
-spin_lock(&addr_lock);
-<interrupt>
-spin_unlock(&addr_lock);
-.
-  \end{lstlisting} &
-  \begin{lstlisting}[language=C]
-.
-spin_lock(&addr_lock);
-// ^^^ deadlock ^^^
-spin_unlock(&addr_lock);
-  \end{lstlisting}
-  \end{tabular}
-  \end{center}
-
-  \pause
-
-  \heading{\texttt{\_irq*} varianty}
-  \begin{itemize}
-  \item Zákaz přerušení, poté spinlock
-  \end{itemize}
-
-  \begin{center}
-  \begin{tabular}{c|c}
-  Vlákno & Přerušení \\ \hline
-  \begin{lstlisting}[language=C]
-spin_lock_irq(&addr_lock);
-// interrupt cannot trigger
-spin_unlock_irq(&addr_lock);
-.
-.
-  \end{lstlisting} &
-  \begin{lstlisting}[language=C]
-.
-.
-spin_lock(&addr_lock);
-...
-spin_unlock(&addr_lock);
-  \end{lstlisting}
-  \end{tabular}
-  \end{center}
-\end{frame}
 
 \begin{frame}
   \frametitle{Přerušení}
@@ -88,42 +37,6 @@ spin_unlock(&addr_lock);
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Pozdržení vykonávání}
-
-  \heading{Čekání na událost trvající pevně danou dobu}
-  \begin{enumerate}
-  \item Spánek
-  \begin{itemize}
-  \item Zapojení plánovače
-  \item Rozlišení: $\sim 10\mu s$ až 10 ms (HW-závislé)
-  \end{itemize}
-  \item Busy-waiting
-  \begin{itemize}
-  \item Smyčka
-  \item Rozlišení: ns
-  \end{itemize}
-  \end{enumerate}
-
-  \pause
-  \medskip
-
-  \heading{API}
-  \begin{itemize}
-  \item \header{linux/delay.h}
-  \item ad 1. \texttt{ssleep}, \texttt{msleep}, \texttt{usleep\_range}
-  \item ad 2. \texttt{mdelay}, \texttt{udelay}, \texttt{ndelay}
-  \end{itemize}
-
-  \pause
-  \medskip
-
-  \begin{center}
-  \heading{V jádře lze čekat jen omezenou dobu}
-  \end{center}
-
-\end{frame}
-
 \part{,,Měkká'' přerušení}
 \frame{\partpage}
 
@@ -133,23 +46,30 @@ spin_unlock(&addr_lock);
   \begin{itemize}
   \item \doc{Documentation/timers/*}
   \item Činnost v nastavených časech (i periodicky)
-  \item Kontext přerušení (nelze spát)
-  \item \texttt{/proc/timer\_list} (jen nová jádra)
+  \item Kód je volán v kontextu přerušení (nelze spát)
+  \item \file{/proc/timer_list} (jen nová jádra)
   \end{itemize}
 
   \pause
 
   \heading{Obyčejné časovače}
   \begin{itemize}
-  \item Fungují na každé architektuře
-  \item Založené na \texttt{jiffies}
-  \item Rozlišení: 1-10 ms
+    \item Fungují na každé architektuře
+    \item Založené na \code{jiffies}
+    \begin{itemize}
+      \item Proměnná zvyšující se o 1 s frekvencí \code{HZ}
+    \end{itemize}
+    \item Rozlišení: 1--10 ms (pro \code{HZ}: 1000--100)
   \end{itemize}
 
   \pause
-  \medskip
 
-  High-res časovače\ldots
+  \heading{High-res časovače}
+  \begin{itemize}
+    \item \header{linux/hrtimer.h}
+    \item \code{usleep_range}
+    \item Rozlišení: $\sim \mu$s
+  \end{itemize}
 
 \end{frame}
 
@@ -158,10 +78,10 @@ spin_unlock(&addr_lock);
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/timer.h}, \texttt{struct timer\_list}
-  \item \texttt{DEFINE\_TIMER}$_S$, \texttt{setup\_timer}$_D$
-  \item \texttt{mod\_timer} (=\texttt{del\_timer}+\texttt{add\_timer})
-  \item \texttt{del\_timer\_sync}
+  \item \header{linux/timer.h}, \code{struct timer_list}
+  \item \code{DEFINE_TIMER}$_S$, \code{setup_timer}$_D$
+  \item \code{mod_timer} (=\code{del_timer}+\code{add_timer})
+  \item \code{del_timer_sync} (\emph{POZOR})
   \end{itemize}
 
   \begin{lstlisting}[language=C]
@@ -181,8 +101,45 @@ static void my_fun(unsigned long data)
   \pause
   \medskip
 
-  Úkol: Každou vteřinu, kdy je modul v systému, vypsat \texttt{HZ} a
-  \texttt{jiffies}
+  Úkol: Každou vteřinu, kdy je modul v systému, vypsat \code{HZ} a
+  \code{jiffies}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pozdržení vykonávání}
+
+  \heading{Čekání na událost trvající pevně danou dobu}
+  \begin{enumerate}
+  \item Spánek
+  \begin{itemize}
+  \item Zapojení časovače a plánovače
+  \item Rozlišení: $\sim 10\,\,\mu$s až 10 ms (HW-závislé)
+  \end{itemize}
+  \item Busy-waiting
+  \begin{itemize}
+  \item Smyčka
+  \item Rozlišení: ns
+  \end{itemize}
+  \end{enumerate}
+
+  \pause
+  \medskip
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/delay.h}
+  \item ad 1. \code{ssleep}, \code{msleep}, \code{usleep_range}
+  \item ad 2. \code{mdelay}, \code{udelay}, \code{ndelay}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{center}
+  \heading{V jádře lze čekat jen omezenou dobu} \\
+  (v řádu jednotek až desítek vteřin)
+  \end{center}
 
 \end{frame}
 
@@ -191,8 +148,11 @@ static void my_fun(unsigned long data)
 
   \heading{Při potřebě vykonat kód, který nelze vykonat teď}
   \begin{itemize}
-  \item Držím zámek, jsem v přerušení, \ldots
-  \item Nespecifikuje se pevně daný moment (na rozdíl od časovačů)
+    \item Držím zámek, jsem v přerušení, \dots
+    \item Není nutno specifikovat pevně daný moment
+    \begin{itemize}
+      \item (Na rozdíl od časovačů)
+    \end{itemize}
   \end{itemize}
 
   \pause
@@ -205,9 +165,9 @@ static void my_fun(unsigned long data)
 
   \heading{Rozdíly}
   \begin{itemize}
-  \item Rychlost zavolání
-  \item Kontext zavolání
-  \item Množství kódu (tj. rychlost vykonání)
+  \item Rychlost zavolání (tasklet dřív)
+  \item Kontext zavolání (tasklet z přerušení, workqueue z procesu)
+  \item Množství kódu (tj.\ rychlost vykonání)
   \end{itemize}
 
 \end{frame}
@@ -235,29 +195,28 @@ static void my_fun(unsigned long data)
   \frametitle{Workqueue API}
 
   \begin{itemize}
-  \item \header{linux/workqueue.h}, \texttt{struct work\_struct}
-  \item Definice funkce (práce): \texttt{DECLARE\_WORK}$_S$,
-    \texttt{INIT\_WORK}$_D$
+  \item \header{linux/workqueue.h}, \code{struct work_struct}
+  \item Definice funkce (práce): \code{DECLARE_WORK}$_S$, \code{INIT_WORK}$_D$
   \item Globální proces:
   \begin{itemize}
-  \item Zařazení do fronty: \texttt{schedule\_work}
-  \item Vyřazení z fronty (předčasně): \texttt{cancel\_work\_sync}
+  \item Zařazení do fronty: \code{schedule_work}
+  \item Vyřazení z fronty (předčasně): \code{cancel_work_sync}
   \end{itemize}
   \item Vlastní proces:
   \begin{itemize}
-  \item Vytvoření procesu: \texttt{create\_workqueue},
-    \texttt{destroy\_workqueue}
-  \item Zařazení do fronty: \texttt{queue\_work}
-  \item Vyřazení z fronty: \texttt{cancel\_work\_sync} (stejně)
+  \item Vytvoření procesu: \code{create_workqueue},
+    \code{destroy_workqueue}
+  \item Zařazení do fronty: \code{queue_work}
+  \item Vyřazení z fronty: \code{cancel_work_sync} (stejně)
   \end{itemize}
-  \item Delayed (s min. prodlevou): \texttt{*\_delayed\_work}
+  \item Delayed (s min. prodlevou): \code{*_delayed_work}
   \end{itemize}
 
   \pause
   \medskip
 
-  Úkol: nahrát modul \texttt{ieee80211} (\texttt{request\_module}). Nelze
-  volat přímo v \texttt{module\_init} a je nutný i vlastní proces
+  Úkol: nahrát modul \code{ieee80211} (\code{request_module}). Nelze volat
+  přímo v \code{module_init} a je nutný i vlastní proces
 
 \end{frame}
 
@@ -275,18 +234,18 @@ static void my_fun(unsigned long data)
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/interrupt.h}, \texttt{struct tasklet\_struct}
-  \item Definice funkce (taskletu): \texttt{DECLARE\_TASKLET}$_S$,
-    \texttt{tasklet\_init}$_D$
-  \item Zařazení do fronty: \texttt{tasklet\_schedule}
-  \item Vyřazení z fronty: \texttt{tasklet\_kill}
+  \item \header{linux/interrupt.h}, \code{struct tasklet_struct}
+  \item Definice funkce (taskletu): \code{DECLARE_TASKLET}$_S$,
+  \code{tasklet_init}$_D$
+  \item Zařazení do fronty: \code{tasklet_schedule}
+  \item Vyřazení z fronty: \code{tasklet_kill}
   \end{itemize}
 
   \pause
   \medskip
 
   Úkol: vytvořit tasklet, spustit a vypsat posloupnost volání pomocí
-  \texttt{dump\_stack}
+  \code{dump_stack}
 
 \end{frame}
 
@@ -299,7 +258,7 @@ static void my_fun(unsigned long data)
   \begin{itemize}
   \item HW informuje o změně stavu
   \begin{itemize}
-  \item Časovač tiknul, přišel paket, přečten blok z disku, \ldots
+  \item Časovač tiknul, přišel paket, přečten blok z disku, \dots
   \end{itemize}
   \item CPU přeruší chod programu/jádra a zavolá jádro
   \begin{itemize}
@@ -327,13 +286,13 @@ static void my_fun(unsigned long data)
 
   \begin{itemize}
   \item \header{linux/interrupt.h}
-  \item \texttt{request\_irq}, \texttt{free\_irq}
-  \item Flags: hlavně \texttt{IRQF\_SHARED}
-  \item Návratová hodnota z obsluhy: \texttt{IRQ\_NONE}, \texttt{IRQ\_HANDLED}
-  \item \texttt{/proc/interrupts}
+  \item \code{request_irq}, \code{free_irq}
+  \item Flags: hlavně \code{IRQF_SHARED}
+  \item Návratová hodnota z obsluhy: \code{IRQ_NONE}, \code{IRQ_HANDLED}
+  \item \file{/proc/interrupts}
   \end{itemize}
 
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 static irqreturn_t my_handler(int irq, void *data)
 { /* data == my_data */
   return my_device_raised_interrupt ? IRQ_HANDLED : IRQ_NONE;
@@ -348,30 +307,73 @@ static int my_probe(struct pci_dev *pdev, ...)
 
   \pause
 
-  Úkol: vytvořte obsluhu pro Combo (zatím vracejte \texttt{IRQ\_HANDLED})
+  Úkol: vytvořte obsluhu pro EDU (zatím vracejte \code{IRQ_HANDLED})
 
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Přerušení a spinlocky}
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno & Přerušení \\ \hline
+  \begin{lstlisting}
+spin_lock(&addr_lock);
+<interrupt>
+spin_unlock(&addr_lock);
+.
+  \end{lstlisting} &
+  \begin{lstlisting}
+.
+spin_lock(&addr_lock);
+// ^^^ deadlock ^^^
+spin_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+
+  \pause
+
+  \heading{\code{\_irq*} varianty} \\
+  ~~~~Zákaz přerušení, poté spinlock
+
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno & Přerušení \\ \hline
+  \begin{lstlisting}
+spin_lock_irq(&addr_lock);
+// interrupt cannot trigger
+spin_unlock_irq(&addr_lock);
+.
+.
+  \end{lstlisting} &
+  \begin{lstlisting}
+.
+.
+spin_lock(&addr_lock);
+...
+spin_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
 \end{frame}
 
 \begin{frame}
   \frametitle{Kontext přerušení}
 
-  \heading{Změny}
+  \heading{Další změny}
   \begin{itemize}
-  \item Zámky
-  \begin{itemize}
-  \item Třeba používat \texttt{*\_irqflags} varianty
-  \item Jinak by mohlo dojít k deadlocku
-  \end{itemize}
-  \item Alokace
-  \begin{itemize}
-  \item \texttt{GFP\_ATOMIC}
-  \item A tedy nevelké alokace
-  \end{itemize}
-  \item Kód
-  \begin{itemize}
-  \item Rychlý, krátký
-  \item (Víc kódu později v taskletu, ještě víc ve workqueue)
-  \end{itemize}
+    \item Alokace
+    \begin{itemize}
+      \item \code{GFP_ATOMIC}
+      \item A tedy nevelké alokace
+    \end{itemize}
+
+    \item Kód
+    \begin{itemize}
+      \item Rychlý, krátký
+      \item (Víc kódu později v taskletu, ještě víc ve workqueue)
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -381,28 +383,26 @@ static int my_probe(struct pci_dev *pdev, ...)
 
   \heading{Práce s přerušením} (součást domácího)
   \begin{enumerate}
-  \item Vytvořit pojmenování (makra) pro registry (v tabulce)
-  \item Spustit 100\,ms periodický časovač (pro každé Combo zařízení)
-  \begin{itemize}
-  \item Vyvolat z Comba přerušení 0x1000 (registr 0x60)
-  \end{itemize}
-  \item Navázat se v probe na prerušení (\texttt{request\_irq})
-  \item Povolit v Combu přerušení 0x1000 (registr 0x44)
-  \item Implementovat obsluhu
-  \begin{itemize}
-  \item Přečíst stav (registr 0x40), vypsat stav -- limitovaně
-  \item Nenula: odsouhlasit přerušení (registr 0x64), vrátit
-    \texttt{IRQ\_HANDLED}
-  \item Jinak: vrátit \texttt{IRQ\_NONE}
-  \end{itemize}
+    \item Vytvořit pojmenování (makra) pro registry (v tabulce)
+    \item Spustit 100ms periodický časovač (pro každé EDU zařízení)
+    \begin{itemize}
+      \item Vyvolat z EDU přerušení 0x1000 (registr 0x60)
+    \end{itemize}
+    \item Navázat se v probe na prerušení (\code{request_irq})
+    \item Implementovat obsluhu
+    \begin{itemize}
+      \item Přečíst stav (registr 0x24), vypsat stav -- limitovaně
+      \item Nenula: odsouhlasit přerušení (registr 0x64), vrátit
+	\code{IRQ_HANDLED}
+      \item Jinak: vrátit \code{IRQ_NONE}
+    \end{itemize}
   \end{enumerate}
 
 \begin{table}
 \footnotesize
 \begin{tabular}{|l|l|l|l|l|} \hline
 Offset & Len & R/W & Contents   & Meaning \\ \hline\hline
-0x0040 & 4B  & R   & bitmap & Raised interrupts \\ \hline
-0x0044 & 4B  & R/W & bitmap & Enabled interrupts \\ \hline
+0x0024 & 4B  & R   & bitmap & Raised interrupts \\ \hline
 0x0060 & 4B  & W   & bitmap & Raise interrupts \\ \hline
 0x0064 & 4B  & W   & bitmap & Acknowledge interrupts \\ \hline
 \end{tabular}
