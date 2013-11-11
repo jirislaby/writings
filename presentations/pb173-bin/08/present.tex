@@ -1,0 +1,391 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\input{../header.tex}
+
+\subtitle{VII. Ladění}
+\date{12. 11. 2013}
+
+\begin{document}
+\shorthandoff{-}
+
+\frame{\titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Ladění}
+
+  \begin{enumerate}
+    \item Funkčnosti
+    \begin{itemize}
+      \item Pády
+      \item Nekorektní chování
+    \end{itemize}
+
+    \item Výkonnosti/velikosti
+    \begin{itemize}
+      \item Optimalizace kódu
+      \item Odstranění nepoužitého kódu
+    \end{itemize}
+  \end{enumerate}
+
+  % staticka analyza
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Techniky ladění}
+
+  \begin{enumerate}
+    \item Dynamicky
+    \begin{itemize}
+      \item Spouštím na CPU a očekávám výsledek
+      \item Testování
+    \end{itemize}
+
+    \item Staticky
+    \begin{itemize}
+      \item Spouštím analyzátor a ten hledá nesrovnalosti
+      \item Analýza ukazatelů, hodnot, velikosti zásobníku, \dots
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\part{Ladění funkčnosti}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Ladění funkčnosti}
+
+  \begin{itemize}
+    \item Výpisy
+    \begin{itemize}
+      \item \code{printf} a jiné
+    \end{itemize}
+
+    \item Monitor chování
+    \begin{itemize}
+      \item \cmd{gdb}, \cmd{ltrace}, \cmd{strace}
+    \end{itemize}
+
+    \item Post-mortem
+    \begin{itemize}
+      \item \file{core} soubor (obraz paměti)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Debugger \cmd{gdb}}
+
+  \begin{itemize}
+    \item Pracuje s ELFem a DWARFem
+    \item Používá systémové volání \code{ptrace}
+    \begin{itemize}
+      \item Sleduje proces
+      \item Upravuje vykonávání
+      \item Čte a mění paměť
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Podpora Python skriptů
+    \item Spuštění: \cmd{gdb --args binarka --volby}
+    \item Nápověda: \cmd{help}
+    \item Manuál: \href{https://sourceware.org/gdb/current/onlinedocs/gdb/}{GDB
+      User Manual}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Příkazy \cmd{gdb}}
+
+  \begin{itemize}
+    \item Operace s během
+    \begin{itemize}
+      \item Spustit: \cmd{run}
+      \item Pokračovat: \file{continue}
+      \item Krokovat s vnořením: \cmd{step} (po řádcích), \cmd{stepi} (po
+	instrukcích)
+      \item Krokovat bez vnoření: \cmd{next} (po řádcích), \cmd{nexti} (po
+	instrukcích)
+    \end{itemize}
+
+    \pause
+
+    \item Breakpointy: \file{break}
+
+    \pause
+
+    \item Výpisy
+    \begin{itemize}
+      \item Programu: \cmd{list} (jen s ladicími informacemi)
+      \item Assembleru: \cmd{disassemble}
+      \item Paměti: \cmd{print}
+      \item HexDump: \cmd{x}
+      \item Ostatní: \cmd{info registers}, \file{info break}, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Zásobník volání: \cmd{where}, \cmd{up}, \cmd{down}
+
+    \pause
+
+    \item Konec: \cmd{quit}
+    \item Opakování předchozího příkazu: ENTER
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s \cmd{gdb}}
+  \begin{enumerate}
+    \item Přeložte si \file{pb173-bin/08/}
+    \item Spusťte \file{debug} (mělo by dojít k pádu)
+    \item Otevřete \file{debug} v \cmd{gdb}
+    \item Spusťte (\cmd{run})
+    \item Prohlédněte si, kde došlo k pádu (vypište):
+    \begin{itemize}
+      \item Zásobník volání (\cmd{where})
+      \item Místo pádu (\cmd{list} s parametrem \code{soubor:radek})
+      \item Disassembly (\cmd{disassemble} s parametrem \code{adresa})
+      \item Proměnnou \code{b} (\cmd{print b})
+      \item Proměnnou \code{argc} v \code{main} (\cmd{up} a \cmd{print argc})
+    \end{itemize}
+    \item Přidejte breakpoint na začátek \code{main} a spusťte (\cmd{run})
+    \item Krokujte až k pádu (\cmd{next})
+    \item Zopakujte pro \code{step} a také \code{stepi}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Obrazy paměti a \cmd{gdb}}
+
+  \begin{itemize}
+    \item Jádro při pádu zapíše obraz paměti (,,coredump'')
+    \begin{itemize}
+      \item Limit velikosti: \cmd{ulimit -c} (bývá 0)
+      \item Cíl: \cmd{sysctl kernel.core_pattern}
+    \end{itemize}
+
+    \pause
+
+    \item Potom se dá analyzovat v \cmd{gdb}
+    \begin{itemize}
+      \item \cmd{gdb --core=core_soubor --args binarka --volby}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s obrazem paměti}
+  \begin{enumerate}
+    \item Nastavte limit na obrazy na \code{unlimited} (\cmd{ulimit -c})
+    \item Podívejte se, kam se obraz uloží (\cmd{sysctl kernel.core_pattern})
+    \item Spusťte program z předchozího příkladu
+    \item Otevřete v \cmd{gdb} s obrazem paměti (\cmd{gdb ./debug core})
+    \item Vypište si podobné informace jako předtím
+    \begin{itemize}
+      \item \cmd{where}
+      \item \cmd{print b}
+      \item A podobně
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Tracery}
+
+  \begin{itemize}
+    \item Sledují události a vypisují je
+    \item \cmd{ltrace}: sleduje knihovní volání
+    \item \cmd{strace}: sleduje systémová volání
+    \item Používají systémové volání \code{ptrace}
+    \begin{itemize}
+      \item \cmd{ltrace} si nastaví breakpointy na všechny externí symboly z
+	ELFu
+      \item \cmd{strace} jednoduše použije \code{PTRACE_SYSCALL}
+    \end{itemize}
+
+    \pause
+
+    \item Spuštění: \cmd{s/ltrace binarka --volby}
+    \item Další parametry
+    \begin{itemize}
+      \item \texttt{-e}: filtr (\texttt{-e write})
+      \item \texttt{-f}: sleduje i potomky
+      \item \texttt{-o}: výstup do souboru
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s tracery}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/08/tracer.c}
+    \item Spusťte nejdříve s \cmd{ltrace}
+    \begin{itemize}
+      \item Kolik je volání \code{fwrite} do \file{libc}?
+    \end{itemize}
+    \item Spusťte s \cmd{strace}
+    \begin{itemize}
+      \item Kolik je volání \code{write} do jádra?
+      \item $\Rightarrow$ \file{libc} bufferuje
+    \end{itemize}
+    \item Pomocí \cmd{ltrace} zjistěte, jak velký buffer \file{libc} používá
+    \begin{itemize}
+      \item V cyklu vypisujte znak
+      \item Použijte volbu \texttt{-S}
+    \end{itemize}
+    \item Pomocí \cmd{strace} ověřte totéž
+    \begin{itemize}
+      \item Třetí parametr \code{write}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Valgrind}
+
+  \begin{itemize}
+    \item Sleduje (zejména) operace s pamětí (\emph{Memcheck})
+    \begin{itemize}
+      \item Úniky paměti
+      \item Neinicializované a nezarovnané přístupy
+      \item Použití paměti po \code{free}
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Několik dalších modulů
+    \begin{itemize}
+      \item Callgrind: profiluje cache CPU
+      \item Massif: profiluje použití haldy
+      \item Další pro problémy se zámky atd.
+    \end{itemize}
+
+    \pause
+
+    \item Spuštění: \cmd{valgrind binarka --volby}
+    \item Další parametry
+    \begin{itemize}
+      \item \texttt{--tool}: výběr nástroje shora
+      \item \texttt{--leak-check}: sledovat úniky paměti
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s nástrojem \cmd{valgrind}}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/08/memcheck.c}
+    \item Spusťte v nástroji \cmd{valgrind}
+    \item Řiďte se pokyny na konci výpisu
+    \begin{itemize}
+      \item Vypište si všechny podrobnosti
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\part{Ladění výkonnosti}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Profilování}
+
+  \heading{Co zabírá nejvíce času při vykonávání?}
+  \begin{enumerate}
+    \item \cmd{gprof}
+    \begin{itemize}
+      \item Při překladu: \cmd{gcc -pg ...}
+      \item Potom se program spustí a data se uloží na disk
+      \item \cmd{gprof} data načte a zobrazí
+      \item Demo: dump
+    \end{itemize}
+
+    \item \cmd{perf}
+    \begin{itemize}
+      \item Používá čítače v procesoru (nutná podpora CPU)
+      \item Zahrnuje chování jádra
+      \item Umí pracovat s \cmd{gcc -pg} binárkami
+      \item Spuštění: \cmd{perf record -g -- binarka --volby}
+      \item Dokumentace: \url{http://perf.wiki.kernel.org}
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Profilování}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/08/prof.c}
+    \item Spusťte \file{prof_pg}
+    \item Prostudujte výstup \cmd{gprof -b prof_pg}
+
+    \bigskip
+
+    \item Nahrajte si výstup
+    \begin{itemize}
+      \item \cmd{perf record -g prof}
+    \end{itemize}
+    \item Zobrazte si výstup
+    \begin{itemize}
+      \item \cmd{perf report -g}
+    \end{itemize}
+    \item Zopakujte \cmd{perf} pro \file{prof_pg}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pokrytí kódu}
+
+  \heading{Která část kódu se vůbec nevykonává?}
+  \begin{itemize}
+    \item \cmd{gcov}
+    \item Při překladu: \cmd{gcc --coverage ...}
+    \item Potom se program spustí a data se uloží na disk
+    \item \cmd{gcov} data načte a zapíše \file{cov.c.gcov}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Profilování}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/08/cov.c}
+    \item Spusťte \file{cov}
+    \item Prostudujte výstup \cmd{gcov cov}
+    \item Prostudujte \file{cov.c.gcov}
+  \end{enumerate}
+
+\end{frame}
+
+
+\end{document}
