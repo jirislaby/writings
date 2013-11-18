@@ -1,0 +1,293 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\input{../header.tex}
+
+\subtitle{IX. Gdb a ladění výkonnosti}
+\date{19. 11. 2013}
+
+\begin{document}
+\shorthandoff{-}
+
+\frame{\titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Ladění}
+
+  \begin{enumerate}
+    \item Funkčnosti (minule)
+    \begin{itemize}
+      \item Dnes ještě více \cmd{gdb}
+    \end{itemize}
+
+    \item Výkonnosti/velikosti (dnes)
+    \begin{itemize}
+      \item Optimalizace kódu
+      \item Odstranění nepoužitého kódu
+    \end{itemize}
+  \end{enumerate}
+
+  % staticka analyza
+
+\end{frame}
+
+\part{\cmd{gdb}}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Debugger \cmd{gdb} (opakování)}
+
+  \begin{itemize}
+    \item Pracuje s ELFem a DWARFem
+    \item Používá systémové volání \code{ptrace}
+    \begin{itemize}
+      \item Sleduje proces
+      \item Upravuje vykonávání
+      \item Čte a mění paměť
+      \item \dots
+    \end{itemize}
+
+    \medskip
+
+    \item Spuštění: \cmd{gdb --args binarka --volby}
+    \item Nápověda: \cmd{help}
+    \item Manuál: \href{https://sourceware.org/gdb/current/onlinedocs/gdb/}{GDB
+      User Manual}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\cmd{gcc} a \cmd{gdb}}
+
+  \begin{itemize}
+    \item \cmd{gcc} generuje různé úrovně ladicích informací
+    \begin{itemize}
+      \item \texttt{-g1} (méně informací)
+      \item \texttt{-g2} alias \texttt{-g}
+      \item \texttt{-g3} (navíc informace o makrech)
+      \item \texttt{-ggdb} (i v kombinaci s \texttt{-g<cislo>})
+      \begin{itemize}
+	\item \cmd{gcc} použije i \cmd{gdb} rozšíření, pokud možno
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+    \medskip
+
+    \item Ladí se obtížněji s \emph{optimalizacemi}
+    \begin{itemize}
+      \item Proměnné zmizely, konstanty se propagovaly, \dots
+      \item Bez optimalizací je pomalý kód
+      \item V \cmd{gcc} 4.8 se objevilo \texttt{-Og}
+      \begin{itemize}
+	\item Nezapíná samotnou generaci ladicích informací!
+	\item Používá se v kombinaci s \texttt{-g...}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  Demo: makra a \cmd{gdb}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Výpisy}
+
+  \begin{itemize}
+    \item Dump (\cmd{x}) a print (\cmd{p})
+    \item Lze použít s formátováním (\cmd{x/f} a \cmd{p/f}, kde \cmd{f} je
+      formát)
+
+    \item Formát jsou tři hodnoty
+    \begin{enumerate}
+      \item Počet vypisovaných hodnot
+      \item Formát vypisovaných hodnot
+      \begin{itemize}
+	\item \cmd{x}: hexa (podobně jako \code{printf})
+	\item \cmd{d}: decimálně
+	\item \cmd{u}: decimálně bez znaménka
+	\item \cmd{s}: řetězec
+	\item \cmd{a}: adresa
+	\item \cmd{i}: instrukce
+	\item Ostatní: viz \cmd{help x}
+      \end{itemize}
+
+      \item Velikost skupiny
+      \begin{itemize}
+	\item \cmd{b}: 1 bajt
+	\item \cmd{h}: 2 bajty
+	\item \cmd{w}: 4 bajty
+	\item \cmd{g}: 8 bajtů
+      \end{itemize}
+    \end{enumerate}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpisy}
+  \begin{enumerate}
+    \item Otevřete si nějaký program v \cmd{gdb}
+    \item Spusťte (\cmd{start})
+    \item Vypište
+    \begin{itemize}
+      \item Adresu aktuální instrukce (\cmd{p/a \$pc})
+      \item 20 instrukcí od aktuální (\cmd{x/20i \$pc})
+      \item 32 hexa byte hodnot na zásobníku (\cmd{\$sp})
+      \item 8 hexa giant hodnot na zásobníku
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Automatické výpisy}
+
+  \begin{itemize}
+    \item Přidání: \cmd{display}
+    \item Informace: \cmd{info display}
+    \item Lze nastavit několik automatických výpisů po každém příkazu
+
+    \item Parametry stejné jako \cmd{p} nebo \cmd{x}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Vlákna a \cmd{gdb}}
+
+  \begin{itemize}
+    \item Informace: \cmd{info threads}
+    \item Přepnutí:  \cmd{thread <cislo>}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  Demo: \file{pb173-bin/09/thread.c}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Další informace}
+
+  \begin{itemize}
+    \item Spousta dalších informací v \cmd{info}
+    \item \cmd{functions}, \cmd{types}, \cmd{variables}, \cmd{locals}
+    \item \cmd{sources}, \cmd{line}, \cmd{macros}, \cmd{scopes}
+    \item \cmd{symbol}
+    \item Další viz \cmd{help info}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  Demo
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Změna běhu}
+
+  \begin{itemize}
+    \item \texttt{set}, \texttt{set variable}
+    \item Registry procesoru: \cmd{\$rax}, \cmd{\$rbx}, \dots
+    \item Proměnné \cmd{gdb}: \cmd{\$pc}, \cmd{\$sp}, \dots
+    \item Vnitřní proměnné: \cmd{\$ostatni}
+    \begin{itemize}
+      \item Pro vlastní použití
+    \end{itemize}
+    \item Paměť: \cmd{\{typ\}adresa}
+  \end{itemize}
+
+\end{frame}
+
+\part{Ladění výkonnosti}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Profilování}
+
+  \heading{Co zabírá nejvíce času při vykonávání?}
+  \begin{enumerate}
+    \item \cmd{gprof}
+    \begin{itemize}
+      \item Při překladu: \cmd{gcc -pg ...}
+      \item Potom se program spustí a data se uloží na disk
+      \item \cmd{gprof} data načte a zobrazí
+      \item Demo: dump
+    \end{itemize}
+
+    \item \cmd{perf}
+    \begin{itemize}
+      \item Používá čítače v procesoru (nutná podpora CPU)
+      \item Zahrnuje chování jádra
+      \item Umí pracovat s \cmd{gcc -pg} binárkami
+      \item Spuštění: \cmd{perf record -g -- binarka --volby}
+      \item Dokumentace: \url{http://perf.wiki.kernel.org}
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Profilování}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/08/prof.c}
+    \item Spusťte \file{prof_pg}
+    \item Prostudujte výstup \cmd{gprof -b prof_pg}
+
+    \bigskip
+
+    \item Nahrajte si výstup
+    \begin{itemize}
+      \item \cmd{perf record -g prof}
+    \end{itemize}
+    \item Zobrazte si výstup
+    \begin{itemize}
+      \item \cmd{perf report -g}
+    \end{itemize}
+    \item Zopakujte \cmd{perf} pro \file{prof_pg}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pokrytí kódu}
+
+  \heading{Která část kódu se vůbec nevykonává?}
+  \begin{itemize}
+    \item \cmd{gcov}
+    \item Při překladu: \cmd{gcc --coverage ...}
+    \item Potom se program spustí a data se uloží na disk
+    \item \cmd{gcov} data načte a zapíše \file{cov.c.gcov}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Pokrytí kódu}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/08/cov.c}
+    \item Spusťte \file{cov}
+    \item Prostudujte výstup \cmd{gcov cov}
+    \item Prostudujte \file{cov.c.gcov}
+  \end{enumerate}
+
+\end{frame}
+
+
+\end{document}
