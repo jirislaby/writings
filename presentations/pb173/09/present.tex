@@ -2,8 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{IX.}
-\date{29. 11. 2012}
+\subtitle{IX. mmap}
+\date{19. 11. 2013}
 
 \begin{document}
 
@@ -32,10 +32,10 @@
 
   \heading{Předání dat do/z procesu}
   \begin{itemize}
-  \item Známe: \texttt{read}, \texttt{write}, \texttt{ioctl}, \ldots
+  \item Známe: \code{read}, \code{write}, \code{ioctl}, \ldots
   \item U všeho nutné kopírování dat
   \begin{itemize}
-  \item \texttt{copy\_\{from,to\}\_user} apod.
+  \item \code{copy_\{from,to\}_user} apod.
   \end{itemize}
   \end{itemize}
 
@@ -44,73 +44,65 @@
 
   \heading{Mapování paměti}
   \begin{itemize}
-  \item Namapování stránek do procesu
-  \item Proces používá kus stejné paměti jako jádro
-  \item Syscall: \texttt{mmap}
+    \item Namapování stránek do procesu
+    \item Proces používá kus stejné paměti jako jádro
+    \item Syscall: \code{mmap}
+    \item \footnotesize{\code{void *mmap(void *addr, size_t len,
+      int prot, int flags, int fd, off_t off)}}
   \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{\texttt{mmap}}
-
-  \begin{itemize}
-  \item V userspace volání \texttt{mmap}
-  \begin{itemize}
-  \item \texttt{\footnotesize void *mmap(void *addr, size\_t len,
-    int prot, int flags, int fd, off\_t off)}
-  \end{itemize}
-  \item V jádře jeden člen v \texttt{struct file\_operations}
-  \begin{itemize}
-  \item \texttt{\footnotesize int mmap(struct file *filp,
-    struct vm\_area\_struct *vma)}
-  \item Parametry jsou v \texttt{struct vm\_area\_struct}
-  \end{itemize}
-  \end{itemize}
-
 
 \end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Alokace pomocí \texttt{mmap} (uživatelský prostor)}
+  \heading{Alokace pomocí \code{mmap} (uživatelský prostor)}
   \begin{enumerate}
-  \item Anonymní paměť
-  \begin{itemize}
-  \item \texttt{\footnotesize void *mmap(void *addr, size\_t len,
-    int prot, int flags, int fd, off\_t off)}
-  \item \texttt{len} \ldots\ 20M
-  \item \texttt{prot} \ldots\ \texttt{PROT\_READ} a \texttt{PROT\_WRITE}
-  \item \texttt{flags} \ldots\ \texttt{MAP\_PRIVATE} a \texttt{MAP\_ANONYMOUS}
-  \item \texttt{fd} \ldots\ -1
-  \end{itemize}
+    \item Anonymní paměť
+    \begin{itemize}
+      \item \footnotesize{\code{void *mmap(void *addr, size_t len,
+	int prot, int flags, int fd, off_t off)}}
+      \item \code{len} \dots\ 20M
+      \item \code{prot} \dots\ \code{PROT_READ} a \code{PROT_WRITE}
+      \item \code{flags} \dots\ \code{MAP_PRIVATE} a \code{MAP_ANONYMOUS}
+      \item \code{fd} \dots\ -1
+    \end{itemize}
 
-  \pause
+    \pause
 
-  \item Mapování /dev/zero
-  \begin{itemize}
-  \item \texttt{flags} \ldots\ \texttt{MAP\_PRIVATE}
-  \item \texttt{fd} \ldots\ deskriptor otevřeného /dev/zero
-  \end{itemize}
+    \item Mapování /dev/zero
+    \begin{itemize}
+      \item \code{flags} \dots\ \code{MAP_PRIVATE}
+      \item \code{fd} \dots\ deskriptor otevřeného /dev/zero
+    \end{itemize}
   \end{enumerate}
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Parametry \texttt{mmap}}
+  \frametitle{Parametry \code{mmap} v jádře}
 
-  Prototyp (znovu):
-
-  \texttt{\footnotesize void *mmap(void *addr, size\_t len,
-    int prot, int flags, int fd, off\_t off)}
   \begin{itemize}
-  \item Jsou v jádře uloženy v \texttt{struct vm\_area\_struct}
+    \item V uživatelském prostoru volání \code{mmap}
+    \begin{itemize}
+      \item \footnotesize{\code{void *mmap(void *addr, size_t len,
+	int prot, int flags, int fd, off_t off)}}
+    \end{itemize}
+
+    \item V jádře jedna položka v \code{struct file_operations}
+    \begin{itemize}
+      \item \footnotesize{\code{int mmap(struct file *filp,
+	struct vm_area_struct *vma)}}
+
+      \pause
+
+      \item Parametry jsou v \code{struct vm_area_struct}
+    \end{itemize}
   \end{itemize}
 
-  \bigskip
+  \medskip
   \pause
 
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct vm_area_struct {
   unsigned long vm_start; /* addr or random when addr is NULL */
   unsigned long vm_end;   /* vm_end = vm_start+len */
@@ -125,20 +117,20 @@ struct vm_area_struct {
 
   \pause
 
-  Je třeba namapovat stránky mezi \texttt{vm\_start} a \texttt{vm\_end}. \\
-  Ale také ověřit privilegia (čtení, zápis, spuštění).
+  Je třeba namapovat stránky mezi \code{vm_start} a \code{vm_end}. \\
+  Ale také ověřit privilegia (čtení, zápis, spuštění). \emph{POZOR}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Základní \texttt{mmap} funkce}
+  \frametitle{Základní \code{mmap} funkce}
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/mm.h}, \texttt{struct vm\_area\_struct}
-  \item \texttt{\_\_get\_free\_page/pages} $\Rightarrow$
-  \texttt{remap\_pfn\_range}
-  \item \texttt{vmalloc\_user} $\Rightarrow$ \texttt{remap\_vmalloc\_range}
+  \item \header{linux/mm.h}, \code{struct vm_area_struct}
+  \item \code{__get_free_page/pages} $\Rightarrow$
+  \code{remap_pfn_range}
+  \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
   \end{itemize}
 
   \begin{lstlisting}[language=C]
@@ -152,7 +144,7 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 {
   if ((vma->vm_flags & (VM_WRITE | VM_READ)) != VM_READ)
     return -EINVAL;
-  return remap_pfn_range(vma, vma->vm_start, virt_to_phys(mem) >> PAGE_SHIFT, 4 * PAGE_SIZE, vma->vm_page_prot);
+  return remap_pfn_range(vma, vma->vm_start, page_to_pfn(virt_to_page(mem)), 4 * PAGE_SIZE, vma->vm_page_prot);
   /* return remap_vmalloc_range(vma, mem, 0); */
 }
   \end{lstlisting}
@@ -164,68 +156,85 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
   \heading{Přemapování prostorů}
   \begin{enumerate}
-  \item Alokovat 2stránku (vmalloc) a 2stránku (page alokátory)
-  \item Zapsat na všechny 4 stránky libovolný, ale různý řetězec
-  \item Přemapovat stránky v \texttt{mmap}
-  \begin{itemize}
-  \item První dvojice RO, druhá R/W
-  \item $0 \leq \text{\texttt{pgoff}} < 2$ $\Rightarrow$ jedno mapování
-  \item $2 \leq \text{\texttt{pgoff}} < 4$ $\Rightarrow$ druhé mapování
-  \end{itemize}
-  \item Z userspace 2$\times$ \texttt{mmap} s off 0 a 2*4096
-  \begin{itemize}
-  \item Již hotovo v pb173/09
-  \end{itemize}
+    \item Alokovat 2+2 stránky
+    \begin{itemize}
+      \item Dvoustránku pomocí \code{vmalloc}
+      \item Dvoustránku pomocí stránkového alokátoru
+    \end{itemize}
+
+    \item Zapsat na všechny 4 stránky libovolný, ale různý řetězec
+    \item Vystavit (mapovat) stránky v \code{mmap}
+    \begin{itemize}
+      \item První dvojice RO, druhá R/W (ověření \code{prot})
+      \item $0 \leq \text{\code{pgoff}} < 2$ $\Rightarrow$ jedno mapování
+      \item $2 \leq \text{\code{pgoff}} < 4$ $\Rightarrow$ druhé mapování
+    \end{itemize}
+
+    \item Z userspace 2$\times$ \code{mmap} s \code{off} \code{0} a
+      \code{2*4096}
+    \begin{itemize}
+      \item Již hotovo v \file{pb173/09}
+    \end{itemize}
   \end{enumerate}
 
   \medskip
 
-  \heading{API znovu}
+  \heading{API (zopakováno)}
   \begin{itemize}
-  \item \header{linux/mm.h}, \texttt{struct vm\_area\_struct}
-  \item \texttt{\footnotesize int mmap(struct file *filp,
-    struct vm\_area\_struct *vma)}
-  \item \texttt{\_\_get\_free\_page*} $\Rightarrow$ \texttt{remap\_pfn\_range}
-  \item \texttt{vmalloc\_user} $\Rightarrow$ \texttt{remap\_vmalloc\_range}
+  \item \header{linux/mm.h}, \code{struct vm_area_struct}
+  \item \footnotesize{\code{int mmap(struct file *filp,
+    struct vm_area_struct *vma)}}
+  \item \code{__get_free_page*} $\Rightarrow$ \code{remap_pfn_range}
+  \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{\texttt{mmap} po stránkách}
+  \frametitle{\code{mmap} po stránkách}
 
   \heading{Přemapování roztroušených stránek}
   \begin{itemize}
-  \item Přes \texttt{remap\_pfn\_range} obtížně
-  \item Při výpadcích stránek se mapují tyto stránky jednotlivě
-  \begin{itemize}
-  \item Každý ovladač má ,,page fault handler''
-  \item Stará jádra: \texttt{nopage}
-  \item Nová jádra: \texttt{fault}
-  \end{itemize}
-  \item V \texttt{mmap}/\texttt{nopage}/\texttt{fault} je třeba zkontrolovat
-    rozsahy a velikosti
-  \begin{itemize}
-  \item Před tím to dělaly \texttt{remap\_*\_range} funkce
-  \end{itemize}
-  \item \texttt{vma->vm\_ops}
-  \begin{itemize}
-  \item Struktura ukazující na háčky (včetně \texttt{nopage}/\texttt{fault})
-  \end{itemize}
-  \item \texttt{vma->vm\_private\_data}
-  \begin{itemize}
-  \item Pro naše potřeby
-  \item K předání informací z \texttt{mmap} do \texttt{vm\_ops}
-  \end{itemize}
+    \item Přes \code{remap_pfn_range} obtížně
+    \item Při výpadcích stránek se mapují takové stránky jednotlivě
+    \begin{itemize}
+      \item Každý ovladač má ,,page fault handler''
+      \item Stará jádra: \code{nopage}
+      \item Nová jádra: \code{fault}
+    \end{itemize}
+
+    \pause
+
+    \item V \code{mmap}/\code{nopage}/\code{fault} je třeba zkontrolovat
+      rozsahy a velikosti
+    \begin{itemize}
+      \item Předtím to dělaly \code{remap_*_range} funkce
+    \end{itemize}
+
+    \pause
+
+    \item \code{vma->vm_ops}
+    \begin{itemize}
+      \item Struktura ukazující na háčky (včetně \code{nopage}/\code{fault})
+    \end{itemize}
+
+    \pause
+
+    \item \code{vma->vm_private_data}
+    \begin{itemize}
+      \item Pro naše potřeby
+      \item K předání informací z \code{file_operations->mmap} do
+        \code{vm_ops->*}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{\texttt{mmap} po stránkách (ponovu)}
+  \frametitle{\code{mmap} po stránkách (ponovu)}
 
   \heading{Nové API}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct vm_operations_struct {
   void (*open)(struct vm_area_struct *vma);
   void (*close)(struct vm_area_struct *vma);
@@ -253,10 +262,10 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{\texttt{mmap} po stránkách (postaru)}
+  \frametitle{\code{mmap} po stránkách (postaru)}
 
   \heading{Staré API}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct vm_operations_struct {
   ...
   struct page (*nopage)(struct vm_area_struct *vma, unsigned long address, int *type)
@@ -284,30 +293,35 @@ struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *t
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Mapování roztroušených stránek} (domácí)
+  \heading{Mapování roztroušených stránek} (součást domácího)
   \begin{enumerate}
-  \item Předchozí příklad rozšiřte
-  \item Místo alokací 2stránek alokovat 4 samostatné stránky
-  \item Přemapovat stránky v \texttt{mmap}
-  \begin{itemize}
-  \item Změna \texttt{remap\_pfn\_range} na \texttt{vma->vm\_ops->nopage}
-  \end{itemize}
-  \item Userspace program stejný (funkčnost navenek stejná)
+    \item Předchozí příklad rozšiřte
+    \item Místo alokací dvoustránek alokujte 4 samostatné stránky
+    \begin{itemize}
+      \item 2$\times$ \code{vmalloc} a 2$\times$ \code{__get_free_pages}
+    \end{itemize}
+
+    \item Přemapovat stránky v \code{mmap}
+    \begin{itemize}
+      \item Změna \code{remap_pfn_range} na \code{vma->vm_ops->nopage}
+    \end{itemize}
+
+    \item Userspace program stejný (funkčnost navenek stejná)
   \end{enumerate}
 
   \medskip
 
   \heading{Potřebné podkroky}
   \begin{itemize}
-  \item Definice \texttt{\footnotesize int fault(struct vm\_area\_struct *vma,
-    struct vm\_fault *vmf);}
-  \begin{itemize}
-  \item Popř. staré \texttt{\footnotesize struct page *nopage(struct
-    vm\_area\_struct *vma, unsigned long address, int *type)}
-  \end{itemize}
-  \item Kontrola rozsahů v \texttt{mmap} (\texttt{end-start < 2*PAGE\_SIZE}
-    apod.)
-  \item Definice \texttt{vm\_ops} a přiřazení do \texttt{vma->vm\_ops}
+    \item Definice \footnotesize{\code{int fault(struct vm_area_struct *vma,
+      struct vm_fault *vmf);}}
+    \begin{itemize}
+      \item \footnotesize{Popř. staré \code{struct page *nopage(struct
+	vm_area_struct *vma, unsigned long address, int *type)}}
+    \end{itemize}
+    \item Kontrola rozsahů v \code{mmap} (\code{end-start < 2*PAGE_SIZE}
+      apod.)
+    \item Definice \code{vm_ops} a přiřazení do \code{vma->vm_ops}
   \end{itemize}
 
 \end{frame}
