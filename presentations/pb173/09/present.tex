@@ -231,9 +231,9 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{\code{mmap} po stránkách (ponovu)}
+  \frametitle{\code{mmap} po stránkách}% (ponovu)}
 
-  \heading{Nové API}
+%  \heading{Nové API}
   \begin{lstlisting}
 struct vm_operations_struct {
   void (*open)(struct vm_area_struct *vma);
@@ -261,34 +261,34 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{\code{mmap} po stránkách (postaru)}
-
-  \heading{Staré API}
-  \begin{lstlisting}
-struct vm_operations_struct {
-  ...
-  struct page (*nopage)(struct vm_area_struct *vma, unsigned long address, int *type)
-}
-struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *type)
-{ /* my_data = vma->vm_private_data; */
-  unsigned long offset = vma->pgoff << PAGE_SHIFT;
-  struct page *page;
-
-  offset += address - vma->vm_start;
-  page = my_find_page(offset);
-  if (!page)
-    return NOPAGE_SIGBUS;
-  get_page(page);
-
-  if (type)
-    *type = VM_FAULT_MINOR;
-
-  return page;
-}
-  \end{lstlisting}
-
-\end{frame}
+%\begin{frame}[fragile]
+%  \frametitle{\code{mmap} po stránkách (postaru)}
+%
+%  \heading{Staré API}
+%  \begin{lstlisting}
+%struct vm_operations_struct {
+%  ...
+%  struct page (*nopage)(struct vm_area_struct *vma, unsigned long address, int *type)
+%}
+%struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *type)
+%{ /* my_data = vma->vm_private_data; */
+%  unsigned long offset = vma->pgoff << PAGE_SHIFT;
+%  struct page *page;
+%
+%  offset += address - vma->vm_start;
+%  page = my_find_page(offset);
+%  if (!page)
+%    return NOPAGE_SIGBUS;
+%  get_page(page);
+%
+%  if (type)
+%    *type = VM_FAULT_MINOR;
+%
+%  return page;
+%}
+%  \end{lstlisting}
+%
+%\end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
@@ -303,7 +303,7 @@ struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *t
 
     \item Přemapovat stránky v \code{mmap}
     \begin{itemize}
-      \item Změna \code{remap_pfn_range} na \code{vma->vm_ops->nopage}
+      \item Změna \code{remap_pfn_range} na \code{vma->vm_ops->fault}
     \end{itemize}
 
     \item Userspace program stejný (funkčnost navenek stejná)
@@ -315,10 +315,10 @@ struct page *my_nopage(struct vm_area_struct *vma, unsigned long address, int *t
   \begin{itemize}
     \item Definice \footnotesize{\code{int fault(struct vm_area_struct *vma,
       struct vm_fault *vmf);}}
-    \begin{itemize}
-      \item \footnotesize{Popř. staré \code{struct page *nopage(struct
-	vm_area_struct *vma, unsigned long address, int *type)}}
-    \end{itemize}
+%    \begin{itemize}
+%      \item \footnotesize{Popř. staré \code{struct page *nopage(struct
+%	vm_area_struct *vma, unsigned long address, int *type)}}
+%    \end{itemize}
     \item Kontrola rozsahů v \code{mmap} (\code{end-start < 2*PAGE_SIZE}
       apod.)
     \item Definice \code{vm_ops} a přiřazení do \code{vma->vm_ops}
