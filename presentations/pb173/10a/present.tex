@@ -2,8 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{X.}
-\date{6. 12. 2012}
+\subtitle{X. DMA}
+\date{26. 11. 2013}
 
 \begin{document}
 
@@ -54,11 +54,11 @@
   \heading{Princip}
   \begin{enumerate}
   \item Alokace (speciální) paměti
-  \item Pro TX: vyplnění daty (paket, zvuk, data na disk, \ldots)
+  \item \emph{Pro TX}: vyplnění daty (paket, zvuk, data na disk, \dots)
   \item Předání ukazatele do zařízení
   \item Odstartování přenosu v zařízení
   \item Přerušení či jiná signalizace konce přenosu od zařízení
-  \item Pro RX: práce s příchozími daty (paket, data z disku, \ldots)
+  \item \emph{Pro RX}: práce s příchozími daty (paket, data z disku, \dots)
   \end{enumerate}
 
 \end{frame}
@@ -69,18 +69,18 @@
   \heading{API alokace}
   \begin{itemize}
   \item \header{linux/dma-mapping.h}, \doc{Documentation/DMA-*}
-  \item \texttt{dma\_alloc\_coherent}, \texttt{dma\_free\_coherent}
+  \item \code{dma_alloc_coherent}, \code{dma_free_coherent}
   \end{itemize}
 
   \pause
   \bigskip
 
-  \texttt{\footnotesize void *dma\_alloc\_coherent(struct device *dev, size\_t size, dma\_addr\_t *dma\_handle, gfp\_t gfp)}
+  \footnotesize{\code{void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp)}}\\[-0.3em]
   \begin{itemize}
-  \item \texttt{dev} -- zařízení, které bude k paměti přistupovat
-    (\texttt{NULL} pokud neznáme)
-  \item \texttt{size} -- velikost, jakou požadujeme
-  \item \texttt{dma\_handle} -- fyzická adresa (návratová hodnota) -- pro
+  \item \code{dev} -- zařízení, které bude k paměti přistupovat
+    (\code{NULL} pokud neznáme)
+  \item \code{size} -- velikost, jakou požadujeme
+  \item \code{dma_handle} -- fyzická adresa (návratová hodnota) -- pro
   zařízení
   \item návratová hodnota -- virtuální adresa -- pro nás
   \end{itemize}
@@ -94,7 +94,7 @@
 int my_do_DMA(struct device *dev)
 {
   dma_addr_t phys;
-  void *virt;
+  char *virt;
 
   virt = dma_alloc_coherent(dev, 100, &phys, GFP_KERNEL);
   if (!virt)
@@ -104,7 +104,7 @@ int my_do_DMA(struct device *dev)
   my_HW_start_transfer(dev);
   while (my_HW_working(dev)) /* polling */
     msleep(100);
-  printk(KERN_INFO "%s", virt);
+  printk(KERN_INFO "%s\n", virt);
   return 0;
 }
   \end{lstlisting}
@@ -112,8 +112,8 @@ int my_do_DMA(struct device *dev)
   \pause
   \bigskip
 
-  Úkol: alokujte pomocí \texttt{dma\_*} 1 stránku paměti (pro dev =
-  \texttt{NULL})
+  Úkol: alokujte a uvolněte pomocí \code{dma_*} 1 stránku paměti (v ovladači
+  EDU z předminula)
 
 \end{frame}
 
@@ -125,13 +125,13 @@ int my_do_DMA(struct device *dev)
   \item Nastavení masky adres
   \begin{itemize}
   \item Ne všechna zařízení zvládnou adresovat celý fyzický prostor
-  \item \texttt{pci\_set\_dma\_mask(pdev, DMA\_BIT\_MASK(27))}
+  \item \code{pci_set_dma_mask(pdev, DMA_BIT_MASK(27))}
   \end{itemize}
   \pause
   \item Zapnutí ,,spravování sběrnice''
   \begin{itemize}
   \item Tj. zařízení umí samo iniciovat přenosy apod.
-  \item \texttt{pci\_set\_master(pdev)}
+  \item \code{pci_set_master(pdev)}
   \end{itemize}
   \end{itemize}
 
@@ -155,24 +155,32 @@ int my_probe(struct pci_dev *pdev, ...)
 \end{frame}
 
 \begin{frame}
-  \frametitle{Combo a DMA}
+  \frametitle{EDU a DMA}
 
   \begin{itemize}
-  \item Zvládá 32-bitové adresy
-  \item DMA řadič napojený na LocalBus (1), PCI (2) a PowerPC (4)
-  \item Generuje přerušení 8 na kartě
+    \item Zvládá 32bitové adresy
+    \item DMA řadič napojený na PCI a lokální paměť
+    \begin{itemize}
+      \item Na adrese 0x40000
+      \item Velikost 4096~B
+    \end{itemize}
+
+    \item Generuje přerušení 8 (\code{0x100}) na kartě
+    \begin{itemize}
+      \item Po dokončení přenosu
+      \item (Jen je-li vyžádáno před přenosem)
+    \end{itemize}
   \end{itemize}
 
   \pause
   \bigskip
 
-  Úkol: upravte předešlou alokaci (\texttt{set\_dma\_mask},
-  \texttt{set\_master}, dev)
+  Úkol: doplňte předešlou alokaci (o \code{set_dma_mask} a \code{set_master})
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Combo DMA registry}
+  \frametitle{EDU DMA registry}
 
 \begin{table}
 \footnotesize
@@ -186,15 +194,17 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 \caption{Specifikace baru 0 (pokračování z minula)}
 \end{table}
 
+  \pause
+
   \begin{itemize}
-  \item \texttt{cmd} registr
-  \begin{itemize}
-  \item Bit 0: \texttt{RUN} (transfer now)
-  \item Bits 1-3: \texttt{SOURCE BUS}
-  \item Bits 4-6: \texttt{DESTINATION BUS}
-  \item Bit 7: \texttt{NOINT} (do not generate interrupt after transaction)
-  \item Bit 31: \texttt{ACKINT} (acknowledge interrupt)
-  \end{itemize}
+    \item \code{cmd} registr
+    \begin{itemize}
+      \item Zapisuje se po nastavení ostatních registrů
+      \item Zapisuje se jednou s kombinací bitů
+      \item Bit 0: \code{RUN} (transfer now)
+      \item Bit 1: \code{DIRECTION} (0: from PCI, 1: to PCI)
+      \item Bit 2: \code{RQINT} (generate an interrupt after the transaction)
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -202,20 +212,21 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Práce s DMA}
+  \heading{Práce s DMA na EDU}
   \begin{enumerate}
-  \item Naalokovat stránku DMA prostoru
-  \item 10B inicializovat textovým řetězcem
-  \item Přenést 10B na PowerPC sběrnici na adresu 0x40000
-  \begin{itemize}
-  \item Nastavit všechny 4 registry
-  \item Bez přerušení (nastavit \texttt{NOINT})
-  \item Počkat na nulovou hodnotu bitu \texttt{RUN} (na dokončení přenosu)
-  \end{itemize}
-  \item Přenést 10B z PowerPC na DMA stránku + 10
-  \begin{itemize}
-  \item Vznikne za sebou 2$\times$ stejný řetězec
-  \end{itemize}
+    \item Naalokovat stránku DMA prostoru
+    \item 10~B inicializovat textovým řetězcem
+    \item Přenést 10~B do EDU na adresu 0x40000
+    \begin{itemize}
+      \item Nastavit všechny 4 registry
+      \item Bez přerušení (bez \code{RQINT})
+      \item Počkat na nulovou hodnotu bitu \code{RUN} (na dokončení přenosu)
+    \end{itemize}
+
+    \item Přenést 10~B z EDU na DMA stránku + 10
+    \begin{itemize}
+      \item Vznikne za sebou 2$\times$ stejný řetězec
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -225,25 +236,25 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 
   \heading{DMA s přerušením} (domácí)
   \begin{enumerate}
-  \item Rozšířit předchozí o přerušení
-  \begin{itemize}
-  \item Přidat ještě jeden přenos z PowerPC na DMA + 20
-  \item Přenos bude bez \texttt{NOINT}
-  \item Je třeba povolit 8. (0x100) přerušení na kartě
-  \end{itemize}
-  \item Obsloužit přerušení
-  \begin{itemize}
-  \item ACK přerušení a DMA
-  \item Iniciovat tasklet
-  \end{itemize}
-  \item V taskletu vypsat obsah DMA paměti + 20
-  \item DMA stránku vystavit přes mmap
+    \item Rozšířit předchozí o přerušení
+    \begin{itemize}
+      \item Přidat ještě jeden přenos z EDU na DMA + 20
+      \item Přenos bude s \code{RQINT}
+    \end{itemize}
+
+    \item Obsloužit přerušení
+    \begin{itemize}
+      \item ACK přerušení
+      \item Iniciovat tasklet
+    \end{itemize}
+    \item V taskletu vypsat obsah DMA paměti + 20
+    \item DMA stránku vystavit přes \code{mmap}
   \end{enumerate}
 
   \bigskip
 
-  Pozn.: pokud se zařízení zasekne (např. špatně nastaveným DMA), je nutné
-  stroj vypnout a zapnout, reboot nepomůže
+  \emph{POZOR} na prezenci a správnou posloupnost zabíjení taskletu, zákazu
+  přerušení, dealokace atd.
 
 \end{frame}
 
