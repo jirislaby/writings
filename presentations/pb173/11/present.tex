@@ -1,9 +1,9 @@
-% vim: ai sw=2
+% vim: ai sw=2 spell spelllang=cs
 
 \input{../header.tex}
 
-\subtitle{XI.}
-\date{6. 12. 2011}
+\subtitle{XI. Komunikace mezi procesy}
+\date{3. 12. 2013}
 
 \begin{document}
 
@@ -19,8 +19,8 @@
   \bigskip
 
   \begin{itemize}
-  \item Čekání na událost
-  \item Buzení procesů
+    \item Čekání na událost
+    \item Buzení procesů
   \end{itemize}
 
 \end{frame}
@@ -29,23 +29,23 @@
   \frametitle{Jednoduchá komunikace}
 
   \begin{itemize}
-  \item 2 procesy (producent-konzument)
-  \begin{itemize}
-  \item A: čeká na nějakou hotovou práci
-  \item B: udělá nějakou práci a oznámí A dokončení
-  \item A: pokračuje
-  \end{itemize}
+    \item 2 procesy (producent-konzument)
+    \begin{itemize}
+      \item A: čeká na nějakou hotovou práci
+      \item B: udělá nějakou práci a oznámí A dokončení
+      \item A: pokračuje
+    \end{itemize}
   \end{itemize}
 
   \pause
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/completion.h}, \texttt{struct completion}
-  \item \texttt{DECLARE\_COMPLETION}$_S$, \texttt{init\_completion}$_D$
-  \item Čekání: \texttt{wait\_for\_completion},
-    \texttt{wait\_for\_completion\_interruptible} (retval)
-  \item Dokončení: \texttt{complete}, \texttt{complete\_all}
+    \item \header{linux/completion.h}, \code{struct completion}
+    \item \code{DECLARE_COMPLETION}$_S$, \code{init_completion}$_D$
+    \item Čekání: \code{wait_for_completion},
+      \code{wait_for_completion_interruptible} (retval)
+    \item Dokončení: \code{complete}, \code{complete_all}
   \end{itemize}
 
   \begin{lstlisting}[language=C]
@@ -62,17 +62,17 @@ printk(KERN_DEBUG "%s\n", str);          complete(&my_comp);
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Použití \texttt{completion}}
+  \heading{Použití \code{completion}}
   \begin{enumerate}
-  \item Doplnit do pb173/11/events \texttt{completion}
-  \item Číst se bude, až někdo dokončí zápis
-  \begin{itemize}
-  \item Čekání v \texttt{read} je možné přerušit signálem
-    (\texttt{wait\_for\_completion\_interruptible})
-  \end{itemize}
-  \item Spustit 2 instance \texttt{cat /dev/my\_name}
-  \item Pozorovat, co se děje
-  \item Spustit nekolikrát \texttt{echo XXX > /dev/my\_name}
+    \item Doplnit do \file{pb173/11/events} \code{completion}
+    \item Číst se bude, až někdo dokončí zápis
+    \begin{itemize}
+      \item Čekání v \code{read} je možné přerušit signálem
+	(\code{wait_for_completion_interruptible})
+    \end{itemize}
+    \item Spustit 2 instance \cmd{cat /dev/my_name}
+    \item Pozorovat, co se děje
+    \item Spustit nekolikrát \cmd{echo XXX > /dev/my_name}
   \end{enumerate}
 
 \end{frame}
@@ -81,25 +81,28 @@ printk(KERN_DEBUG "%s\n", str);          complete(&my_comp);
   \frametitle{Složitější komunikace}
 
   \begin{itemize}
-  \item Čekání na více místech na jinou událost
-  \item 3 procesy
-  \begin{itemize}
-  \item A: plní buffer
-  \item B: čeká na 100B
-  \item C: čeká na 200B
-  \end{itemize}
+    \item Čekání na více místech na jinou událost
+    \item 3 procesy
+    \begin{itemize}
+      \item A: plní buffer
+      \item B: čeká na 100B
+      \item C: čeká na 200B
+    \end{itemize}
   \end{itemize}
 
   \pause
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/wait.h}, \texttt{wait\_queue\_head\_t}
-  \item \texttt{DECLARE\_WAIT\_QUEUE\_HEAD}$_S$,
-    \texttt{init\_waitqueue\_head}$_D$
-  \item Čekání: \texttt{wait\_event}, \texttt{wait\_event\_interruptible}
-  \item Dokončení: \texttt{wake\_up}, \texttt{wake\_up\_all}
-  \item \texttt{completion} je obalená \texttt{wait\_queue}
+    \item \header{linux/wait.h}, \code{wait_queue_head_t}
+    \item \code{DECLARE_WAIT_QUEUE_HEAD}$_S$,
+      \code{init_waitqueue_head}$_D$
+    \item Čekání: \code{wait_event}, \code{wait_event_interruptible}
+    \item Dokončení: \code{wake_up}, \code{wake_up_all}
+
+    \pause
+
+    \item \code{completion} je obalená \code{wait_queue}
   \end{itemize}
 
 \end{frame}
@@ -107,7 +110,7 @@ printk(KERN_DEBUG "%s\n", str);          complete(&my_comp);
 \begin{frame}[fragile]
   \frametitle{Složitější komunikace -- příklad}
 
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 static DECLARE_WAIT_QUEUE_HEAD(my_wait);
 static atomic_t my_cnt = ATOMIC_INIT(0);
 static char *str;
@@ -118,11 +121,19 @@ A
     wake_up_all(&my_wait);
     msleep(10);
   }
+  \end{lstlisting}
 
+  \pause
+
+  \begin{lstlisting}
 B
   wait_event(my_wait, atomic_read(&my_cnt) > 100);
   printk(KERN_DEBUG "%s\n", str);
+  \end{lstlisting}
 
+  \pause
+
+  \begin{lstlisting}
 C
   if (wait_event_interruptible(my_wait, atomic_read(&my_cnt) > 200)) {
     printk(KERN_WARNING "interrupted\n");
@@ -136,10 +147,11 @@ C
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Použití \texttt{wait\_queue}}
+  \heading{Použití \code{wait_queue}}
   \begin{enumerate}
-  \item Místo \texttt{completion}, použít v pb173/11/events \texttt{wait\_queue}
-  \item Číst se bude, až bude v bufferu více než 5 znaků
+    \item Namísto \code{completion}, použít v \file{pb173/11/events}
+      \code{wait_queue}
+    \item Číst se bude, až bude v bufferu více než 5 znaků
   \end{enumerate}
 
 \end{frame}
@@ -148,23 +160,25 @@ C
   \frametitle{Scheduler}
 
   \begin{itemize}
-  \item Celé je to instruování plánovače
-  \item Ve skutečnosti je \texttt{wait\_event} a \texttt{wake\_up}:
-  \begin{itemize}
-  \item Nastavení stavu procesu: \texttt{set\_current\_state}
-  \item Uspání procesu: \texttt{schedule}
-  \item Probuzení procesu: \texttt{wake\_up\_process}
-  \item Popř. s obsluhou signálů: \texttt{signal\_pending}
-  \item \header{linux/sched.h}
-  \end{itemize}
-  \pause
-  \item \texttt{completion} a \texttt{wait\_queue} ulehčuje práci
-  \begin{itemize}
-  \item Pamatováním si, koho vzbudit
-  \item Případnou kontrolou signálů
-  \item Případnou kontrolou vypršení timeoutu
-  \item \texttt{completion} navíc řeší předání čítače (kolik procesů vzbudit)
-  \end{itemize}
+    \item Celé je to instruování plánovače
+    \item Ve skutečnosti je \code{wait_event} a \code{wake_up}:
+    \begin{itemize}
+      \item Nastavení stavu procesu: \code{set_current_state}
+      \item Uspání procesu: \code{schedule}
+      \item Probuzení procesu: \code{wake_up_process}
+      \item Popř. s obsluhou signálů: \code{signal_pending}
+      \item \header{linux/sched.h}
+    \end{itemize}
+
+    \pause
+
+    \item \code{completion} a \code{wait_queue} ulehčuje práci
+    \begin{itemize}
+      \item Pamatováním si, koho vzbudit
+      \item Případnou kontrolou signálů
+      \item Případnou kontrolou vypršení timeoutu
+      \item \code{completion} navíc řeší předání čítače (kolik procesů vzbudit)
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -174,37 +188,40 @@ C
 
   \heading{Explicitní čekání}
   \begin{enumerate}
-  \item Místo \texttt{wait\_event}, použijte funkce z předchozího slidu
-  \begin{itemize}
-  \item Prostudujte (a použijte) tělo makra
-    \texttt{\_\_wait\_event\_interruptible}
-  \end{itemize}
-  \item Pozměňte čekací podmínku tak, že se bude čekat alespoň na 2~\texttt{a} a
-    1~\texttt{b} v poli
+    \item Místo \code{wait_event}, použijte funkce z předchozího slidu
+    \begin{itemize}
+      \item Prostudujte (a použijte) tělo makra
+	\code{__wait_event_interruptible}
+    \end{itemize}
+    \item Pozměňte čekací podmínku
+    \begin{itemize}
+      \item Bude se čekat alespoň na 2~,,\code{a}'' a 1~,,\code{b}'' v poli
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{\texttt{kthread}}
+  \frametitle{\code{kthread}}
 
   \begin{itemize}
-  \item Vytvoření vlákna (procesu) pro výpočty
-  \begin{itemize}
-  \item Beží v jádře
-  \item Chování jako uživatelský proces
-  \end{itemize}
-  \item \header{linux/kthread.h}
-  \item \texttt{kthread\_run}, \texttt{kthread\_stop}
-  \item \texttt{kthread\_should\_stop}
+    \item Vytvoření vlákna (procesu) pro výpočty
+    \begin{itemize}
+      \item Běží v jádře
+      \item Chování jako uživatelský proces
+    \end{itemize}
+    \item \header{linux/kthread.h}
+    \item \code{kthread_run}, \code{kthread_stop}
+    \item \code{kthread_should_stop}
   \end{itemize}
 
   \medskip
   \pause
 
-  \heading{Příklad} \\
+  \heading{Příklad}
+  \begin{center}
   \begin{tabular}{c|c}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 static int my_proc(void *data)
 { /* data = my_data */
   while (1) {
@@ -216,19 +233,19 @@ static int my_proc(void *data)
   return 0;
 }
   \end{lstlisting} &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 static int my_init(void)
 {
   struct task_struct *t;
-  t = kthread_run(my_proc, my_data,
-      "my_process");
-  if (!IS_ERR(t)) {
-    ssleep(10);
-    kthread_stop(t);
-  }
+  t = kthread_run(my_proc, my_data, "my_process");
+  if (IS_ERR(t))
+    return PTR_ERR(t);
+  ...
+  kthread_stop(t); /* some time later */
   ...
   \end{lstlisting}
   \end{tabular}
+  \end{center}
 
 \end{frame}
 
@@ -237,10 +254,10 @@ static int my_init(void)
 
   \heading{Vytvoření vlákna}
   \begin{enumerate}
-  \item Vytvořte vlákno
-  \item Vlákno počká, až někdo něco zapíše
-  \item Přepíše všechny znaky \texttt{a} na \texttt{b}
-  \item Vzbudí všechny, kteří čekají na data
+    \item Vytvořte vlákno
+    \item Vlákno počká, až někdo něco zapíše
+    \item Přepíše všechny znaky \code{a} na \code{b}
+    \item Vzbudí všechny, kteří čekají na data
   \end{enumerate}
 
 \end{frame}
