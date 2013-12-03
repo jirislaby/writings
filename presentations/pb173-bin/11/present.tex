@@ -1,0 +1,397 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\input{../header.tex}
+
+\subtitle{XI. Komunikace mezi procesy}
+
+\date{3. 12. 2013}
+
+\begin{document}
+\shorthandoff{-}
+
+\frame{\titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Komunikace mezi procesy}
+
+  \begin{itemize}
+    \item Alespoň 2 procesy, které chtějí komunikovat
+    \begin{itemize}
+      \item Roura (\code{pipe})
+      \item Sdílená paměť (\code{mmap})
+      \item Plná meziprocesová komunikace (IPC)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\part{Roury}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Roury}
+
+  \begin{itemize}
+    \item Jednosměrná komunikace
+    \begin{itemize}
+      \item Jádro při \code{fork} kopíruje deskriptory
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{pipe}
+    \begin{itemize}
+      \item Vrací pole 2 deskriptorů (+ návratovou hodnotu)
+      \item Jeden pro potomka, druhý pro rodiče
+
+      \pause
+
+      \item Provede se \code{fork}
+      \item Zavřou se nepotřebné deskriptory
+      \item Zapisuje se do prvního deskriptoru (\code{write})
+      \item Čte se z druhého deskriptoru (\code{read})
+    \end{itemize}
+
+    \pause
+
+    \item \code{popen}=\code{pipe}+\code{fork}+\code{exec}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření ,,echa'' přes roury}
+  \begin{enumerate}
+    \item Vytvořte si 2 roury
+    \begin{itemize}
+      \item Pro obousměrnou komunikaci
+    \end{itemize}
+    \item Proveďte \code{fork}
+    \item Zavřete nepotřebné deskriptory
+
+    \item V jednom procesu v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Do jednoho \code{fd} zapisujte měnící se text
+      \begin{itemize}
+	\item Např.\ \code{char buf[10] = "Hello";} a \code{(*buf)++;}
+      \end{itemize}
+      \item Z druhého \code{fd} čtěte a vypisujte
+    \end{itemize}
+
+    \item V druhém procesu:
+    \begin{itemize}
+      \item Čtěte z prvního \code{fd}
+      \item A zapisujte to do druhého \code{fd}
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pojmenovaná roura}
+
+  \begin{itemize}
+    \item Soubor na disku
+    \item \code{mknod}
+    \item Demo
+  \end{itemize}
+
+\end{frame}
+
+\part{Sdílená paměť}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Sdílená paměť}
+
+  \begin{itemize}
+    \item Mapování a sdílení paměti
+    \begin{itemize}
+      \item Jádro při \code{fork} kopíruje mapování
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{mmap} s \code{MAP_ANONYMOUS | MAP_SHARED}
+    \begin{itemize}
+      \item Provede se \code{fork}
+      \item Paměť se může libovolně měnit
+      \item Ale pozor na optimalizace překladače
+      \begin{itemize}
+	\item \code{volatile}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření sdílené paměti}
+  \begin{enumerate}
+    \item Vytvořte si mapování
+    \item Proveďte \code{fork}
+
+    \item V jednom procesu v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém procesu:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\part{IPC}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{IPC}
+
+  \begin{itemize}
+    \item Plná meziprocesová komunikace
+    \begin{itemize}
+      \item Sdílená paměť
+      \item Zprávy
+      \item Semafory
+    \end{itemize}
+
+    \pause
+
+    \item Výpis: \cmd{ipcs}
+    \item Dokumentace: \cmd{man 5 ipc}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{IPC a klíče}
+
+  \begin{itemize}
+    \item IPC pracuje s klíči (\code{key_t})
+
+    \item Vytvoření: \code{ftok}
+    \begin{itemize}
+      \item Cesta k existujícímu uzlu
+      \item Nějaký znak
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ \code{ftok(".", 'x')}
+  \end{itemize}
+
+\end{frame}
+
+\section{Sdílená paměť}
+\frame{\sectionpage}
+
+\begin{frame}
+  \frametitle{Sdílená paměť (IPC)}
+
+  \begin{itemize}
+    \item Vytvoření: \code{shmget}
+    \begin{itemize}
+      \item Parametr \code{IPC_CREAT}
+      \item Logický OR s právy 
+    \end{itemize}
+
+    \pause
+
+    \item Získaní adresy: \code{shmat}
+    \item Navrácení adresy: \code{shmdt}
+
+    \pause
+
+    \item Další operace: \code{shmctl}
+    \begin{itemize}
+      \item Informace: \code{SHM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření sdílené paměti (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho
+    \end{itemize}
+    \item Vytvořte si sdílený segment (\code{shmget})
+    \item Získejte adresu (\code{shmat})
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V obou proveďte \code{shmdt}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\section{Zprávy}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]
+  \frametitle{Zprávy (IPC)}
+
+  \heading{Formát zprávy}
+  \begin{lstlisting}
+struct msgbuf {
+  long mtype;
+  ...
+};
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}
+    \item Vytvoření fronty zpráv: \code{msgget}
+
+    \pause
+
+    \item Odeslání zprávy: \code{msgsnd}
+    \item Přijetí zprávy: \code{msgrcv}
+
+    \pause
+
+    \item Další operace: \code{msgctl}
+    \begin{itemize}
+      \item Informace: \code{MSG_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Posílání zpráv (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho
+    \end{itemize}
+    \item Vytvořte si frontu zpráv (\code{msgget})
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do fronty (\code{msgsnd}) řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte frontu (\code{msgrcv}) a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\section{Semafory}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]
+  \frametitle{Semafory (IPC)}
+
+  \pause
+
+  \begin{itemize}
+    \item Meziprocesové zamykání/správa prostředků
+
+    \pause
+
+    \item Vytvoření semaforu: \code{semget}
+
+    \pause
+
+    \item Změna stavu semaforu: \code{semop}
+
+    \pause
+
+    \item Další operace: \code{semctl}
+    \begin{itemize}
+      \item \emph{Nastavení iniciální hodnoty}: \code{SETVAL} (spolu s
+	\code{union semun.val})
+      \item Informace: \code{SEM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+  \heading{Parametr \code{semop}}
+  \begin{lstlisting}
+struct sembuf {
+  ushort  sem_num;
+  short   sem_op;  /*  -  0  +  */
+  short   sem_flg;
+};
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce se semaforem (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho
+    \end{itemize}
+    \item Vytvořte 2 programy
+
+    \item Jeden tiskový server
+    \begin{itemize}
+      \item Vytvořte si 1 semafor (\code{semget})
+      \item Obsluhuje 5 tiskáren (\code{shmctl} a \code{SETVAL})
+      \item Tisk trvá 10 vteřin
+    \end{itemize}
+
+    \item Druhý je klient
+    \begin{itemize}
+      \item Chce tisknout
+    \end{itemize}
+
+    \item Spusťte jeden server a více než 5 klientů
+    \begin{itemize}
+      \item Do 10 vteřin
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
