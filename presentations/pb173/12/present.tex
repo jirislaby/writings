@@ -2,8 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{XI.}
-\date{13. 12. 2012}
+\subtitle{XII. Síťové rozhraní}
+\date{10. 12. 2013}
 
 \begin{document}
 
@@ -51,12 +51,12 @@
 
   \heading{Ovladač síťové karty}
   \begin{itemize}
-  \item Mezivrstva mezi HW a Linuxem (síťovou vrstvou)
-  \item Vytváří \texttt{eth*} apod. zařízení (tzv. \texttt{netdevice})
-  \item Obsahuje háčky
-  \begin{itemize}
-  \item Zařízení je UP, DOWN, změna MTU, pošli paket, \ldots
-  \end{itemize}
+    \item Mezivrstva mezi HW a Linuxem (síťovou vrstvou)
+    \item Vytváří \code{eth*} a podobná zařízení (tzv.\ \code{netdevice})
+    \item Obsahuje háčky
+    \begin{itemize}
+      \item Zařízení je UP, DOWN, změna MTU, pošli paket, \dots
+    \end{itemize}
   \end{itemize}
 
   \pause
@@ -64,30 +64,32 @@
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/netdevice.h}, \texttt{struct net\_device}
-  \item Alokace: \texttt{alloc\_netdev}$_D$, \texttt{free\_netdev}$_D$
-  \item Registrace: \texttt{register\_netdev}, \texttt{unregister\_netdev}
+  \item \header{linux/netdevice.h}, \code{struct net\_device}
+  \item Alokace: \code{alloc_netdev}$_D$, \code{free_netdev}$_D$
+  \item Registrace: \code{register_netdev}, \code{unregister_netdev}
   \item Háčky
   \begin{itemize}
-  \item Staré jádro: v \texttt{netdevice} přímo \texttt{open}, \texttt{stop},
-    \ldots
-  \item Nové jádro: \texttt{net\_device\_ops} (podobně jako znaková zařízení)
+  \item Staré jádro: v \code{netdevice} přímo \code{open}, \code{stop}, \dots
+  \item Nové jádro: \code{net_device_ops} (podobně jako znaková zařízení)
   \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{\texttt{net\_device\_ops}}
+  \frametitle{\code{net_device_ops}}
 
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct net_device_ops {
   int (*ndo_open)(struct net_device *dev); /* ifup */
   int (*ndo_stop)(struct net_device *dev); /* ifdown */
-  netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb,
-       struct net_device *dev); /* send a packet */
-  int (*ndo_change_mtu)(struct net_device *dev,
-       int new_mtu); /* change MTU */
+
+  /* send a packet */
+  netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb, struct net_device *dev);
+
+  /* change MTU */
+  int (*ndo_change_mtu)(struct net_device *dev, int new_mtu);
+
   ... /* no receive packet */
 };
   \end{lstlisting}
@@ -98,36 +100,50 @@ struct net_device_ops {
   \frametitle{Konkrétnější rozhraní}
 
   \begin{itemize}
-  \item Místo \texttt{alloc\_netdev} se použije konkrétnější
-  \item Nastaví vnitřní položky \texttt{netdevice}
-  \begin{itemize}
-  \item \emph{Ethernet}: \texttt{alloc\_etherdev} (\header{linux/etherdevice.h})
-  \item IRDA: \texttt{alloc\_irdadev} (\header{net/irda/irda\_device.h})
-  \item CAN: \texttt{alloc\_candev} (\header{linux/can/dev.h})
-  \item HDLC: \texttt{alloc\_hdlcdev} (\header{linux/hdlc.h})
-  \item \ldots
-  \end{itemize}
+    \item Místo \code{alloc_netdev} se použije konkrétnější \code{alloc_*}
+    \begin{itemize}
+      \item Inicializuje \code{netdevice}
+      \item Délku hlavičky, adresy, fronty, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Nastaví vnitřní položky \code{netdevice}
+    \begin{itemize}
+      \item \emph{Ethernet}: \code{alloc_etherdev}
+	(\header{linux/etherdevice.h})
+      \item IRDA: \code{alloc_irdadev} (\header{net/irda/irda\_device.h})
+      \item CAN: \code{alloc_candev} (\header{linux/can/dev.h})
+      \item HDLC: \code{alloc_hdlcdev} (\header{linux/hdlc.h})
+      \item \dots
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Vytvoření \texttt{eth*}}
+  \frametitle{Vytvoření \code{eth*}}
 
   \heading{Postup vytvoření ethernetového zařízení v systému}
   \begin{enumerate}
-  \item Alokace (\texttt{alloc\_etherdev(priv\_size)})
-  \item Vyplnění informací
-  \begin{itemize}
-  \item Háčky (\texttt{net\_device\_ops})
-  \item MAC adresa (\texttt{dev->dev\_addr})
-  \item Získání privátního ukazatele o velikosti \texttt{priv\_size}
-    (\texttt{netdev\_priv})
-  \end{itemize}
-  \item Registrace (\texttt{register\_netdev})
-  \item \ldots
-  \item Deregistrace (\texttt{unregister\_netdev})
-  \item Uvolnění (\texttt{free\_netdev})
+    \item Alokace (\code{alloc_etherdev(priv_size)})
+    \begin{itemize}
+      \item \code{priv_size} může být \code{0}
+    \end{itemize}
+
+    \item Inicializace informací
+    \begin{itemize}
+      \item Nastavení háčků (\code{net_device_ops})
+      \item Nastavení MAC adresy (\code{dev->dev_addr})
+      \item Získání privátního ukazatele o velikosti \code{priv_size}
+      \begin{itemize}
+	\item Funkce \code{netdev_priv}
+      \end{itemize}
+    \end{itemize}
+    \item Registrace (\code{register_netdev})
+    \item \dots
+    \item Deregistrace (\code{unregister_netdev})
+    \item Uvolnění (\code{free_netdev})
   \end{enumerate}
 
 \end{frame}
@@ -135,25 +151,30 @@ struct net_device_ops {
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Vytvořit \texttt{eth*}}
+  \heading{Vytvoření \code{eth*}}
   \begin{enumerate}
-  \item Dle postupu z předchozího slidu
-  \begin{itemize}
-  \item Alokace+registrace v \texttt{module\_init}
-  \item Deregistrace+uvolnění v \texttt{module\_exit}
-  \item MAC: \texttt{random\_ether\_addr}
-  \item \texttt{priv\_size}: \texttt{sizeof(struct timer\_list)}
+    \item Dle postupu z předchozího slajdu
     \begin{itemize}
-    \item Nezapoměnte na \texttt{setup\_timer}
+      \item Alokace+registrace v \code{module_init}
+      \item Deregistrace+uvolnění v \code{module_exit}
+      \item MAC: \code{random_ether_addr}
+      \item \code{priv_size}: \code{sizeof(struct timer_list)}
+      \begin{itemize}
+	\item Nezapomeňte na \code{setup_timer}
+      \end{itemize}
     \end{itemize}
-  \end{itemize}
-  \item Vytvořit \texttt{open}, \texttt{stop}, \texttt{start\_xmit}
-  \begin{itemize}
-  \item Těla vypíšou jen název funkce
-  \item \texttt{start\_xmit} vrátí \texttt{NETDEV\_TX\_OK}
-  \end{itemize}
-%  \item Vložit do systému, udělat \texttt{ifup}, \texttt{ifdown}, \texttt{ping}
-  \item NEVKLÁDEJTE do systému
+
+    \item Vytvořit \code{open}, \code{stop}, \code{start_xmit}
+    \begin{itemize}
+      \item Těla vypíšou jen název funkce
+      \item \code{start_xmit} vrátí \code{NETDEV_TX_OK}
+    \end{itemize}
+  %  \item Vložit do systému, udělat \code{ifup}, \code{ifdown}, \code{ping}
+
+    \item NEVKLÁDEJTE do systému
+    \begin{itemize}
+      \item Nelze modul odebrat
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -163,28 +184,30 @@ struct net_device_ops {
 
   \heading{Tzv. socket buffery}
   \begin{itemize}
-  \item \header{linux/skbuff.h}, \texttt{struct sk\_buff}
-  \item \texttt{dev\_alloc\_skb}$_D$ (obecně), \texttt{netdev\_alloc\_skb}$_D$
-    (pro \texttt{netdevice}), \texttt{dev\_kfree\_skb}$_D$
-  \item Obsah: \texttt{skb->data}
-  \item Délka obsahu: \texttt{skb->len}
+    \item \header{linux/skbuff.h}, \code{struct sk_buff}
+    \item \code{dev_alloc_skb}$_D$ (obecně), \code{netdev_alloc_skb}$_D$
+      (pro \code{netdevice}), \code{dev_kfree_skb}$_D$
+    \item Obsah: \code{skb->data}
+    \item Délka obsahu: \code{skb->len}
 
-  \pause
+    \pause
 
-  \item Příjem z HW (např. z přerušení)
-  \begin{itemize}
-  \item \texttt{skb = netdev\_alloc\_skb(dev, len)}
-  \item Naplnění daty z HW
-  \item Nastavení protokolu (\texttt{skb->protocol = eth\_type\_trans(skb,
-  dev)})
-  \item \texttt{netif\_rx(skb)}
-  \end{itemize}
-  \pause
-  \item Posílání do HW (skb je parametr \texttt{start\_xmit})
-  \begin{itemize}
-  \item Poslat paket
-  \item \texttt{dev\_kfree\_skb(skb)}
-  \end{itemize}
+    \item Příjem z HW (např.\ z přerušení)
+    \begin{itemize}
+      \item \code{skb = netdev_alloc_skb(dev, len)}
+      \item Naplnění daty z HW
+      \item Nastavení protokolu (\code{skb->protocol = eth_type_trans(skb,
+	dev)})
+      \item \code{netif_rx(skb)}
+    \end{itemize}
+
+    \pause
+
+    \item Posílání do HW (skb je parametr \code{start_xmit})
+    \begin{itemize}
+      \item Poslat paket
+      \item \code{dev_kfree_skb(skb)}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -192,21 +215,23 @@ struct net_device_ops {
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Posílání/příjem paketů}
+  \heading{Odesílání/příjem paketů}
   \begin{enumerate}
-  \item Doplnit kód TX
-  \begin{itemize}
-  \item Vypsat obsah paketu (\texttt{print\_hex\_dump\_bytes})
-  \item Uvolnit \texttt{skb}
-  \end{itemize}
-  \item Nastavit RX
-  \begin{itemize}
-  \item V \texttt{open} nastavit periodický časovač, smazat ve \texttt{stop}
-  \item V časovači volat \texttt{netif\_rx} s paketem z pb173/12
-  \item Inkrementovat v paketu 24. char
-  \end{itemize}
-  \item Vložit modul do systému
-  \item Spustit \texttt{tcpdump -ni} na \texttt{eth} rozhraní
+    \item Doplnit kód TX
+    \begin{itemize}
+      \item Vypsat obsah paketu (\code{print_hex_dump_bytes})
+      \item Uvolnit \code{skb}
+    \end{itemize}
+
+    \item Nastavit RX
+    \begin{itemize}
+      \item V \code{open} nastavit periodický časovač, zrušit ve \code{stop}
+      \item V časovači volat \code{netif_rx} s paketem z \file{pb173/12/}
+      \item Inkrementovat v paketu 24.\ znak o \code{1}
+    \end{itemize}
+
+    \item Vložit modul do systému
+    \item Spustit \cmd{tcpdump -ni} na \code{eth} rozhraní
   \end{enumerate}
 
 \end{frame}
