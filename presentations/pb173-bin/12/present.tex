@@ -1,0 +1,286 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\input{../header.tex}
+
+\subtitle{XII. Komunikace mezi procesy, část 2}
+
+\date{10. 12. 2013}
+
+\begin{document}
+\shorthandoff{-}
+
+\frame{\titlepage}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}
+  \frametitle{Komunikace mezi procesy}
+
+  \begin{itemize}
+    \item Alespoň 2 procesy, které chtějí komunikovat
+    \item Minule
+    \begin{itemize}
+      \item Roura (\code{pipe})
+      \item Sdílená paměť (\code{mmap})
+      \item Plná meziprocesová komunikace (IPC)
+    \end{itemize}
+
+    \pause
+
+    \item Dnes
+    \begin{itemize}
+      \item Netlink
+      \item RPC
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\part{Netlink}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{Netlink}
+
+  \begin{itemize}
+    \item Protokol pro komunikaci s jádrem
+    \begin{itemize}
+      \item Standardní socket
+      \item Ale umožňuje i komunikaci mezi procesy
+    \end{itemize}
+
+    \pause
+
+    \item Adresování: \code{struct sockaddr_nl}
+    \begin{itemize}
+      \item \code{nl_family = AF_NETLINK}
+      \item \code{nl_pid} je většinou číslo procesu
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{socket(AF_NETLINK, SOCK_RAW, NETLINK_USERSOCK)}
+
+    \pause
+
+    \item Server
+    \begin{itemize}
+      \item Provede \code{bind} s nastaveným \code{sockaddr_nl.nl_pid}
+      \item Potom poslouchá pomocí \code{recv}
+    \end{itemize}
+
+    \pause
+
+    \item Klient
+    \begin{itemize}
+      \item Posílá pomocí \code{sendto}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření netlink komunikace}
+  \begin{enumerate}
+    \item Vytvořte si 2 programy
+    \begin{itemize}
+      \item Server a klient
+    \end{itemize}
+
+    \item V serveru proveďte:
+    \begin{itemize}
+      \item \code{bind} s nastaveným \code{sockaddr_nl.nl_pid}
+      \item Vypište si \code{nl_pid}
+      \item A v cyklu \code{recv} a \code{write} na standardní výstup
+    \end{itemize}
+
+    \item V klientovi proveďte:
+    \begin{itemize}
+      \item \code{sendto} nějakých dat
+      \item Adresu (\code{nl_pid}) si vezměte s příkazové řádky
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\part{RPC}
+\frame{\partpage}
+
+\begin{frame}
+  \frametitle{RPC}
+
+  \begin{itemize}
+    \item Vzdálené volání procedur
+    \begin{itemize}
+      \item Volání funkcí přes síť (UDP nebo TCP)
+      \item Využití např.\ v NFS
+    \end{itemize}
+
+    \pause
+
+    \item Portmapper
+    \begin{itemize}
+      \item Lokální služba
+      \item Mapuje číslo programu, verzi a protokol na funkce
+      \begin{itemize}
+        \item Registrovaná čísla v \file{/etc/rpc}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{RPC rozhraní pro server}
+
+  \begin{itemize}
+    \item \header{rpc/rpc.h}, \cmd{man 3 rpc}
+    \item Vytvoření spojení: \code{svctcp_create}, \code{svcudp_create}
+    \begin{itemize}
+      \item \code{RPC_ANYSOCK}
+    \end{itemize}
+
+    \pause
+    
+    \item Registrace funkce: \code{svc_register}
+    \begin{itemize}
+      \item Registruje u portmapperu pomocí \code{pmap_set}
+      \item Viditelné v \cmd{rpcinfo -p}
+      \item Je zvykem před tím volat \code{pmap_unset}
+
+      \pause
+
+      \item Volá háček \code{dispatch}
+      \begin{itemize}
+        \item Parametr \code{svc_req->rq_proc} určuje funkcionalitu
+        \item Lze odpovědět na zprávu: \code{svc_sendreply}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Obslužná smyčka: \code{svc_run}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření RPC serveru}
+  \begin{enumerate}
+    \item Vytvořte si TCP spojení (\code{svctcp_create} a \code{RPC_ANYSOCK})
+    \item Zvolte si čísla funkce a verze
+    \begin{itemize}
+      \item Vyhněte se číslům funkcí z \file{/etc/rpc}
+    \end{itemize}
+    \item Zrušte stará mapování (\code{pmap_unset})
+    \item Registrujte službu (\code{svc_register})
+    \begin{itemize}
+      \item V \code{dispatch} funkci proveďte výpis \code{svc_req->rq_proc}
+    \end{itemize}
+    \item Spusťte smyčku (\code{svc_run})
+    \item Spusťte program
+    \begin{itemize}
+      \item Za předpokladu, že běží portmapper
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{RPC rozhraní pro klienta}
+
+  \begin{itemize}
+    \item Vytvoření spojení: \code{clnt_create}
+    \begin{itemize}
+      \item Stroj, protokol a číslo funkce+verze
+    \end{itemize}
+    \item Zrušení spojení: \code{clnt_destroy}
+
+    \pause
+    
+    \item Zavolání funkce: \code{clnt_call}
+    \begin{itemize}
+      \item 2.\ parametr do \code{dispatch} $\rightarrow$
+	\code{svc_req->rq_proc}
+      \item 3.\ a 5.\ parametr: kódovací funkce (zatím \code{xdr_void})
+      \item 4.\ a 6.\ parametr: parametry vzdálené funkce (zatím \code{NULL})
+      \item Timeout: čas na odpověď
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření RPC klienta}
+  \begin{enumerate}
+    \item Vytvořte si TCP spojení na localhost (\code{clnt_create})
+    \begin{itemize}
+      \item Použijte čísla zvolená v serveru
+    \end{itemize}
+    \item Zavolejte několikrát \code{clnt_call}
+    \begin{itemize}
+      \item S různým 2.\ parametrem
+    \end{itemize}
+    \item Spusťte program
+    \begin{itemize}
+      \item Za předpokladu, že server běží
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{RPC a parametry}
+
+  \heading{XDR}
+  \begin{itemize}
+    \item \header{rpc/xdr.h}, \cmd{man 3 xdr}
+    \item Funkce k přenositelnému zakódování dat
+    \begin{itemize}
+      \item \code{xdr_void}
+      \item \code{xdr_char}, \code{xdr_short}, \code{xdr_int}, \code{xdr_long}
+      \item \code{xdr_float}, \code{xdr_double}
+      \item \code{xdr_string}, \code{xdr_array}
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Klient
+    \begin{itemize}
+      \item 3.\ a 5.\ parametr pro \code{clnt_call}
+    \end{itemize}
+
+    \item Server
+    \begin{itemize}
+      \item V \code{dispatch}: \code{svc_getargs}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Předávání parametrů}
+  \begin{enumerate}
+    \item V serveru vytvořte funkci
+    \begin{itemize}
+      \item Vezme \code{int}, vynásobí \code{10} a vrátí \code{long}
+    \end{itemize}
+    \item Z klienta zavolejte
+    \item Spusťte program
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
