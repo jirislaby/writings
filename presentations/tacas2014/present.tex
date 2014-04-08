@@ -1,0 +1,147 @@
+% vim: ai sw=2 spell spelllang=en
+
+\documentclass[xcolor=dvipsnames]{beamer}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+\newcommand{\red}[1]{\textcolor{red}{#1}}
+
+\newcommand{\clang}{\textsc{Clang}\xspace}
+\newcommand{\klee}{\textsc{Klee}\xspace}
+\newcommand{\stan}{\textsc{Stanse}\xspace}
+\newcommand{\symb}{\textsc{Symbiotic}\xspace}
+
+\mode<presentation>
+{
+\usetheme{Madrid}
+}
+
+\setbeamertemplate{navigation symbols}{}
+%\setbeamertemplate{footline}[frame number]{}
+
+\usepackage{adjustbox}
+\usepackage[utf8x]{inputenc}
+\usepackage{helvet}
+\usepackage{mathptmx}
+\usepackage[IL2]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[final]{listings}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{xspace}
+\usetikzlibrary{arrows, positioning}
+
+\tikzset{tl_state/.style={rounded corners, thick, draw, minimum height=6mm,
+	minimum width=12mm, bottom color=black!15, top color=black!5}}
+\tikzset{tl_phase/.style={thick, draw, minimum size=8mm}}
+\tikzset{tl_edge/.style={<-, >=stealth', semithick}}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}, columns=flexible, language=C}
+
+\newcommand{\cmd}[2][]{\lstinline[columns=fullflexible, language=bash,
+	basicstyle=\ttfamily, #1]$#2$}
+\newcommand{\code}[2][]{\lstinline[columns=fullflexible, basicstyle=\ttfamily,
+	#1]$#2$}
+
+\title[Symbiotic 2]{Symbiotic 2: More Precise Slicing}
+\subtitle{Competition Contribution}
+\date{April 10\textsuperscript{th} 2014, Grenoble}
+
+\author[Jiri~Slaby]{\textbf{Jiri~Slaby}, Jan~Strej\v{c}ek}
+
+\institute[Masaryk University]{Faculty of Informatics\\
+Masaryk University, Brno}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}[fragile]
+  \frametitle{Symbiotic}
+
+\begin{semiverbatim}
+                    void fun(int x) \{
+                      \only<1-3>{while (compute())}\only<4>{\red{while (compute())}}
+                        \only<1-3>{;}\only<4>{\red{;}}
+                      if (x == 2) \{
+                    ERROR: \only<2>{\red{assert(0);}}\only<3-5>{assert(0);}
+                        goto ERROR;
+                      \}
+                    \}
+\end{semiverbatim}
+
+    \medskip
+
+    \begin{center}
+    \begin{tikzpicture}[node distance=6mm, font=\sffamily]
+      \node [tl_state] (C) {C Sources};
+      \node [tl_phase, right=of C] (PREP) {\color<2>{red}{Instrumentor}}
+        edge[tl_edge] node {} (C);
+      \node [tl_state, right=of PREP, align=center] (PREPS) {
+	  Instrumented \\
+	  C Code
+	}
+        edge[tl_edge] node {} (PREP);
+      \node [tl_phase, right=of PREPS] (CLANG) {\color<3>{red}{\clang}}
+        edge[tl_edge] node {} (PREPS);
+      \node [tl_state, below=10mm of CLANG] (LLVM) {Llvm}
+        edge[tl_edge] node {} (CLANG);
+      \node [tl_phase, left=of LLVM] (SLICER) {\color<4>{red}{Slicer}}
+        edge[tl_edge] node {} (LLVM);
+      \node [tl_state, left=of SLICER, align=center] (SLICED) {Sliced \\ Llvm}
+        edge[tl_edge] node {} (SLICER);
+      \node [tl_phase, left=of SLICED] (KLEE) {\color<5>{red}{\klee}}
+        edge[tl_edge] node {} (SLICED);
+      \node [tl_state, left=of KLEE, align=center] (RESULTS) {
+	  \textsf{TRUE} or \\
+	  \textsf{FALSE} or \\
+	  \textsf{UNKNOWN}}
+        edge[tl_edge] node {} (KLEE);
+    \end{tikzpicture}
+    \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Improvements in Symbiotic 2}
+
+  \begin{itemize}
+    \item Field-sensitive pointer analysis
+    \begin{itemize}
+      \item Including arrays (first 64 members) 
+      \pause
+      \item Need for type filtering to speed up
+    \end{itemize}
+
+    \pause
+
+    \item Fixed bugs in implementation
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Result}
+  \begin{itemize}
+    \item More precise slicing
+    \begin{itemize}
+      \item Less incorrect answers
+      \item Example: from 131 incorrect answers to none in \textit{ProductLines}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\end{document}
