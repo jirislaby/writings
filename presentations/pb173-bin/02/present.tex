@@ -5,7 +5,7 @@
 \newcommand{\ant}{\textsc{Antlr}\xspace}
 
 \subtitle{II. Parsery}
-\date{24. 9. 2013}
+\date{23. 9. \the\year}
 
 \begin{document}
 
@@ -35,13 +35,13 @@
   \item \cmd{git pull --rebase}
   \end{itemize}
 
-  \item Studijní materiály v \href{https://is.muni.cz/auth/el/1433/podzim2013/PB173/index.qwarp?prejit=2957736}{ISu}
+  \item Studijní materiály v \href{https://is.muni.cz/auth/el/1433/podzim2014/PB173/index.qwarp}{\nolinkurl{ISu}}
 
   \end{itemize}
 \end{frame}
 
-\part{Parsery}
-\frame{\partpage}
+\section{Parsery}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Parsery}
@@ -52,11 +52,11 @@
     \item Přirozeného, \emph{programovacího}, \dots
   \end{itemize}
 
-  \item Výstupem je nějaký lepší popis jazyka
+  \item Výstupem je nějaký lépe zpracovatelný popis jazyka
   \begin{itemize}
     \item Např.\ informace v grafu nebo stromu
     \item Několik mezifází, jak toho dosáhnout
-    \item Projdeme si na dalších slajdech
+    \item Projdeme si na dalších slidech
   \end{itemize}
 
   \pause
@@ -68,7 +68,7 @@
     \item \dots
   \end{itemize}
 
-  \item Detailněji o jazycích a parserech např.\ v ,,Dragon book''
+  \item Detailněji o jazycích a parserech např.\ v ,,Dragon Book''
 
   \end{itemize}
 
@@ -111,7 +111,7 @@
 
   \item Generuje parsery do různých jazyků
   \begin{itemize}
-    \item Java, C, C++, C\#, \dots
+    \item Java, C, C\texttt{++}, C\#, \dots
     \item Podpora pro C jen ve verzi 3 (pro 4 se připravuje)
   \end{itemize}
 
@@ -128,7 +128,7 @@
     \begin{itemize}
     \item Ukládejte do \file{pb173-bin/02/}
     \item \textsc{AntlrWorks}: ,,Version 1.5''
-    \item \ant: ,,Complete \ant 3.5 Java binaries jar''
+    \item \ant: ,,Complete \ant 3.5.2 Java binaries jar''
     \end{itemize}
 
   \item Knihovna pro C (\file{libantlr3c} a \file{libantlr3c-devel})
@@ -268,7 +268,7 @@ helloWorld
 
 /* lexikalni analyza */
 AHOJ
-  : 'Ahoj' // vytvori token Ahoj z retezce "Ahoj"
+  : 'Ahoj' // vytvori token AHOJ z retezce "Ahoj"
   ;
 
 SVETE
@@ -283,34 +283,47 @@ SVETE
   \begin{itemize}
     \item \code{|} odděluje možnosti
     \begin{itemize}
+      \item Více možností: \code{zvirata : savci | obojzivelnici ;}
       \item Kombinace podčásti: \code{zvirata : ('pe'|'ko') 's' ;}
     \end{itemize}
 
-    \item Opakování pravidla: \code{zvukHada : 's'+ ;}
+    \pause
+
+    \item Opakování pravidla
     \begin{itemize}
-      \item \code{pravidlo?} -- 0--1krát
-      \item \code{pravidlo*} -- 0--$\infty$krát
-      \item \code{pravidlo+} -- 1--$\infty$krát
+      \item \code{pravidlo?} -- 0--1krát (\code{nicNeboX : 'x'? ;})
+      \item \code{pravidlo*} -- 0--$\infty$krát (\code{kolonaAut : 'auto'* ;})
+      \item \code{pravidlo+} -- 1--$\infty$krát (\code{zvukHada : 's'+ ;})
     \end{itemize}
 
     \item Speciální pravidlo pro konec souboru: \code{EOF}
     \begin{itemize}
       \item Donutí číst celý soubor
     \end{itemize}
-
-    \pause
-
-    \item Může obsahovat akce
-    \begin{itemize}
-      \item \code{p : ID \{ x++; \} ID \{ x++; \} ID \{ puts("neco"); \} ;}
-      \item Akce můžou referencovat předcházející části
-      \begin{itemize}
-	\item Implicitně (\code{p : ID \{ \$ID... \} ;})
-	\item Nebo pojmenováním (\code{p : id1=ID \{ \$id1... \} ;})
-      \end{itemize}
-    \end{itemize}
-
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Úkol}
+
+  \heading{Rozšíření gramatiky}
+  \begin{enumerate}
+    \item Prozkoumejte obsah \file{02/test/Parser.g}
+    \item Vytvořte si token \code{NUMBER} pro čísla (\code{('0'..'9')+})
+    \item Vytvořte si tokeny \code{\+} a \code{\-} pro operace
+    \item Vytvořte si nové pravidlo \code{expr} pro tyto 2 operace
+    \begin{itemize}
+      \item Bude obsahovat 2 řádky
+      \item Pro sčítání např.\ \code{NUMBER PLUS NUMBER}
+    \end{itemize}
+    \item Přidejte do \code{translationUnit} novou pravou stranu \code{expr+}
+
+    \item Vyzkoušejte nově podporované vstupy
+    \begin{itemize}
+      \item \code{1+2}, \code{100-10}, apod.
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
@@ -323,14 +336,11 @@ grammar Jmeno; // shoda s nazvem souboru
 options {
   language = C; // vystupni jazyk parseru
 }
-tokens {
-  STATEMENT; // uvidime dale
-}
-@header{
+@header {
 #define X	10
   // vlozi se na zacatek generovaneho parseru
 }
-@members{
+@members {
   static void moje_funkce() { ... }
   // vlozi se za hlavicku parseru
 }
@@ -343,145 +353,282 @@ pravidlo1
 
 \end{frame}
 
+\section{Akce pravidel}
+\frame{\sectionpage}
+
+\begin{frame}
+  \frametitle{Akce pravidel}
+
+  \heading{Pravidla mohou obsahovat akce}
+  \begin{itemize}
+    \item Kód spouštěný při určitých událostech
+    \item \code{p : ID \{ x++; \} ID \{ x++; \} ID \{ puts("neco"); \} ;}
+
+    \pause
+
+    \item Akce můžou referencovat předcházející části
+    \begin{itemize}
+      \item Implicitně jménem tokenu/pravidla (\code{p : NUMBER \{ \$NUMBER... \} ;})
+
+      \pause
+
+      \item Nebo pojmenováním (\code{p : n1=NUMBER PLUS n2=NUMBER \{ \$n1 ... \$n2 ... \} ;})
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Rozšíření gramatiky}
+  \heading{Akce pravidel}
   \begin{enumerate}
-    \item Prozkoumejte obsah \file{02/test/Parser.g}
-    \item Přidejte do \code{helloWorld} nová pravidla
-    \begin{itemize}
-      \item Pro anglický pozdrav
-      \item Možnost opakovaně zdravit ,,Hi'' pomocí nového pravidla \code{hi*}
-    \end{itemize}
-
-    \item Dopište akce pro všechna pravidla \code{helloWorld}
-    \begin{itemize}
-      \item Výpis nějakého textu
-    \end{itemize}
-
-    \item Vyzkoušejte nově podporované vstupy
+    \item Dopište akce na konec jednotlivých pravidel \code{expr}
+    \item Vypište nějaký text
+    \item Vyzkoušejte
   \end{enumerate}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Tvorba AST}
+  \frametitle{Vlastnosti tokenů}
 
+  \heading{Každý token má vlastnosti}
   \begin{itemize}
-    \item Do \code{options}
+    \item \code{text} -- tokenizovaný řetězec (,,Ahoj'' pro AHOJ)
     \begin{itemize}
-      \item \code{ASTLabelType = pANTLR3_BASE_TREE;}
-      \item \code{output = AST;}
+      \item Typ: \code{pANTLR3_STRING}, obsahuje \code{char *chars}
+      \item Pravidla jej mají také
     \end{itemize}
-
-    \item Kořenem je uzel tvořený počátečním symbolem gramatiky
-    \item Podstromy se připojují ve vnořených pravidlech
-    \begin{itemize}
-      \item Pomocí speciálních přepisovacích pravidel
-      \item Explicitně: \code{pravaStrana -> podstromAST}
-      \begin{itemize}
-	\item \code{^(KOREN pravaStrana)}
-	\item \code{KOREN} musí být v token nebo v \code{tokens}
-      \end{itemize}
-
-      \item Implicitně: \code{pravaStrana} (vytvoří podstrom \code{pravaStrana})
-      \begin{itemize}
-	\item \code{^} -- kořen (pod)stromu
-	\item \code{!} -- nevkládat do stromu
-      \end{itemize}
-    \end{itemize}
+    \item \code{line} -- zdrojový řádek
+    \item \code{pos} -- zdrojový sloupec
   \end{itemize}
+
+  \bigskip
 
   \begin{lstlisting}[language=XML, columns=fullflexible]
-statement
-  : expression^ ';'! // implicitni strom
-  | e1=expression '+' e2=expression ';' -> ^(BINARY_OP '+' e1 e2)
-  \end{lstlisting}
+helloWorld
+  : x=AHOJ y=SVETE {
+    printf("line=\%d col=\%d x=\%s y=\%s whole=\%s\n",
+      $x.line, $x.pos,
+      $x.text->chars,
+      $y.text->chars,
+      $helloWorld.text->chars);
+  }
+  | SVETE AHOJ { puts("Nepise se to obracene?"); }
+  ;
+  \end{lstlisting} %stopzone
 
 \end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Dopište tvorbu stromu do gramatiky \file{test/Parser.g}}
+  \heading{Vlastnosti pravidel}
   \begin{enumerate}
-    \item Nejprve přesuňte \file{test/Parser.g} do \file{parser/Parser.g}
+    \item Pro každou operaci sčítání/odčítání
     \begin{itemize}
-    \item Je zde již podpora pro AST
+      \item Vypište číslo řádku a sloupce pro obě čísla (\code{\$NUMBER.line} a
+	\code{\$NUMBER.pos})
+      \item Vypište obě čísla (\code{\$NUMBER.text->chars})
     \end{itemize}
-
-    \item Definujte token \code{KOREN}
-    \begin{itemize}
-    \item V sekci \code{tokens}
-    \end{itemize}
-
-    \item Explicitně vytvořte AST podstromy v \code{helloWorld}
-    \begin{itemize}
-      \item Např.\ \code{AHOJ} \code{SVETE} přepište na
-        \code{^(KOREN AHOJ SVETE)}
-    \end{itemize}
+    \item Vyzkoušejte roztroušením textu po testovacím vstupu
   \end{enumerate}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Co s AST?}
+\begin{frame}[fragile]
+  \frametitle{Předávání hodnot}
 
+  \heading{Každé pravidlo muže akceptovat/vracet hodnotu}
   \begin{itemize}
-    \item Vypsat (viz \file{main.c})
+    \item \code{pravidlo[type1 param1, ...] returns [type2 name] : pravaStrana;}
     \begin{itemize}
-      \item \code{puts((char *)parseTree.tree-> toStringTree(parseTree.tree)->chars);}
+      \item Pak lze v akcích odkazovat na \code{\$param1} typu \code{type1}
+      \item Akce musí nastavovat \code{\$name} typu \code{type2}
     \end{itemize}
-
-    \pause
-
-    \item Vytvořit novou stromovou gramatiku
-      \begin{itemize}
-	\item Čte AST
-	\item Nemusí se starat o původní jazyk
-	\item Provádí akce na podstromech
-	\begin{itemize}
-	  \item Interpretuje je
-	  \item Překládá
-	  \item Vytváří graf toku řízení
-	  \item \dots
-	\end{itemize}
-
-	\pause
-
-	\item \code{tree grammar JmenoAST;} v hlavičce
-	\item \code{tokenVocab = JmenoGramatiky;} v \code{options}
-
-	\pause
-
-	\item Pravidla podle generovaných: \code{^(BINARY_OP '+' e1 e2)}
-	\item Na pravé straně může být akce: \\
-	\code{\{ printf("\\\%s + \\\%s\\n", \$e1.text->chars, \$e2.text->chars);\ \}}
-      \end{itemize}
   \end{itemize}
 
+  \bigskip
+
+  \begin{lstlisting}[language=XML, columns=fullflexible]
+translationUnit
+        : ex=expr[5] EOF { printf("I'm done \%d\n", $expr.ret); }
+;
+
+expr[int par] returns [int ret]
+  : n1=NUMBER PLUS n2=NUMBER {
+    $ret = $par * atoi($n1.text->chars) + atoi($n2.text->chars);
+  }
+  | SVETE AHOJ { puts("Nepise se to obracene?"); $ret = 0; }
+  ;
+  \end{lstlisting} %stopzone
+
 \end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Napište stromovou gramatiku pro \file{Parser.g}}
+  \heading{Vlastnosti pravidel}
   \begin{enumerate}
-    \item Vytvořte nový soubor ASTParser.g (nebo použijte ukázkový)
-
-    \item Zapište všechny možné AST stromy, které generujete v \file{Parser.g}
+    \item Vytvořte si pravidlo pro čísla
+    \item Z něj a z \code{expr} si vracejte (smysluplnou) hodnotu
     \begin{itemize}
-      \item Můžete strukturovat za použití pravidel a rekurze
+      \item Tj.\ počítejte
     \end{itemize}
 
-    \item A vypište si ke každému pravidlu jeho jednotlivé části
-    \begin{itemize}
-      \item \code{p : X \{ puts(\$X.text->chars); \} ;}
-    \end{itemize}
+    \item V \code{translationUnit} vypište výsledek
   \end{enumerate}
 
 \end{frame}
 
-\end{document}
+\begin{frame}[fragile]
+  \frametitle{Inicializace/ukončení}
 
+  \heading{Každé pravidlo muže mít inicializace/ukončení}
+  \begin{itemize}
+    \item Za jménem pravidla a parametry
+    \item Před středníkem
+    \item Inicializace: \code{@init\{ ... \}}
+    \begin{itemize}
+      \item Např.\ inicializovat proměnné
+    \end{itemize}
+    \item Ukončení: \code{@after\{ ... \}}
+    \begin{itemize}
+      \item Např.\ počítání
+    \end{itemize}
+  \end{itemize}
+
+  \bigskip
+
+  \begin{lstlisting}[language=XML, columns=fullflexible]
+expr[int par] returns [int ret]
+@init{ $ret = 0; }
+@after{ $par--; }
+  : n1=NUMBER PLUS n2=NUMBER {
+    $ret = $par * atoi($n1.text->chars) + atoi($n2.text->chars);
+  }
+  ;
+  \end{lstlisting} %stopzone
+
+\end{frame}
+
+%\begin{frame}[fragile]
+%  \frametitle{Tvorba AST}
+%
+%  \begin{itemize}
+%    \item Do \code{options}
+%    \begin{itemize}
+%      \item \code{ASTLabelType = pANTLR3_BASE_TREE;}
+%      \item \code{output = AST;}
+%    \end{itemize}
+%
+%    \item Kořenem je uzel tvořený počátečním symbolem gramatiky
+%    \item Podstromy se připojují ve vnořených pravidlech
+%    \begin{itemize}
+%      \item Pomocí speciálních přepisovacích pravidel
+%      \item Explicitně: \code{pravaStrana -> podstromAST}
+%      \begin{itemize}
+%	\item \code{^(KOREN pravaStrana)}
+%	\item \code{KOREN} musí být v token nebo v \code{tokens}
+%      \end{itemize}
+%
+%      \item Implicitně: \code{pravaStrana} (vytvoří podstrom \code{pravaStrana})
+%      \begin{itemize}
+%	\item \code{^} -- kořen (pod)stromu
+%	\item \code{!} -- nevkládat do stromu
+%      \end{itemize}
+%    \end{itemize}
+%  \end{itemize}
+%
+%  \begin{lstlisting}[language=XML, columns=fullflexible]
+%statement
+%  : expression^ ';'! // implicitni strom
+%  | e1=expression '+' e2=expression ';' -> ^(BINARY_OP '+' e1 e2)
+%  \end{lstlisting}
+%
+%\end{frame}
+%
+%\begin{frame}
+%  \frametitle{Úkol}
+%
+%  \heading{Dopište tvorbu stromu do gramatiky \file{test/Parser.g}}
+%  \begin{enumerate}
+%    \item Nejprve přesuňte \file{test/Parser.g} do \file{parser/Parser.g}
+%    \begin{itemize}
+%    \item Je zde již podpora pro AST
+%    \end{itemize}
+%
+%    \item Definujte token \code{KOREN}
+%    \begin{itemize}
+%    \item V sekci \code{tokens}
+%    \end{itemize}
+%
+%    \item Explicitně vytvořte AST podstromy v \code{helloWorld}
+%    \begin{itemize}
+%      \item Např.\ \code{AHOJ} \code{SVETE} přepište na
+%        \code{^(KOREN AHOJ SVETE)}
+%    \end{itemize}
+%  \end{enumerate}
+%
+%\end{frame}
+%
+%\begin{frame}
+%  \frametitle{Co s AST?}
+%
+%  \begin{itemize}
+%    \item Vypsat (viz \file{main.c})
+%    \begin{itemize}
+%      \item \code{puts((char *)parseTree.tree-> toStringTree(parseTree.tree)->chars);}
+%    \end{itemize}
+%
+%    \pause
+%
+%    \item Vytvořit novou stromovou gramatiku
+%      \begin{itemize}
+%	\item Čte AST
+%	\item Nemusí se starat o původní jazyk
+%	\item Provádí akce na podstromech
+%	\begin{itemize}
+%	  \item Interpretuje je
+%	  \item Překládá
+%	  \item Vytváří graf toku řízení
+%	  \item \dots
+%	\end{itemize}
+%
+%	\pause
+%
+%	\item \code{tree grammar JmenoAST;} v hlavičce
+%	\item \code{tokenVocab = JmenoGramatiky;} v \code{options}
+%
+%	\pause
+%
+%	\item Pravidla podle generovaných: \code{^(BINARY_OP '+' e1 e2)}
+%	\item Na pravé straně může být akce: \\
+%	\code{\{ printf("\\\%s + \\\%s\\n", \$e1.text->chars, \$e2.text->chars);\ \}}
+%      \end{itemize}
+%  \end{itemize}
+%
+%\end{frame}
+%
+%\begin{frame}
+%  \frametitle{Úkol}
+%
+%  \heading{Napište stromovou gramatiku pro \file{Parser.g}}
+%  \begin{enumerate}
+%    \item Vytvořte nový soubor ASTParser.g (nebo použijte ukázkový)
+%
+%    \item Zapište všechny možné AST stromy, které generujete v \file{Parser.g}
+%    \begin{itemize}
+%      \item Můžete strukturovat za použití pravidel a rekurze
+%    \end{itemize}
+%
+%    \item A vypište si ke každému pravidlu jeho jednotlivé části
+%    \begin{itemize}
+%      \item \code{p : X \{ puts(\$X.text->chars); \} ;}
+%    \end{itemize}
+%  \end{enumerate}
+%
+%\end{frame}
+
+\end{document}
