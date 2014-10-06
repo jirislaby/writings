@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{IV. Chyby souběhu}
-\date{8. 10. 2013}
+\date{7. 10. \the\year}
 
 \begin{document}
 
@@ -11,7 +11,14 @@
   \titlepage
 \end{frame}
 
+\begin{frame}
+  \frametitle{Obsah cvičení}
+  \tableofcontents
+\end{frame}
+
 %%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Chyby souběhu}
 
 \begin{frame}[fragile]
   \frametitle{Chyby souběhu, zámky}
@@ -25,8 +32,9 @@
   \item Chyba závislá na načasování/prokládání operací
   \end{itemize}
 
-  \begin{center}
-  \begin{tabular}{c}
+  \medskip
+
+  \begin{block}{Ukázkový kód}
   \begin{lstlisting}[language=C]
 int *addr;
 ...
@@ -34,9 +42,7 @@ int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting}
-  \end{tabular}\\[2mm]
-  \emph{Ukázkový kód}
-  \end{center}
+  \end{block}
 
 \end{frame}
 
@@ -71,10 +77,10 @@ int a = load(addr);
 a = a + 1;
 <schedule>
   \end{lstlisting} &
-  \begin{lstlisting}
+  \begin{lstlisting}[showlines]
 <waiting>         ~
 
-_
+
   \end{lstlisting} \\
   \end{tabular}
   \end{center}
@@ -117,10 +123,10 @@ int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}[language=C,showlines]
 <exited>          ~
 
-_
+
   \end{lstlisting}
   \end{tabular}
   \end{center}
@@ -140,7 +146,7 @@ _
 
   \item Kritickou sekcí
   \begin{itemize}
-  \item Kus kódu vykonávaný max. jedním procesem
+  \item Kus kódu vykonávaný max.\ jedním procesem
   \item Zámky
   \end{itemize}
 
@@ -153,8 +159,8 @@ _
   \end{itemize}
 \end{frame}
 
-\part{Atomické operace, bitmapy}
-\frame{\partpage}
+\section{Atomické operace, bitmapy}
+\frame{\sectionpage}
 
 \begin{frame}[fragile]
   \frametitle{Atomické operace}
@@ -170,6 +176,7 @@ _
 
   \pause
 
+  \begin{block}{Řešení pomocí atomických operací}
   \begin{center}
   \begin{tabular}{ccc}
   \begin{lstlisting}[language=C]
@@ -185,9 +192,9 @@ atomic_t a;
 atomic_inc(&a);
 /* nebo atomic_add(1, &a); */
   \end{lstlisting}
-  \end{tabular}\\[2mm]
-  \emph{\footnotesize Řešení pomocí atomických operací}
+  \end{tabular}
   \end{center}
+  \end{block}
 
   \pause
 
@@ -250,8 +257,8 @@ atomic_inc(&a);
   \begin{enumerate}
   \item Definice bitového pole o 100 bitech
   \item Výmaz pole (\code{bitmap_zero})
-  \item Nastavení 2., 63. a 76. bitu
-  \item Výpis \emph{longu} (\code{\%lx}) s 63. bitem
+  \item Nastavení 2., 63.\ a 76.\ bitu (počítáno od nuly)
+  \item Výpis \emph{longu} (\code{\%lx}) s 63.\ bitem
   (\code{bitmapa[BIT_WORD(63)]})
   \item Výpis celé bitmapy (\code{bitmap_scnprintf})
   \item Výpis \emph{longů} obsahující ,,1'' bity (\code{for_each_set_bit})
@@ -259,8 +266,8 @@ atomic_inc(&a);
   \end{enumerate}
 \end{frame}
 
-\part{Zámky}
-\frame{\partpage}
+\section{Zámky}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Zámky}
@@ -300,6 +307,8 @@ atomic_inc(&a);
   \end{center}
 \end{frame}
 
+\subsection{Spinlocky}
+
 \begin{frame}[fragile]
   \frametitle{Zámky v jádře -- spinlocky}
 
@@ -313,6 +322,7 @@ atomic_inc(&a);
 
   \pause
 
+  \begin{block}{Řešení pomocí spinlocků}
   \begin{center}
   \begin{tabular}{ccc}
   \begin{lstlisting}[language=C]
@@ -332,9 +342,9 @@ a = a + 1;
 store(a, addr);
 spin_unlock(&addr_lock);
   \end{lstlisting}
-  \end{tabular}\\[2mm]
-  \emph{\footnotesize Řešení pomocí spinlocků}
+  \end{tabular}
   \end{center}
+  \end{block}
 
 \end{frame}
 
@@ -342,14 +352,16 @@ spin_unlock(&addr_lock);
   \frametitle{Úkol}
 
   \heading{Práce se spinlocky}
-  \begin{itemize}
+  \begin{enumerate}
   \item Úkol s atomickými operacemi přepište
   \item \code{atomic_t} změnte na obyčejný \code{int} 
   \item A celý kód obalte spinlockem
   \item Vyzkoušejte
-  \end{itemize}
+  \end{enumerate}
 
 \end{frame}
+
+\subsection{Mutexy}
 
 \begin{frame}[fragile]
   \frametitle{Zámky v jádře -- mutexy}
@@ -365,6 +377,7 @@ spin_unlock(&addr_lock);
 
   \pause
 
+  \begin{block}{Řešení pomocí mutexů}
   \begin{center}
   \begin{tabular}{ccc}
   \begin{lstlisting}[language=C]
@@ -384,9 +397,9 @@ a = a + 1;
 store(a, addr);
 mutex_unlock(&addr_lock);
   \end{lstlisting}
-  \end{tabular}\\[2mm]
-  \emph{\footnotesize Řešení pomocí mutexů}
+  \end{tabular}
   \end{center}
+  \end{block}
 
 \end{frame}
 
@@ -419,7 +432,7 @@ mutex_unlock(&addr_lock);
   \frametitle{Úkol}
 
   \heading{Atomické čtení/zápis bufferu o velikosti 128 bytů}
-  \begin{itemize}
+  \begin{enumerate}
   \item Globální buffer 128 B
   \item 2 znaková (misc) zařízení
   \begin{itemize}
@@ -438,7 +451,7 @@ mutex_unlock(&addr_lock);
   \item Musí vidět změny pouze po 5 znacích (až na poslední pětici)
   \end{itemize}
   \item Vyzkoušejte
-  \end{itemize}
+  \end{enumerate}
 
   \medskip
 
