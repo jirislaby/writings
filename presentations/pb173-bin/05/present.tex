@@ -29,8 +29,8 @@
 
     \item Dokumentace
     \begin{itemize}
-      \item Introduction to the DWARF Debugging Format
-      \item DWARF Debugging Information Format (Version 4)
+      \item \href{http://www.dwarfstd.org/doc/Debugging\%20using\%20DWARF.pdf}{Introduction to the DWARF Debugging Format}
+      \item \href{http://www.dwarfstd.org/doc/DWARF4.pdf}{DWARF Debugging Information Format (Version 4)}
     \end{itemize}
 
   \end{itemize}
@@ -57,8 +57,8 @@
   \begin{tikzpicture}
     \node [die] (CU) {
       \textbf{DIE} \\
-      type = compilation\_unit \\
-      dir = /tmp/test \\
+      type = compile\_unit \\
+      comp\_dir = /tmp/test \\
       name = test.c \\
       producer = GCC
     };
@@ -133,7 +133,7 @@
       \item Lepší rozhraní
       \item Základní: \file{libdw} (\header{elfutils/libdw.h})
       \item Nadstavba: \file{libdwfl} (\header{elfutils/libdwfl.h})
-      \item Tuto budeme používat
+      \item \emph{Tuto budeme používat}
     \end{itemize}
   \end{enumerate}
 
@@ -148,6 +148,7 @@
     \item Inicializace: \code{Dwfl *dwfl_begin(const Dwfl_Callbacks *cb)}
     \begin{itemize}
       \item \code{.section_address = dwfl_offline_section_address}
+      \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
 
     \item Ukončení: \code{void dwfl_end(Dwfl *dwfl)}
@@ -158,6 +159,7 @@
     \item Dokumentace
     \begin{itemize}
       \item V hlavičkových souborech
+      \item PDF ze slajdů
     \end{itemize}
 
     \item Knihovny při překladu: \cmd{gcc ... -ldw}
@@ -176,6 +178,7 @@
     \begin{itemize}
       \item Struktura \code{const Dwfl_Callbacks}
       \item \code{.section_address = dwfl_offline_section_address}
+      \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
 
     \item Zavolejte \code{dwfl_begin}
@@ -257,35 +260,41 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
     \item Typ/tag \code{DW_TAG_*}
     \item Z DIE: \code{int dwarf_tag (Dwarf_Die *die)}
     \begin{itemize}
-      \item \code{DW_TAG_compile_unit}: o souboru
-      \item \code{DW_TAG_subprogram}: o funkci
-      \item \code{DW_TAG_base_type}: o typu
+      \item \code{DW_TAG_compile_unit}: DIE o souboru
+      \item \code{DW_TAG_subprogram}: DIE o funkci
+      \item \code{DW_TAG_base_type}: DIE o typu
       \item \dots
     \end{itemize}
 
     \pause
 
-    \item Seznam dvojic
+    \item Seznam trojic
     \begin{itemize}
-      \item Typ hodnoty: \code{DW_AT_*}
+      \item O co jde: \code{DW_AT_*}
       \begin{itemize}
+	\item \code{DW_AT_comp_dir}: adresář, kde se překládalo
 	\item \code{DW_AT_name}: jméno (proměnné, souboru, \dots)
 	\item \code{DW_AT_decl_file}: soubor s deklarací
-	\item \code{DW_AT_decl_line}: řádek s deklarací
 	\item \code{DW_AT_type}: typ proměnné
+	\item \dots
+      \end{itemize}
+      \item Typ/forma hodnoty (\code{DW_FORM_*})
+      \begin{itemize}
+	\item \code{DW_FORM_addr}
+	\item \code{DW_FORM_string}
 	\item \dots
       \end{itemize}
       \item Hodnota
     \end{itemize}
   \end{itemize}
 
-  \begin{textblock*}{5cm}(9cm,1.2cm)
+  \begin{textblock*}{5cm}(9.3cm,1.2cm)
   \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
   \begin{tikzpicture}
     \node [die] (CU) {
       \textbf{DIE} \\
-      type = compilation\_unit \\
-      dir = /tmp/test \\
+      type = compile\_unit \\
+      comp\_dir = /tmp/test \\
       name = test.c \\
       producer = GCC
     };
@@ -345,7 +354,7 @@ DW_TAG_subprogram
 
   \heading{Operace nad atributem}
   \begin{itemize}
-    \item Typ: \code{dwarf_whatattr}
+    \item O co jde: \code{dwarf_whatattr}
     \begin{itemize}
       \item Vrací \code{DW_AT_*} (\code{DW_AT_name} apod.)
     \end{itemize}
@@ -392,7 +401,7 @@ static int cb(Dwarf_Attribute *attr, void *ptr)
     \item Definujte funkci (háček) pro \code{dwarf_getattrs}
     \item V ní vypište informace
     \begin{itemize}
-      \item Typ atributu (\code{dwarf_whatattr(attr)})
+      \item O jaký atribut jde (\code{dwarf_whatattr(attr)})
       \item Typ obsahu atributu (\code{dwarf_whatform(attr)})
       \item Adresu, pokud se jedná o typ \code{DW_AT_low_pc}
       \item Řetězec a typ atributu \code{DW_AT_*}, pokud se jedná o typ hodnoty

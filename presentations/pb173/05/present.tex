@@ -3,12 +3,17 @@
 \input{../header.tex}
 
 \subtitle{V. Paměť}
-\date{15. 10. 2013}
+\date{14. 10. \the\year}
 
 \begin{document}
 
 \begin{frame}
   \titlepage
+\end{frame}
+
+\begin{frame}
+  \frametitle{Obsah cvičení}
+  \tableofcontents
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%
@@ -29,11 +34,8 @@
 
 \end{frame}
 
-\part{Organizace paměti}
-
-\begin{frame}
-\partpage
-\end{frame}
+\section{Organizace paměti}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Organizace paměti}
@@ -41,10 +43,16 @@
   \begin{center}
   \heading{2 oddělené světy} \\
   (tentokrát z pohledu HW)
-  \end{center}
 
   \pause
   \bigskip
+
+  tj.\\
+  \heading{2 různé adresové prostory}
+  \end{center}
+
+  \pause
+  \medskip
 
   \heading{Fyzický prostor}
   \begin{itemize}
@@ -74,6 +82,8 @@
   \end{figure}
 
 \end{frame}
+
+\subsection{Fyzický prostor}
 
 \begin{frame}
   \frametitle{Fyzický prostor}
@@ -117,12 +127,12 @@
   \item Najít fyzickou adresu nějaké ACPI tabulky v \cmd{dmesg}
   \begin{itemize}
   \item Řádky formátu \code{ACPI: XSDT 00000000af5b0100 00064}
-  \item Jeden si zvolit (kromě \code{RSDP})
-  \item Zapamatovat adresu (\code{0x00000000af5b0100})
+  \item Jeden si zvolit (\emph{jinou než} \code{RSDP})
+  \item Zapamatovat si adresu (\code{0x00000000af5b0100})
   \end{itemize}
   \item Získat virtuální adresu (\code{u32 *virt = ioremap_cache(phys, 8)})
-  \item Vypsat signaturu (text, 4B -- \code{virt[0]})
-  \item Vypsat délku tabulky (4B -- \code{virt[1]})
+  \item Vypsat signaturu (4\,B textu -- \code{virt[0]})
+  \item Vypsat délku tabulky (4\,B -- \code{virt[1]})
   \item Odmapovat (\code{iounmap(virt)})
   \item Porovnejte délku s výpisem (tj. \code{0x00064} nahoře)
   \item Můžete si přemapovat a vypsat celou tabulku a porovnat položky se
@@ -134,6 +144,8 @@
   Pozn.: na starších jádrech se výpis v dmesg liší
 
 \end{frame}
+
+\subsection{Virtuální prostor}
 
 \begin{frame}
   \frametitle{Virtuální prostor}
@@ -204,7 +216,7 @@
     \item \code{void *virt = page_to_virt(page)}
   \end{itemize}
 
-  \heading{PFN}
+  \heading{PFN} (Page Frame Number)
   \begin{itemize}
     \item \code{unsigned long pfn = page_to_pfn(virt_to_page(virt))}
     \item \code{void *virt = pfn_to_virt(pfn)}
@@ -238,8 +250,8 @@
   \end{enumerate}
 \end{frame}
 
-\part{Alokace paměti}
-\frame{\partpage}
+\section{Alokace paměti}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Alokace paměti}
@@ -264,6 +276,8 @@
   \end{itemize}
 
 \end{frame}
+
+\subsection{SLAB alokátor}
 
 \begin{frame}
   \frametitle{\code{kmalloc}}
@@ -301,6 +315,8 @@
 
 \end{frame}
 
+\subsection{Stránkový alokátor}
+
 \begin{frame}
   \frametitle{\code{__get_free_pages}}
 
@@ -316,7 +332,7 @@
   \item Používá tzv. \emph{buddy} systém
   \begin{itemize}
     \item Snižuje fragmentaci
-    \item Podrobnosti viz wiki
+    \item Podrobnosti viz wiki nebo Překladače
   \end{itemize}
 
   \pause
@@ -329,15 +345,17 @@
   \end{itemize}
 
   \item \code{__get_free_pages}, \code{free_pages}
-  \item \code{__get_free_page}, \code{free_page} (order 0)
+  \item \code{__get_free_page}, \code{free_page} (zkratky pro řád \code{0})
   \end{itemize}
 
-  \medskip
+  \bigskip
   \pause
 
-  Úkol: alokace 32 stránek a výpis pfn
+  \heading{Úkol:} alokace 32 stránek a výpis pfn
 
 \end{frame}
+
+\subsection{Virtuální alokátor}
 
 \begin{frame}
   \frametitle{\code{vmalloc}}
@@ -351,6 +369,8 @@
     \item x86: 128\,MiB (lze zvýšit parametrem, ne o moc)
     \item x86\_64: 30\,TiB
   \end{itemize}
+
+  \pause
 
   \item Alokuje po stránkách a mapuje je souvisle
   \begin{itemize}
@@ -368,10 +388,10 @@
   \end{itemize}
   \end{itemize}
 
-  \medskip
+  \bigskip
   \pause
 
-  Úkol: alokace 32 stránek a výpis pfn
+  \heading{Úkol:} alokace 32 stránek a výpis pfn
 
 \end{frame}
 
@@ -381,7 +401,7 @@
   \begin{itemize}
   \item Vše, co může číst uživatel se musí nejprve vymazat
   \begin{itemize}
-    \item \code{kzalloc}, \code{get_zeroed_page}, \code{vzalloc}
+    \item Pomocníci: \code{kzalloc}, \code{get_zeroed_page}, \code{vzalloc}
     \item Nejlépe vymazat všechno, co alokuji a není kritické
   \end{itemize}
   \item Používat správné \code{GFP_*}
@@ -413,7 +433,9 @@
     Přijde OOM killer\dots
   \end{enumerate}
 
-  Demo: pb173/05
+  \bigskip
+
+  Inspirace: pb173/05
 
 \end{frame}
 
