@@ -3,13 +3,17 @@
 \input{../header.tex}
 
 \subtitle{VI. Linker skripty}
-\date{29. 10. 2013}
+\date{21. 10. \the\year}
 
 \begin{document}
 
 \frame{\titlepage}
 
+\frame{\tableofcontents}
+
 %%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Linker skripty}
 
 \begin{frame}
   \frametitle{Linker skripty}
@@ -39,10 +43,14 @@
 
     \item Může přidávat i symboly
     \begin{itemize}
-      \item Např.\ ,,toto'' je adresa začátku sekce XY
+      \item Např.\ ,,toto'' je adresa začátku sekce Z
     \end{itemize}
 
-    \item Dokumentace: \cmd{pinfo ld} (\href{http://sourceware.org/binutils/docs/ld/}{\nolinkurl{http://sourceware.org/binutils/}})
+    \item Dokumentace
+    \begin{itemize}
+      \item \cmd{pinfo ld}
+      \item (\href{http://sourceware.org/binutils/docs/ld/}{\nolinkurl{http://sourceware.org/binutils/}})
+    \end{itemize}
 
   \end{itemize}
 
@@ -55,7 +63,7 @@
     \item Textové soubory
     \item Příkazy
     \begin{itemize}
-      \item První instrukce: \code{ENTRY}
+      \item Pozice první instrukce, kterou spustit: \code{ENTRY}
       \item Výstupní formát: \code{OUTPUT_FORMAT}
       \item Seznam sekcí a jejich obsah: \code{SECTIONS}
       \item Verzování: \code{VERSION}
@@ -200,6 +208,7 @@ SECTIONS
   \end{itemize}
 
   \medskip
+  \pause
 
   \begin{lstlisting}
 SECTIONS
@@ -220,13 +229,16 @@ SECTIONS
   \begin{enumerate}
     \item Rozšiřte zdrojový soubor o další 2 funkce, tedy:
     \begin{itemize}
-      \item 1: s nekonečným cyklem, dejte ji do sekce \code{.text.t2}
+      \item 1 (původní): s nekonečným cyklem, dejte ji do sekce \code{.text.t2}
       \item 2: bude volat \code{extern void my_fun(void)}, do sekce \code{.text.t1}
-      \item 3: \code{ENTRY} funkce bude volat adresu \code{0x401000}
+      \item 3: bude volat adresu \code{0x401000}
     \end{itemize}
     \item Rozšiřte skript
     \begin{itemize}
-      \item Všechny sekce začínaly za hranicí \code{0x400000}
+      \item Aby všechny sekce začínaly za hranicí \code{0x400000}
+      \begin{itemize}
+	\item \code{. = ...} na začátku bloku \code{SECTIONS}
+      \end{itemize}
       \item Přidejte novou výstupní sekci \code{.text.t} na adresu \code{0x401000}
       \begin{itemize}
 	\item Obsah \code{.text.t1}
@@ -241,8 +253,8 @@ SECTIONS
 
 \end{frame}
 
-\part{Verzování funkcí}
-\frame{\partpage}
+\section{Verzování funkcí}
+\frame{\sectionpage}
 
 \begin{frame}[fragile]
   \frametitle{Verzování funkcí}
@@ -260,6 +272,7 @@ SECTIONS
   \end{itemize}
 
   \smallskip
+  \pause
 
   \begin{center}
     \begin{tabular}{|c|c|} \hline
@@ -282,7 +295,7 @@ void fun()
     \bigskip
     \bigskip
 
-    \heading{Řešením jsou linker skripty}
+    \heading{Řešením jsou linker skripty s verzováním}
   \end{center}
 
 \end{frame}
@@ -299,7 +312,7 @@ void fun()
 
     \pause
 
-    \item \code{VERSION \{ ... \}}
+    \item Blok \code{VERSION \{ ... \}}
 
     \pause
 
@@ -330,10 +343,15 @@ void fun()
   \begin{itemize}
     \item Strom verzí
     \item Uzly obsahují funkce
-    \item Uzly mohou obsahovat i označení \code{global:} a \code{local:}
+    \item Uzly mohou obsahovat i označení viditelnosti
+    \begin{itemize}
+      \item \code{global:}
+      \item \code{local:}
+    \end{itemize}
   \end{itemize}
 
   \medskip
+  \pause
 
   \begin{lstlisting}
 VERS_1.1 {
@@ -344,7 +362,7 @@ VERS_1.1 {
 };
 
 VERS_1.2 {
-  new_functionality;
+  new_functionality_fun;
 } VERS_1.1; /* inheritance */
   \end{lstlisting}
 
@@ -357,9 +375,9 @@ VERS_1.2 {
     \item Ve zdrojových souborech je třeba přiřadit verze
     \item Globální \code{asm} direktiva
     \begin{itemize}
-    \item Neverzovaná: \code{asm(".symver fun_old1,fun@");}
-    \item Pro určitou verzi: \code{asm(".symver fun_old2,fun@VERS_1");}
-    \item Výchozí: \code{asm(".symver fun_new,fun@@VERS_2");}
+      \item Neverzovaná: \code{asm(".symver fun_old1,fun@");}
+      \item Pro určitou verzi: \code{asm(".symver fun_old2,fun@VERS_1");}
+      \item Výchozí: \code{asm(".symver fun_new,fun@@VERS_2");}
     \end{itemize}
   \end{itemize}
 
@@ -386,8 +404,18 @@ asm(".symver fun_new,fun@@VERS_2");
   \begin{enumerate}
     \item Otevřete si \file{pb173-bin/06/}
     \item Projděte 3 verze knihovny \file{vers\{1,2,3\}.c}
-    \item Projděte uživatele \file{x.c}
+    \begin{itemize}
+      \item Definuje funkci \code{bubak}
+      \item \code{bubak} v nich má 3 různé sémantiky
+    \end{itemize}
+    \item Projděte soubor, který ji používá \file{x.c}
+    \begin{itemize}
+      \item Volá funkci \code{bubak}
+    \end{itemize}
     \item Přeložte
+    \begin{itemize}
+      \item Standardně pomocí \cmd{make}
+    \end{itemize}
     \item Spusťte \file{x\{1,2,3\}}
     \item Projděte verze v \file{x\{1,2,3\}} za pomoci \cmd{readelf -V}
     \item Pokračujte domácím úkolem, částí 2
