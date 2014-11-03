@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{VII. C bez libc}
-\date{5. 11. 2013}
+\date{4. 11. \the\year}
 
 \begin{document}
 \shorthandoff{-}
@@ -41,7 +41,7 @@
 
   \smallskip
 
-  Jak teď např.\ ale otevřu soubor?
+  Jak teď ale např.\ otevřu soubor?
   \end{center}
 
 \end{frame}
@@ -50,6 +50,14 @@
   \frametitle{Komunikace s jádrem}
 
   \begin{itemize}
+    \item Sdílená paměť
+    \begin{itemize}
+      \item Jádro zapisuje, uživatel čte a naopak
+      \item V jednom z dalších cvičení
+    \end{itemize}
+
+    \pause
+
     \item Systémová volání
     \begin{itemize}
       \item Podobné jako zavolání funkce
@@ -62,13 +70,6 @@
       \item Uvidíme dnes dále
     \end{itemize}
 
-    \pause
-
-    \item Sdílená paměť
-    \begin{itemize}
-      \item Jádro zapisuje, uživatel čte a naopak
-      \item V jednom z dalších cvičení
-    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -85,7 +86,7 @@
       \item Softwarové přerušení (x86\_32: číslo \code{0x80})
       \item Speciální instrukce (x86\_32: \code{sysenter},
         x86\_64: \code{syscall})
-      \item Demo: implementace \code{syscall} z \file{glibc}
+      \item \heading{Demo:} implementace \code{syscall} z \file{glibc}
     \end{itemize}
 
     \pause
@@ -113,52 +114,12 @@
     \end{itemize}
     \item Pomocí funkce \code{syscall} z \file{libc}
     \begin{itemize}
+      \item Viz \cmd{man 2 syscall}
       \item První argument: číslo systémového volání
       \item Další argumenty: odpovídají už danému volání
       \item Např.\ \code{syscall(__NR_kill, -1, SIGKILL)}
     \end{itemize}
     \item Přeložte a vyzkoušejte
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Virtuální systémová volání}
-
-  \heading{\code{vsyscall}}
-  \begin{itemize}
-    \item Jen na některých architekturách
-    \item Neprobíhá přepnutí kontextu
-    \item Speciální stránka(y) s kódem namapovaným jádrem
-    \item Podpora jen 3 funkcí
-    \begin{itemize}
-      \item \code{getcpu}: číslo CPU a NUMA uzlu
-      \item \code{gettimeofday}: aktuální čas
-      \item \code{time}: čas v sekundách od Epochy
-    \end{itemize}
-
-    \item Demo: \cmd{ldd}
-
-    \pause
-
-    \item Adresa funkce se získá pomocí makra \code{VSYSCALL_ADDR()}
-    \begin{itemize}
-      \item \header{asm/vsyscall.h}
-      \item Parametr je název shora s předponou \code{__NR_v}
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Volání \code{time} z \code{vsyscall}}
-  \begin{enumerate}
-    \item Zjistěte si adresu \code{time} z \code{vsyscall}
-    \item Zavolejte tento \code{time}
-    \item Vypište hodnotu
-    \item Přeložte a spusťte několikrát
   \end{enumerate}
 
 \end{frame}
@@ -178,27 +139,10 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Systémová volání bez \file{libc}}
-  \begin{enumerate}
-    \item Otevřete a projděte si \file{pb173-bin/07/}
-    \item Zavolejte
-    \begin{itemize}
-      \item \code{fork}
-      \item Z potomka: \code{write}
-      \item Z rodiče: \code{read} a \code{write} 16 bytů
-      \item Z obou potom: \code{exit}
-    \end{itemize}
-    \item Přeložte a spusťte
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}
   \frametitle{Volací konvence}
 
-  \begin{table}
+  \begin{block}{Volací konvence}
+    \begin{center}
     \begin{tabular}{|l||c|c||c|c|} \hline
       \multirow{3}{*}{Parametr} &
         \multicolumn{4}{c|}{Registry} \\ \cline{2-5}
@@ -210,17 +154,168 @@
       3. & EDX  & RDX & Zásobník & RDX  \\ \hline
       4. & ESI  & R10 & Zásobník & RCX  \\ \hline
       5. & EDI  & R8  & Zásobník & R8   \\ \hline
-      6. & EBP  & R9  & Zásobník & Zásobník \\ \hline
-      7. & \multicolumn{2}{c||}{Jen 6 parametrů}
-                      & Zásobník & R9   \\ \hline
-      8. & \multicolumn{2}{c||}{--}
+      6. & EBP  & R9  & Zásobník & R9   \\ \hline
+      7. & \multicolumn{2}{c||}{\emph{Jen 6 parametrů}}
                       & Zásobník & Zásobník \\ \hline
-Návratová & EAX  & RAX & EAX  & \\ \hline
+      8. & \multicolumn{2}{c||}{}
+                      & Zásobník & Zásobník \\ \hline\hline
+Návratová & EAX  & RAX & EAX  & RAX     \\ \hline
     \end{tabular}
-    \caption{Volací konvence}
-  \end{table}
+    \end{center}
+  \end{block}
 
   Pozn.: i386 a \texttt{-mregparm}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Systémová volání bez \file{libc}}
+  \begin{enumerate}
+    \item Otevřete a projděte si \file{pb173-bin/07/}
+    \item Zavolejte
+    \begin{itemize}
+      \item \code{fork}
+      \item Z potomka: \code{write}
+      \item Z rodiče: \code{read} 16 bytů a jejich \code{write}
+      \item Z obou potom: \code{exit}
+    \end{itemize}
+
+    \item Přeložte a spusťte
+    \begin{itemize}
+      \item \cmd{gcc -nostdlib ...}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Data z jádra}
+
+  \begin{itemize}
+    \item Jádro předává
+    \begin{itemize}
+      \item Parametry programu
+      \item Proměnné prostředí
+      \item Rozšiřující vektor
+    \end{itemize}
+
+    \pause
+
+    \item Vše na zásobníku
+    \begin{itemize}
+      \item Formát zásobníku je pevně daný
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Formát zásobníku}
+
+  \begin{block}{Formát zásobníku}
+  \begin{center}
+    \begin{tabular}{|l|l|} \hline
+      Počet parametrů & \code{long}   \\ \hline\hline
+      1.\ parametr    & \code{char *} \\ \hline
+      \dots           & \code{char *} \\ \hline
+      m-tý parametr   & \code{char *} \\ \hline
+      Konec parametrů & \code{0UL}    \\ \hline\hline
+
+      1.\ proměnná prostředí     & \code{char *} \\ \hline
+      \dots                      & \code{char *} \\ \hline
+      n-tá proměnná prostředí    & \code{char *} \\ \hline
+      Konec proměnných prostředí & \code{0UL} \\ \hline\hline
+
+      Rozšiřující vektor 1    & \code{struct \{ long type, val; \}} \\ \hline
+      \dots                   & \code{struct \{ long type, val; \}} \\ \hline
+      Rozšiřující vektor o    & \code{struct \{ long type, val; \}} \\ \hline
+      Konec rozšiřujících vektorů & \code{\{AT_NULL, ? \}} \\ \hline\hline
+
+    \end{tabular}
+  \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Rozšiřující vektor}
+
+  \begin{block}{Typ záznamů}
+  \begin{lstlisting}
+struct {
+  long type;
+  long value;
+};
+  \end{lstlisting}
+  \end{block}
+
+  \smallskip
+
+  \begin{itemize}
+    \item Typy: \code{AT_NULL}, \code{AT_ENTRY}, \code{AT_RANDOM}, \dots
+    \item Pole struktur zakončuje typ \code{AT_NULL}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Zjištění názvu programu a platformy}
+  \begin{enumerate}
+    \item Vypište první parametr programu
+    \begin{itemize}
+      \item Tj.\ název samotného programu
+    \end{itemize}
+
+    \item Dále iterujte přes zásobník až k rozšiřujícímu vektoru
+    \item Tam najděte typ \code{AT_PLATFORM}
+    \item Vypište hodnotu jako řetězec
+    \item Přeložte (bez \file{libc}) a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Virtuální systémová volání}
+
+  \heading{\code{vsyscall}}
+  \begin{itemize}
+    \item Jen na některých architekturách
+    \item Neprobíhá přepnutí kontextu
+    \item Speciální stránka(y) s kódem namapovaným jádrem
+    \item Podpora jen 3 funkcí
+    \begin{itemize}
+      \item \code{gettimeofday}: aktuální čas (\code{0xffffffffff600000})
+      \item \code{time}: čas v sekundách od Epochy (\code{0xffffffffff600400})
+      \item \code{getcpu}: číslo CPU a NUMA uzlu (\code{0xffffffffff600800})
+    \end{itemize}
+
+    \item \heading{Demo:} \file{/proc/self/maps}
+
+%    \pause
+%
+%    \item Adresa funkce se získá pomocí makra \code{VSYSCALL_ADDR()}
+%    \begin{itemize}
+%      \item \header{asm/vsyscall.h}
+%      \item Parametr je název shora s předponou \code{__NR_v}
+%    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Volání \code{time} z \code{vsyscall}}
+  \begin{enumerate}
+    \item Zavolejte adresu s \code{time}
+    \item Vypište hodnotu
+    \item Přeložte a spusťte několikrát
+  \end{enumerate}
 
 \end{frame}
 
@@ -231,11 +326,12 @@ Návratová & EAX  & RAX & EAX  & \\ \hline
   \begin{itemize}
     \item Speciální knihovna přilinkovaná jádrem
     \item Podpora také závislá na architektuře
+
     \item Podobná \code{vsyscall}, ale více flexibilní
     \begin{itemize}
       \item Navíc obsahuje jen \code{clock_gettime}
     \end{itemize}
-    \item Demo: \cmd{ldd} a \cmd{readelf}
+    \item \heading{Demo:} \cmd{ldd} a \cmd{readelf}
 
     \pause
 
@@ -250,7 +346,7 @@ Návratová & EAX  & RAX & EAX  & \\ \hline
   \pause
   \bigskip
 
-  Úkol: domácí úkol
+  \heading{Úkol:} domácí úkol
 
 \end{frame}
 
