@@ -4,7 +4,7 @@
 
 \subtitle{XI. Komunikace mezi procesy, část 1}
 
-\date{3. 12. 2013}
+\date{2. 12. \the\year}
 
 \begin{document}
 \shorthandoff{-}
@@ -16,28 +16,28 @@
 \begin{frame}
   \frametitle{Komunikace mezi procesy}
 
+  Alespoň 2 procesy, které chtějí komunikovat
+
+  \bigskip
+  \pause
+
+  \heading{Dnes}
+
+  \tableofcontents
+
+  \pause
+  \medskip
+
+  \heading{Příště}
   \begin{itemize}
-    \item Alespoň 2 procesy, které chtějí komunikovat
-    \item Dnes
-    \begin{itemize}
-      \item Roura (\code{pipe})
-      \item Sdílená paměť (\code{mmap})
-      \item Plná meziprocesová komunikace (IPC)
-    \end{itemize}
-
-    \pause
-
-    \item Příště
-    \begin{itemize}
-      \item Netlink
-      \item RPC
-    \end{itemize}
+    \item Netlink
+    \item RPC
   \end{itemize}
 
 \end{frame}
 
-\part{Roury}
-\frame{\partpage}
+\section{Roura}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Roury}
@@ -78,23 +78,24 @@
     \item Vytvořte si 2 roury
     \begin{itemize}
       \item Pro obousměrnou komunikaci
+      \item Budete mít \code{fd1[2]} a \code{fd2[2]}
     \end{itemize}
     \item Proveďte \code{fork}
     \item Zavřete nepotřebné deskriptory
 
     \item V jednom procesu v cyklu o několika iteracích:
     \begin{itemize}
-      \item Do jednoho \code{fd} zapisujte měnící se text
+      \item Do \code{fd1[1]} zapisujte měnící se text
       \begin{itemize}
 	\item Např.\ \code{char buf[10] = "Hello";} a \code{(*buf)++;}
       \end{itemize}
-      \item Z druhého \code{fd} čtěte a vypisujte
+      \item Z \code{fd2[0]} čtěte a vypisujte na standardní výstup
     \end{itemize}
 
-    \item V druhém procesu (echo):
+    \item V druhém procesu (loopback):
     \begin{itemize}
-      \item Čtěte z prvního \code{fd}
-      \item A zapisujte to do druhého \code{fd}
+      \item Čtěte z \code{fd1[0]}
+      \item A zapisujte to do \code{fd2[1]}
     \end{itemize}
 
     \item Spusťte
@@ -102,19 +103,21 @@
 
 \end{frame}
 
+\subsection{Pojmenovaná roura}
+
 \begin{frame}
   \frametitle{Pojmenovaná roura}
 
   \begin{itemize}
     \item Soubor na disku
     \item \code{mknod}
-    \item Demo
+    \item \heading{Demo}
   \end{itemize}
 
 \end{frame}
 
-\part{Sdílená paměť}
-\frame{\partpage}
+\section{Sdílená paměť}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Sdílená paměť}
@@ -130,8 +133,8 @@
     \item Vytvoření: \code{mmap} s \code{MAP_ANONYMOUS | MAP_SHARED}
     \begin{itemize}
       \item Provede se \code{fork}
-      \item Paměť se může libovolně měnit
-      \item Ale pozor na optimalizace překladače
+      \item Paměť je volně k dispozici oběma procesům
+      \item Jen pozor na optimalizace překladače
       \begin{itemize}
 	\item \code{volatile}
       \end{itemize}
@@ -145,7 +148,7 @@
 
   \heading{Vytvoření sdílené paměti}
   \begin{enumerate}
-    \item Vytvořte si mapování
+    \item Vytvořte si sdílené mapování
     \item Proveďte \code{fork}
 
     \item V jednom procesu v cyklu o několika iteracích:
@@ -165,8 +168,8 @@
 
 \end{frame}
 
-\part{IPC}
-\frame{\partpage}
+\section{Plná meziprocesová komunikace}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{IPC}
@@ -181,22 +184,28 @@
 
     \pause
 
-    \item Výpis: \cmd{ipcs}
+    \item Výpis: \cmd{ipcs} (\heading{Demo})
     \item Dokumentace: \cmd{man 5 ipc}
+    \item \header{sys/ipc.h}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{IPC a klíče}
+\begin{frame}{IPC}{Klíče}
 
   \begin{itemize}
     \item IPC pracuje s klíči (\code{key_t})
+    \item Procesy komunikují pomocí klíče
+    \begin{itemize}
+      \item Jen pokud mají stejný
+    \end{itemize}
 
-    \item Vytvoření: \code{ftok}
+    \pause
+
+    \item Vytvoření klíče: \code{ftok} (\header{sys/ipc.h})
     \begin{itemize}
       \item Cesta k existujícímu uzlu
-      \item Nějaký znak
+      \item Nějaké 8bitové číslo
     \end{itemize}
 
     \pause
@@ -206,23 +215,22 @@
 
 \end{frame}
 
-\section{Sdílená paměť}
-\frame{\sectionpage}
+\subsection{Sdílená paměť}
 
-\begin{frame}
-  \frametitle{Sdílená paměť (IPC)}
+\begin{frame}{IPC}{Sdílená paměť}
 
   \begin{itemize}
+    \item \header{sys/shm.h}
     \item Vytvoření: \code{shmget}
     \begin{itemize}
-      \item Parametr \code{IPC_CREAT}
-      \item Logický OR s právy 
+      \item Poslední parametr \code{IPC_CREAT}
+      \item Logický OR s právy (\code{0644} apod.)
     \end{itemize}
 
     \pause
 
-    \item Získaní adresy: \code{shmat}
-    \item Navrácení adresy: \code{shmdt}
+    \item Získaní adresy (attach): \code{shmat}
+    \item Navrácení adresy (detach): \code{shmdt}
 
     \pause
 
@@ -243,7 +251,7 @@
   \begin{enumerate}
     \item Vytvořte si klíč (\code{ftok})
     \begin{itemize}
-      \item A vypište ho
+      \item A vypište ho (\code{\%x})
     \end{itemize}
     \item Vytvořte si sdílený segment (\code{shmget})
     \item Získejte adresu (\code{shmat})
@@ -266,23 +274,23 @@
 
 \end{frame}
 
-\section{Zprávy}
-\frame{\sectionpage}
+\subsection{Zprávy}
 
-\begin{frame}[fragile]
-  \frametitle{Zprávy (IPC)}
+\begin{frame}[fragile]{IPC}{Zprávy}
 
-  \heading{Formát zprávy}
+  \begin{block}{Formát zprávy}
   \begin{lstlisting}
-struct msgbuf {
-  long mtype;
+struct my_message {
+  long mtype;   /* set to something > 0 */
   ...
 };
   \end{lstlisting}
+  \end{block}
 
   \pause
 
   \begin{itemize}
+    \item \header{sys/msg.h}
     \item Vytvoření fronty zpráv: \code{msgget}
 
     \pause
@@ -309,9 +317,16 @@ struct msgbuf {
   \begin{enumerate}
     \item Vytvořte si klíč (\code{ftok})
     \begin{itemize}
-      \item A vypište ho
+      \item A vypište ho (\code{\%x})
     \end{itemize}
+
     \item Vytvořte si frontu zpráv (\code{msgget})
+    \item Vytvořte si strukturu zprávy
+    \begin{itemize}
+      \item Musí obsahovat \code{long mtype}
+      \item Přidejte \code{char text[10]}
+    \end{itemize}
+
     \item Nyní si zkopírujte tento \code{main} do dvou souborů
     \item V jednom souboru v cyklu o několika iteracích:
     \begin{itemize}
@@ -330,15 +345,12 @@ struct msgbuf {
 
 \end{frame}
 
-\section{Semafory}
-\frame{\sectionpage}
+\subsection{Semafory}
 
-\begin{frame}[fragile]
-  \frametitle{Semafory (IPC)}
-
-  \pause
+\begin{frame}[fragile]{IPC}{Semafory}
 
   \begin{itemize}
+    \item \header{sys/sem.h}
     \item Meziprocesové zamykání/správa prostředků
 
     \pause
@@ -361,7 +373,7 @@ struct msgbuf {
     \end{itemize}
   \end{itemize}
 
-  \heading{Parametr \code{semop}}
+  \begin{block}{Parametr \code{semop}}
   \begin{lstlisting}
 struct sembuf {
   ushort  sem_num;
@@ -369,6 +381,7 @@ struct sembuf {
   short   sem_flg;
 };
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -379,18 +392,18 @@ struct sembuf {
   \begin{enumerate}
     \item Vytvořte si klíč (\code{ftok})
     \begin{itemize}
-      \item A vypište ho
+      \item A vypište ho (\code{\%x})
     \end{itemize}
     \item Vytvořte 2 programy
 
-    \item Jeden tiskový server
+    \item Jeden program je tiskovým serverem
     \begin{itemize}
       \item Vytvořte si 1 semafor (\code{semget})
       \item Obsluhuje 5 tiskáren (\code{shmctl} a \code{SETVAL})
       \item Tisk trvá 10 vteřin
     \end{itemize}
 
-    \item Druhý je klient
+    \item Druhý program je klientem
     \begin{itemize}
       \item Chce tisknout
     \end{itemize}
