@@ -16,28 +16,27 @@
 \begin{frame}
   \frametitle{Komunikace mezi procesy}
 
+  Alespoň 2 procesy, které chtějí komunikovat
+
+  \bigskip
+
+  \heading{Minule}
   \begin{itemize}
-    \item Alespoň 2 procesy, které chtějí komunikovat
-    \item Minule
-    \begin{itemize}
-      \item Roura (\code{pipe})
-      \item Sdílená paměť (\code{mmap})
-      \item Plná meziprocesová komunikace (IPC)
-    \end{itemize}
-
-    \pause
-
-    \item Dnes
-    \begin{itemize}
-      \item Netlink
-      \item RPC
-    \end{itemize}
+    \item Roura (\code{pipe})
+    \item Sdílená paměť (\code{mmap})
+    \item Plná meziprocesová komunikace (IPC)
   \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Dnes}
+  \tableofcontents
 
 \end{frame}
 
-\part{Netlink}
-\frame{\partpage}
+\section{Netlink}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{Netlink}
@@ -66,14 +65,22 @@
     \item Server
     \begin{itemize}
       \item Provede \code{bind} s nastaveným \code{sockaddr_nl.nl_pid}
-      \item Potom poslouchá pomocí \code{recv}
+      \item Potom poslouchá pomocí \code{recvmsg}
     \end{itemize}
 
     \pause
 
     \item Klient
     \begin{itemize}
-      \item Posílá pomocí \code{sendto}
+      \item Posílá pomocí \code{sendmsg}
+    \end{itemize}
+
+    \pause
+
+    \item Zpráva: \code{struct nlmsghdr}
+    \begin{itemize}
+      \item Operace: \code{NLMSG_DATA} (data), \code{NLMSG_PAYLOAD} (délka),
+        \dots
     \end{itemize}
 
   \end{itemize}
@@ -83,33 +90,32 @@
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Vytvoření netlink komunikace}
+  \heading{Vytvoření netlink komunikace} (bez hlaviček, jen \code{char *})
   \begin{enumerate}
-    \item Vytvořte si 2 programy
-    \begin{itemize}
-      \item Server a klient
-    \end{itemize}
+    \item Otevřete si kostru v \file{pb173-bin/12/netlink.c}
+    \item Doplňte server a klient (tři TODO)
 
     \item V serveru proveďte:
     \begin{itemize}
       \item \code{bind} s nastaveným \code{sockaddr_nl.nl_pid}
-      \item Vypište si \code{nl_pid}
-      \item A v cyklu \code{recv} a \code{write} na standardní výstup
+      \item A v cyklu opakujte \code{recv} a \code{write} na standardní výstup
     \end{itemize}
 
     \item V klientovi proveďte:
     \begin{itemize}
       \item \code{sendto} nějakých dat
-      \item Adresu (\code{nl_pid}) si vezměte s příkazové řádky
     \end{itemize}
 
-    \item Spusťte
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item Vypsaný PID použijte jako adresu v klientovi
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
 
-\part{RPC}
-\frame{\partpage}
+\section{RPC}
+\frame{\sectionpage}
 
 \begin{frame}
   \frametitle{RPC}
@@ -117,7 +123,9 @@
   \begin{itemize}
     \item Vzdálené volání procedur
     \begin{itemize}
-      \item Volání funkcí přes síť (UDP nebo TCP)
+      \item Volání funkcí přes síť
+      \item UDP nebo TCP
+      \item Předávání parametrů a návratových hodnot
       \item Využití např.\ v NFS
     \end{itemize}
 
@@ -126,7 +134,7 @@
     \item Portmapper
     \begin{itemize}
       \item Lokální služba
-      \item Mapuje číslo programu, verzi a protokol na funkce
+      \item Mapuje číslo ,,programu'' (funkce), jeho verzi a protokol na funkce
       \begin{itemize}
         \item Registrovaná čísla v \file{/etc/rpc}
       \end{itemize}
@@ -135,6 +143,8 @@
 
 \end{frame}
 
+\subsection{RPC rozhraní pro server}
+
 \begin{frame}
   \frametitle{RPC rozhraní pro server}
 
@@ -142,23 +152,25 @@
     \item \header{rpc/rpc.h}, \cmd{man 3 rpc}
     \item Vytvoření spojení: \code{svctcp_create}, \code{svcudp_create}
     \begin{itemize}
-      \item \code{RPC_ANYSOCK}
+      \item Parametr: socket nebo \code{RPC_ANYSOCK}
     \end{itemize}
 
     \pause
     
-    \item Registrace funkce: \code{svc_register}
+    \item Registrace volatelného ,,programu'' (funkce): \code{svc_register}
     \begin{itemize}
-      \item Registruje u portmapperu pomocí \code{pmap_set}
+      \item Registruje program u portmapperu pomocí \code{pmap_set}
       \item Viditelné v \cmd{rpcinfo -p}
       \item Je zvykem před tím volat \code{pmap_unset}
+      \begin{itemize}
+        \item Zruší případnou zastaralou registraci
+      \end{itemize}
 
       \pause
 
-      \item Volá háček \code{dispatch}
+      \item Volá se funkce udaná parametrem \code{dispatch}
       \begin{itemize}
         \item Parametr \code{svc_req->rq_proc} určuje funkcionalitu
-        \item Lze odpovědět na zprávu: \code{svc_sendreply}
       \end{itemize}
     \end{itemize}
 
@@ -169,21 +181,45 @@
 
 \end{frame}
 
+\begin{frame}[fragile]{RPC rozhraní pro server}{Příklad}
+
+\begin{lstlisting}
+#define RUSERSPROG 0x40000000
+#define RUSERSVERS 1
+
+static void dispatch(struct svc_req *req, SVCXPRT *xprt)
+{
+  printf("request %ld\n", req->rq_proc);
+}
+
+int main(void) {
+  SVCXPRT *xprt = svctcp_create(RPC_ANYSOCK, 0, 0);
+  svc_register(xprt, RUSERSPROG, RUSERSVERS, dispatch, IPPROTO_TCP);
+  svc_run();
+
+  return 0;
+}
+\end{lstlisting} %stop_zone
+\end{frame}
+
 \begin{frame}
   \frametitle{Úkol}
 
   \heading{Vytvoření RPC serveru}
   \begin{enumerate}
     \item Vytvořte si TCP spojení (\code{svctcp_create} a \code{RPC_ANYSOCK})
-    \item Zvolte si čísla funkce a verze
+    \item Zvolte si čísla programu a verze
     \begin{itemize}
-      \item Vyhněte se číslům funkcí z \file{/etc/rpc}
+      \item Vyhněte se číslům programů z \file{/etc/rpc}
     \end{itemize}
+
     \item Zrušte stará mapování (\code{pmap_unset})
+
     \item Registrujte službu (\code{svc_register})
     \begin{itemize}
       \item V \code{dispatch} funkci proveďte výpis \code{svc_req->rq_proc}
     \end{itemize}
+
     \item Spusťte smyčku (\code{svc_run})
     \item Spusťte program
     \begin{itemize}
@@ -193,27 +229,38 @@
 
 \end{frame}
 
-\begin{frame}
+\subsection{RPC rozhraní pro klienta}
+
+\begin{frame}[fragile]
   \frametitle{RPC rozhraní pro klienta}
 
   \begin{itemize}
     \item Vytvoření spojení: \code{clnt_create}
     \begin{itemize}
-      \item Stroj, protokol a číslo funkce+verze
+      \item Stroj, protokol a číslo programu+verze
     \end{itemize}
+
     \item Zrušení spojení: \code{clnt_destroy}
 
     \pause
     
-    \item Zavolání funkce: \code{clnt_call}
+    \item Zavolání programu (funkce): \code{clnt_call}
     \begin{itemize}
-      \item 2.\ parametr do \code{dispatch} $\rightarrow$
-	\code{svc_req->rq_proc}
+      \item 2.\ parametr do \code{dispatch} jako \code{svc_req->rq_proc}
       \item 3.\ a 5.\ parametr: kódovací funkce (zatím \code{xdr_void})
       \item 4.\ a 6.\ parametr: parametry vzdálené funkce (zatím \code{NULL})
       \item Timeout: čas na odpověď
     \end{itemize}
   \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+struct timeval tout = { 1, 0 };
+CLIENT *cln = clnt_create("localhost", RUSERSPROG, RUSERSVERS, "tcp");
+clnt_call(cln, 1, (xdrproc_t)xdr_void, NULL, (xdrproc_t)xdr_void, NULL, tout);
+clnt_destroy(cln);
+\end{lstlisting} %stop_zone
+\end{block}
 
 \end{frame}
 
@@ -238,6 +285,8 @@
 
 \end{frame}
 
+\subsection{XDR}
+
 \begin{frame}
   \frametitle{RPC a parametry}
 
@@ -257,28 +306,47 @@
 
     \item Klient
     \begin{itemize}
-      \item 3.\ a 5.\ parametr pro \code{clnt_call}
+      \item Funkce shora jako 3.\ a 5.\ parametr pro \code{clnt_call}
+      \item Ukazatele na proměnné potom jako 4.\ a 6.
     \end{itemize}
 
     \item Server
     \begin{itemize}
       \item V \code{dispatch}: \code{svc_getargs}
+      \item A lze také odpovědět na zprávu: \code{svc_sendreply}
     \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}
+\begin{frame}[fragile]
   \frametitle{Úkol}
+
+  \begin{block}{Příklad}
+\begin{lstlisting}
+/* server */
+int in;
+svc_getargs(xprt, (xdrproc_t)xdr_int, (char *)&in);
+in++;
+svc_sendreply(xprt, (xdrproc_t)xdr_int, (char *)&in);
+
+/* client */
+int in = 5;
+clnt_call(cln, 0, (xdrproc_t)xdr_int, (char *)&in, (xdrproc_t)xdr_int, (char *)&in, tout);
+/* 'in' is 6 now (unless timed out) */
+  \end{lstlisting}
+  \end{block}
+
+  \bigskip
 
   \heading{Předávání parametrů}
   \begin{enumerate}
-    \item V serveru vytvořte funkci
+    \item V serveru vytvořte program
     \begin{itemize}
       \item Vezme \code{int}, vynásobí \code{10} a vrátí \code{long}
     \end{itemize}
     \item Z klienta zavolejte
-    \item Spusťte program
+    \item Vyzkoušejte
   \end{enumerate}
 
 \end{frame}

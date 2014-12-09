@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{XII. Síťové rozhraní}
-\date{10. 12. 2013}
+\date{9. 12. \the\year}
 
 \begin{document}
 
@@ -64,25 +64,21 @@
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/netdevice.h}, \code{struct net\_device}
-  \item Alokace: \code{alloc_netdev}$_D$, \code{free_netdev}$_D$
-  \item Registrace: \code{register_netdev}, \code{unregister_netdev}
-  \item Háčky
-  \begin{itemize}
-  \item Staré jádro: v \code{netdevice} přímo \code{open}, \code{stop}, \dots
-  \item Nové jádro: \code{net_device_ops} (podobně jako znaková zařízení)
-  \end{itemize}
+    \item \header{linux/netdevice.h}, \code{struct net\_device}
+    \item Alokace: \code{alloc_netdev}$_D$, \code{free_netdev}$_D$
+    \item Registrace: \code{register_netdev}, \code{unregister_netdev}
+    \item Háčky: \code{struct net_device_ops} (podobně jako znaková zařízení)
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{\code{net_device_ops}}
+  \frametitle{\code{struct net_device_ops}}
 
+  \begin{block}{\code{struct net_device_ops}}
   \begin{lstlisting}
-struct net_device_ops {
-  int (*ndo_open)(struct net_device *dev); /* ifup */
-  int (*ndo_stop)(struct net_device *dev); /* ifdown */
+  int (*ndo_open)(struct net_device *dev); /* ip link set up */
+  int (*ndo_stop)(struct net_device *dev); /* ip link set down */
 
   /* send a packet */
   netdev_tx_t (*ndo_start_xmit)(struct sk_buff *skb, struct net_device *dev);
@@ -91,8 +87,8 @@ struct net_device_ops {
   int (*ndo_change_mtu)(struct net_device *dev, int new_mtu);
 
   ... /* no receive packet */
-};
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -108,7 +104,7 @@ struct net_device_ops {
 
     \pause
 
-    \item Nastaví vnitřní položky \code{netdevice}
+    \item Příklady
     \begin{itemize}
       \item \emph{Ethernet}: \code{alloc_etherdev}
 	(\header{linux/etherdevice.h})
@@ -128,16 +124,18 @@ struct net_device_ops {
   \begin{enumerate}
     \item Alokace (\code{alloc_etherdev(priv_size)})
     \begin{itemize}
+      \item Alokuje navíc paměť o velikosti \code{priv_size}
       \item \code{priv_size} může být \code{0}
     \end{itemize}
 
     \item Inicializace informací
     \begin{itemize}
-      \item Nastavení háčků (\code{net_device_ops})
+      \item Nastavení háčků (\code{net_device_ops} do \code{dev->netdev_ops})
       \item Nastavení MAC adresy (\code{dev->dev_addr})
-      \item Získání privátního ukazatele o velikosti \code{priv_size}
+      \item Získání ukazatele na paměť alokovanou navíc
       \begin{itemize}
-	\item Funkce \code{netdev_priv}
+	\item Funkcí \code{netdev_priv}
+	\item Jen při alokaci s \code{priv_size} > 0
       \end{itemize}
     \end{itemize}
     \item Registrace (\code{register_netdev})
@@ -169,7 +167,6 @@ struct net_device_ops {
       \item Těla vypíšou jen název funkce
       \item \code{start_xmit} vrátí \code{NETDEV_TX_OK}
     \end{itemize}
-  %  \item Vložit do systému, udělat \code{ifup}, \code{ifdown}, \code{ping}
 
     \item NEVKLÁDEJTE do systému
     \begin{itemize}
@@ -185,53 +182,118 @@ struct net_device_ops {
   \heading{Tzv. socket buffery}
   \begin{itemize}
     \item \header{linux/skbuff.h}, \code{struct sk_buff}
-    \item \code{dev_alloc_skb}$_D$ (obecně), \code{netdev_alloc_skb}$_D$
-      (pro \code{netdevice}), \code{dev_kfree_skb}$_D$
+    \item Obecně: \code{dev_alloc_skb}$_D$
+    \item \emph{Pro netdevice:} \code{netdev_alloc_skb}$_D$
+    \item Uvolnění: \code{dev_kfree_skb}$_D$
+
+    \pause
+
     \item Obsah: \code{skb->data}
-    \item Délka obsahu: \code{skb->len}
-
-    \pause
-
-    \item Příjem z HW (např.\ z přerušení)
     \begin{itemize}
-      \item \code{skb = netdev_alloc_skb(dev, len)}
-      \item Naplnění daty z HW
-      \item Nastavení protokolu (\code{skb->protocol = eth_type_trans(skb,
-	dev)})
-      \item \code{netif_rx(skb)}
+      \item Ukazuje na alokovanou paměť
+      \item Plní/čte se klasicky přes \code{memcpy} apod.
     \end{itemize}
-
-    \pause
-
-    \item Posílání do HW (skb je parametr \code{start_xmit})
+    \item Délka obsahu: \code{skb->len}
+    \item Protokol: \code{skb->protocol}
     \begin{itemize}
-      \item Poslat paket
-      \item \code{dev_kfree_skb(skb)}
+      \item Při příjmu nutno nastavit!
     \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Pakety}{Odesílání do HW}
+
+  \heading{\code{skb} je parametr \code{start_xmit}}
+  \begin{enumerate}
+    \item Předat do HW data
+    \begin{itemize}
+      \item \code{skb->data} o délce \code{skb->len}
+    \end{itemize}
+
+    \item Uvolnit \code{skb}
+    \begin{itemize}
+      \item \code{dev_kfree_skb(skb)}
+    \end{itemize}
+
+    \item Vrátit stav
+    \begin{itemize}
+      \item \code{NETDEV_TX_OK}
+      \item \code{NETDEV_TX_BUSY}
+    \end{itemize}
+
+    \item Lze pozastavit odesílání
+    \begin{itemize}
+      \item Při zaplněném HW
+      \item \code{netif_stop_queue}
+      \item Při volném HW později: \code{netif_wake_queue}
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Odesílání/příjem paketů}
+  \heading{,,Odesílání'' paketů}
   \begin{enumerate}
-    \item Doplnit kód TX
+    \item Doplňte kód pro odesílání (\code{start_xmit})
     \begin{itemize}
-      \item Vypsat obsah paketu (\code{print_hex_dump_bytes})
-      \item Uvolnit \code{skb}
+      \item Vypište obsah paketu (\code{print_hex_dump})
+      \item Uvolněte \code{skb} (\code{dev_kfree_skb})
     \end{itemize}
 
-    \item Nastavit RX
+    \item Vložte modul do systému
+    \item Pusťte si \cmd{arping}
+    \item Pozorujte \cmd{dmesg}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Pakety}{Příjem z HW}
+
+  \heading{Např.\ z přerušení}
+  \begin{enumerate}
+    \item \code{skb = netdev_alloc_skb(dev, len)}
     \begin{itemize}
-      \item V \code{open} nastavit periodický časovač, zrušit ve \code{stop}
-      \item V časovači volat \code{netif_rx} s paketem z \file{pb173/12/}
-      \item Inkrementovat v paketu 24.\ znak o \code{1}
+      \item \code{len} např.\ MTU nebo přesná velikost
     \end{itemize}
 
-    \item Vložit modul do systému
-    \item Spustit \cmd{tcpdump -ni} na \code{eth} rozhraní
+    \item Naplnění daty z HW do \code{skb->data} o délce max.\ \code{len}
+    \item Nastavení \code{skb->len}
+    \begin{itemize}
+      \item \code{skb->len} $\leq$ \code{len}
+    \end{itemize}
+    \item Nastavení protokolu
+    \begin{itemize}
+      \item \code{skb->protocol = eth_type_trans(skb, dev)}
+    \end{itemize}
+
+    \item Předání \code{skb} jádru
+    \begin{itemize}
+      \item \code{netif_rx(skb)}
+      \item Jádro \code{skb} uvolní
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{,,Příjem'' paketů}
+  \begin{enumerate}
+    \item Emulujte příjem paketů
+    \begin{itemize}
+      \item V \code{open} nastavte periodický časovač
+      \item Časovač zrušte ve \code{stop}
+      \item V časovači volejte \code{netif_rx} s paketem z \file{pb173/12/}
+      \item Inkrementujte o \code{1} v paketu 24.\ znak
+    \end{itemize}
+
+    \item Vložte modul do systému
+    \item Spusťte \cmd{tcpdump -ni} na \code{eth} rozhraní
   \end{enumerate}
 
 \end{frame}
