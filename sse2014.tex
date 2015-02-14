@@ -17,6 +17,7 @@
 \renewcommand\note[1]{\nb{\textcolor{blue}{#1}}}
 \newcommand\todo[1]{\nb{\textcolor{red}{#1}}}
 \newcommand\tool{\textsc{Symbiotic}\xspace}
+\newcommand\klee{\textsc{Klee}\xspace}
 
 %\renewcommand\note[1]{}
 %\renewcommand\todo[1]{}
@@ -27,9 +28,8 @@
 
 %{{{ Title + Author + Abstract
 
-\title{\tool~2: Improvements in Slicing}
-% \thanks{This work has been supported by The Czech Science
-%     Foundation (GA\v{C}R), grant No.~P202/12/G061.}}
+\title{\tool~2: More Precise Slicing\thanks{The authors are supported by the Czech Science
+    Foundation grant~P202-10-1469.}}
 \subtitle{(Competition Contribution)}
 \author{Jiri~Slaby \and Jan~Strej\v{c}ek}
 \institute{Faculty of Informatics, Masaryk University\\
@@ -39,152 +39,138 @@
 \maketitle
 
 \begin{abstract}
-  \tool~2 is a tool for detection of bugs described by finite state machines
-  in C programs. The tool combines three well-known techniques:
-  instrumentation, program slicing, and symbolic execution.  This paper
-  briefly describes the approach of \tool~2 including its strengths,
-  weaknesses, and particularly improvements implemented during the last
-  year. The architecture and installation of the tool are described as well.
+  \tool~2 keeps the concept and the structure of the original bug-finding
+  tool \tool, but it uses a more precise slicing based on a field-sensitive
+  pointer analysis instead of field-insensitive analysis of the original
+  tool. The paper discusses this improvement and its consequences.  We also
+  briefly recall basic principles of the tool, its strong and weak points,
+  installation, and running instructions. Finally, we comment the results
+  achieved by \tool 2 in the competition.
 \end{abstract}
 
 %}}}
 
 %{{{ Verification approach
 
-\section{Verification Approach}
+\section{Verification Approach and Software Architecture}
 \label{sec:approach}
 
-\tool implements our technique~\cite{sse} that combines instrumentation,
-program slicing, and symbolic execution in order to detect bugs described by
-finite state machines. More precisely, we instrument a given program with
-code that tracks runs of state machines representing various erroneous
-behaviours. If an instrumented state machine enters an error location during
-a program execution, then the original program contains a bug specified by
-the machine. After instrumentation, we slice~\cite{weiser} the program to
-reduce its size without affecting runs of state machines. Finally, we
-symbolically execute~\cite{king} the sliced program to find bugs in the
-program.
+Both \tool~\cite{SST13} and \tool 2 implement our verification approach
+proposed earlier~\cite{sse}. The approach combines three standard techniques,
+namely \emph{code instrumentation}, \emph{program slicing}~\cite{weiser}, and
+\emph{symbolic execution}~\cite{king}. While the approach was originally
+designed for the detection of bugs described by state-machines, \tool 2 still
+supports only one kind of bugs: reachability of an \texttt{ERROR} label.
+Hence, we briefly recall the approach restricted just to this simple kind of
+errors. We explain the structure of the tool simultaneously.
+\begin{enumerate}
+\item Code instrumentation inserts \texttt{assert(0)} to each \texttt{ERROR}
+  label. It is performed by a \texttt{bash} script calling \texttt{sed}. The
+  instrumented code is translated into the \textsc{Llvm} bitcode by
+  the \textsc{Clang} compiler.
+\item Program slicing removes instructions of the instrumented code that do
+  not affect reachability of the inserted \texttt{assert(0)}
+  statements. This code size reduction is crucial for the overall efficiency
+  of \tool 2. The slicer is implemented in C++ as a plug-in for the
+  \textsc{Llvm} optimizer \texttt{opt}.
+\item Symbolic execution either reaches \texttt{assert(0)}, or correctly
+  finishes the execution without reaching \texttt{assert(0)}, or it runs out
+  of time or memory etc. These possibilities correspond to answers
+  \texttt{FALSE}, \texttt{TRUE}, \texttt{UNKNOWN}, respectively.
+  We use the symbolic executor \klee~\cite{klee} whose outputs are translated
+  to \texttt{TRUE/FALSE/UNKNOWN} by a simple \texttt{bash} script.
+\end{enumerate}
+The whole pipeline is executed stepwise by another \texttt{bash} script.
 
-While the rules of SV-COMP 2014 newly recognize more kinds of errors, 
-the current competition version of our tool searches only for reachability
-of an \texttt{ERROR} label. Our instrumentor puts \texttt{assert(0)}
-function calls at these \texttt{ERROR} labels. Given the instrumented
-code, we execute \textsc{Clang} to produce an \textsc{Llvm} bitcode. This is
-in turn interprocedurally sliced with respect to slicing criteria, which are
-the instrumented \texttt{assert} calls. In other words we remove all the
-code except the one that has an effect on reachability of \texttt{assert}
-calls. The sliced \textsc{Llvm} bitcode is finally symbolically executed by
-\textsc{Klee}~\cite{klee}. There are several possible outputs that
-\textsc{Klee} may generate. It can either find a reachable \texttt{assert}
-and report it, or finish the computation without any report, or terminate in
-some errant way (out of time, out of memory, invalid memory dereference, or
-some internal error for example). We map these to the demanded answers:
-\texttt{UNSAFE}, \texttt{SAFE}, or \texttt{UNKNOWN} respectively. This is
-taken care of in a simple scripted filter.
+All improvements of \tool 2 over the tool \tool competing in SV-COMP 2013
+are in the slicer.  We have fixed some bugs in the original slicer (invalid
+treatment of several instructions and functions with variable number of
+arguments). While the original fixpoint algorithm for slicing~\cite{weiser}
+is relatively simple, it gets more complicated for programs with pointers as
+one instruction can influence the following one without any syntactic
+overlap. We need to use a pointer analysis (also called points-to analysis)
+to know which pointers can point to the same target. Both \tool and \tool 2
+use Andersen's pointer analysis~\cite{And94}, \tool 2 replaces the original
+field-insensitive analysis by a field-sensitive one. This means that every
+field of a \texttt{struct} is now handled as a different pointer
+target. Similarly, we handle the first 64 elements of each array as distinct
+targets. The field-sensitive analysis is computationally more
+demanding. Thus we have also added some type filters that speed up the
+pointer analysis and make its results more accurate. All these improvements
+of the slicer significantly reduce the number of incorrect answers produced
+by \tool 2. For example, \tool 2 produces only correct answers for the
+category \emph{ProductLines} while \tool produces 131 incorrect answers for
+the same category.
 
-The main improvements of \tool 2 compared to the original version of \tool
-competing in SV-COMP 2013 are in the Slicer. We have fixed several bugs in
-the original slicer (invalid treatment of several instructions and functions
-with variable number of arguments). We have also substantially improved
-precision of the employed pointer analysis, which is a crucial part of
-slicing. In particular, we have switched from a field-insensitive to a
-field-sensitive pointer analysis.  This means that every field of a
-\texttt{struct} is now handled as a different pointer target. Similarly, we
-handle the first 64 elements of each array as distinct targets. Finally, we
-have added some type-filters that speed the pointer analysis up and make its
-results more accurate. All the improvements significantly reduce the number of
-incorrect answers produced by \tool.
- 
-%}}}
-%{{{ Software architecture
-
-\section{Software Architecture}
-\paragraph{Libraries/External Tools} For the code translation and for
-operations with the \textsc{Llvm} bitcode we use \textsc{Llvm}/\textsc{Clang}
-3.2\footnote{\url{http://llvm.org}}.  The symbolic executor is
-\textsc{Klee}~\cite{klee} which itself uses the \textsc{Stp} constraint
-solver~\cite{stp}. We obtained both \textsc{Klee} and \textsc{Stp} from the
-respective GIT repositories and used the snapshots.
-
-\paragraph{Software Structure and Architecture} The architecture described
-in Section~\ref{sec:approach} is summarized in Figure~\ref{fig:pipeline}.
-The slicer is written as a plug-in for the optimizer \texttt{opt} from the
-\textsc{Llvm} suite. It is publicly available in a separate repository at
-\url{https://github.com/jirislaby/LLVMSlicer/}.
-% The slicer improves the symbolic execution considerably.
-For ease of use, all parts of the tool pipeline are one by one run by a
-single script \texttt{runme}.
-
-\begin{figure}[tb]
-\begin{center}
-\input{pipeline2.pspdftex}
-\end{center}
-  \caption{Pipeline of the tool}
-\label{fig:pipeline}
-\end{figure}
-
-\paragraph{Implementation Technology} The instrumentation is performed by a
-\texttt{bash} script using \texttt{sed}. The final filter also uses
-\texttt{bash} with the help of \texttt{grep}. The rest of the toolchain is
-written in C++ and compiled using \texttt{gcc}.
-
-%}}}
+%}}} 
 %{{{ Discussion
 
-\section{Discussion of Strengths and Weaknesses of the Approach}
+\section{Strengths and Weaknesses}
 
-The strength of the tool lies in its high precision of the answers. In
-theory, the only source of potential incorrect answers is the slicer: it can
-completely remove an infinite loop %in some cases 
-and an unreachable
-\texttt{ERROR} label located below the loop may become reachable. However,
-there is no such case in the competition benchmarks.  All incorrect answers
-%produced by our tool in the competition
-are due to imperfection of our implementation.
+Our tool is applicable to all competition benchmarks satisfying two
+restrictions: the studied property is \texttt{ERROR} label reachability and
+the benchmark code is a sequential C program. Hence, the results of \tool 2
+in the competition categories \emph{MemorySafety} and \emph{Concurrency}
+should be ignored (we missed the opt-out deadline). The first restriction
+can be removed by the implementation of a more sophisticated code
+instrumentation.  The second restriction comes directly from the approach as
+symbolic execution and program slicing are primarily designed for sequential
+programs.
 
-%In general, 
-The main weakness of the tool is a high percentage of
-\texttt{UNKNOWN} results coming mainly from high computation
-cost of the symbolic execution of programs with loops or recursion. This
-problem is relieved by slicing, but there are still many cases where the
-sliced code remains complex and the symbolic execution runs out of time or
-memory.  Other sources of \texttt{UNKNOWN} results are internal errors of
-\textsc{Klee} and general limitations of constraint solving.  We plan to
-reduce this weakness by application of the compact symbolic
-execution~\cite{CSE} instead of the classic one.
+\medskip We first discuss strong and weak aspects of the approach and then
+we talk about additional strong and weak aspects of the tool. Our approach
+is based on symbolic execution which should produce only correct answers. On
+the other hand, symbolic execution suffers from the path explosion problem
+and relies on expensive (and often even undecidable) SMT solving. Hence,
+application of symbolic execution leads to many \texttt{UNKNOWN} answers,
+which is also the main weakness of the approach. To reduce this weakness, we
+combine symbolic execution with slicing which is the only theoretical source
+of incorrect answers (namely false positives) of our approach. Indeed,
+slicing can in some cases remove an infinite loop and a potential
+unreachable \texttt{ERROR} label located below the cycle thus become
+reachable. However, this situation is very rare in practice (e.g.~it does
+not appear in the competition benchmarks) and we do not see it as a problem.
+An orthogonal method to reduce the high cost of symbolic execution is to use
+some of its variants suppressing the path explosion problem. For example, we
+plan to apply \emph{compact symbolic execution}~\cite{CSE} instead of the
+classic one.
+
+The strong aspect of the tool is its simple architecture: it is a sequence
+of scripts and standalone tools that are easy to replace (for example, if
+there is a better symbolic executor for \textsc{Llvm} bitcode, we can deploy
+it in few minutes). The main weakness of \tool 2 lies in the incorrect
+results which are sometimes reported.  Even if the number of incorrect
+results is substantially lower than in the case of \tool, it is still
+relatively high.  All the incorrect results are due to imperfection of our
+implementation.
 
 %}}}
 %{{{ Tool setup and configuration
 
 \section{Tool Setup and Configuration}
-\paragraph{Download and Installation Instructions}
-\begin{itemize}
-\item \emph{Requirements:} \texttt{llvm-3.2}, \texttt{clang-3.2}.
-\item Download \tool 2 at: \url{https://sf.net/projects/symbiotic/}.
-\item Change the current directory to \texttt{/opt} (this location is
-	needed by \textsc{Klee}).
-\item Untar the archive with the tool.
-\item Change directory into \texttt{/opt/symbiotic}.
-\item Run \texttt{./runme <benchmark.c>} for each source file in the set. Set
-\texttt{MFLAG=-m64} environment variable for 64-bit benchmarks.
-\end{itemize}
-
-\paragraph{Results Reported} \texttt{SAFE/UNSAFE/UNKWNOWN} answers match
-the competition rules. The counterexample for an error in some
-\texttt{<benchmark.c>} is generated for each error path in the benchmark to
+Before using \tool 2, ensure that the target system contains 32-bit
+libraries (for 32-bit benchmarks) and \textsc{Llvm} with \textsc{Clang}.
+\textsc{Llvm} and \textsc{Clang} have to be in version 3.2 exactly.  Then,
+\tool 2 can be downloaded from \url{http://sf.net/projects/symbiotic/}.
+Due to a bug in \klee causing absolute paths to be built in, \klee requires to
+be run from a pre-defined path. Hence we are obliged to change the current
+directory to \texttt{/opt/} and \emph{untar} the downloaded \tool 2 archive
+there.  Running the tool is then straightforward.  When the current directory
+is \texttt{/opt/symbiotic/}, the tool can be invoked for each
+\texttt{<benchmark.c>} from the set by \texttt{./runme <benchmark.c>}. For
+benchmarks intended for 64-bit, set \texttt{MFLAG=-m64} environment variable.
+The answers provided by \tool 2 are as required by the competition rules:
+\texttt{TRUE/FALSE/UNKWNOWN}. If the result for \texttt{<benchmark.c>} is
+\texttt{FALSE}, discovered error paths can be found in
 \texttt{<benchmark.c>-klee-out/}.
-
-%There is also a sliced code referred by all the error paths.
 
 %}}}
 %{{{ Software project and contributors
 
 \section{Software Project and Contributors}
-The concept of the tool has been developed by the authors of this paper and
-Marek Trt\'{\i}k. The tool was implemented by Jiri Slaby (contact person),
-Marek Trt\'ik, and Ben Liblit (several fixes).  It is available under the
-GNU GPLv2 License and is hosted by the Faculty of Informatics, Masaryk
-University.
+\tool 2 was contributed mostly by the authors of this paper and Marek
+Trt\'{\i}k. Jiri Slaby is a contact person. The tool is licensed under the GNU
+GPLv2 License unless specified otherwise for its parts.
 
 % We would like to thank our advisors prof. Anton\'in Ku\v{c}era and dr. Jan
 % Strej\v{c}ek. Our work is supported by grant no.
