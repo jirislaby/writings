@@ -1,4 +1,7 @@
 TEX=latex
+ifeq ("$(NH)", "")
+	HANDOUT = ",handout"
+endif
 
 all: pdf
 pdf: present.pdf
@@ -6,7 +9,10 @@ ps: present.ps
 
 present.dvi: present.tex FORCE
 
-present.tex:
+present.tex: class.tex
+
+class.tex: FORCE
+	@echo "\documentclass[xcolor=dvipsnames$(HANDOUT)]{beamer}" > class.tex
 
 %.pdf: %.tex FORCE
 	pdflatex $<
@@ -21,4 +27,4 @@ clean:
 
 FORCE:
 
-.PHONY: FORCE
+.PHONY: FORCE all pdf ps clean
