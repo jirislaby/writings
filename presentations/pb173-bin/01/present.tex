@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{I. GIT a binární programování}
-\date{16. 9. \the\year}
+\date{24. 9. \the\year}
 
 \begin{document}
 
@@ -24,9 +24,12 @@
 \begin{frame}
   \frametitle{Úvodní informace}
   \begin{itemize}
-  \item Semestr = 13 týdnů (14. 10.\ konference)
+    \item Semestr = 13 týdnů
+    \begin{itemize}
+      \item 15. 10.\ pravděpodobně konference
+    \end{itemize}
 
-  \pause
+    \pause
 
   \item Cvičící
   \begin{itemize}
@@ -52,7 +55,7 @@
 
   \pause
 
-  \item Vše potřebné ve studijních materiálech v \href{https://is.muni.cz/auth/el/1433/podzim2014/PB173/index.qwarp}{\nolinkurl{ISu}}
+  \item Vše potřebné ve studijních materiálech v \href{https://is.muni.cz/auth/el/1433/podzim2015/PB173/index.qwarp}{\nolinkurl{ISu}}
 
   \end{itemize}
 
@@ -61,11 +64,11 @@
 \begin{frame}
   \frametitle{Bodování úkolů}
 
-  \heading{Na začátku: 10 bodů za každý příklad}
+  \heading{10 bodů za každý příklad}
   \begin{itemize}
   \item -3 body za každý týden prodlení (termín je vždy do dalšího cvičení)
+  \item -3 body za bezpečnostní díru (ve slidech značené \pozor)
   \item -2 body za každé vrácení v případě nějaké nefunkčnosti
-  \item -2 body za závažný problém (ve slidech značené POZOR)
   \item -1 bod za kód neodpovídající stylu
   \item -1 bod za ostatní drobnosti
   \end{itemize}
@@ -75,7 +78,7 @@
 \begin{frame}
   \frametitle{S čím budeme pracovat?}
 
-  \heading{HW}
+  \heading{Hardware}
   \begin{itemize}
   \item Stroje satyr01--10
   \begin{itemize}
@@ -90,7 +93,7 @@
 \begin{frame}
   \frametitle{S čím budeme pracovat?}
 
-  \heading{SW}
+  \heading{Software}
   \begin{itemize}
   \item GIT
   \begin{itemize}
@@ -106,12 +109,12 @@
 
   \item Zdroje glibc
   \begin{itemize}
-  \item GIT: \url{http://repo.or.cz/w/glibc.git}
-  \item LXR: \url{http://koala.cs.pub.ro/lxr/glibc/}
+    \item GIT: \url{http://repo.or.cz/w/glibc.git}
   \end{itemize}
 
   \item \textsc{AntLR}, \textsc{Binutils}, \textsc{Coreutils},
-    \textsc{Elfutils}, \textsc{libDwarf}, \dots
+    \textsc{Elfutils}, \textsc{Gdb}, IPC, \textsc{libDwarf},
+    \textsc{libPciAccess}, RPC, \dots
 
   \end{itemize}
 
@@ -184,14 +187,17 @@
 	zkráceně \code{d3323c1503}
     \end{itemize}
 
-    \item \cmd{HEAD} je alias pro poslední
+    \item \cmd{HEAD} je alias pro horní/poslední commit
 
-    \item Lze odkazovat předchůdce pomocí \textasciitilde
+    \item Lze odkazovat předchůdce pomocí \textasciitilde\ nebo \textasciicircum
     \begin{itemize}
-      \item Např.\ \code{HEAD~1}, \code{d3323c1503~5}
+      \item Např.\ \code{HEAD}\textasciicircum\textasciicircum\textasciicircum,
+	\code{HEAD~1}, \code{d3323c1503~5}
     \end{itemize}
 
     \item Lze vytvořit jmenný alias, tzv.\ tag
+
+    \item Více: \doc{man gitrevisions}
 
   \end{itemize}
 
@@ -208,11 +214,12 @@
 
     \pause
 
-    \item Vygenerujte záplaty 2 posledních commitů (\cmd{git format-patch -2})
+    \item Vygenerujte záplaty ze 2 posledních commitů (\cmd{git format-patch
+      -2})
 
     \pause
 
-    \item Proveďte push (\cmd{git push}, pokud máte klon na aise)
+    \item Proveďte push (\cmd{git push}, jen pokud máte klon na aise)
 
   \end{enumerate}
 
@@ -230,46 +237,54 @@
 \frame{\sectionpage}
 
 \begin{frame}
-  \frametitle{Jen jádro a my}
+  \frametitle{Binární programování}
 
   \begin{itemize}
-    \item V některých cvičeních bez \emph{libc} (\code{printf}, \code{strlen},
-      \code{malloc}, \dots), ani ostatní (pthread)
-
-    \item Jen rozhraní jádra a překladač
-    \begin{itemize}
-
-      \item Naučíme se rozhraní používat
-      \item Nastíníme tvorbu překladače
-      \item Uvedeme si souborové formáty a budeme s nimi pracovat
-      \item Probereme si malé základy assembleru
-      \item \dots
-    \end{itemize}
+    \item Popíšeme si fáze překladače
+    \item Nastíníme tvorbu překladače
+    \item Uvedeme si souborové formáty a budeme s nimi pracovat
+    \item C bez \emph{libc} (\code{printf}, \code{strlen}, \code{malloc},
+      \dots) a ostatních
+    \item Probereme si malé základy assembleru
+    \item Ladění z jiného úhlu pohledu
+    \item Komunikace s HW a mezi procesy
   \end{itemize}
+
+  \pause
+
+  \heading{C budeme psát ve stylu jádra (\emph{CodingStyle})}
+  \begin{itemize}
+    \item Kontrola: v jádře \cmd{scripts/checkpatch.pl} (není 100\%)
+  \end{itemize}
+
 \end{frame}
 
 \begin{frame}
   \frametitle{\textsc{gcc}}
 
   \begin{itemize}
-  \item Pro překlad C i assembleru
-  \item C budeme psát ve stylu jádra (\emph{CodingStyle})
-  \begin{itemize}
-  \item Kontrola: v jádře \cmd{scripts/checkpatch.pl} (není 100\%)
-  \end{itemize}
-  \item Důležité volby
-  \begin{itemize}
-  \item \texttt{-E} -- jen preprocesor
-  \item \texttt{-S} -- generování assembleru
-  \item \texttt{-c} -- generování objektových souborů
-  \item \texttt{-x} -- definuje jazyk souboru (\texttt{-x c soubor1 -x assembler soubor2})
-  \item \texttt{-O} -- optimalizace (\texttt{-O0}, \texttt{-O2}, \dots)
-  \end{itemize}
+    \item Pro překlad C, assembleru a hlavičkových souborů
+
+    \pause
+
+    \item Důležité volby
+    \begin{itemize}
+      \item \texttt{-E} -- spusť jen preprocesor a skonči
+      \item \texttt{-S} -- generuj assembleru
+      \item \texttt{-c} -- generuj objektový soubor
+      \item \texttt{-x} -- definujeme jazyk souboru, když nelze určit dle
+	přípony (\texttt{-x c soubor\_v\_C -x assembler soubor\_v\_asm})
+      \item \texttt{-O} -- optimalizace (\texttt{-O0}, \texttt{-O2}, \dots)
+      \item \texttt{-W} -- varování (\texttt{-Wall}, \dots)
+    \end{itemize}
+
+    \pause
 
     \item Dokumentace
     \begin{itemize}
       \item Offline: \textsc{info}/\textsc{pinfo}
-      \item Na webu: \href{https://gcc.gnu.org/onlinedocs/}{\textit{Using the GNU Compiler Collection}}
+      \item Na webu: \href{https://gcc.gnu.org/onlinedocs/}{\textit{Using the
+	GNU Compiler Collection}}
     \end{itemize}
   \end{itemize}
 
@@ -285,14 +300,19 @@
       \item \cmd{echo -e '}\code{\#include <stdio.h>\\n int main() \{ puts("Hello"); return 0; \}}\cmd{' | ...}
     \end{itemize}
 
-    \item Spusttě všechny tři fáze (\texttt{-E}, \texttt{-S} a \texttt{-c})
-      jako samostatné příkazy propojené rourami
+    \item Spusťte všechny tři fáze (\texttt{-E}, \texttt{-S} a \texttt{-c})
+      postupně jako samostatné příkazy propojené rourami
     \begin{itemize}
+      \item \cmd{echo ... | gcc -E ...}
+      \item \cmd{echo ... | gcc -E ... | gcc -S ... }
       \item \cmd{echo ... | gcc -E ... | gcc -S ... | gcc -c ...}
     \end{itemize}
 
     \item Pozorujte \texttt{-E} a \texttt{-S} výstupy
     \item Zapněte optimalizace \texttt{-O2} a pozorujte oba výstupy znovu
+    \begin{itemize}
+      \item Mění optimalizace oba výstupy?
+    \end{itemize}
   \end{enumerate}
 \end{frame}
 

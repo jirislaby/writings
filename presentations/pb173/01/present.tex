@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{I. GIT a jádro}
-\date{16. 9. \the\year}
+\date{24. 9. \the\year}
 
 \begin{document}
 
@@ -24,9 +24,12 @@
 \begin{frame}
   \frametitle{Úvodní informace}
   \begin{itemize}
-  \item Semestr = 13 týdnů (14. 10.\ konference)
+    \item Semestr = 13 týdnů
+    \begin{itemize}
+      \item 15. 10.\ pravděpodobně konference
+    \end{itemize}
 
-  \pause
+    \pause
 
   \item Cvičící
   \begin{itemize}
@@ -52,7 +55,7 @@
 
   \pause
 
-  \item Vše potřebné ve studijních materiálech v \href{https://is.muni.cz/auth/el/1433/podzim2014/PB173/index.qwarp}{\nolinkurl{ISu}}
+  \item Vše potřebné ve studijních materiálech v \href{https://is.muni.cz/auth/el/1433/podzim2015/PB173/index.qwarp}{\nolinkurl{ISu}}
 
   \end{itemize}
 
@@ -61,11 +64,11 @@
 \begin{frame}
   \frametitle{Bodování úkolů}
 
-  \heading{Na začátku: 10 bodů za každý příklad}
+  \heading{10 bodů za každý příklad}
   \begin{itemize}
   \item -3 body za každý týden prodlení (termín je vždy do dalšího cvičení)
+  \item -3 body za bezpečnostní díru (ve slidech značené \pozor)
   \item -2 body za každé vrácení v případě nějaké nefunkčnosti
-  \item -2 body za bezpečnostní díru (ve slidech značené POZOR)
   \item -1 bod za kód neodpovídající stylu
   \item -1 bod za ostatní drobnosti
   \end{itemize}
@@ -75,7 +78,7 @@
 \begin{frame}
   \frametitle{S čím budeme pracovat?}
 
-  \heading{HW}
+  \heading{Hardware}
   \begin{itemize}
   \item Stroje satyr01--10
   \begin{itemize}
@@ -90,7 +93,7 @@
 \begin{frame}
   \frametitle{S čím budeme pracovat?}
 
-  \heading{SW}
+  \heading{Software}
   \begin{itemize}
   \item GIT
   \begin{itemize}
@@ -180,14 +183,17 @@
 	zkráceně \code{d3323c1503}
     \end{itemize}
 
-    \item \cmd{HEAD} je alias pro poslední
+    \item \cmd{HEAD} je alias pro horní/poslední commit
 
-    \item Lze odkazovat předchůdce pomocí \textasciitilde
+    \item Lze odkazovat předchůdce pomocí \textasciitilde\ nebo \textasciicircum
     \begin{itemize}
-      \item Např.\ \code{HEAD~1}, \code{d3323c1503~5}
+      \item Např.\ \code{HEAD}\textasciicircum\textasciicircum\textasciicircum,
+	\code{HEAD~1}, \code{d3323c1503~5}
     \end{itemize}
 
     \item Lze vytvořit jmenný alias, tzv.\ tag
+
+    \item Více: \doc{man gitrevisions}
 
   \end{itemize}
 
@@ -204,11 +210,12 @@
 
     \pause
 
-    \item Vygenerujte záplaty 2 posledních commitů (\cmd{git format-patch -2})
+    \item Vygenerujte záplaty ze 2 posledních commitů (\cmd{git format-patch
+      -2})
 
     \pause
 
-    \item Proveďte push (\cmd{git push}, pokud máte klon na aise)
+    \item Proveďte push (\cmd{git push}, jen pokud máte klon na aise)
 
   \end{enumerate}
 
@@ -227,12 +234,25 @@
 
   \heading{Záplaty v linuxovém jádře}
   \begin{enumerate}
-  \item Poslat odpovídajícímu správci (\file{scripts/get_maintainer.pl})
-  \item Poslat na ML ,,pull request'' a vystavit celý GIT strom
+    \item Poslat odpovídajícímu správci
+    \begin{itemize}
+      \item \file{scripts/get_maintainer.pl}
+      \item \cmd{git send-email}
+    \end{itemize}
+
+    \pause
+
+    \item Poslat na ML ,,pull request'' a vystavit celý GIT strom
+    \begin{itemize}
+      \item \cmd{git push}
+      \item \cmd{git request-pull}
+    \end{itemize}
   \end{enumerate}
 
+  \pause
+
   \begin{itemize}
-  \item Popis v \doc{Documentation/SubmittingPatches}
+    \item Zevrubný popis v \doc{Documentation/SubmittingPatches}
   \end{itemize}
 
 \end{frame}
@@ -246,8 +266,13 @@
 
   \heading{Hlavní rozdíly}
   \begin{itemize}
-    \item Žádné \emph{libc} (\code{printf}, \code{strlen}, \code{malloc},
-      \ldots), ani ostatní (pthread)
+    \item Žádné knihovny
+    \begin{itemize}
+      \item Zejména \emph{libc} (\code{printf}, \code{strlen}, \code{malloc},
+	\dots)
+      \item Ale ani ostatní (např.\ \file{m}, \file{pthread}, \file{ssl},
+	\file{z})
+    \end{itemize}
 
     \pause
 
@@ -275,16 +300,22 @@
   \frametitle{Kód}
 
   \begin{itemize}
-  \item Výhradně \emph{GNU C} (\xes už jen \textsc{gcc} $\geq$ 4.x)
-  \item Pevně daný \emph{CodingStyle}
-  \begin{itemize}
-  \item Kontrola: \cmd{scripts/checkpatch.pl} (není 100\%)
-  \end{itemize}
-  \item Vše slinkováno do jednoho
-  \begin{itemize}
-  \item \file{vmlinux} $\rightarrow$ \file{(b)zImage}
-  \item Ale moduly (standardní ELF: \file{*.ko})
-  \end{itemize}
+    \item Výhradně \emph{GNU C} (\xes už jen \textsc{gcc} $\geq$ 4.x)
+
+    \pause
+
+    \item Pevně daný \emph{CodingStyle}
+    \begin{itemize}
+      \item Kontrola: \cmd{scripts/checkpatch.pl} (není 100\%)
+    \end{itemize}
+
+    \pause
+
+    \item Vše slinkováno do jednoho celku
+    \begin{itemize}
+      \item \file{vmlinux} $\rightarrow$ \file{(b)zImage}
+      \item Ale moduly (standardní ELF: \file{*.ko})
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -296,7 +327,7 @@
   \begin{enumerate}
   \item Zvolte si jeden modul v systému (\cmd{lsmod})
   \item Zavolejte na něm \cmd{modinfo}
-  \item Proveďte \cmd{objdump -d} sekce \file{.modinfo} sekce
+  \item Proveďte \cmd{objdump -d} sekce \file{.modinfo}
   \item Porovnejte oba výstupy
   \end{enumerate}
 \end{frame}
@@ -314,7 +345,7 @@
   \medskip
 
   Demo: pomocí lxr najděte v jádře obecnou (v \file{lib/}) a optimalizovanou
-  (v \file{arch/}) implementaci \code{strlen}
+  pro \xes 32-bity (v \file{arch/x86/}) implementaci \code{strlen}
 \end{frame}
 
 \begin{frame}
@@ -338,7 +369,7 @@
     \item \cmd{make}, \cmd{insmod <modul.ko>}
   \end{itemize}
   \item Zkontrolujte výstup \cmd{dmesg}
-  \item Můžete udělat commit a push do svého repozitáře
+  \item Můžete udělat \cmd{commit} a \cmd{push} do svého repozitáře
   \end{enumerate}
 \end{frame}
 
@@ -348,7 +379,7 @@
   \frametitle{Paměť}
 
   \begin{itemize}
-  \item Omezený zásobník (4--8\,K)
+  \item \pozor: omezený zásobník (4--8\,K)
   \begin{itemize}
   \item Žádná nebo malá rekurze
   \item Jen pro malá data (\code{int}, malé \code{struct}, krátká pole, \dots)
@@ -408,4 +439,3 @@ kfree(mem);
 \end{frame}
 
 \end{document}
-
