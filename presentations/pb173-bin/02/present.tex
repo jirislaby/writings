@@ -5,7 +5,7 @@
 \newcommand{\ant}{\textsc{Antlr}\xspace}
 
 \subtitle{II. Parsery}
-\date{23. 9. \the\year}
+\date{1. 10. \the\year}
 
 \begin{document}
 
@@ -35,7 +35,7 @@
   \item \cmd{git pull --rebase}
   \end{itemize}
 
-  \item Studijní materiály v \href{https://is.muni.cz/auth/el/1433/podzim2014/PB173/index.qwarp}{\nolinkurl{ISu}}
+  \item Studijní materiály v \href{https://is.muni.cz/auth/el/1433/podzim2015/PB173/index.qwarp}{\nolinkurl{ISu}}
 
   \end{itemize}
 \end{frame}
@@ -153,7 +153,7 @@
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Struktura parseru}
+  \frametitle{Části parseru}
 
   \input{parser.tex}
 
@@ -170,7 +170,12 @@
 
   \item Syntaktická analýza
   \begin{itemize}
-  \item Převod sekvence tokenů na strom\dots
+    \item Dává sekvence tokenů smysl?
+    \item Ano $\Rightarrow$ sémantická analýza
+
+    \begin{itemize}
+      \item Přímá interpretace, tvorba AST, \dots
+    \end{itemize}
   \end{itemize}
 
   \end{enumerate}
@@ -178,7 +183,7 @@
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Abstraktní syntaktický strom (AST)}
+  \frametitle{Vnitřní struktury parseru}
 
   \begin{center}
   \begin{tabular}{ccc}
@@ -246,15 +251,17 @@ RCUR
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Analýzy v \ant}
+  \frametitle{Části parseru v \ant}
 
   \heading{\ant obsahuje obě části v jednom souboru}
   \begin{itemize}
     \item 2 typy pravidel
     \begin{itemize}
-      \item Počáteční velké písmeno -- lexikální
-      \item Počáteční malé písmeno -- syntaktická
+      \item Počáteční \emph{velké} písmeno -- lexikální
+      \item Počáteční \emph{malé} písmeno -- syntaktická
     \end{itemize}
+    \item \code{;} odděluje pravidla
+    \item \code{:} odděluje levou a pravou stranu pravidla
   \end{itemize}
 
   \pause
@@ -267,8 +274,8 @@ helloWorld
   ;
 
 /* lexikalni analyza */
-AHOJ
-  : 'Ahoj' // vytvori token AHOJ z retezce "Ahoj"
+AHOJ // vytvori token AHOJ, kdyz ...
+  : 'Ahoj' // ... narazi na retezec "Ahoj"
   ;
 
 SVETE
@@ -284,7 +291,7 @@ SVETE
     \item \code{|} odděluje možnosti
     \begin{itemize}
       \item Více možností: \code{zvirata : savci | obojzivelnici ;}
-      \item Kombinace podčásti: \code{zvirata : ('pe'|'ko') 's' ;}
+      \item Také kombinace podčástí: \code{strunatci : ('pe'|'ko') 's' ;}
     \end{itemize}
 
     \pause
@@ -294,6 +301,11 @@ SVETE
       \item \code{pravidlo?} -- 0--1krát (\code{nicNeboX : 'x'? ;})
       \item \code{pravidlo*} -- 0--$\infty$krát (\code{kolonaAut : 'auto'* ;})
       \item \code{pravidlo+} -- 1--$\infty$krát (\code{zvukHada : 's'+ ;})
+    \end{itemize}
+
+    \item Rozsahy
+    \begin{itemize}
+      \item \code{'A'..'Z'} -- celá ASCII abeceda
     \end{itemize}
 
     \item Speciální pravidlo pro konec souboru: \code{EOF}
@@ -311,13 +323,16 @@ SVETE
   \begin{enumerate}
     \item Prozkoumejte obsah \file{02/test/Parser.g}
     \item Vytvořte si token \code{NUMBER} pro čísla (\code{('0'..'9')+})
-    \item Vytvořte si tokeny \code{\+} a \code{\-} pro operace
+    \item Vytvořte si tokeny pro \code{\+} a \code{\-}
     \item Vytvořte si nové pravidlo \code{expr} pro tyto 2 operace
     \begin{itemize}
-      \item Bude obsahovat 2 řádky
+      \item Bude obsahovat 2 možnosti (oddělené \code{|})
       \item Pro sčítání např.\ \code{NUMBER PLUS NUMBER}
     \end{itemize}
-    \item Přidejte do \code{translationUnit} novou pravou stranu \code{expr+}
+    \item Přidejte do \code{translationUnit} novou možnost
+    \begin{itemize}
+      \item Bude odpovídat 1--$\infty$ opakováním \code{expr}
+    \end{itemize}
 
     \item Vyzkoušejte nově podporované vstupy
     \begin{itemize}
@@ -356,25 +371,28 @@ pravidlo1
 \section{Akce pravidel}
 \frame{\sectionpage}
 
-\begin{frame}
+\begin{frame}[fragile]
   \frametitle{Akce pravidel}
 
   \heading{Pravidla mohou obsahovat akce}
   \begin{itemize}
     \item Kód spouštěný při určitých událostech
-    \item \code{p : ID \{ x++; \} ID \{ x++; \} ID \{ puts("neco"); \} ;}
-
-    \pause
-
-    \item Akce můžou referencovat předcházející části
-    \begin{itemize}
-      \item Implicitně jménem tokenu/pravidla (\code{p : NUMBER \{ \$NUMBER... \} ;})
-
-      \pause
-
-      \item Nebo pojmenováním (\code{p : n1=NUMBER PLUS n2=NUMBER \{ \$n1 ... \$n2 ... \} ;})
-    \end{itemize}
+    \item \code{\{ C code \}} za pravostrannými tokeny
+    \item Vykoná se ihned, když token odpovídá vstupu
   \end{itemize}
+
+  \medskip
+
+  \begin{lstlisting}[language=XML, columns=fullflexible]
+p : ID {
+    puts("found an ID");
+  } ID {
+    puts("found second ID");
+  } ID {
+    puts("wow, 3 IDs");
+  }
+  ;
+  \end{lstlisting}
 
 \end{frame}
 
@@ -383,8 +401,11 @@ pravidlo1
 
   \heading{Akce pravidel}
   \begin{enumerate}
-    \item Dopište akce na konec jednotlivých pravidel \code{expr}
+    \item Dopište akce na konec obou možností \code{expr}
     \item Vypište nějaký text
+    \begin{itemize}
+      \item Ale různý pro každou možnost
+    \end{itemize}
     \item Vyzkoušejte
   \end{enumerate}
 
@@ -395,27 +416,40 @@ pravidlo1
 
   \heading{Každý token má vlastnosti}
   \begin{itemize}
-    \item \code{text} -- tokenizovaný řetězec (,,Ahoj'' pro AHOJ)
-    \begin{itemize}
-      \item Typ: \code{pANTLR3_STRING}, obsahuje \code{char *chars}
-      \item Pravidla jej mají také
-    \end{itemize}
     \item \code{line} -- zdrojový řádek
     \item \code{pos} -- zdrojový sloupec
+
+    \pause
+
+    \item \code{text} -- tokenizovaný řetězec (,,Ahoj'' pro AHOJ)
+    \begin{itemize}
+      \item Jak pro tokeny (pravé strany), tak pro pravidla (levé strany)
+      \item Typ: \code{pANTLR3_STRING}, obsahuje \code{char *chars}
+    \end{itemize}
+
+    \pause
+
+    \item Akce můžou odkazovat předcházející tokeny
+    \begin{itemize}
+      \item Implicitně jménem tokenu/pravidla (\code{p : NUMBER \{ \$NUMBER.line; \} ;})
+
+      \pause
+
+      \item Nebo pojmenováním (\code{p : n1=NUMBER PLUS n2=NUMBER \{ \$n2.pos; \} ;})
+    \end{itemize}
+
   \end{itemize}
 
-  \bigskip
+  \medskip
+  \pause
 
   \begin{lstlisting}[language=XML, columns=fullflexible]
-helloWorld
-  : x=AHOJ y=SVETE {
+helloWorld : x=AHOJ y=SVETE {
     printf("line=\%d col=\%d x=\%s y=\%s whole=\%s\n",
       $x.line, $x.pos,
-      $x.text->chars,
-      $y.text->chars,
+      $x.text->chars, $y.text->chars,
       $helloWorld.text->chars);
   }
-  | SVETE AHOJ { puts("Nepise se to obracene?"); }
   ;
   \end{lstlisting} %stopzone
 
@@ -430,7 +464,7 @@ helloWorld
     \begin{itemize}
       \item Vypište číslo řádku a sloupce pro obě čísla (\code{\$NUMBER.line} a
 	\code{\$NUMBER.pos})
-      \item Vypište obě čísla (\code{\$NUMBER.text->chars})
+      \item Vypište obě čísla jako řetězec (\code{\$NUMBER.text->chars})
     \end{itemize}
     \item Vyzkoušejte roztroušením textu po testovacím vstupu
   \end{enumerate}
@@ -442,10 +476,11 @@ helloWorld
 
   \heading{Každé pravidlo muže akceptovat/vracet hodnotu}
   \begin{itemize}
-    \item \code{pravidlo[type1 param1, ...] returns [type2 name] : pravaStrana;}
+    \item Stejně jako funkce
+    \item \code{levaStrana[type1 param1, ...] returns [typeR ret] : pravaStrana;}
     \begin{itemize}
       \item Pak lze v akcích odkazovat na \code{\$param1} typu \code{type1}
-      \item Akce musí nastavovat \code{\$name} typu \code{type2}
+      \item Akce \emph{musí} nastavovat \code{\$ret} typu \code{typeR}
     \end{itemize}
   \end{itemize}
 
@@ -460,7 +495,7 @@ expr[int par] returns [int ret]
   : n1=NUMBER PLUS n2=NUMBER {
     $ret = $par * atoi($n1.text->chars) + atoi($n2.text->chars);
   }
-  | SVETE AHOJ { puts("Nepise se to obracene?"); $ret = 0; }
+  | SVETE AHOJ { $ret = 0; }
   ;
   \end{lstlisting} %stopzone
 
@@ -494,13 +529,12 @@ expr[int par] returns [int ret]
 
   \heading{Každé pravidlo muže mít inicializace/ukončení}
   \begin{itemize}
-    \item Za jménem pravidla a parametry
-    \item Před středníkem
-    \item Inicializace: \code{@init\{ ... \}}
+    \item Na konci levé strany pravidla
+    \item Před aplikováním pravidla: \code{@init\{ ... \}}
     \begin{itemize}
       \item Např.\ inicializovat proměnné
     \end{itemize}
-    \item Ukončení: \code{@after\{ ... \}}
+    \item Po aplikování pravidla: \code{@after\{ ... \}}
     \begin{itemize}
       \item Např.\ počítání
     \end{itemize}
