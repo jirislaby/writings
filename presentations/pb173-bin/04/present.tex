@@ -15,6 +15,149 @@
 
 % radsi vysvetlit libebl...
 
+\section{ELF}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]
+  \frametitle{ELF}
+
+    \item Literatura
+    \begin{itemize}
+      \item System V Application Binary Interface (ELF)
+    \end{itemize}
+
+  \heading{Executable and Linkable Format}
+  \begin{itemize}
+    \item Hlavní souborový formát na Linuxu
+    \item Přenositelný, relokovatelný, rozšiřitelný
+
+    \pause
+
+    \item Struktura
+    \begin{itemize}
+      \item ELF hlavička
+
+      \pause
+
+      \item Hlavičky programové
+      \begin{itemize}
+	\item Pohled na data pro spuštění
+	\item Pro interpretr
+      \end{itemize}
+      \item Hlavičky sekcí
+      \begin{itemize}
+	\item Popis dat pro linkování, ladění apod.
+	\item Pro překladač, debugger, \dots
+      \end{itemize}
+
+      \pause
+
+      \item Data
+      \begin{itemize}
+	\item Odkazovány z obou typů hlaviček
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item \cmd{readelf} je specializovaný \cmd{objdump} pro ELF
+  \end{itemize}
+
+  \begin{textblock*}{5.1cm}(7.5cm,1.9cm)
+    \includegraphics[width=5.1cm]{Elf-layout--en}
+    \begin{center}
+      \tiny{Zdroj: wikipedia}
+    \end{center}
+  \end{textblock*}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{ELF hlavička}
+
+  \begin{itemize}
+    \item \cmd{readelf -h}
+    \item Magické číslo (\code{0x7f 'E' 'L' 'F'})
+    \item Typ, cílová architektura, stroj, systém, \dots
+    \item Metadata popisující hlavičky
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Úkol}
+  \begin{enumerate}
+    \item Vypište ELF hlavičku
+    \item Zjistěte počet hlaviček
+    \begin{itemize}
+      \item Programových
+      \item Sekcí
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Sekce}
+
+  \begin{itemize}
+    \item \cmd{readelf -S} (obsah sekce: \cmd{readelf -x},
+      popř.\ \cmd{readelf -p})
+    \item Vytvářené překladačem/linkerem
+    \item Čtené překladačem/linkerem/interpretrem
+
+    \pause
+
+    \item Předdefinované sekce:
+    \begin{itemize}
+      \item \code{.text}: kód
+      \item \code{.data}: nekonstantní data (proměnné)
+      \item \code{.rodata}: konstantní data (řetězce apod.)
+      \item \code{.bss}: data, která se inicializují při startu na 0
+      \item \code{.interp}: interpretr
+      \item \code{.symtab}: tabulka symbolů pro ladění (\cmd{strip})
+      \item \code{.dynsym}: tabulka symbolů pro dynamický linker
+      \item \code{.gnu_debuglink}: odkaz na soubor s ladicími informacemi
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+
+  Demo: ukázka sekcí
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Úkol}
+
+  \heading{Práce se sekcemi}
+  \begin{enumerate}
+    \item Vytvořte si soubor s \code{puts("hello")} a \code{puts("world")}
+    \item Vytvořte si vlastní sekci s daty
+    \begin{lstlisting}
+int __attribute__((section(".data.my_section"))) x = 3;
+    \end{lstlisting}
+    \item Vytvořte si vlastní sekci s funkcí (\code{.text.my_section})
+    \item Přeložte do \file{.o} a poté i slinkujte
+    \begin{itemize}
+      \item Mějte 2 soubory
+    \end{itemize}
+
+    \item Vypište si seznam sekcí v obou souborech (\cmd{readelf -S})
+    \item Vypište si obsah sekcí (\cmd{readelf -x})
+    \begin{itemize}
+      \item \code{.rodata} (zkuste i \cmd{readelf -p})
+      \item V \file{.o}: \code{.data.my_section}
+      \item V \file{.o}: \code{.text.my_section} (zkuste i \cmd{objdump -d})
+    \end{itemize}
+  \end{enumerate}
+
+  \medskip
+
+  Pozn.: tyto soubory nezahazujte.
+
+\end{frame}
+
 \begin{frame}
   \frametitle{ELF (opakování)}
 
