@@ -15,7 +15,6 @@
 
 \setbeamertemplate{navigation symbols}{}
 
-\usepackage[czech]{babel}
 \usepackage[utf8x]{inputenc}
 \usepackage{helvet}
 \usepackage{mathptmx}
@@ -33,6 +32,7 @@
 	minimum width=12mm, bottom color=black!15, top color=black!5}}
 \tikzset{tl_phase/.style={thick, draw, minimum size=8mm}}
 \tikzset{tl_edge/.style={<-, >=stealth', semithick}}
+\tikzstyle{na} = [baseline=-.5ex]
 
 \lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
 	breakatwhitespace=true,escapeinside={(*@}{@*)},
@@ -46,11 +46,11 @@
 \newcommand{\file}[2][]{\code[language=XML, #1]{#2}}
 
 \title{Static Analysis}
-\subtitle{Deployed Tools}
+\subtitle{Linux Kernel \& Used Tools}
 
 \author{Jiri~Slaby}
 
-\institute[SUSE Labs, FI MU]{SUSE Labs \\ and \\ Faculty of Informatics,
+\institute[SUSE Labs and FI MU]{SUSE Labs \\ and \\ Faculty of Informatics,
   Masaryk University}
 
 \date{21. 10. \the\year}
@@ -58,7 +58,7 @@
 \begin{document}
 
 \frame{\titlepage}
-\begin{frame}{Presentation Overview}
+\begin{frame}{Presentation Outline}
   \tableofcontents
 \end{frame}
 
@@ -67,8 +67,8 @@
 
 \begin{frame}[fragile]
   \frametitle{Introduction}
-  \framesubtitle{What is static analysis?}
 
+  \heading{What is static analysis?}
   \begin{itemize}
     \item Analysing code similar to code inspection
     \begin{itemize}
@@ -87,6 +87,8 @@
   \medskip
 
   \begin{block}{Example}
+    \begin{center}
+    \begin{tabular}{c}
     \begin{lstlisting}
 int foo(int a) {
   int b = 0;
@@ -95,17 +97,19 @@ int foo(int a) {
   return a / b;
 }
     \end{lstlisting}
+    \end{tabular}
+    \end{center}
   \end{block}
 
 \end{frame}
 
-\begin{frame}{Introduction}{Why to use static analysis?}
+\begin{frame}{Introduction}
 
-  \heading{Pros}
+  \heading{Why to use static analysis?}
   \begin{itemize}
     \item Can catch bugs in unlikely branches
     \begin{itemize}
-      \item Higher coverage
+      \item Usually much higher coverage
     \end{itemize}
 
     \pause
@@ -114,15 +118,24 @@ int foo(int a) {
     \begin{itemize}
       \item E.g.\ when checking drivers
     \end{itemize}
+
+    \pause
+
+    \item For debugging
+    \begin{itemize}
+      \item Where does this value in this variable come from?
+      \item Show me only code affecting this line/variable
+    \end{itemize}
+
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Introduction}{Why not?}
+\begin{frame}{Introduction}
 
-  \heading{Cons}
+  \heading{Why not?}
   \begin{itemize}
-    \item Produces false positives
+    \item False positives
     \begin{itemize}
       \item Imprecision in the state simulation
     \end{itemize}
@@ -132,6 +145,10 @@ int foo(int a) {
     \item May be slow
     \begin{itemize}
       \item Complex algorithms
+      \begin{itemize}
+	\item E.g.\ too precise state simulation to avoid false positives
+      \end{itemize}
+
       \item Complex code
       \begin{itemize}
 	\item E.g.\ find \code{y} such that \code{MD5(y) == 1} holds
@@ -143,9 +160,33 @@ int foo(int a) {
     \item The problem is \emph{generally undecidable}
     \begin{itemize}
       \item Not \emph{every} program can be reasoned about
-      \item We can try our best for the rest :)
+
+      \pause
+
+      \item This will not stop us to try our best for the rest :)
     \end{itemize}
 
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Scope of the Presentation}
+
+  \heading{In this presentation}
+  \begin{itemize}
+    \item Simple analyses
+    \item Abstract interpretation
+    \item Symbolic execution
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{\textbf{Not} in this presentation}
+  \begin{itemize}
+    \item Commercial tools
+    \item Model checking
+    \item \dots
   \end{itemize}
 
 \end{frame}
@@ -153,105 +194,456 @@ int foo(int a) {
 \section{Techniques and Tools}
 \frame{\sectionpage}
 
-\begin{frame}{The History}
+\subsection{Pattern Matching}
+
+\begin{frame}[fragile]{Pattern Matching}
 
   \begin{itemize}
-    \item Three papers laying down the foundation
+    \item Straightforward approach
+    \item \textsc{Grep}
+
+    \pause
+
+    \item \textsc{Coccinelle}
+    \item \textsc{FindBugs} (Java)
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{block}{\textsc{Grep} Example}
+  \begin{lstlisting}[language=XML]
+git grep -E '%[ +0#-]*#[ +0#-]*(\*|[0-9]+)?(\.(\*|[0-9]+)?)?p'
+  \end{lstlisting}
+  \footnotesize{(See commit f7f94af080f2ff5cf558908c7fcc7a66f0c8adf8.)}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Pattern Matching}{\textsc{Coccinelle}}
+
+  \begin{itemize}
+    \item Semantic patches
     \begin{itemize}
-      \item Kildall – A Unified Approach to Global Program Optimization
-      \item Cousot\&Cousot – Abstract interpretation: a unified lattice model
-	for static analysis of programs by construction or approximation of
-	fixpoints
-      \item King – Symbolic execution and program testing
+      \item Search ``this'' in ``this'' context
+      \item And replace by ``this''
+
+      \pause
+
+      \item Over 50 patches ready for immediate use
+      \begin{itemize}
+	\item See \file{scripts/coccinelle/}
+      \end{itemize}
+    \end{itemize}
+
+    \item Integrated into the Linux kernel build system
+    \begin{itemize}
+      \item \cmd{make coccicheck MODE=report}
+      \item $\Rightarrow$ Easy to use
+    \end{itemize}
+
+    \item SmPL language
+
+    \pause
+
+    \item Very useful for changing API
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{block}{Example}
+  \begin{lstlisting}[language=XML]
+$ make coccicheck MODE=report
+...
+drivers/staging/lustre/lustre/llite/dir.c:1055:8-15: WARNING opportunity for memdup_user
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\subsection{Data-Flow Analysis}
+
+\definecolor{darkblue}{rgb}{0.1, 0.1, 0.7}
+
+\begin{frame}[fragile]
+  \frametitle{Data-Flow Analysis in Example}
+
+  \begin{center}
+  \heading{Analyze possible values}
+
+  \medskip
+
+  \begin{tabular}{|c|c|c|c|c|} \hline
+  \multirow{2}{*}{Code} & \multicolumn{2}{|c|}{\uncover<2->{must-be}} &
+    \multicolumn{2}{|c|}{\uncover<3->{may-be}} \\ \cline{2-5}
+  & \textcolor{darkblue}{\code{a}} & \textcolor{red}{\code{b}} &
+    \textcolor{darkblue}{\code{a}} & \textcolor{red}{\code{b}} \\ \hline
+  \begin{lstlisting}
+void foo() {
+  int (*@\textcolor{darkblue}{a}@*), (*@\textcolor{red}{b}@*) = 0;
+  if (usually)
+    (*@\textcolor{darkblue}{a}@*) = 1;
+  else
+    (*@\textcolor{darkblue}{a}@*) = 0;
+  if ((*@\textcolor{red}{b}@*))
+    printf("%d\n", (*@\textcolor{red}{b}@*) / (*@\textcolor{darkblue}{a}@*));  (*@\textcolor{white}{'}@*)
+}
+  \end{lstlisting} &
+  \begin{uncoverenv}<2->
+  \begin{lstlisting}
+{}
+{}
+{}
+{ 1 }
+{}
+{ 0 }
+{}
+{}
+{}
+  \end{lstlisting}
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<2->
+  \begin{lstlisting}
+{}
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }(*@ \tikz[remember picture, na]\node[coordinate] (B0) {X}; @*)
+{ 0 }
+{ 0 }
+  \end{lstlisting}
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<3->
+  \begin{lstlisting}
+{}
+{}
+{}
+{ 1 }
+{}
+{ 0 }
+{ 0, 1 }
+{ 0, 1 }
+{}
+  \end{lstlisting}
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<3->
+  \begin{lstlisting}
+{}
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+{ 0 }
+  \end{lstlisting}
+  \end{uncoverenv}
+  \\ \hline
+  \end{tabular}
+  \end{center}
+
+%  \tikz[remember picture, na]\node (X) {X};
+%
+%  \begin{tikzpicture}[overlay]
+%    \path (X) edge (B0);
+%  \end{tikzpicture}
+
+\end{frame}
+
+\begin{frame}{Data-Flow Analysis}
+
+  \begin{itemize}
+    \item Described by Kildall in 1970s
+    \begin{itemize}
+      \item \textit{A Unified Approach to Global Program Optimization}
     \end{itemize}
 
     \pause
 
-    \item No big advances till 2000's
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Flow Analysis}{Use}
-
-  \begin{itemize}
-    \item Used for decades
+    \item Intensively used for decades
     \item Optimizing compilers
 
     \pause
 
     \item Static analysis
     \begin{itemize}
-      \item FindBugs (Java)
       \item Sparse, Smatch (C)
-      \item Lint, Splint (C)
       \item Clang analyzer (C, C++)
+      \item Lint, Splint (C) -- dead
       \item \dots
     \end{itemize}
   \end{itemize}
 
 \end{frame}
 
+\begin{frame}[fragile]{Data-Flow Analysis}{\textsc{Gcc}}
+
+  \begin{itemize}
+    \item Everybody should use their favourite -Wxyz
+    \item Integrated into the Linux kernel build system
+    \begin{itemize}
+      \item By definition
+      \item $\Rightarrow$ Easy to use
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{block}{Example}
+  \begin{lstlisting}[language=XML]
+$ make
+...
+drivers/hwmon/applesmc.c: In function 'applesmc_init_smcreg':
+drivers/hwmon/applesmc.c:595:43: warning: 'right_light_sensor' may be used uninitialized in this function [-Wmaybe-uninitialized]
+s->num_light_sensors = left_light_sensor + right_light_sensor;
+                                            ^
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Data-Flow Analysis}{\textsc{Sparse}}
+
+  \begin{itemize}
+    \item ``Semantic Parser''
+    \item Designed for development and debugging of the Linux kernel
+    \begin{itemize}
+      \item Many kernel-specific checks (address spaces, etc.)
+      \item Locking policy
+      \item Use of \code{0} instead of \code{NULL}
+      \item \dots
+    \end{itemize}
+
+    \item Integrated into the Linux kernel build system
+    \begin{itemize}
+      \item \cmd{make C=1}
+%      \item $\Rightarrow$ Easy to use
+    \end{itemize}
+
+    \item Framework for others
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{block}{Example}
+  \begin{lstlisting}[language=XML]
+$ make C=1
+...
+drivers/staging/android/ion/ion.c:1475:21: warning: incorrect type in assignment (different base types)
+drivers/staging/android/ion/ion.c:1475:21:    expected restricted gfp_t [usertype] gfp_mask
+drivers/staging/android/ion/ion.c:1475:21:    got int
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Data-Flow Analysis}{\textsc{Smatch}}
+
+  \begin{itemize}
+    \item ``Source Matcher''
+    \item Based on \textsc{Sparse} framework
+    \begin{itemize}
+      \item Aimed at Linux kernel too
+      \item More checks
+      \item DMA-on-stack, wrong arguments to API functions, \dots
+    \end{itemize}
+
+    \item Integrated into the Linux kernel build system
+    \begin{itemize}
+      \item \cmd{make C=1 CHECK="smatch -p=kernel"}
+%      \item $\Rightarrow$ Easy to use
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \begin{block}{Use}
+  \begin{lstlisting}[language=XML]
+$ make C=1 CHECK="smatch -p=kernel"
+...
+drivers/staging/comedi/drivers/pcl812.c:738 pcl812_ai_cmd() error: we previously assumed 'dma' could be null (see line 713)
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Data-Flow Analysis}{\textsc{Clang}}
+
+  \begin{itemize}
+    \item From LLVM framework
+    \item Besides compiler, contains also a static checker
+
+    \pause
+
+    \item \emph{Does not work} for Linux kernel yet
+  \end{itemize}
+
+\end{frame}
+
 \begin{frame}[fragile]
-  \frametitle{Flow Analysis}
-  \framesubtitle{Caveat}
+  \frametitle{Data-Flow Analysis}
+  \framesubtitle{Caveat for Static Analysis}
 
   \begin{center}
+  \heading{How to represent multiple values?}
+
+  \medskip
+
+  \begin{tabular}{c}
   \begin{lstlisting}
 int a = 0;
 while (something) {
   a++;
 }
   \end{lstlisting}
+  \end{tabular}
 
-  \begin{equation}
-  may\_be(a) = & \{ 0, 1, 2, \dots \} \\
-  |may\_be(a)| = & \infty
+  \begin{equation*}
+    \begin{aligned}
+      may\_be(a) = &\ \{ 0, 1, 2, \dots \} \\
+      count(may\_be(a)) = &\ \infty
+    \end{aligned}
+  \end{equation*}
   \end{center}
 
 \end{frame}
 
-\begin{frame}{\textsc{Coccinelle}}
+\subsection{Abstract Interpretation}
 
-  \heading{Pros}
+\begin{frame}{Abstract Interpretation}
+
+  \begin{itemize}
+    \item Described by Cousot\&Cousot in 1970s
+    \begin{itemize}
+      \item \textit{Abstract interpretation: a unified lattice model for static
+	analysis of programs by construction or approximation of fixpoints}
+    \end{itemize}
+
+    \item Handle states of programs abstractly
+    \item Forget irrelevant information
+    \item Arbitrary levels of abstraction
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \begin{center}
+  \begin{tabular}{|l|l|} \hline
+  \textbf{Original code} & \textbf{Abstraction} \\ \hline
+  \code{int}	& \code{Aint} \\
+  \code{0}	& \code{ZERO} \\
+  \code{..., -2, -1, 1, 2, ...} & \code{NONZERO} \\
+  \code{int a = 5 + 0;} & \code{Aint a = NONZERO + ZERO} \\ \hline
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Abstract Interpretation}
+  \framesubtitle{Example}
+
+  \begin{tabular}{|l|l|l|} \hline
+  Original Code & First Abstraction & Second Abstraction \\ \hline
+  \begin{lstlisting}
+void foo() {
+  int a;
+  switch (something) {
+    case 0: a = 5; break;
+    case 1: a = -1; break;
+    case 2: a = 0; break;
+  }
+  if (a == 0)
+    BUG();
+  else if (a == -2)
+    BUG();
+}
+  \end{lstlisting} &
+  \begin{lstlisting}
+void foo() {
+  Aint a;
+  switch (something) {
+    case 0: a = POS; break;
+    case 1: a = NEG; break;
+    case 2: a = ZERO; break;
+  }
+  if (a == ZERO)
+    BUG();
+  else if (a == NEG)
+    BUG();
+}
+  \end{lstlisting} &
+  \begin{lstlisting}
+void foo() {
+  int a;
+  switch (something) {
+    case 0: a = POS0; break;
+    case 1: a = NEG; break;
+    case 2: a = 0; break;
+  }
+  if (a == POS0)
+    BUG();
+  else if (a == NEG)
+    BUG();
+}
+  \end{lstlisting} \\ \hline
+  \end{tabular}
+
+  \bigskip
+  \pause
+
+  \begin{center}
+    \heading{Be careful with abstractions!}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Abstract Interpretation}{\textsc{Stanse}}
+
   \begin{itemize}
     \item Can catch unlikely branches bugs
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Sparse}
+\subsection{Symbolic Execution}
 
-  \heading{Pros}
+\begin{frame}
+  \frametitle{Symbolic Execution}
+
   \begin{itemize}
-    \item Can catch unlikely branches bugs
+    \item Described by King in 1970s
+    \begin{itemize}
+      \item \textit{Symbolic execution and program testing}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{\textsc{Smatch}}
+\begin{frame}{Symbolic Execution}{\textsc{Symbiotic}}
 
-  \heading{Pros}
   \begin{itemize}
-    \item Can catch unlikely branches bugs
+    \item XX
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{\textsc{Sparse}}
+\begin{frame}{Why to use different tools?}
 
-  \heading{Pros}
   \begin{itemize}
-    \item Can catch unlikely branches bugs
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{\textsc{Stanse}}
-
-  \heading{Pros}
-  \begin{itemize}
-    \item Can catch unlikely branches bugs
+    \item Different kind of errors
+    \item Different found subsets
+    \item Different speed
   \end{itemize}
 
 \end{frame}
