@@ -45,8 +45,8 @@
 	#1]$#2$}
 \newcommand{\file}[2][]{\code[language=XML, #1]{#2}}
 
-\title{Static Analysis}
-\subtitle{Linux Kernel \& Used Tools}
+\title{Overview of Static Analysis}
+\subtitle{Used on the Linux Kernel}
 
 \author{Jiri~Slaby}
 
@@ -84,7 +84,7 @@
   \end{itemize}
 
   \pause
-  \medskip
+  \bigskip
 
   \begin{block}{Example}
     \begin{center}
@@ -109,7 +109,7 @@ int foo(int a) {
   \begin{itemize}
     \item Can catch bugs in unlikely branches
     \begin{itemize}
-      \item Usually much higher coverage
+      \item Gives us usually much higher coverage
     \end{itemize}
 
     \pause
@@ -202,21 +202,22 @@ int foo(int a) {
     \item Straightforward approach
     \item \textsc{Grep}
 
-    \pause
+    \addtocounter{beamerpauses}{2}
 
-    \item \textsc{Coccinelle}
-    \item \textsc{FindBugs} (Java)
+    \item<+-> \textsc{Coccinelle}
+    \item<.-> \textsc{FindBugs} (Java)
   \end{itemize}
 
-  \pause
   \medskip
 
+  \begin{uncoverenv}<2->
   \begin{block}{\textsc{Grep} Example}
   \begin{lstlisting}[language=XML]
 git grep -E '%[ +0#-]*#[ +0#-]*(\*|[0-9]+)?(\.(\*|[0-9]+)?)?p'
   \end{lstlisting}
   \footnotesize{(See commit f7f94af080f2ff5cf558908c7fcc7a66f0c8adf8.)}
   \end{block}
+  \end{uncoverenv}
 
 \end{frame}
 
@@ -225,6 +226,7 @@ git grep -E '%[ +0#-]*#[ +0#-]*(\*|[0-9]+)?(\.(\*|[0-9]+)?)?p'
   \begin{itemize}
     \item Semantic patches
     \begin{itemize}
+      \item SmPL language
       \item Search ``this'' in ``this'' context
       \item And replace by ``this''
 
@@ -236,17 +238,16 @@ git grep -E '%[ +0#-]*#[ +0#-]*(\*|[0-9]+)?(\.(\*|[0-9]+)?)?p'
       \end{itemize}
     \end{itemize}
 
+    \pause
+
     \item Integrated into the Linux kernel build system
     \begin{itemize}
       \item \cmd{make coccicheck MODE=report}
-      \item $\Rightarrow$ Easy to use
     \end{itemize}
-
-    \item SmPL language
 
     \pause
 
-    \item Very useful for changing API
+    \item Very useful also for changing API
   \end{itemize}
 
   \pause
@@ -263,6 +264,7 @@ drivers/staging/lustre/lustre/llite/dir.c:1055:8-15: WARNING opportunity for mem
 \end{frame}
 
 \subsection{Data-Flow Analysis}
+\frame{\subsectionpage}
 
 \definecolor{darkblue}{rgb}{0.1, 0.1, 0.7}
 
@@ -270,13 +272,13 @@ drivers/staging/lustre/lustre/llite/dir.c:1055:8-15: WARNING opportunity for mem
   \frametitle{Data-Flow Analysis in Example}
 
   \begin{center}
-  \heading{Analyze possible values}
+  \heading{Find possible values of variables}
 
   \medskip
 
   \begin{tabular}{|c|c|c|c|c|} \hline
-  \multirow{2}{*}{Code} & \multicolumn{2}{|c|}{\uncover<2->{must-be}} &
-    \multicolumn{2}{|c|}{\uncover<3->{may-be}} \\ \cline{2-5}
+  \multirow{2}{*}{Code} & \multicolumn{2}{|c|}{\uncover<2->{may-be}} &
+    \multicolumn{2}{|c|}{\uncover<4->{must-be}} \\ \cline{2-5}
   & \textcolor{darkblue}{\code{a}} & \textcolor{red}{\code{b}} &
     \textcolor{darkblue}{\code{a}} & \textcolor{red}{\code{b}} \\ \hline
   \begin{lstlisting}
@@ -298,8 +300,8 @@ void foo() {
 { 1 }
 {}
 { 0 }
-{}
-{}
+{ 0, 1 }
+{ 0, 1 }
 {}
   \end{lstlisting}
   \end{uncoverenv}
@@ -312,13 +314,13 @@ void foo() {
 { 0 }
 { 0 }
 { 0 }
-{ 0 }(*@ \tikz[remember picture, na]\node[coordinate] (B0) {X}; @*)
+{ 0 }
 { 0 }
 { 0 }
   \end{lstlisting}
   \end{uncoverenv}
   &
-  \begin{uncoverenv}<3->
+  \begin{uncoverenv}<4->
   \begin{lstlisting}
 {}
 {}
@@ -326,13 +328,13 @@ void foo() {
 { 1 }
 {}
 { 0 }
-{ 0, 1 }
-{ 0, 1 }
+{}
+{}
 {}
   \end{lstlisting}
   \end{uncoverenv}
   &
-  \begin{uncoverenv}<3->
+  \begin{uncoverenv}<4->
   \begin{lstlisting}
 {}
 { 0 }
@@ -349,11 +351,10 @@ void foo() {
   \end{tabular}
   \end{center}
 
-%  \tikz[remember picture, na]\node (X) {X};
-%
-%  \begin{tikzpicture}[overlay]
-%    \path (X) edge (B0);
-%  \end{tikzpicture}
+  \uncover<3->{may-be(a) contains \code{0} at division $\Rightarrow$
+    division by zero?} \\
+  \uncover<5->{No, must-be(b) contains \code{0} $\Rightarrow$ whole \code{if}
+    is dead code} \\
 
 \end{frame}
 
@@ -374,9 +375,9 @@ void foo() {
 
     \item Static analysis
     \begin{itemize}
+      \item Lint, Splint (C) -- dead
       \item Sparse, Smatch (C)
       \item Clang analyzer (C, C++)
-      \item Lint, Splint (C) -- dead
       \item \dots
     \end{itemize}
   \end{itemize}
@@ -389,8 +390,7 @@ void foo() {
     \item Everybody should use their favourite -Wxyz
     \item Integrated into the Linux kernel build system
     \begin{itemize}
-      \item By definition
-      \item $\Rightarrow$ Easy to use
+      \item Obviously, by definition
     \end{itemize}
   \end{itemize}
 
@@ -414,7 +414,7 @@ s->num_light_sensors = left_light_sensor + right_light_sensor;
 
   \begin{itemize}
     \item ``Semantic Parser''
-    \item Designed for development and debugging of the Linux kernel
+    \item<+-> Designed for development and debugging of the Linux kernel
     \begin{itemize}
       \item Many kernel-specific checks (address spaces, etc.)
       \item Locking policy
@@ -422,18 +422,19 @@ s->num_light_sensors = left_light_sensor + right_light_sensor;
       \item \dots
     \end{itemize}
 
-    \item Integrated into the Linux kernel build system
+    \item<+-> Integrated into the Linux kernel build system
     \begin{itemize}
       \item \cmd{make C=1}
-%      \item $\Rightarrow$ Easy to use
     \end{itemize}
 
-    \item Framework for others
+    \addtocounter{beamerpauses}{1}
+
+    \item<+-> Framework for others
   \end{itemize}
 
-  \pause
   \medskip
 
+  \begin{uncoverenv}<3->
   \begin{block}{Example}
   \begin{lstlisting}[language=XML]
 $ make C=1
@@ -443,6 +444,7 @@ drivers/staging/android/ion/ion.c:1475:21:    expected restricted gfp_t [usertyp
 drivers/staging/android/ion/ion.c:1475:21:    got int
   \end{lstlisting} %stopzone
   \end{block}
+  \end{uncoverenv}
 
 \end{frame}
 
@@ -457,10 +459,11 @@ drivers/staging/android/ion/ion.c:1475:21:    got int
       \item DMA-on-stack, wrong arguments to API functions, \dots
     \end{itemize}
 
+    \pause
+
     \item Integrated into the Linux kernel build system
     \begin{itemize}
       \item \cmd{make C=1 CHECK="smatch -p=kernel"}
-%      \item $\Rightarrow$ Easy to use
     \end{itemize}
   \end{itemize}
 
@@ -482,20 +485,21 @@ drivers/staging/comedi/drivers/pcl812.c:738 pcl812_ai_cmd() error: we previously
   \begin{itemize}
     \item From LLVM framework
     \item Besides compiler, contains also a static checker
+    \begin{itemize}
+      \item \cmd{ccc-analyzer}
+    \end{itemize}
 
     \pause
 
-    \item \emph{Does not work} for Linux kernel yet
+    \item \emph{Cannot handle} Linux kernel yet
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Data-Flow Analysis}
-  \framesubtitle{Caveat for Static Analysis}
+\begin{frame}[fragile]{Data-Flow Analysis}{Caveat for Static Analysis}
 
   \begin{center}
-  \heading{How to represent multiple values?}
+  \heading{How to represent many values?}
 
   \medskip
 
@@ -508,6 +512,8 @@ while (something) {
   \end{lstlisting}
   \end{tabular}
 
+  \pause
+
   \begin{equation*}
     \begin{aligned}
       may\_be(a) = &\ \{ 0, 1, 2, \dots \} \\
@@ -519,6 +525,7 @@ while (something) {
 \end{frame}
 
 \subsection{Abstract Interpretation}
+\frame{\subsectionpage}
 
 \begin{frame}{Abstract Interpretation}
 
@@ -530,101 +537,353 @@ while (something) {
     \end{itemize}
 
     \item Handle states of programs abstractly
-    \item Forget irrelevant information
-    \item Arbitrary levels of abstraction
+    \begin{itemize}
+      \item Forget irrelevant information
+    \end{itemize}
   \end{itemize}
 
-  \medskip
   \pause
 
   \begin{center}
   \begin{tabular}{|l|l|} \hline
   \textbf{Original code} & \textbf{Abstraction} \\ \hline
   \code{int}	& \code{Aint} \\
+  \code{..., -2, -1 } & \code{NEG} \\
   \code{0}	& \code{ZERO} \\
-  \code{..., -2, -1, 1, 2, ...} & \code{NONZERO} \\
-  \code{int a = 5 + 0;} & \code{Aint a = NONZERO + ZERO} \\ \hline
+  \code{ 1, 2, ...} & \code{POS} \\
+  \code{int a = 5 + 0;} & \code{Aint a = POS + ZERO} \\ \hline\hline
+  \uncover<+(1)->{\code{a} is \code{5}} &
+    \uncover<.(1)->{\code{a} is \code{POS}} \\ \hline
   \end{tabular}
+
+  \pause
+  \medskip
+
+  What is \code{POS + NEG}?
+
+  \pause
+
+  Special value: \code{DONTKNOW} (usually $\top$)
   \end{center}
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Abstract Interpretation}
-  \framesubtitle{Example}
+\begin{frame}[fragile]{Abstract Interpretation}
+
+  \heading{Arbitrary levels of abstraction}
+
+  \smallskip
 
   \begin{tabular}{|l|l|l|} \hline
-  Original Code & First Abstraction & Second Abstraction \\ \hline
+  Original code & First abstraction & Second abstraction \\ \hline
+  \begin{uncoverenv}<+->
   \begin{lstlisting}
 void foo() {
   int a;
   switch (something) {
-    case 0: a = 5; break;
-    case 1: a = -1; break;
-    case 2: a = 0; break;
+  case -1:
+    a = -5; break;
+  case 0:
+    a = 0; break;
+  case 1:
+    a = 8; break;
   }
   if (a == 0)
     BUG();
   else if (a == -2)
     BUG();
 }
-  \end{lstlisting} &
+  \end{lstlisting}
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<+->
   \begin{lstlisting}
 void foo() {
   Aint a;
   switch (something) {
-    case 0: a = POS; break;
-    case 1: a = NEG; break;
-    case 2: a = ZERO; break;
+  case NEG:
+    a = NEG; break;
+  case ZERO:
+    a = ZERO; break;
+  case POS:
+    a = POS; break;
   }
   if (a == ZERO)
     BUG();
   else if (a == NEG)
-    BUG();
+    (*@\alert<+->{BUG();}@*)
 }
-  \end{lstlisting} &
+  \end{lstlisting}
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<+->
   \begin{lstlisting}
 void foo() {
-  int a;
+  AAint a;
   switch (something) {
-    case 0: a = POS0; break;
-    case 1: a = NEG; break;
-    case 2: a = 0; break;
+  case NEG:
+    a = NEG; break;
+  case POS0:
+    a = POS0; break;
+  /* the two
+     joined */
   }
   if (a == POS0)
-    BUG();
+    (*@\alert<+->{BUG();}@*)
   else if (a == NEG)
-    BUG();
+    (*@\alert<.->{BUG();}@*)
 }
-  \end{lstlisting} \\ \hline
+  \end{lstlisting}
+  \end{uncoverenv}
+  \\ \hline
   \end{tabular}
 
-  \bigskip
-  \pause
+  \smallskip
 
-  \begin{center}
-    \heading{Be careful with abstractions!}
-  \end{center}
+  \begin{uncoverenv}<+->
+    \begin{center}
+      \heading{Be careful with abstractions! \\
+      We can lose a lot of precision.}
+    \end{center}
+  \end{uncoverenv}
+
+\end{frame}
+
+\begin{frame}{Abstract Interpretation}
+
+  \heading{Formalism by Cousots}
+  \begin{itemize}[<+->]
+    \item Mechanism to design an abstraction
+    \item Is the abstraction correct?
+    \item Is an abstraction A more abstract than B?
+    \item Will the computation halt?
+  \end{itemize}
 
 \end{frame}
 
 \begin{frame}{Abstract Interpretation}{\textsc{Stanse}}
 
   \begin{itemize}
-    \item Can catch unlikely branches bugs
+    \item Developed at FI MU
+    \item Aimed at the Linux kernel
+    \item<+-> Interprocedural analysis
+
+    \item<+-> 4 checkers
+    \begin{itemize}[<+->]
+      \item AutomatonChecker -- check user described properties
+      \item LockChecker -- statistics about locks around variables
+      \item ThreadChecker -- find deadlocks in concurrent programs
+      \item ReachabilityChecker -- demonstration of the framework
+    \end{itemize}
   \end{itemize}
+
+  \begin{textblock*}{5cm}(7cm, 1.8cm)
+    \tikzstyle{stat} = [circle,thick,draw,minimum size=7mm]
+    \tikzstyle{edge} = [shorten <=1pt,>=stealth',semithick]
+    \begin{uncoverenv}<3->
+    \resizebox{5cm}{!}{
+    \begin{tikzpicture}[node distance=15mm,font=\sffamily]
+
+      \node [stat] (ERR) {\textbf{Err}}
+	edge [edge,loop above] node[right, xshift=2mm, yshift=-2mm]
+	  {\code{lock()}/\code{unlock()}} ();
+
+      \node [stat] (U) [below left=of ERR] {U}
+	edge [edge,->] node[above left] {\code{unlock()}} (ERR);
+
+      \node [stat] (L) [below right=of ERR] {L}
+	edge [edge,->] node[above right] {\code{lock()}} (ERR)
+	edge [edge,<-,bend right=12] node[above] {\code{lock()}} (U)
+	edge [edge,->,bend left=12] node[below] {\code{unlock()}} (U);
+
+      \node [left=6mm of U] {}
+	edge [edge,->] node {} (U);
+
+    \end{tikzpicture} }
+    \end{uncoverenv}
+  \end{textblock*}
+
+\end{frame}
+
+\begin{frame}[fragile]{Abstract Interpretation}{\textsc{Stanse}}
+
+  \begin{block}{Example}
+  \begin{lstlisting}[language=XML]
+$ JOB_FILE=`pwd`/jf make CC=stcc
+...
+$ stanse --jobfile jf -c AutomatonChecker:/usr/share/stanse/checkers/AutomatonChecker/kernel_locking_irq.xml
+...
+File: drivers/staging/wilc1000/wilc_msgqueue.c ...
+...
+<1>     *** error found: leaving function in locked state at line 108
+<1>     *** 1 error(s) found
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Abstract Interpretation}{Caveat for Static Analysis}
+
+  \begin{center}
+  \begin{tabular}{|l|l|} \hline
+  Code & may-be(a) \\ \hline
+  \begin{uncoverenv}<+->
+  \begin{lstlisting}
+Aint a = ZERO;
+if ((*@\alert<.(3)>{X}@*))
+  a = POS;
+Aint b = compute();
+if ((*@\alert<.(3)>{X}@*))
+  printf("%d\n", b / a);
+  \end{lstlisting} %stopzone
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<+->
+  \begin{lstlisting}
+{ ZERO }
+{ ZERO }
+{ POS }
+{ ZERO, POS }
+{ ZERO, POS }
+{ (*@\alert<.(1)>{ZERO}@*), POS }
+  \end{lstlisting}
+  \end{uncoverenv}
+  \\ \hline
+  \end{tabular}
+
+  \addtocounter{beamerpauses}{-1}
+  \pause
+  \bigskip
+
+  \heading{Division by zero?}
+
+  \pause
+  \medskip
+
+  \heading{\code{X} did not change $\Rightarrow$ not at all!}
+  \end{center}
 
 \end{frame}
 
 \subsection{Symbolic Execution}
 
-\begin{frame}
-  \frametitle{Symbolic Execution}
+\begin{frame}[fragile]{Symbolic Execution}
 
   \begin{itemize}
     \item Described by King in 1970s
     \begin{itemize}
       \item \textit{Symbolic execution and program testing}
+    \end{itemize}
+
+    \item Handle program states symbolically
+    \begin{itemize}
+      \item Remember relations between variables
+      \item Use (SMT) solver on branchings
+      \item Often works on binary language
+    \end{itemize}
+
+    \pause
+
+    \item Minimum false positives
+
+  \end{itemize}
+
+  \pause
+
+  \begin{center}
+  \begin{tabular}{|l|l|} \hline
+  Code & Symbolic state \\ \hline
+  \begin{uncoverenv}<+->
+  \begin{lstlisting}
+Aint a = ZERO;
+if (X)
+  a = POS;
+Aint b = compute();
+if (X)
+  printf("%d\n", b / a);
+  \end{lstlisting} %stopzone
+  \end{uncoverenv}
+  &
+  \begin{uncoverenv}<+->
+  \begin{lstlisting}
+a=ZERO
+a=ZERO
+(!X && a=ZERO) || (X && a=POS)
+(!X && a=ZERO) || (X && a=POS)
+(!X && a=ZERO) || (X && a=POS)
+(!X && a=ZERO) || ((*@\alert{X \&\& a=POS}@*))
+  \end{lstlisting}
+  \end{uncoverenv}
+  \\ \hline
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Symbolic Execution}
+
+  \heading{Use}
+  \begin{itemize}
+    \item In 1970s, not enough computer power
+
+    \pause
+
+    \item Since \textasciitilde 2000, computers are finally powerful enough
+    \begin{itemize}
+      \item Execution needs longer time to finish anyway
+      \item Loops take time
+      \item Symbolic space consumes memory
+    \end{itemize}
+
+    \pause
+
+    \item (Unit) test generation
+    \begin{itemize}
+      \item Klee (LLVM)
+    \end{itemize}
+
+    \pause
+
+    \item Finding bugs
+    \begin{itemize}
+      \item Pex (.NET)
+      \item Sage (x86, ARM)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Symbolic Execution}{\textsc{Klee}}
+
+  \begin{itemize}
+    \item Executes LLVM
+
+    \pause
+
+    \item Reports only asserts (and memory errors)
+    \begin{itemize}
+      \item But we can add \code{assert(whatever)}
+    \end{itemize}
+
+    \pause
+
+    \item Generates counter-examples
+    \begin{itemize}
+      \item E.g.\ a disk to be mounted
+    \end{itemize}
+
+    \pause
+
+    \item Ran by authors on Coreutils
+    \begin{itemize}
+      \item 10 bugs found
+    \end{itemize}
+
+    \pause
+
+    \item It is relatively slow on large codebases
+    \begin{itemize}
+      \item Sometimes unusable
     \end{itemize}
   \end{itemize}
 
@@ -633,17 +892,78 @@ void foo() {
 \begin{frame}{Symbolic Execution}{\textsc{Symbiotic}}
 
   \begin{itemize}
-    \item XX
+    \item The heart is \textsc{Klee}
+
+    \pause
+
+    \item Employs program slicing before execution
+    \begin{itemize}
+      \item Slice away uninteresting code
+    \end{itemize}
+
+    \pause
+
+    \item Instruments code
+    \begin{itemize}
+      \item Support for other than asserts (esp.\ locking)
+    \end{itemize}
+
+    \pause
+
+    \item Crashed btrfs mount path code
+    \begin{itemize}
+      \item Ongoing work
+    \end{itemize}
+
+    \pause
+
+    \item Participates in SV-COMP
+
+    \pause
+
+    \item Very precise, but not that easy to run on kernel
+    \begin{itemize}
+      \item Only authors do
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\section{Summary}
+\frame{\sectionpage}
+
+\begin{frame}{Approaches summary}
+
+  \begin{itemize}
+    \item Pattern matching
+    \item Data-Flow analysis
+    \item Abstract interpretation
+    \item Symbolic execution
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}{Why to use different tools?}
 
+  \heading{Tools differ}
   \begin{itemize}
-    \item Different kind of errors
-    \item Different found subsets
-    \item Different speed
+    \item Different kinds of errors
+    \item Different found errors of the same error kind
+    \item Different speed on particular code
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Combination of techniques}
+  \begin{itemize}
+    \item Fast and precise
+    \item One supports the other
+    \item To overcome significant issues
+    \begin{itemize}
+      \item State explosion (too small memory)
+      \item Solver limits (floating arithmetics, bitvectors, \dots)
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -651,12 +971,21 @@ void foo() {
 \section{Conclusion}
 
 \begin{frame}{Conclusion}
-  XXX \\
 
-  \bigskip
-  \pause
+  \begin{center}
+    \heading{\Large{Many approaches to check the Linux kernel}}
 
-  \heading{Questions?}
+    \medskip
+
+    \heading{\Large{Try some out}}
+
+    \pause
+    \bigskip
+    \bigskip
+    \bigskip
+
+    \heading{\LARGE{Questions?}}
+  \end{center}
 \end{frame}
 
 \end{document}
