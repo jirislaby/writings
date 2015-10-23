@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{V. Paměť}
-\date{14. 10. \the\year}
+\date{29. 10. \the\year}
 
 \begin{document}
 
@@ -189,11 +189,60 @@
 \begin{frame}
   \frametitle{Grafické shrnutí}
 
-  \begin{figure}
-  \includegraphics[height=7.5cm]{MMU_and_IOMMU.pdf}
+  \begin{center}
+  \resizebox{!}{.85\textheight}{
+    \pgfdeclarelayer{background}
+    \pgfsetlayers{background,main}
 
-  \tiny Zdroj: wikipedia
-  \end{figure}
+    \tikzstyle{ent} = [rectangle, thick, draw, inner sep=12pt,fill=white]
+%      fill=orange!25]
+    \tikzstyle{mmu} = [ent, rounded corners=8pt, minimum width=2.2cm]
+    \tikzstyle{arr} = [->, >=stealth', thick]
+    \tikzstyle{note} = [font=\footnotesize]
+    \tikzstyle{empty} = [inner sep=0pt, minimum size=0pt]
+    \tikzstyle{fillline} = [thick, dotted]
+
+    \begin{tikzpicture}[node distance=8mm]
+        \node [ent, minimum width=6cm] (MEM) { RAM };
+        \node [note] (PHYS) [below=1.5mm of MEM] { Physical addresses };
+
+	\node [empty] (MEML) [below=0mm of MEM,xshift=-1.9cm] {};
+	\node [empty] (MEMR) [below=0mm of MEM,xshift=1.9cm] {};
+
+        \begin{uncoverenv}<2->
+        \node [mmu] (IOMMU) [below=of MEML] { IOMMU }
+	  edge[arr] node {} (MEML);
+        \node [ent] (DEV) [below=of IOMMU, align=center] {
+	  Device \\[-1.5mm] \tiny{(DMA)} }
+	  edge[arr] node [note, right, align=left] {Device \\ addresses} (IOMMU);
+        \end{uncoverenv}
+
+        \node [mmu] (MMU) [below=of MEMR] { MMU }
+	  edge[arr] node {} (MEMR);
+        \node [ent] (CPU) [below=of MMU, align=center] {
+	  CPU \\[-1.5mm] \tiny{(program)} }
+	  edge[arr] node [left, note, align=right] {Virtual \\ addresses} (MMU);
+
+	\node[empty] (CENR) [right=3mm of MMU] {};
+	\node[empty] (CENL) [left=3mm of IOMMU] {};
+	\node[empty] (TL) [above=2.8cm of CENL] {};
+	\node[empty] (TR) [above=2.8cm of CENR] {};
+	\node[empty] (CEN) [right=3.3cm of CENL] {};
+	\node[empty] (BL) [below=3.1cm of CENL] {};
+	\node[empty] (BR) [below=3.1cm of CENR] {};
+	\node[empty] (BOT) [right=3.3cm of BL] {};
+
+	\begin{pgfonlayer}{background}
+	\fill[color=green!25] (TL) rectangle (CENR);
+	\fill<2->[color=blue!25] (CENL) rectangle (BOT);
+	\fill[color=red!25] (CEN) rectangle (BR);
+	\draw[fillline,color=green] (CENL) -- (TL) -- (TR) -- (CENR);
+	\draw<2->[fillline,color=blue] (CENL) -- (CEN) -- (BOT) -- (BL) -- (CENL);
+	\draw[fillline,color=red] (CEN) -- (CENR) -- (BR) -- (BOT);
+	\end{pgfonlayer}
+    \end{tikzpicture}
+  }~~~~~~~~~~~~~
+  \end{center}
 
 \end{frame}
 
@@ -258,7 +307,7 @@
   \frametitle{Alokace paměti}
 
   \heading{Základní typy alokací}
-  \begin{itemize}
+  \begin{itemize}[<+->]
   \item Malé bloky až souvisle po stránkách (\code{kmalloc})
   \item Souvisle po stránkách (\code{__get_free_pages})
   \item Nesouvisle po stránkách a namapovat (\code{vmalloc})
@@ -325,12 +374,13 @@
   \begin{itemize}
   \item Musí najít souvislý blok volných stránek
   \begin{itemize}
-    \item Může být problém najít větší bloky (řádu $>=$ 2) kvůli fragmentaci
+    \item Může být problém najít větší bloky ($\geq$ 4 stránky) kvůli
+      fragmentaci
   \end{itemize}
 
   \item Rychlejší než \code{kmalloc}
 
-  \item Používá tzv. \emph{buddy} systém
+  \item Používá tzv.\ \emph{buddy} systém
   \begin{itemize}
     \item Snižuje fragmentaci
     \item Podrobnosti viz wiki nebo Překladače
@@ -342,7 +392,8 @@
   \item Velikost alokace se udává řádem, \code{order} ($2^{order}$ = počet
     stránek)
   \begin{itemize}
-    \item \code{get_order}, \code{MAX_ORDER} (na x86 = 11 $=$ 8M)
+    \item \code{get_order}, \code{MAX_ORDER} (na x86: 11, tj.\
+      $2^{11} \cdot 4\text{k} = 8\text{M}$)
   \end{itemize}
 
   \item \code{__get_free_pages}, \code{free_pages}
@@ -364,7 +415,7 @@
   \heading{Virtuální alokátor}
   \begin{itemize}
   \item Použitím podobný \code{kmalloc}
-  \item Neatomický (vnitřně používá \code{GFP_KERNEL})
+  \item \pozor: neatomický (vnitřně používá \code{GFP_KERNEL})
   \item Maximální velikost alokace daná omezením architektury
   \begin{itemize}
     \item x86: 128\,MiB (lze zvýšit parametrem, ne o moc)
