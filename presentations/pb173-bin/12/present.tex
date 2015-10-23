@@ -2,9 +2,9 @@
 
 \input{../header.tex}
 
-\subtitle{XII. Komunikace mezi procesy, část 2}
+\subtitle{XI. Komunikace mezi procesy, část 1}
 
-\date{10. 12. 2013}
+\date{2. 12. \the\year}
 
 \begin{document}
 \shorthandoff{-}
@@ -19,334 +19,399 @@
   Alespoň 2 procesy, které chtějí komunikovat
 
   \bigskip
+  \pause
 
-  \heading{Minule}
-  \begin{itemize}
-    \item Roura (\code{pipe})
-    \item Sdílená paměť (\code{mmap})
-    \item Plná meziprocesová komunikace (IPC)
-  \end{itemize}
+  \heading{Dnes}
+
+  \tableofcontents
 
   \pause
   \medskip
 
-  \heading{Dnes}
-  \tableofcontents
-
-\end{frame}
-
-\section{Netlink}
-\frame{\sectionpage}
-
-\begin{frame}
-  \frametitle{Netlink}
-
+  \heading{Příště}
   \begin{itemize}
-    \item Protokol pro komunikaci s jádrem
-    \begin{itemize}
-      \item Standardní socket (\header{sys/socket.h})
-      \item Ale umožňuje i komunikaci mezi procesy
-    \end{itemize}
-
-    \pause
-
-    \item Adresování: \code{struct sockaddr_nl} (\header{linux/netlink.h})
-    \begin{itemize}
-      \item \code{nl_family = AF_NETLINK}
-      \item \code{nl_pid} je většinou číslo procesu
-    \end{itemize}
-
-    \pause
-
-    \item Vytvoření: \code{socket(AF_NETLINK, SOCK_RAW, NETLINK_USERSOCK)}
-
-    \pause
-
-    \item Server
-    \begin{itemize}
-      \item Provede \code{bind} s nastaveným \code{sockaddr_nl.nl_pid}
-      \item Potom poslouchá pomocí \code{recvmsg}
-    \end{itemize}
-
-    \pause
-
-    \item Klient
-    \begin{itemize}
-      \item Posílá pomocí \code{sendmsg}
-    \end{itemize}
-
-    \pause
-
-    \item Zpráva: \code{struct nlmsghdr}
-    \begin{itemize}
-      \item Operace: \code{NLMSG_DATA} (data), \code{NLMSG_PAYLOAD} (délka),
-        \dots
-    \end{itemize}
-
+    \item Netlink
+    \item RPC
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Vytvoření netlink komunikace} (bez hlaviček, jen \code{char *})
-  \begin{enumerate}
-    \item Otevřete si kostru v \file{pb173-bin/12/netlink.c}
-    \item Doplňte server a klient (tři TODO)
-
-    \item V serveru proveďte:
-    \begin{itemize}
-      \item \code{bind} s nastaveným \code{sockaddr_nl.nl_pid}
-      \item A v cyklu opakujte \code{recv} a \code{write} na standardní výstup
-    \end{itemize}
-
-    \item V klientovi proveďte:
-    \begin{itemize}
-      \item \code{sendto} nějakých dat
-    \end{itemize}
-
-    \item Vyzkoušejte
-    \begin{itemize}
-      \item Vypsaný PID použijte jako adresu v klientovi
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\section{RPC}
+\section{Roura}
 \frame{\sectionpage}
 
 \begin{frame}
-  \frametitle{RPC}
+  \frametitle{Roury}
 
   \begin{itemize}
-    \item Vzdálené volání procedur
+    \item Jednosměrná komunikace
     \begin{itemize}
-      \item Volání funkcí přes síť
-      \item UDP nebo TCP
-      \item Předávání parametrů a návratových hodnot
-      \item Využití např.\ v NFS
+      \item Jádro při \code{fork} kopíruje deskriptory
     \end{itemize}
 
     \pause
 
-    \item Portmapper
+    \item Vytvoření: \code{pipe}
     \begin{itemize}
-      \item Lokální služba
-      \item Mapuje číslo ,,programu'' (funkce), jeho verzi a protokol na funkce
-      \begin{itemize}
-        \item Registrovaná čísla v \file{/etc/rpc}
-      \end{itemize}
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\subsection{RPC rozhraní pro server}
-
-\begin{frame}
-  \frametitle{RPC rozhraní pro server}
-
-  \begin{itemize}
-    \item \header{rpc/rpc.h}, \cmd{man 3 rpc}
-    \item Vytvoření spojení: \code{svctcp_create}, \code{svcudp_create}
-    \begin{itemize}
-      \item Parametr: socket nebo \code{RPC_ANYSOCK}
-    \end{itemize}
-
-    \pause
-    
-    \item Registrace volatelného ,,programu'' (funkce): \code{svc_register}
-    \begin{itemize}
-      \item Registruje program u portmapperu pomocí \code{pmap_set}
-      \item Viditelné v \cmd{rpcinfo -p}
-      \item Je zvykem před tím volat \code{pmap_unset}
-      \begin{itemize}
-        \item Zruší případnou zastaralou registraci
-      \end{itemize}
+      \item Vrací pole 2 deskriptorů (+ návratovou hodnotu)
+      \item Jeden pro potomka, druhý pro rodiče
 
       \pause
 
-      \item Volá se funkce udaná parametrem \code{dispatch}
+      \item Provede se \code{fork}
+      \item Zavřou se nepotřebné deskriptory
+      \item Čte se z prvního deskriptoru (\code{read})
+      \item Zapisuje se do druhého deskriptoru (\code{write})
+    \end{itemize}
+
+    \pause
+
+    \item \code{popen}=\code{pipe}+\code{fork}+\code{exec}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření ,,echa'' přes roury}
+  \begin{enumerate}
+    \item Vytvořte si 2 roury
+    \begin{itemize}
+      \item Pro obousměrnou komunikaci
+      \item Budete mít \code{fd1[2]} a \code{fd2[2]}
+    \end{itemize}
+    \item Proveďte \code{fork}
+    \item Zavřete nepotřebné deskriptory
+
+    \item V jednom procesu v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Do \code{fd1[1]} zapisujte měnící se text
       \begin{itemize}
-        \item Parametr \code{svc_req->rq_proc} určuje funkcionalitu
+	\item Např.\ \code{char buf[10] = "Hello";} a \code{(*buf)++;}
+      \end{itemize}
+      \item Z \code{fd2[0]} čtěte a vypisujte na standardní výstup
+    \end{itemize}
+
+    \item V druhém procesu (loopback):
+    \begin{itemize}
+      \item Čtěte z \code{fd1[0]}
+      \item A zapisujte to do \code{fd2[1]}
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\subsection{Pojmenovaná roura}
+
+\begin{frame}
+  \frametitle{Pojmenovaná roura}
+
+  \begin{itemize}
+    \item Soubor na disku
+    \item \code{mknod}
+    \item \heading{Demo}
+  \end{itemize}
+
+\end{frame}
+
+\section{Sdílená paměť}
+\frame{\sectionpage}
+
+\begin{frame}
+  \frametitle{Sdílená paměť}
+
+  \begin{itemize}
+    \item Mapování a sdílení paměti
+    \begin{itemize}
+      \item Jádro při \code{fork} kopíruje mapování
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{mmap} s \code{MAP_ANONYMOUS | MAP_SHARED}
+    \begin{itemize}
+      \item Provede se \code{fork}
+      \item Paměť je volně k dispozici oběma procesům
+      \item Jen pozor na optimalizace překladače
+      \begin{itemize}
+	\item \code{volatile}
       \end{itemize}
     \end{itemize}
-
-    \pause
-
-    \item Obslužná smyčka: \code{svc_run}
   \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{RPC rozhraní pro server}{Příklad}
-
-\begin{lstlisting}
-#define RUSERSPROG 0x40000000
-#define RUSERSVERS 1
-
-static void dispatch(struct svc_req *req, SVCXPRT *xprt)
-{
-  printf("request %ld\n", req->rq_proc);
-}
-
-int main(void) {
-  SVCXPRT *xprt = svctcp_create(RPC_ANYSOCK, 0, 0);
-  svc_register(xprt, RUSERSPROG, RUSERSVERS, dispatch, IPPROTO_TCP);
-  svc_run();
-
-  return 0;
-}
-\end{lstlisting} %stop_zone
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Vytvoření RPC serveru}
-  \begin{enumerate}
-    \item Vytvořte si TCP spojení (\code{svctcp_create} a \code{RPC_ANYSOCK})
-    \item Zvolte si čísla programu a verze
-    \begin{itemize}
-      \item Vyhněte se číslům programů z \file{/etc/rpc}
-    \end{itemize}
-
-    \item Zrušte stará mapování (\code{pmap_unset})
-
-    \item Registrujte službu (\code{svc_register})
-    \begin{itemize}
-      \item V \code{dispatch} funkci proveďte výpis \code{svc_req->rq_proc}
-    \end{itemize}
-
-    \item Spusťte smyčku (\code{svc_run})
-    \item Spusťte program
-    \begin{itemize}
-      \item Za předpokladu, že běží portmapper
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\subsection{RPC rozhraní pro klienta}
-
-\begin{frame}[fragile]
-  \frametitle{RPC rozhraní pro klienta}
-
-  \begin{itemize}
-    \item Vytvoření spojení: \code{clnt_create}
-    \begin{itemize}
-      \item Stroj, protokol a číslo programu+verze
-    \end{itemize}
-
-    \item Zrušení spojení: \code{clnt_destroy}
-
-    \pause
-    
-    \item Zavolání programu (funkce): \code{clnt_call}
-    \begin{itemize}
-      \item 2.\ parametr do \code{dispatch} jako \code{svc_req->rq_proc}
-      \item 3.\ a 5.\ parametr: kódovací funkce (zatím \code{xdr_void})
-      \item 4.\ a 6.\ parametr: parametry vzdálené funkce (zatím \code{NULL})
-      \item Timeout: čas na odpověď
-    \end{itemize}
-  \end{itemize}
-
-\begin{block}{Příklad}
-\begin{lstlisting}
-struct timeval tout = { 1, 0 };
-CLIENT *cln = clnt_create("localhost", RUSERSPROG, RUSERSVERS, "tcp");
-clnt_call(cln, 1, (xdrproc_t)xdr_void, NULL, (xdrproc_t)xdr_void, NULL, tout);
-clnt_destroy(cln);
-\end{lstlisting} %stop_zone
-\end{block}
 
 \end{frame}
 
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Vytvoření RPC klienta}
+  \heading{Vytvoření sdílené paměti}
   \begin{enumerate}
-    \item Vytvořte si TCP spojení na localhost (\code{clnt_create})
+    \item Vytvořte si sdílené mapování
+    \item Proveďte \code{fork}
+
+    \item V jednom procesu v cyklu o několika iteracích:
     \begin{itemize}
-      \item Použijte čísla zvolená v serveru
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
     \end{itemize}
-    \item Zavolejte několikrát \code{clnt_call}
+
+    \item V druhém procesu:
     \begin{itemize}
-      \item S různým 2.\ parametrem
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
     \end{itemize}
-    \item Spusťte program
-    \begin{itemize}
-      \item Za předpokladu, že server běží
-    \end{itemize}
+
+    \item Spusťte
   \end{enumerate}
 
 \end{frame}
 
-\subsection{XDR}
+\section{Plná meziprocesová komunikace}
+\frame{\sectionpage}
 
 \begin{frame}
-  \frametitle{RPC a parametry}
+  \frametitle{IPC}
 
-  \heading{XDR}
   \begin{itemize}
-    \item \header{rpc/xdr.h}, \cmd{man 3 xdr}
-    \item Funkce k přenositelnému zakódování dat
+    \item Plná meziprocesová komunikace
     \begin{itemize}
-      \item \code{xdr_void}
-      \item \code{xdr_char}, \code{xdr_short}, \code{xdr_int}, \code{xdr_long}
-      \item \code{xdr_float}, \code{xdr_double}
-      \item \code{xdr_string}, \code{xdr_array}
+      \item Sdílená paměť
+      \item Zprávy
+      \item Semafory
+    \end{itemize}
+
+    \pause
+
+    \item Výpis: \cmd{ipcs} (\heading{Demo})
+    \item Dokumentace: \cmd{man 5 ipc}
+    \item \header{sys/ipc.h}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{IPC}{Klíče}
+
+  \begin{itemize}
+    \item IPC pracuje s klíči (\code{key_t})
+    \item Procesy komunikují pomocí klíče
+    \begin{itemize}
+      \item Jen pokud mají stejný
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření klíče: \code{ftok} (\header{sys/ipc.h})
+    \begin{itemize}
+      \item Cesta k existujícímu uzlu
+      \item Nějaké 8bitové číslo
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ \code{ftok(".", 'x')}
+  \end{itemize}
+
+\end{frame}
+
+\subsection{Sdílená paměť}
+
+\begin{frame}{IPC}{Sdílená paměť}
+
+  \begin{itemize}
+    \item \header{sys/shm.h}
+    \item Vytvoření: \code{shmget}
+    \begin{itemize}
+      \item Poslední parametr \code{IPC_CREAT}
+      \item Logický OR s právy (\code{0644} apod.)
+    \end{itemize}
+
+    \pause
+
+    \item Získaní adresy (attach): \code{shmat}
+    \item Navrácení adresy (detach): \code{shmdt}
+
+    \pause
+
+    \item Další operace: \code{shmctl}
+    \begin{itemize}
+      \item Informace: \code{SHM_STAT}
+      \item Zrušení: \code{IPC_RMID}
       \item \dots
     \end{itemize}
-
-    \pause
-
-    \item Klient
-    \begin{itemize}
-      \item Funkce shora jako 3.\ a 5.\ parametr pro \code{clnt_call}
-      \item Ukazatele na proměnné potom jako 4.\ a 6.
-    \end{itemize}
-
-    \item Server
-    \begin{itemize}
-      \item V \code{dispatch}: \code{svc_getargs}
-      \item A lze také odpovědět na zprávu: \code{svc_sendreply}
-    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}[fragile]
+\begin{frame}
   \frametitle{Úkol}
 
-  \begin{block}{Příklad}
-\begin{lstlisting}
-/* server */
-int in;
-svc_getargs(xprt, (xdrproc_t)xdr_int, (char *)&in);
-in++;
-svc_sendreply(xprt, (xdrproc_t)xdr_int, (char *)&in);
+  \heading{Vytvoření sdílené paměti (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+    \item Vytvořte si sdílený segment (\code{shmget})
+    \item Získejte adresu (\code{shmat})
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
 
-/* client */
-int in = 5;
-clnt_call(cln, 0, (xdrproc_t)xdr_int, (char *)&in, (xdrproc_t)xdr_int, (char *)&in, tout);
-/* 'in' is 6 now (unless timed out) */
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V obou proveďte \code{shmdt}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\subsection{Zprávy}
+
+\begin{frame}[fragile]{IPC}{Zprávy}
+
+  \begin{block}{Formát zprávy}
+  \begin{lstlisting}
+struct my_message {
+  long mtype;   /* set to something > 0 */
+  ...
+};
   \end{lstlisting}
   \end{block}
 
-  \bigskip
+  \pause
 
-  \heading{Předávání parametrů}
-  \begin{enumerate}
-    \item V serveru vytvořte program
+  \begin{itemize}
+    \item \header{sys/msg.h}
+    \item Vytvoření fronty zpráv: \code{msgget}
+
+    \pause
+
+    \item Odeslání zprávy: \code{msgsnd}
+    \item Přijetí zprávy: \code{msgrcv}
+
+    \pause
+
+    \item Další operace: \code{msgctl}
     \begin{itemize}
-      \item Vezme \code{int}, vynásobí \code{10} a vrátí \code{long}
+      \item Informace: \code{MSG_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
     \end{itemize}
-    \item Z klienta zavolejte
-    \item Vyzkoušejte
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Posílání zpráv (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+
+    \item Vytvořte si frontu zpráv (\code{msgget})
+    \item Vytvořte si strukturu zprávy
+    \begin{itemize}
+      \item Musí obsahovat \code{long mtype}
+      \item Přidejte \code{char text[10]}
+    \end{itemize}
+
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do fronty (\code{msgsnd}) řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte frontu (\code{msgrcv}) a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\subsection{Semafory}
+
+\begin{frame}[fragile]{IPC}{Semafory}
+
+  \begin{itemize}
+    \item \header{sys/sem.h}
+    \item Meziprocesové zamykání/správa prostředků
+
+    \pause
+
+    \item Vytvoření semaforu: \code{semget}
+
+    \pause
+
+    \item Změna stavu semaforu: \code{semop}
+
+    \pause
+
+    \item Další operace: \code{semctl}
+    \begin{itemize}
+      \item \emph{Nastavení iniciální hodnoty}: \code{SETVAL} (spolu s
+	\code{union semun.val})
+      \item Informace: \code{SEM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{Parametr \code{semop}}
+  \begin{lstlisting}
+struct sembuf {
+  ushort  sem_num;
+  short   sem_op;  /*  -  0  +  */
+  short   sem_flg;
+};
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce se semaforem (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+    \item Vytvořte 2 programy
+
+    \item Jeden program je tiskovým serverem
+    \begin{itemize}
+      \item Vytvořte si 1 semafor (\code{semget})
+      \item Obsluhuje 5 tiskáren (\code{shmctl} a \code{SETVAL})
+      \item Tisk trvá 10 vteřin
+    \end{itemize}
+
+    \item Druhý program je klientem
+    \begin{itemize}
+      \item Chce tisknout
+    \end{itemize}
+
+    \item Spusťte jeden server a více než 5 klientů
+    \begin{itemize}
+      \item Do 10 vteřin
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}

@@ -2,352 +2,426 @@
 
 \input{../header.tex}
 
-\subtitle{VII. C bez libc}
-\date{4. 11. \the\year}
+\subtitle{VI. Linker skripty}
+\date{21. 10. \the\year}
 
 \begin{document}
-\shorthandoff{-}
 
 \frame{\titlepage}
 
+\frame{\tableofcontents}
+
 %%%%%%%%%%%%%%%%%%%%%%%
 
+\section{Linker skripty}
+
 \begin{frame}
-  \frametitle{C a \file{libc}}
+  \frametitle{Linker skripty}
 
   \begin{itemize}
-    \item \file{libc} se stará o komunikaci s OS (jádrem)
+    \item \code{ldscripts}
+    \item Linker se jimi řídí při linkování objektů
     \begin{itemize}
-      \item Jádro poskytuje pouze ,,základní'' funkcionalitu
+      \item Tj.\ vždy se nějaký použije
     \end{itemize}
 
     \pause
 
-    \item \file{libc} poskytuje spoustu nadstaveb
+    \item Udávají
     \begin{itemize}
-      \item Soubory: \code{fopen}, \code{fread}, \code{fwrite}, \code{fclose},
-	\dots
-      \item Síť: \code{getaddrinfo}, \code{ntoh*}, \code{hton*}
-      \item Více vláken (\file{libpthread}): \code{pthread_*} (včetně zamykání)
-      \item A spoustu dalšího (celý POSIX), \dots
+      \item Kde která sekce leží
+      \begin{itemize}
+	\item Např.\ pro embedded, kód musí být na adrese X a data na adrese Y
+      \end{itemize}
+
+      \item Výstupní formát
+      \item Kam skočit po načtení
+      \item A další
+    \end{itemize}
+
+    \pause
+
+    \item Může přidávat i symboly
+    \begin{itemize}
+      \item Např.\ ,,toto'' je adresa začátku sekce Z
+    \end{itemize}
+
+    \item Dokumentace
+    \begin{itemize}
+      \item \cmd{pinfo ld}
+      \item (\href{http://sourceware.org/binutils/docs/ld/}{\nolinkurl{http://sourceware.org/binutils/}})
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Formát skriptu}
+
+  \begin{itemize}
+    \item Textové soubory
+    \item Příkazy
+    \begin{itemize}
+      \item Pozice první instrukce, kterou spustit: \code{ENTRY}
+      \item Výstupní formát: \code{OUTPUT_FORMAT}
+      \item Seznam sekcí a jejich obsah: \code{SECTIONS}
+      \item Verzování: \code{VERSION}
+      \item \dots
+    \end{itemize}
+
+    \item Komentáře
+    \begin{itemize}
+      \item \code{/* */} jako v C
+    \end{itemize}
+
+    \pause
+
+    \item Linkeru se předává při linkování
+    \begin{itemize}
+      \item \cmd{gcc -T skript.x ...}
+      \item \cmd{ld -T skript.x ...}
+    \end{itemize}
+
+    \pause
+
+    \item Demo: výchozí skript
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Základní příkazy}
+
+  \begin{itemize}
+    \item \code{ENTRY}
+    \begin{itemize}
+      \item Udává, kam se má skočit po zavedení
+      \item Např.\ \code{ENTRY(main)}
+    \end{itemize}
+
+    \pause
+
+    \item \code{OUTPUT_FORMAT}
+    \begin{itemize}
+      \item Výstupní BFD formát
+      \item \code{OUTPUT_FORMAT("elf64-x86-64")} (popř.\ \code{elf32-i386})
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Základní skript}
+  \begin{enumerate}
+    \item Vytvořte si linker skript
+    \item Bude obsahovat pouze \code{ENTRY} a \code{OUTPUT_FORMAT}
+    \item Vytvořte zdrojový soubor s jednou funkcí
+    \begin{itemize}
+      \item Bude obsahovat nekonečný cyklus
+      \item Jméno bude stejné jako v \code{ENTRY}
+    \end{itemize}
+
+    \item Přeložte a slinkujte skriptem
+    \begin{itemize}
+      \item \cmd{gcc -Wl,--build-id=none -nostdlib -T skript.x ...}
+    \end{itemize}
+
+    \item Podívejte se na rozložení sekcí
+    \begin{itemize}
+      \item Měly by začínat okolo adresy 0
+    \end{itemize}
+
+    \item Spusťte program
+    \begin{itemize}
+      \item Bude fungovat jen pokud \cmd{sysctl vm.mmap_min_addr} je 0
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Sekce}
+
+  \begin{itemize}
+    \item \code{SECTIONS}
+    \item Záznamy typu \code{.vystupni_sekce : \{ *(.vstupni_sekce) \}}
+    \item \code{/DISCARD/} je specíální výstupní sekce
+  \end{itemize}
+
+  \medskip
+
+  \begin{lstlisting}
+SECTIONS
+{
+  .text   : { *(.text) }
+  .data   : { *(.data) }
+  .bss    : { *(.bss) }
+  /DISCARD/ : { *(.debug*) *(.comment*) *(.eh_frame*) }
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Skript se sekcemi}
+  \begin{enumerate}
+    \item Rozšiřte skript, aby výsledek obsahoval pouze sekci \code{.text}
+    \item Přeložte
+    \item Ověřte pomocí \cmd{objdump -h}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Sekce -- adresování}
+
+  \begin{itemize}
+    \item Každému bodu ve skriptu lze přiřadit adresu
+    \begin{itemize}
+      \item Aktuální adresa je \code{.} (tečka)
+      \item \code{. = 0x10000;}
+    \end{itemize}
+
+    \pause
+
+    \item Každou sekci lze:
+    \begin{itemize}
+      \item Vložit na nějakou adresu: \code{.sekce 0x10000 : \{ ... \}}
+      \item Zarovnat: \code{.sekce ALIGN(...) : \{ ... \}}
+    \end{itemize}
+
+    \pause
+
+    \item Pro každou adresu lze vložit symbol
+    \begin{itemize}
+      \item \code{symbol = .;}
+      \item V kódu pak \code{extern void *symbol;}
     \end{itemize}
   \end{itemize}
 
   \medskip
   \pause
 
-  \begin{center}
-  \heading{Bez \file{libc} nic z toho nemáme}
+  \begin{lstlisting}
+SECTIONS
+{
+  . = 0x40000;
+  my_start = .;
+  .text : { *(.text) }
+  .data 0x50000 : { *(.data) }
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Skript se sekcemi a adresami}
+  \begin{enumerate}
+    \item Rozšiřte zdrojový soubor o další 2 funkce, tedy:
+    \begin{itemize}
+      \item 1 (původní): s nekonečným cyklem, dejte ji do sekce \code{.text.t2}
+      \item 2: bude volat \code{extern void my_fun(void)}, do sekce \code{.text.t1}
+      \item 3: bude volat adresu \code{0x401000} (bude \code{ENTRY})
+    \end{itemize}
+    \item Rozšiřte skript
+    \begin{itemize}
+      \item Aby všechny sekce začínaly za hranicí \code{0x400000}
+      \begin{itemize}
+	\item \code{. = ...} na začátku bloku \code{SECTIONS}
+      \end{itemize}
+      \item Přidejte novou výstupní sekci \code{.text.t} na adresu \code{0x401000}
+      \begin{itemize}
+	\item Obsah \code{.text.t1}
+	\item Nový symbol \code{my_fun} na aktuální adrese
+	\item Obsah \code{.text.t2} (tedy \code{my_fun} ukazuje na začátek \code{.text.t2})
+      \end{itemize}
+    \end{itemize}
+    \item Přeložte
+    \item Ověřte pomocí \cmd{objdump -h} a \cmd{objdump -t}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\section{Verzování funkcí}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]
+  \frametitle{Verzování funkcí}
+
+  \begin{itemize}
+    \item Pro zachování zpětné kompatibility knihovních funkcí
+    \begin{itemize}
+      \item Knihovny, které jsou udržované opravují chyby
+      \begin{itemize}
+	\item Ale někteří uživatelé spoléhali na ,,chyby''
+      \end{itemize}
+      \item Jak zachovat zpětnou kompatibilitu nějaké funkce?
+    \end{itemize}
+    \item Chceme 2 funkce s týmž názvem, ale s jinou funkcionalitou
+  \end{itemize}
 
   \smallskip
+  \pause
 
-  Jak teď ale např.\ otevřu soubor?
-  \end{center}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Komunikace s jádrem}
-
-  \begin{itemize}
-    \item Sdílená paměť
-    \begin{itemize}
-      \item Jádro zapisuje, uživatel čte a naopak
-      \item V jednom z dalších cvičení
-    \end{itemize}
-
-    \pause
-
-    \item Systémová volání
-    \begin{itemize}
-      \item Podobné jako zavolání funkce
-      \item Ale program a jádro běží v jiných kontextech
-      \item Přepnutí kontextu
-      \begin{itemize}
-	\item Uložení a změna stavu procesoru
-	\item Relativně drahá operace
-      \end{itemize}
-      \item Uvidíme dnes dále
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Systémová volání}
-
-  \begin{itemize}
-    \item Volání funkce
-
-    \item Instrukcí procesoru
-    \begin{itemize}
-      \item Závislé na architektuře
-      \item Softwarové přerušení (x86\_32: číslo \code{0x80})
-      \item Speciální instrukce (x86\_32: \code{sysenter},
-        x86\_64: \code{syscall})
-      \item \heading{Demo:} implementace \code{syscall} z \file{glibc}
-    \end{itemize}
-
-    \pause
-
-    \item Systémová volání jsou očíslovaná
-    \begin{itemize}
-      \item Do jednoho registru číslo
-      \item Čísla \code{__NR_*} definovaná jádrem (pro každou architekturu)
-      \item \header{sys/syscall.h}
-      \item Např. (x86\_64): \code{__NR_write} (1), \code{__NR_exit} (60)
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{\file{libc} o úroveň níže}
-  \begin{enumerate}
-    \item Zavolejte systémová volání
-    \begin{itemize}
-      \item \code{write} s nějakým textem
-      \item \code{exit}
-    \end{itemize}
-    \item Pomocí funkce \code{syscall} z \file{libc}
-    \begin{itemize}
-      \item Viz \cmd{man 2 syscall}
-      \item První argument: číslo systémového volání
-      \item Další argumenty: odpovídají už danému volání
-      \item Např.\ \code{syscall(__NR_kill, -1, SIGKILL)}
-    \end{itemize}
-    \item Přeložte a vyzkoušejte
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{C bez \file{libc}}
-
-  \begin{itemize}
-    \item Žádné hlavičkové soubory z \file{libc}
-    \item Jen to, co poskytuje jádro (\file{/usr/include/linux/})
-    \item Při linkování: \cmd{gcc -nostdlib ...}
-    \begin{itemize}
-      \item \cmd{gcc} stále může vkládat volání \code{memset} apod.
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Volací konvence}
-
-  \begin{block}{Volací konvence}
-    \begin{center}
-    \begin{tabular}{|l||c|c||c|c|} \hline
-      \multirow{3}{*}{Parametr} &
-        \multicolumn{4}{c|}{Registry} \\ \cline{2-5}
-         & \multicolumn{2}{c||}{Systémová volání} &
-         \multicolumn{2}{c|}{Uživatelský prostor} \\ \cline{2-5}
-         & i386 & x86\_64 & i386 & x86\_64 \\ \hline\hline
-      1. & EBX  & RDI & EAX      & RDI  \\ \hline
-      2. & ECX  & RSI & EDX      & RSI  \\ \hline
-      3. & EDX  & RDX & Zásobník & RDX  \\ \hline
-      4. & ESI  & R10 & Zásobník & RCX  \\ \hline
-      5. & EDI  & R8  & Zásobník & R8   \\ \hline
-      6. & EBP  & R9  & Zásobník & R9   \\ \hline
-      7. & \multicolumn{2}{c||}{\emph{Jen 6 parametrů}}
-                      & Zásobník & Zásobník \\ \hline
-      8. & \multicolumn{2}{c||}{}
-                      & Zásobník & Zásobník \\ \hline\hline
-Návratová & EAX  & RAX & EAX  & RAX     \\ \hline
-    \end{tabular}
-    \end{center}
-  \end{block}
-
-  Pozn.: i386 a \texttt{-mregparm}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Systémová volání bez \file{libc}}
-  \begin{enumerate}
-    \item Otevřete a projděte si \file{pb173-bin/07/}
-    \item Zavolejte
-    \begin{itemize}
-      \item \code{fork}
-      \item Z potomka: \code{write}
-      \item Z rodiče: \code{read} 16 bytů a jejich \code{write}
-      \item Z obou potom: \code{exit}
-    \end{itemize}
-
-    \item Přeložte a spusťte
-    \begin{itemize}
-      \item \cmd{gcc -nostdlib ...}
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Data z jádra}
-
-  \begin{itemize}
-    \item Jádro předává
-    \begin{itemize}
-      \item Parametry programu
-      \item Proměnné prostředí
-      \item Rozšiřující vektor
-    \end{itemize}
-
-    \pause
-
-    \item Vše na zásobníku
-    \begin{itemize}
-      \item Formát zásobníku je pevně daný
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Formát zásobníku}
-
-  \begin{block}{Formát zásobníku}
   \begin{center}
-    \begin{tabular}{|l|l|} \hline
-      Počet parametrů & \code{long}   \\ \hline\hline
-      1.\ parametr    & \code{char *} \\ \hline
-      \dots           & \code{char *} \\ \hline
-      m-tý parametr   & \code{char *} \\ \hline
-      Konec parametrů & \code{0UL}    \\ \hline\hline
-
-      1.\ proměnná prostředí     & \code{char *} \\ \hline
-      \dots                      & \code{char *} \\ \hline
-      n-tá proměnná prostředí    & \code{char *} \\ \hline
-      Konec proměnných prostředí & \code{0UL} \\ \hline\hline
-
-      Rozšiřující vektor 1    & \code{struct \{ long type, val; \}} \\ \hline
-      \dots                   & \code{struct \{ long type, val; \}} \\ \hline
-      Rozšiřující vektor o    & \code{struct \{ long type, val; \}} \\ \hline
-      Konec rozšiřujících vektorů & \code{\{AT_NULL, ? \}} \\ \hline\hline
-
+    \begin{tabular}{|c|c|} \hline
+      \footnotesize{Před opravou chyby} & \footnotesize{Po opravě chyby} \\ \hline
+      \begin{lstlisting}
+void fun()
+{
+  puts("X");
+}
+      \end{lstlisting} &
+      \begin{lstlisting}
+void fun()
+{
+  puts("Y");
+}
+      \end{lstlisting} \\ \hline
     \end{tabular}
+
+    \pause
+    \bigskip
+    \bigskip
+
+    \heading{Řešením jsou linker skripty s verzováním}
   \end{center}
-  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Verzování funkcí}
+
+  \begin{itemize}
+    \item Každé funkci lze ve skriptu:
+    \begin{itemize}
+      \item Přiřadit verzi
+      \item Určit její viditelnost
+    \end{itemize}
+
+    \pause
+
+    \item Blok \code{VERSION \{ ... \}}
+
+    \pause
+
+    \item Obsah \code{VERSION} lze předat i samostatně na příkazové řádce
+    \begin{itemize}
+      \item Odpadá nutnost psaní celého linker skriptu
+      \item \cmd{ld --version-script=verze.x ...}
+      \item \cmd{gcc -Wl,--version-script=verze.x ...}
+    \end{itemize}
+
+    \item Zobrazení pomocí \code{readelf -V}
+
+    \pause
+
+    \item Dokumentace
+    \begin{itemize}
+      \item \cmd{pinfo ld}
+      \item \href{http://people.redhat.com/drepper/dsohowto.pdf}{U. Drepper: How To Write Shared Libraries}, kap.\ 3
+    \end{itemize}
+  \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Rozšiřující vektor}
+  \frametitle{Verze ve skriptu}
 
-  \begin{block}{Typ záznamů}
-  \begin{lstlisting}
-struct {
-  long type;
-  long value;
-};
-  \end{lstlisting}
-  \end{block}
-
-  \smallskip
-
+  \heading{Obsah sekce \code{VERSION} ve skriptech}
   \begin{itemize}
-    \item Typy: \code{AT_NULL}, \code{AT_ENTRY}, \code{AT_RANDOM}, \dots
-    \item Pole struktur zakončuje typ \code{AT_NULL}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Zjištění názvu programu a platformy}
-  \begin{enumerate}
-    \item Vypište první parametr programu
+    \item Strom verzí
+    \item Uzly obsahují funkce
+    \item Uzly mohou obsahovat i označení viditelnosti
     \begin{itemize}
-      \item Tj.\ název samotného programu
-    \end{itemize}
-
-    \item Dále iterujte přes zásobník až k rozšiřujícímu vektoru
-    \item Tam najděte typ \code{AT_PLATFORM}
-    \item Vypište hodnotu jako řetězec
-    \item Přeložte (bez \file{libc}) a spusťte
-  \end{enumerate}
-
-\end{frame}
-
-
-\begin{frame}
-  \frametitle{Virtuální systémová volání}
-
-  \heading{\code{vsyscall}}
-  \begin{itemize}
-    \item Jen na některých architekturách
-    \item Neprobíhá přepnutí kontextu
-    \item Speciální stránka(y) s kódem namapovaným jádrem
-    \item Podpora jen 3 funkcí
-    \begin{itemize}
-      \item \code{gettimeofday}: aktuální čas (\code{0xffffffffff600000})
-      \item \code{time}: čas v sekundách od Epochy (\code{0xffffffffff600400})
-      \item \code{getcpu}: číslo CPU a NUMA uzlu (\code{0xffffffffff600800})
-    \end{itemize}
-
-    \item \heading{Demo:} \file{/proc/self/maps}
-
-%    \pause
-%
-%    \item Adresa funkce se získá pomocí makra \code{VSYSCALL_ADDR()}
-%    \begin{itemize}
-%      \item \header{asm/vsyscall.h}
-%      \item Parametr je název shora s předponou \code{__NR_v}
-%    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Volání \code{time} z \code{vsyscall}}
-  \begin{enumerate}
-    \item Zavolejte adresu s \code{time}
-    \item Vypište hodnotu
-    \item Přeložte a spusťte několikrát
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Virtuální dynamická knihovna}
-
-  \heading{\code{vdso}}
-  \begin{itemize}
-    \item Speciální knihovna přilinkovaná jádrem
-    \item Podpora také závislá na architektuře
-
-    \item Podobná \code{vsyscall}, ale více flexibilní
-    \begin{itemize}
-      \item Navíc obsahuje jen \code{clock_gettime}
-    \end{itemize}
-    \item \heading{Demo:} \cmd{ldd} a \cmd{readelf}
-
-    \pause
-
-    \item Knihovna v ELF formátu
-    \begin{itemize}
-      \item Adresa začátku v auxv: \code{getauxval(AT_SYSINFO_EHDR)}
-      \item Dále se přečte ELF pomocí \file{libelf}
-      \item Ukázkový kód: \href{https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vDSO/parse_vdso.c}{\file{Documentation/vDSO/parse_vdso.c}}
+      \item \code{global:}
+      \item \code{local:}
     \end{itemize}
   \end{itemize}
 
+  \medskip
   \pause
-  \bigskip
 
-  \heading{Úkol:} domácí úkol
+  \begin{lstlisting}
+VERS_1.1 {
+  global:
+    fun;
+  local:
+    old_fun*;
+};
+
+VERS_1.2 {
+  new_functionality_fun;
+} VERS_1.1; /* inheritance */
+  \end{lstlisting}
 
 \end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Verze ve zdrojovém souboru}
+
+  \begin{itemize}
+    \item Ve zdrojových souborech je třeba přiřadit verze
+    \item Globální \code{asm} direktiva
+    \begin{itemize}
+      \item Neverzovaná: \code{asm(".symver fun_old1,fun@");}
+      \item Pro určitou verzi: \code{asm(".symver fun_old2,fun@VERS_1");}
+      \item Výchozí: \code{asm(".symver fun_new,fun@@VERS_2");}
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+
+  \begin{lstlisting}
+void fun_old() {
+  puts("OLD");
+}
+asm(".symver fun_old,fun@");
+
+void fun_new() {
+  puts("NEW");
+}
+asm(".symver fun_new,fun@@VERS_2");
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Verzování}
+  \begin{enumerate}
+    \item Otevřete si \file{pb173-bin/06/}
+    \item Projděte 3 verze knihovny \file{vers\{1,2,3\}.c}
+    \begin{itemize}
+      \item Definuje funkci \code{bubak}
+      \item \code{bubak} v nich má 3 různé sémantiky
+    \end{itemize}
+    \item Projděte soubor, který ji používá \file{x.c}
+    \begin{itemize}
+      \item Volá funkci \code{bubak}
+    \end{itemize}
+    \item Přeložte
+    \begin{itemize}
+      \item Standardně pomocí \cmd{make}
+    \end{itemize}
+    \item Spusťte \file{x\{1,2,3\}}
+    \item Projděte verze v \file{x\{1,2,3\}} za pomoci \cmd{readelf -V}
+    \item Pokračujte domácím úkolem, částí 2
+  \end{enumerate}
+
+\end{frame}
+
 
 \end{document}

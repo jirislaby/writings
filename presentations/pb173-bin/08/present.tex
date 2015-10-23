@@ -2,8 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{VIII. Ladění}
-\date{11. 11. \the\year}
+\subtitle{VII. C bez libc}
+\date{4. 11. \the\year}
 
 \begin{document}
 \shorthandoff{-}
@@ -12,348 +12,341 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-%%% TODO presunout kus gdb do priste (je to kratky)
-%%% tady probrat ptrace, ktery je za DU!
+\begin{frame}
+  \frametitle{C a \file{libc}}
 
-\begin{frame}{Techniky ladění}{Z pohledu vykonávání}
-
-  \begin{enumerate}
-    \item Staticky
+  \begin{itemize}
+    \item \file{libc} se stará o komunikaci s OS (jádrem)
     \begin{itemize}
-      \item Spouštím analyzátor a ten hledá nesrovnalosti
-      \item Analýza ukazatelů, hodnot, velikosti zásobníku, \dots
-      \item Není cílem cvičení, ale \href{http://formela.fi.muni.cz/}{\emph{formela}}
+      \item Jádro poskytuje pouze ,,základní'' funkcionalitu
     \end{itemize}
 
     \pause
 
-    \item Dynamicky
+    \item \file{libc} poskytuje spoustu nadstaveb
     \begin{itemize}
-      \item Spouštím na CPU a očekávám výsledek
-      \item Testování
-      \item Vyzkoušíme si dnes a příště
+      \item Soubory: \code{fopen}, \code{fread}, \code{fwrite}, \code{fclose},
+	\dots
+      \item Síť: \code{getaddrinfo}, \code{ntoh*}, \code{hton*}
+      \item Více vláken (\file{libpthread}): \code{pthread_*} (včetně zamykání)
+      \item A spoustu dalšího (celý POSIX), \dots
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \begin{center}
+  \heading{Bez \file{libc} nic z toho nemáme}
+
+  \smallskip
+
+  Jak teď ale např.\ otevřu soubor?
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Komunikace s jádrem}
+
+  \begin{itemize}
+    \item Sdílená paměť
+    \begin{itemize}
+      \item Jádro zapisuje, uživatel čte a naopak
+      \item V jednom z dalších cvičení
+    \end{itemize}
+
+    \pause
+
+    \item Systémová volání
+    \begin{itemize}
+      \item Podobné jako zavolání funkce
+      \item Ale program a jádro běží v jiných kontextech
+      \item Přepnutí kontextu
+      \begin{itemize}
+	\item Uložení a změna stavu procesoru
+	\item Relativně drahá operace
+      \end{itemize}
+      \item Uvidíme dnes dále
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Systémová volání}
+
+  \begin{itemize}
+    \item Volání funkce
+
+    \item Instrukcí procesoru
+    \begin{itemize}
+      \item Závislé na architektuře
+      \item Softwarové přerušení (x86\_32: číslo \code{0x80})
+      \item Speciální instrukce (x86\_32: \code{sysenter},
+        x86\_64: \code{syscall})
+      \item \heading{Demo:} implementace \code{syscall} z \file{glibc}
+    \end{itemize}
+
+    \pause
+
+    \item Systémová volání jsou očíslovaná
+    \begin{itemize}
+      \item Do jednoho registru číslo
+      \item Čísla \code{__NR_*} definovaná jádrem (pro každou architekturu)
+      \item \header{sys/syscall.h}
+      \item Např. (x86\_64): \code{__NR_write} (1), \code{__NR_exit} (60)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{\file{libc} o úroveň níže}
+  \begin{enumerate}
+    \item Zavolejte systémová volání
+    \begin{itemize}
+      \item \code{write} s nějakým textem
+      \item \code{exit}
+    \end{itemize}
+    \item Pomocí funkce \code{syscall} z \file{libc}
+    \begin{itemize}
+      \item Viz \cmd{man 2 syscall}
+      \item První argument: číslo systémového volání
+      \item Další argumenty: odpovídají už danému volání
+      \item Např.\ \code{syscall(__NR_kill, -1, SIGKILL)}
+    \end{itemize}
+    \item Přeložte a vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{C bez \file{libc}}
+
+  \begin{itemize}
+    \item Žádné hlavičkové soubory z \file{libc}
+    \item Jen to, co poskytuje jádro (\file{/usr/include/linux/})
+    \item Při linkování: \cmd{gcc -nostdlib ...}
+    \begin{itemize}
+      \item \cmd{gcc} stále může vkládat volání \code{memset} apod.
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Volací konvence}
+
+  \begin{block}{Volací konvence}
+    \begin{center}
+    \begin{tabular}{|l||c|c||c|c|} \hline
+      \multirow{3}{*}{Parametr} &
+        \multicolumn{4}{c|}{Registry} \\ \cline{2-5}
+         & \multicolumn{2}{c||}{Systémová volání} &
+         \multicolumn{2}{c|}{Uživatelský prostor} \\ \cline{2-5}
+         & i386 & x86\_64 & i386 & x86\_64 \\ \hline\hline
+      1. & EBX  & RDI & EAX      & RDI  \\ \hline
+      2. & ECX  & RSI & EDX      & RSI  \\ \hline
+      3. & EDX  & RDX & Zásobník & RDX  \\ \hline
+      4. & ESI  & R10 & Zásobník & RCX  \\ \hline
+      5. & EDI  & R8  & Zásobník & R8   \\ \hline
+      6. & EBP  & R9  & Zásobník & R9   \\ \hline
+      7. & \multicolumn{2}{c||}{\emph{Jen 6 parametrů}}
+                      & Zásobník & Zásobník \\ \hline
+      8. & \multicolumn{2}{c||}{}
+                      & Zásobník & Zásobník \\ \hline\hline
+Návratová & EAX  & RAX & EAX  & RAX     \\ \hline
+    \end{tabular}
+    \end{center}
+  \end{block}
+
+  Pozn.: i386 a \texttt{-mregparm}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Systémová volání bez \file{libc}}
+  \begin{enumerate}
+    \item Otevřete a projděte si \file{pb173-bin/07/}
+    \item Zavolejte
+    \begin{itemize}
+      \item \code{fork}
+      \item Z potomka: \code{write}
+      \item Z rodiče: \code{read} 16 bytů a jejich \code{write}
+      \item Z obou potom: \code{exit}
+    \end{itemize}
+
+    \item Přeložte a spusťte
+    \begin{itemize}
+      \item \cmd{gcc -nostdlib ...}
     \end{itemize}
   \end{enumerate}
 
 \end{frame}
 
-\begin{frame}{Techniky ladění}{Z pohledu cíle}
+\begin{frame}
+  \frametitle{Data z jádra}
 
-  \tableofcontents
-
-  \heading{Příště}
   \begin{itemize}
-    \item Pokračování s \cmd{gdb}
-    \item Ladění výkonnosti/velikosti
+    \item Jádro předává
     \begin{itemize}
-      \item Optimalizace kódu
-      \item Odstranění nepoužitého kódu
+      \item Parametry programu
+      \item Proměnné prostředí
+      \item Rozšiřující vektor
+    \end{itemize}
+
+    \pause
+
+    \item Vše na zásobníku
+    \begin{itemize}
+      \item Formát zásobníku je pevně daný
     \end{itemize}
   \end{itemize}
 
 \end{frame}
-
-\section{Ladění funkčnosti (dnes)}
-\frame{\sectionpage}
 
 \begin{frame}
-  \frametitle{Ladění funkčnosti}
+  \frametitle{Formát zásobníku}
 
-  \begin{itemize}
-    \item Výpisy
-    \begin{itemize}
-      \item \code{printf} a příbuzné
-    \end{itemize}
+  \begin{block}{Formát zásobníku}
+  \begin{center}
+    \begin{tabular}{|l|l|} \hline
+      Počet parametrů & \code{long}   \\ \hline\hline
+      1.\ parametr    & \code{char *} \\ \hline
+      \dots           & \code{char *} \\ \hline
+      m-tý parametr   & \code{char *} \\ \hline
+      Konec parametrů & \code{0UL}    \\ \hline\hline
 
-    \item Monitor chování
-    \begin{itemize}
-      \item \cmd{gdb}, \cmd{ltrace}, \cmd{strace}, \cmd{valgrind}, \dots
-    \end{itemize}
+      1.\ proměnná prostředí     & \code{char *} \\ \hline
+      \dots                      & \code{char *} \\ \hline
+      n-tá proměnná prostředí    & \code{char *} \\ \hline
+      Konec proměnných prostředí & \code{0UL} \\ \hline\hline
 
-    \item Post-mortem
-    \begin{itemize}
-      \item \file{core} soubor (obraz paměti)
-    \end{itemize}
-  \end{itemize}
+      Rozšiřující vektor 1    & \code{struct \{ long type, val; \}} \\ \hline
+      \dots                   & \code{struct \{ long type, val; \}} \\ \hline
+      Rozšiřující vektor o    & \code{struct \{ long type, val; \}} \\ \hline
+      Konec rozšiřujících vektorů & \code{\{AT_NULL, ? \}} \\ \hline\hline
+
+    \end{tabular}
+  \end{center}
+  \end{block}
 
 \end{frame}
 
-\subsection{\cmd{gdb}}
+\begin{frame}[fragile]
+  \frametitle{Rozšiřující vektor}
+
+  \begin{block}{Typ záznamů}
+  \begin{lstlisting}
+struct {
+  long type;
+  long value;
+};
+  \end{lstlisting}
+  \end{block}
+
+  \smallskip
+
+  \begin{itemize}
+    \item Typy: \code{AT_NULL}, \code{AT_ENTRY}, \code{AT_RANDOM}, \dots
+    \item Pole struktur zakončuje typ \code{AT_NULL}
+  \end{itemize}
+
+\end{frame}
 
 \begin{frame}
-  \frametitle{Debugger \cmd{gdb}}
+  \frametitle{Úkol}
 
-  \begin{itemize}
-    \item Pracuje s ELFem a DWARFem
-
-    \item Používá systémové volání \code{ptrace}
+  \heading{Zjištění názvu programu a platformy}
+  \begin{enumerate}
+    \item Vypište první parametr programu
     \begin{itemize}
-      \item Sleduje proces
-      \item Upravuje vykonávání
-      \item Čte a mění paměť
-      \item \dots
+      \item Tj.\ název samotného programu
     \end{itemize}
 
-    \pause
+    \item Dále iterujte přes zásobník až k rozšiřujícímu vektoru
+    \item Tam najděte typ \code{AT_PLATFORM}
+    \item Vypište hodnotu jako řetězec
+    \item Přeložte (bez \file{libc}) a spusťte
+  \end{enumerate}
 
-    \item Podpora Python skriptů
-    \item Spuštění: \cmd{gdb --volby_gdb --args binarka --volby_binarky}
-    \item Nápověda: \cmd{help}
-    \item Manuál: \href{https://sourceware.org/gdb/current/onlinedocs/gdb/}{GDB
-      User Manual}
+\end{frame}
+
+
+\begin{frame}
+  \frametitle{Virtuální systémová volání}
+
+  \heading{\code{vsyscall}}
+  \begin{itemize}
+    \item Jen na některých architekturách
+    \item Neprobíhá přepnutí kontextu
+    \item Speciální stránka(y) s kódem namapovaným jádrem
+    \item Podpora jen 3 funkcí
+    \begin{itemize}
+      \item \code{gettimeofday}: aktuální čas (\code{0xffffffffff600000})
+      \item \code{time}: čas v sekundách od Epochy (\code{0xffffffffff600400})
+      \item \code{getcpu}: číslo CPU a NUMA uzlu (\code{0xffffffffff600800})
+    \end{itemize}
+
+    \item \heading{Demo:} \file{/proc/self/maps}
+
+%    \pause
+%
+%    \item Adresa funkce se získá pomocí makra \code{VSYSCALL_ADDR()}
+%    \begin{itemize}
+%      \item \header{asm/vsyscall.h}
+%      \item Parametr je název shora s předponou \code{__NR_v}
+%    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Příkazy \cmd{gdb}}{Operace s během}
+\begin{frame}
+  \frametitle{Úkol}
 
+  \heading{Volání \code{time} z \code{vsyscall}}
+  \begin{enumerate}
+    \item Zavolejte adresu s \code{time}
+    \item Vypište hodnotu
+    \item Přeložte a spusťte několikrát
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Virtuální dynamická knihovna}
+
+  \heading{\code{vdso}}
   \begin{itemize}
-    \item Spustit: \cmd{run}
-    \item Spustit po \code{main}: \cmd{start}
-    \item Přerušit: signálem (např.\ Ctrl-c)
-    \item Pokračovat po návrat z funkce: \file{finish}
-    \item Pokračovat: \file{continue}
+    \item Speciální knihovna přilinkovaná jádrem
+    \item Podpora také závislá na architektuře
+
+    \item Podobná \code{vsyscall}, ale více flexibilní
+    \begin{itemize}
+      \item Navíc obsahuje jen \code{clock_gettime}
+    \end{itemize}
+    \item \heading{Demo:} \cmd{ldd} a \cmd{readelf}
 
     \pause
 
-    \item Krokovat s vnořením: \cmd{step} (po řádcích), \cmd{stepi} (po
-      instrukcích)
-    \item Krokovat bez vnoření: \cmd{next} (po řádcích), \cmd{nexti} (po
-      instrukcích)
-
-    \item Konec: \cmd{quit}
-
-    \medskip
-    \pause
-
-    \item Opakování předchozího příkazu: ENTER
+    \item Knihovna v ELF formátu
+    \begin{itemize}
+      \item Adresa začátku v auxv: \code{getauxval(AT_SYSINFO_EHDR)}
+      \item Dále se přečte ELF pomocí \file{libelf}
+      \item Ukázkový kód: \href{https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/vDSO/parse_vdso.c}{\file{Documentation/vDSO/parse_vdso.c}}
+    \end{itemize}
   \end{itemize}
 
   \pause
   \bigskip
 
-  \heading{Úkol:} spusťte si \cmd{yes} v \cmd{gdb} a přerušte. Vyzkoušejte si
-  \file{finish} a \file{continue}. Zkuste krokovat po instrukcích hlavní cyklus
-  \cmd{yes}. Poté \cmd{quit}.
-
-\end{frame}
-
-\begin{frame}{Příkazy \cmd{gdb}}{Výpisy}
-
-  \begin{itemize}
-    \item Zásobník volání: \cmd{where}
-    \begin{itemize}
-      \item Pohyb po rámcích zásobníku: \cmd{up}, \cmd{down}
-    \end{itemize}
-
-    \pause
-
-    \item Programu: \cmd{list} (jen s ladicími informacemi)
-    \item Assembleru: \cmd{disassemble}
-    \item Paměti: \cmd{print}
-    \item HexDump: \cmd{x}
-    \item Ostatní: \cmd{info registers}, \file{info break}, \dots
-  \end{itemize}
-
-  \bigskip
-
-  Většina příkazů akceptuje parametry -- výpis lokací, proměnných, registrů atd.
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Výpisy v \cmd{gdb}}
-  \begin{enumerate}
-    \item Přeložte si \file{pb173-bin/08/}
-    \item Spusťte \file{debug} (mělo by dojít k pádu)
-    \item Otevřete \file{debug} v \cmd{gdb}
-    \item Spusťte (\cmd{run})
-
-    \item Prohlédněte si, kde došlo k pádu (vypište):
-    \begin{itemize}
-      \item Zásobník volání (\cmd{where})
-      \item Místo pádu (\cmd{list} s parametrem \code{soubor:radek})
-      \item Disassembly (\cmd{disassemble} s parametrem \code{adresa})
-      \item Proměnnou \code{b} (\cmd{print b})
-      \item Proměnnou \code{argc} v \code{main} (\cmd{up} a \cmd{print argc})
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}{Příkazy \cmd{gdb}}{Breakpointy}
-
-  \begin{itemize}
-    \item Příkaz: \file{break}
-    \item Parametr
-    \begin{itemize}
-      \item Adresa
-      \item Funkce
-      \item soubor:radek
-      \item \dots
-    \end{itemize}
-  \end{itemize}
-
-  \pause
-  \bigskip
-  
-  \heading{Úkol}
-  \begin{enumerate}
-    \item Přidejte breakpoint na začátek \code{main} a spusťte (\cmd{run})
-    \item Krokujte až k pádu (\cmd{next})
-    \item Zopakujte pro \code{step} a také \code{stepi}
-  \end{enumerate}
-\end{frame}
-
-\subsection{Obrazy paměti}
-
-\begin{frame}
-  \frametitle{Obrazy paměti a \cmd{gdb}}
-
-  \begin{itemize}
-    \item Jádro při pádu zapíše obraz paměti (,,coredump'')
-    \begin{itemize}
-      \item Nutno zvýšit limit velikosti (bývá 0): \cmd{ulimit -c}
-      \item Cíl, kam se ukládají: \cmd{sysctl kernel.core_pattern}
-    \end{itemize}
-
-    \pause
-
-    \item Potom se dá analyzovat v \cmd{gdb}
-    \begin{itemize}
-      \item \cmd{gdb --core=core_soubor --args binarka --volby_binarky}
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Práce s obrazem paměti}
-  \begin{enumerate}
-    \item Nastavte limit na obrazy na \code{unlimited} (\cmd{ulimit -c})
-    \item Podívejte se, kam se obraz uloží (\cmd{sysctl kernel.core_pattern})
-    \item Spusťte program z předchozího příkladu
-    \item Otevřete v \cmd{gdb} s obrazem paměti (\cmd{gdb --core=<core>
-      ./debug})
-    \item Vypište si podobné informace jako předtím
-    \begin{itemize}
-      \item \cmd{where}
-      \item \cmd{print b}
-      \item A podobně
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\subsection{Tracery}
-
-\begin{frame}
-  \frametitle{Tracery}
-
-  \begin{itemize}
-    \item Sledují události a vypisují je
-    \item \cmd{ltrace}: sleduje knihovní volání
-    \item \cmd{strace}: sleduje systémová volání
-    \item Používají systémové volání \code{ptrace}
-    \begin{itemize}
-      \item \cmd{ltrace} si nastaví breakpointy na všechny externí symboly z
-	ELFu
-      \item \cmd{strace} jednoduše použije \code{PTRACE_SYSCALL}
-    \end{itemize}
-
-    \pause
-
-    \item Spuštění: \cmd{\{s,l\}trace binarka --volby}
-    \item Další parametry
-    \begin{itemize}
-      \item \texttt{-e}: filtr (\texttt{-e write})
-      \item \texttt{-f}: sleduje i potomky
-      \item \texttt{-o}: výstup do souboru
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Práce s tracery}
-  \begin{enumerate}
-    \item Projděte si \file{pb173-bin/08/tracer.c}
-    \item Spusťte nejdříve s \cmd{ltrace}
-    \begin{itemize}
-      \item Kolik je volání \code{fwrite} do \file{libc}?
-    \end{itemize}
-    \item Spusťte s \cmd{strace}
-    \begin{itemize}
-      \item Kolik je volání \code{write} do jádra?
-      \item $\Rightarrow$ \file{libc} bufferuje
-    \end{itemize}
-    \item Pomocí \cmd{ltrace} zjistěte, jak velký buffer \file{libc} používá
-    \begin{itemize}
-      \item V cyklu vypisujte znak pomocí \code{fwrite}
-      \item Použijte volbu \texttt{-S}
-    \end{itemize}
-    \item Pomocí \cmd{strace} ověřte totéž
-    \begin{itemize}
-      \item Pozorujte třetí parametr \code{write}
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\subsection{\cmd{valgrind}}
-
-\begin{frame}
-  \frametitle{\cmd{valgrind}}
-
-  \begin{itemize}
-    \item Sleduje (zejména) operace s pamětí (\emph{Memcheck})
-    \begin{itemize}
-      \item Úniky paměti
-      \item Neinicializované a nezarovnané přístupy
-      \item Použití paměti po \code{free}
-      \item \dots
-    \end{itemize}
-
-    \pause
-
-    \item Několik dalších modulů
-    \begin{itemize}
-      \item Callgrind: profiluje cache CPU
-      \item Massif: profiluje použití haldy
-      \item Další pro problémy se zámky atd.
-    \end{itemize}
-
-    \pause
-
-    \item Spuštění: \cmd{valgrind --volby_valgrindu binarka --volby_binarky}
-    \item Další parametry
-    \begin{itemize}
-      \item \texttt{-\!-tool}: výběr nástroje shora
-      \item \texttt{-\!-leak-check}: sledovat úniky paměti
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Práce s nástrojem \cmd{valgrind}}
-  \begin{enumerate}
-    \item Projděte si \file{pb173-bin/08/memcheck.c}
-    \item Spusťte v nástroji \cmd{valgrind}
-    \item Řiďte se pokyny na konci výpisu
-    \begin{itemize}
-      \item Vypište si všechny podrobnosti
-      \item Přidáváním navržených parametrů (,,Rerun with'')
-    \end{itemize}
-  \end{enumerate}
+  \heading{Úkol:} domácí úkol
 
 \end{frame}
 

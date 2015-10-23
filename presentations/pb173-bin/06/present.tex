@@ -2,54 +2,35 @@
 
 \input{../header.tex}
 
-\subtitle{VI. Linker skripty}
-\date{21. 10. \the\year}
+\subtitle{V. DWARF}
+\date{15. 10. 2013}
 
 \begin{document}
 
-\frame{\titlepage}
-
-\frame{\tableofcontents}
+\begin{frame}
+  \titlepage
+\end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Linker skripty}
-
 \begin{frame}
-  \frametitle{Linker skripty}
+  \frametitle{DWARF}
 
   \begin{itemize}
-    \item \code{ldscripts}
-    \item Linker se jimi řídí při linkování objektů
+    \item Strukturované ladicí informace
     \begin{itemize}
-      \item Tj.\ vždy se nějaký použije
+      \item Zápis komplikovaných výrazů
+      \item Vytvářené překladačem
     \end{itemize}
+
+    \item Nezávislost na jazyku a formátu souborů
 
     \pause
-
-    \item Udávají
-    \begin{itemize}
-      \item Kde která sekce leží
-      \begin{itemize}
-	\item Např.\ pro embedded, kód musí být na adrese X a data na adrese Y
-      \end{itemize}
-
-      \item Výstupní formát
-      \item Kam skočit po načtení
-      \item A další
-    \end{itemize}
-
-    \pause
-
-    \item Může přidávat i symboly
-    \begin{itemize}
-      \item Např.\ ,,toto'' je adresa začátku sekce Z
-    \end{itemize}
 
     \item Dokumentace
     \begin{itemize}
-      \item \cmd{pinfo ld}
-      \item (\href{http://sourceware.org/binutils/docs/ld/}{\nolinkurl{http://sourceware.org/binutils/}})
+      \item \href{http://www.dwarfstd.org/doc/Debugging\%20using\%20DWARF.pdf}{Introduction to the DWARF Debugging Format}
+      \item \href{http://www.dwarfstd.org/doc/DWARF4.pdf}{DWARF Debugging Information Format (Version 4)}
     \end{itemize}
 
   \end{itemize}
@@ -57,342 +38,357 @@
 \end{frame}
 
 \begin{frame}
-  \frametitle{Formát skriptu}
+  \frametitle{DWARF formát}
 
   \begin{itemize}
-    \item Textové soubory
-    \item Příkazy
+    \item Ladicí informace v lese skoro-stromů
     \begin{itemize}
-      \item Pozice první instrukce, kterou spustit: \code{ENTRY}
-      \item Výstupní formát: \code{OUTPUT_FORMAT}
-      \item Seznam sekcí a jejich obsah: \code{SECTIONS}
-      \item Verzování: \code{VERSION}
-      \item \dots
+      \item Pro každý zdrojový soubor jeden skoro-strom
     \end{itemize}
 
-    \item Komentáře
-    \begin{itemize}
-      \item \code{/* */} jako v C
-    \end{itemize}
-
-    \pause
-
-    \item Linkeru se předává při linkování
-    \begin{itemize}
-      \item \cmd{gcc -T skript.x ...}
-      \item \cmd{ld -T skript.x ...}
-    \end{itemize}
-
-    \pause
-
-    \item Demo: výchozí skript
+    \item Uzly stromů jsou \emph{Debugging Information Entry} (DIE)
+    \item Jeden DIE může odkazovat na kterýkoliv jiný
 
   \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Základní příkazy}
-
-  \begin{itemize}
-    \item \code{ENTRY}
-    \begin{itemize}
-      \item Udává, kam se má skočit po zavedení
-      \item Např.\ \code{ENTRY(main)}
-    \end{itemize}
-
-    \pause
-
-    \item \code{OUTPUT_FORMAT}
-    \begin{itemize}
-      \item Výstupní BFD formát
-      \item \code{OUTPUT_FORMAT("elf64-x86-64")} (popř.\ \code{elf32-i386})
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Základní skript}
-  \begin{enumerate}
-    \item Vytvořte si linker skript
-    \item Bude obsahovat pouze \code{ENTRY} a \code{OUTPUT_FORMAT}
-    \item Vytvořte zdrojový soubor s jednou funkcí
-    \begin{itemize}
-      \item Bude obsahovat nekonečný cyklus
-      \item Jméno bude stejné jako v \code{ENTRY}
-    \end{itemize}
-
-    \item Přeložte a slinkujte skriptem
-    \begin{itemize}
-      \item \cmd{gcc -Wl,--build-id=none -nostdlib -T skript.x ...}
-    \end{itemize}
-
-    \item Podívejte se na rozložení sekcí
-    \begin{itemize}
-      \item Měly by začínat okolo adresy 0
-    \end{itemize}
-
-    \item Spusťte program
-    \begin{itemize}
-      \item Bude fungovat jen pokud \cmd{sysctl vm.mmap_min_addr} je 0
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}[fragile]
-  \frametitle{Sekce}
-
-  \begin{itemize}
-    \item \code{SECTIONS}
-    \item Záznamy typu \code{.vystupni_sekce : \{ *(.vstupni_sekce) \}}
-    \item \code{/DISCARD/} je specíální výstupní sekce
-  \end{itemize}
-
-  \medskip
-
-  \begin{lstlisting}
-SECTIONS
-{
-  .text   : { *(.text) }
-  .data   : { *(.data) }
-  .bss    : { *(.bss) }
-  /DISCARD/ : { *(.debug*) *(.comment*) *(.eh_frame*) }
-}
-  \end{lstlisting}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Skript se sekcemi}
-  \begin{enumerate}
-    \item Rozšiřte skript, aby výsledek obsahoval pouze sekci \code{.text}
-    \item Přeložte
-    \item Ověřte pomocí \cmd{objdump -h}
-    \item Spusťte
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}[fragile]
-  \frametitle{Sekce -- adresování}
-
-  \begin{itemize}
-    \item Každému bodu ve skriptu lze přiřadit adresu
-    \begin{itemize}
-      \item Aktuální adresa je \code{.} (tečka)
-      \item \code{. = 0x10000;}
-    \end{itemize}
-
-    \pause
-
-    \item Každou sekci lze:
-    \begin{itemize}
-      \item Vložit na nějakou adresu: \code{.sekce 0x10000 : \{ ... \}}
-      \item Zarovnat: \code{.sekce ALIGN(...) : \{ ... \}}
-    \end{itemize}
-
-    \pause
-
-    \item Pro každou adresu lze vložit symbol
-    \begin{itemize}
-      \item \code{symbol = .;}
-      \item V kódu pak \code{extern void *symbol;}
-    \end{itemize}
-  \end{itemize}
-
-  \medskip
-  \pause
-
-  \begin{lstlisting}
-SECTIONS
-{
-  . = 0x40000;
-  my_start = .;
-  .text : { *(.text) }
-  .data 0x50000 : { *(.data) }
-}
-  \end{lstlisting}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Skript se sekcemi a adresami}
-  \begin{enumerate}
-    \item Rozšiřte zdrojový soubor o další 2 funkce, tedy:
-    \begin{itemize}
-      \item 1 (původní): s nekonečným cyklem, dejte ji do sekce \code{.text.t2}
-      \item 2: bude volat \code{extern void my_fun(void)}, do sekce \code{.text.t1}
-      \item 3: bude volat adresu \code{0x401000} (bude \code{ENTRY})
-    \end{itemize}
-    \item Rozšiřte skript
-    \begin{itemize}
-      \item Aby všechny sekce začínaly za hranicí \code{0x400000}
-      \begin{itemize}
-	\item \code{. = ...} na začátku bloku \code{SECTIONS}
-      \end{itemize}
-      \item Přidejte novou výstupní sekci \code{.text.t} na adresu \code{0x401000}
-      \begin{itemize}
-	\item Obsah \code{.text.t1}
-	\item Nový symbol \code{my_fun} na aktuální adrese
-	\item Obsah \code{.text.t2} (tedy \code{my_fun} ukazuje na začátek \code{.text.t2})
-      \end{itemize}
-    \end{itemize}
-    \item Přeložte
-    \item Ověřte pomocí \cmd{objdump -h} a \cmd{objdump -t}
-    \item Spusťte
-  \end{enumerate}
-
-\end{frame}
-
-\section{Verzování funkcí}
-\frame{\sectionpage}
-
-\begin{frame}[fragile]
-  \frametitle{Verzování funkcí}
-
-  \begin{itemize}
-    \item Pro zachování zpětné kompatibility knihovních funkcí
-    \begin{itemize}
-      \item Knihovny, které jsou udržované opravují chyby
-      \begin{itemize}
-	\item Ale někteří uživatelé spoléhali na ,,chyby''
-      \end{itemize}
-      \item Jak zachovat zpětnou kompatibilitu nějaké funkce?
-    \end{itemize}
-    \item Chceme 2 funkce s týmž názvem, ale s jinou funkcionalitou
-  \end{itemize}
-
-  \smallskip
-  \pause
 
   \begin{center}
-    \begin{tabular}{|c|c|} \hline
-      \footnotesize{Před opravou chyby} & \footnotesize{Po opravě chyby} \\ \hline
-      \begin{lstlisting}
-void fun()
-{
-  puts("X");
-}
-      \end{lstlisting} &
-      \begin{lstlisting}
-void fun()
-{
-  puts("Y");
-}
-      \end{lstlisting} \\ \hline
-    \end{tabular}
-
-    \pause
-    \bigskip
-    \bigskip
-
-    \heading{Řešením jsou linker skripty s verzováním}
+  \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
+  \tikzstyle{diee} = [<-, thick, >=stealth']
+  \begin{tikzpicture}
+    \node [die] (CU) {
+      \textbf{DIE} \\
+      type = compile\_unit \\
+      comp\_dir = /tmp/test \\
+      name = test.c \\
+      producer = GCC
+    };
+    \node [die, below=of CU] (FUN1) {
+      \textbf{DIE} \\
+      type = subprogram \\
+      name = main \\
+      type = int
+    } edge[diee] (CU);
+    \node [die, right=of CU] (FUN2) {
+      \textbf{DIE} \\
+      type = subprogram \\
+      name = fun \\
+      type = int
+    } edge[diee] (CU);
+    \node [die, right=1.4cm of FUN1] (TYPE) {
+      \textbf{DIE} \\
+      type = base\_type \\
+      name = int \\
+      size = 4
+    } edge[diee] (FUN1)
+    edge[diee] (FUN2);
+  \end{tikzpicture}
   \end{center}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Verzování funkcí}
+  \frametitle{DWARF a ELF}
+
+  \begin{enumerate}
+    \item DWARF je v ELFu uložený v \code{.debug_*} sekcích
+    \begin{itemize}
+      \item \code{.debug_info}: všechny DIE z lesa stromů
+      \item \code{.debug_abbrev}: formát \code{.debug_info} (Figure 48 v DWARF)
+      \item \code{.debug_types}: popis datových typů
+      \item \code{.debug_str}: řetězce odkazované z \code{.debug_info}
+      \item \code{.debug_line}: překlad instrukce $\leftrightarrow$ řádek kódu
+    \end{itemize}
+
+    \pause
+
+    \item Výpis DWARFu v ELFu
+    \begin{itemize}
+      \item \cmd{readelf --debug-dump}
+      \item \cmd{objdump --dwarf}
+      \item \cmd{dwarfdump} (z \file{libdwarf})
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Knihovny na práci s DWARF}
+
+  \heading{Dvě různé implementace knihoven}
+  \begin{enumerate}
+    \item \file{libdwarf}
+    \begin{itemize}
+      \item Starší
+      \item Hůř se s ní pracuje
+      \item Obsahuje méně chyb
+      \item Lépe dokumentovaná
+      \item \header{libdwarf/libdwarf.h}
+    \end{itemize}
+
+    \pause
+
+    \item \file{libdw} a \file{libdwfl}
+    \begin{itemize}
+      \item Podpora nových standardů DWARF
+      \item Lepší rozhraní
+      \item Základní: \file{libdw} (\header{elfutils/libdw.h})
+      \item Nadstavba: \file{libdwfl} (\header{elfutils/libdwfl.h})
+      \item \emph{Tuto budeme používat}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\file{libdw} a \file{libdwfl}}
 
   \begin{itemize}
-    \item Každé funkci lze ve skriptu:
+    \item Knihovny jsou součástí elfutils
+    \item Lze je používat střídavě (jako \code{elf} a \code{gelf})
+    \item Inicializace: \code{Dwfl *dwfl_begin(const Dwfl_Callbacks *cb)}
     \begin{itemize}
-      \item Přiřadit verzi
-      \item Určit její viditelnost
+      \item \code{.section_address = dwfl_offline_section_address}
+      \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
 
-    \pause
-
-    \item Blok \code{VERSION \{ ... \}}
-
-    \pause
-
-    \item Obsah \code{VERSION} lze předat i samostatně na příkazové řádce
-    \begin{itemize}
-      \item Odpadá nutnost psaní celého linker skriptu
-      \item \cmd{ld --version-script=verze.x ...}
-      \item \cmd{gcc -Wl,--version-script=verze.x ...}
-    \end{itemize}
-
-    \item Zobrazení pomocí \code{readelf -V}
+    \item Ukončení: \code{void dwfl_end(Dwfl *dwfl)}
+    \item Poslední chyba: \code{dwfl_errmsg(-1)}
 
     \pause
 
     \item Dokumentace
     \begin{itemize}
-      \item \cmd{pinfo ld}
-      \item \href{http://people.redhat.com/drepper/dsohowto.pdf}{U. Drepper: How To Write Shared Libraries}, kap.\ 3
+      \item V hlavičkových souborech
+      \item PDF ze slajdů
     \end{itemize}
+
+    \item Knihovny při překladu: \cmd{gcc ... -ldw}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Verze ve skriptu}
+\begin{frame}
+  \frametitle{Úkol}
 
-  \heading{Obsah sekce \code{VERSION} ve skriptech}
-  \begin{itemize}
-    \item Strom verzí
-    \item Uzly obsahují funkce
-    \item Uzly mohou obsahovat i označení viditelnosti
+  \heading{Inicializace \file{libdwfl}}
+  \begin{enumerate}
+    \item Nainstalujte si \file{libdw} (a \file{libdwfl})
+    \item Vytvořte si \code{main}
+    \item Definujte si statické háčky
     \begin{itemize}
-      \item \code{global:}
-      \item \code{local:}
+      \item Struktura \code{const Dwfl_Callbacks}
+      \item \code{.section_address = dwfl_offline_section_address}
+      \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
+
+    \item Zavolejte \code{dwfl_begin}
+    \item Zavolejte \code{dwfl_end}
+    \item Ověřujte návratové hodnoty a vypisujte chyby
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{\file{libdw} a \file{libdwfl} -- soubory}
+
+  \heading{Načtení ELFu s DWARFem uvnitř}
+  \begin{itemize}
+    \item \code{Dwfl_Module *dwfl_report_offline(Dwfl *dwfl,
+      const char *name, const char *file_name, int fd)}
+    \begin{itemize}
+      \item \code{dwfl}: návratová hodnota z \code{dwfl_begin}
+      \item \code{name}: cokoliv (např.\ \lstinline@""@)
+      \item \code{file_name}: jméno souboru
+      \item \code{fd}: \lstinline|-1| (nebo souborový deskriptor, pak
+	\code{file_name == ""})
+    \end{itemize}
+
   \end{itemize}
 
-  \medskip
   \pause
+  \medskip
 
-  \begin{lstlisting}
-VERS_1.1 {
-  global:
-    fun;
-  local:
-    old_fun*;
-};
+  \heading{Průchod stromů (jednotlivých Compilation Unit)}
+  \begin{itemize}
+    \item \code{Dwarf_Die *dwfl_nextcu(Dwfl *dwfl, Dwarf_Die *lastcu,
+      Dwarf_Addr *bias)}
+    \begin{itemize}
+      \item \code{dwfl}: návratová hodnota z \code{dwfl_begin}
+      \item \code{lastcu}: poslední CU
+      \item \code{bias}: přičítá se k adresám, které vrací \file{libdw}
+    \end{itemize}
 
-VERS_1.2 {
-  new_functionality_fun;
-} VERS_1.1; /* inheritance */
-  \end{lstlisting}
+  \end{itemize}
+
+    \begin{lstlisting}
+mod = dwfl_report_offline(dwfl, "", argv[1], -1);
+while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
+    \end{lstlisting}
+
+%
+%    \item Získání struktury \code{Dwarf} (pro funkce \file{libdw}):
+%    \begin{itemize}
+%      \item \code{Dwarf *dwfl_module_getdwarf(Dwfl_Module *mod,
+%	Dwarf_Addr *bias)}
+%    \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Otevření ELFu pomocí \file{libdwfl}}
+  \begin{enumerate}
+    \item Přidávejte kód mezi \code{dwfl_begin} a \code{dwfl_end}
+    \item Zavolejte \code{dwfl_report_offline}
+    \item Iterujte přes CU DIE \code{dwfl_nextcu}
+    \begin{itemize}
+      \item Spočítejte z kolika souborů je objekt přeložen
+    \end{itemize}
+    \item Ověřujte návratové hodnoty a vypisujte chyby
+    \item Přeložte a spusťte
+  \end{enumerate}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Verze ve zdrojovém souboru}
+  \frametitle{DIE}
 
+  \heading{Debugging Information Entry}
   \begin{itemize}
-    \item Ve zdrojových souborech je třeba přiřadit verze
-    \item Globální \code{asm} direktiva
+    \item Typ/tag \code{DW_TAG_*}
+    \item Z DIE: \code{int dwarf_tag (Dwarf_Die *die)}
     \begin{itemize}
-      \item Neverzovaná: \code{asm(".symver fun_old1,fun@");}
-      \item Pro určitou verzi: \code{asm(".symver fun_old2,fun@VERS_1");}
-      \item Výchozí: \code{asm(".symver fun_new,fun@@VERS_2");}
+      \item \code{DW_TAG_compile_unit}: DIE o souboru
+      \item \code{DW_TAG_subprogram}: DIE o funkci
+      \item \code{DW_TAG_base_type}: DIE o typu
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Seznam trojic
+    \begin{itemize}
+      \item O co jde: \code{DW_AT_*}
+      \begin{itemize}
+	\item \code{DW_AT_comp_dir}: adresář, kde se překládalo
+	\item \code{DW_AT_name}: jméno (proměnné, souboru, \dots)
+	\item \code{DW_AT_decl_file}: soubor s deklarací
+	\item \code{DW_AT_type}: typ proměnné
+	\item \dots
+      \end{itemize}
+      \item Typ/forma hodnoty (\code{DW_FORM_*})
+      \begin{itemize}
+	\item \code{DW_FORM_addr}
+	\item \code{DW_FORM_string}
+	\item \dots
+      \end{itemize}
+      \item Hodnota
     \end{itemize}
   \end{itemize}
 
+  \begin{textblock*}{5cm}(9.3cm,1.2cm)
+  \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
+  \begin{tikzpicture}
+    \node [die] (CU) {
+      \textbf{DIE} \\
+      type = compile\_unit \\
+      comp\_dir = /tmp/test \\
+      name = test.c \\
+      producer = GCC
+    };
+  \end{tikzpicture}
+  \end{textblock*}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Hlavní DIE}
+
+\begin{lstlisting}
+DW_TAG_compile_unit
+    DW_AT_producer              GNU C 4.7.2 20130108 [gcc-4_7-branch revision 195012]
+    DW_AT_language              DW_LANG_C89
+    DW_AT_name                  test.c
+    DW_AT_comp_dir              /tmp/test
+    DW_AT_low_pc                0x00000000
+    DW_AT_entry_pc              0x00000000
+    DW_AT_stmt_list             0x00000000
+...
+DW_TAG_subprogram
+    DW_AT_external              yes(1)
+    DW_AT_name                  main
+    DW_AT_decl_file             0x00000001 /tmp/test/test.c
+    DW_AT_decl_line             0x00000019
+    DW_AT_prototyped            yes(1)
+    DW_AT_type                  <0x0000005b>
+    DW_AT_low_pc                0x00000000
+    DW_AT_high_pc               0x0000011d
+    DW_AT_frame_base            ...
+    DW_AT_GNU_all_call_sites    yes(1)
+    DW_AT_sibling               <0x00000770>
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Atributy DIE}
+
+  \heading{Iterace přes všechny atributy v jednom DIE}
+  \begin{itemize}
+    \item \code{ptrdiff_t dwarf_getattrs(Dwarf_Die *die, int
+      (*callback)(Dwarf_Attribute *, void *), void *arg, ptrdiff_t offset)}
+    \begin{itemize}
+      \item \code{die}: z \code{dwfl_nextcu}
+      \item \code{callback}: vaše funkce, která se zavolá pro každý atribut v
+	DIE
+      \item \code{arg}: něco, co se předá do \code{callback} jako 2.\ parametr
+      \item \code{offset}: \code{0}
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
   \medskip
 
-  \begin{lstlisting}
-void fun_old() {
-  puts("OLD");
-}
-asm(".symver fun_old,fun@");
+  \heading{Operace nad atributem}
+  \begin{itemize}
+    \item O co jde: \code{dwarf_whatattr}
+    \begin{itemize}
+      \item Vrací \code{DW_AT_*} (\code{DW_AT_name} apod.)
+    \end{itemize}
 
-void fun_new() {
-  puts("NEW");
+    \item Typ obsahu: \code{dwarf_whatform}
+    \begin{itemize}
+      \item Vrací \code{DW_FORM_*} (\code{DW_FORM_string} apod.)
+    \end{itemize}
+
+    \item Obsah: \code{dwarf_form*}
+    \begin{itemize}
+      \item Např.\ \code{dwarf_formstring}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Atributy DIE -- příklad}
+
+  \begin{lstlisting}
+static int cb(Dwarf_Attribute *attr, void *ptr)
+{
+  printf("AT=%x FORM=%x\n", dwarf_whatattr(attr), dwarf_whatform(attr));
+  if (dwarf_whatform(attr) == DW_FORM_strp)
+    printf("name=%s\n", dwarf_formstring(attr));
+  return DWARF_CB_OK;
 }
-asm(".symver fun_new,fun@@VERS_2");
+
+...
+
+  while ((die = dwfl_nextcu(dwfl, die, &bias))) {
+    dwarf_getattrs(die, cb, NULL, 0);
+  }
   \end{lstlisting}
 
 \end{frame}
@@ -400,28 +396,62 @@ asm(".symver fun_new,fun@@VERS_2");
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Verzování}
+  \heading{Výpis atributů}
   \begin{enumerate}
-    \item Otevřete si \file{pb173-bin/06/}
-    \item Projděte 3 verze knihovny \file{vers\{1,2,3\}.c}
+    \item Definujte funkci (háček) pro \code{dwarf_getattrs}
+    \item V ní vypište informace
     \begin{itemize}
-      \item Definuje funkci \code{bubak}
-      \item \code{bubak} v nich má 3 různé sémantiky
+      \item O jaký atribut jde (\code{dwarf_whatattr(attr)})
+      \item Typ obsahu atributu (\code{dwarf_whatform(attr)})
+      \item Adresu, pokud se jedná o typ \code{DW_AT_low_pc}
+      \item Řetězec a typ atributu \code{DW_AT_*}, pokud se jedná o typ hodnoty
+      \code{DW_FORM_string} nebo \code{DW_FORM_strp}
     \end{itemize}
-    \item Projděte soubor, který ji používá \file{x.c}
-    \begin{itemize}
-      \item Volá funkci \code{bubak}
-    \end{itemize}
-    \item Přeložte
-    \begin{itemize}
-      \item Standardně pomocí \cmd{make}
-    \end{itemize}
-    \item Spusťte \file{x\{1,2,3\}}
-    \item Projděte verze v \file{x\{1,2,3\}} za pomoci \cmd{readelf -V}
-    \item Pokračujte domácím úkolem, částí 2
+    \item V těle cyklu \code{dwfl_nextcu} zavolejte \code{dwarf_getattrs}
+    \item Přeložte a spusťte
   \end{enumerate}
 
 \end{frame}
 
+\begin{frame}
+  \frametitle{Průchod skoro-stromem}
+
+  \heading{Iterace přes všechny atributy v jednom DIE}
+  \begin{itemize}
+    \item \code{int dwarf_child(Dwarf_Die *die, Dwarf_Die *result)}
+    \begin{itemize}
+      \item Do \code{result} vloží potomka \code{die}
+      \item Vrací 0 (OK), 1 (žádný potomek), -1 (chyba)
+      \item \code{result} musí být ukazatel na lokální proměnnou
+    \end{itemize}
+
+    \item \code{int dwarf_siblingof(Dwarf_Die *die, Dwarf_Die *result)}
+    \begin{itemize}
+      \item Do \code{result} vloží sourozence \code{die}
+      \item Vrací 0 (OK), 1 (žádný sourozenec), -1 (chyba)
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis potomků CU}
+  \begin{enumerate}
+    \item Vezměte 1. potomka od CU (\code{dwarf_child})
+    \item Iterujte přes sourozence potomka (\code{dwarf_siblingof})
+    \item Pro všechny potomky vypište typ DIE (\code{dwarf_tag})
+    \begin{itemize}
+      \item Nejprve zjistěte, které tam jsou
+      \item Potom vypisujte v textové podobě
+    \end{itemize}
+
+    \item Rozšiřte na celý podstrom, nejen  první úroveň
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
 
 \end{document}

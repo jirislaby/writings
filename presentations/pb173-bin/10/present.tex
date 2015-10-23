@@ -2,9 +2,10 @@
 
 \input{../header.tex}
 
-\subtitle{X. Komunikace s HW}
+\subtitle{IX. Gdb a ladění výkonnosti}
+\date{18. 11. \the\year}
 
-\date{25. 11. \the\year}
+% watchpoints
 
 \begin{document}
 \shorthandoff{-}
@@ -13,86 +14,121 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-\section{Komunikace s HW}
+% MOOOC KRATKY
 
 \begin{frame}
-  \frametitle{Komunikace s HW}
+  \frametitle{Ladění}
+
+  \heading{Minule}
+  \begin{itemize}
+    \item Ladění funkčnosti
+  \end{itemize}
+
+  \tableofcontents
+
+\end{frame}
+
+\section{Ještě více \cmd{gdb}}
+\frame{\sectionpage}
+
+\begin{frame}
+  \frametitle{Debugger \cmd{gdb} (opakování)}
 
   \begin{itemize}
-    \item Obvykle práce ovladačů v jádře
-    \item Ale často není jádro třeba
+    \item Pracuje s ELFem a DWARFem
+    \item Používá systémové volání \code{ptrace}
     \begin{itemize}
-      \item Zařízení na sériovém portu
-      \item Skenery, tiskárny a podobná USB zařízení
-      \item I jednoduchá PCI zařízení
+      \item Sleduje proces
+      \item Upravuje vykonávání
+      \item Čte a mění paměť
+      \item \dots
     \end{itemize}
+
+    \medskip
+
+    \item Spuštění: \cmd{gdb --args binarka --volby}
+    \item Nápověda: \cmd{help}
+    \item Manuál: \href{https://sourceware.org/gdb/current/onlinedocs/gdb/}{GDB
+      User Manual}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Různé přístupy ke komunikaci s HW}
+  \frametitle{\cmd{gcc} a \cmd{gdb}}
 
-  \begin{enumerate}
-    \item Jádro zaštiťuje nízkoúrovňovou komunikaci
+  \begin{itemize}
+    \item \cmd{gcc} generuje různé úrovně ladicích informací
     \begin{itemize}
-      \item Zařízení v \file{/dev/} (\file{ttyS*}, \file{ttyUSB*}, \file{lp*})
-      \item Soubory v \file{/sys/} (gadgety)
+      \item \texttt{-g1} (méně informací)
+      \item \texttt{-g2} alias \texttt{-g}
+      \item \texttt{-g3} (navíc informace o makrech)
+      \item \texttt{-ggdb} (i v kombinaci s \texttt{-g<cislo>})
+      \begin{itemize}
+	\item \cmd{gcc} použije i \cmd{gdb} rozšíření, pokud možno
+      \end{itemize}
     \end{itemize}
 
     \pause
+    \medskip
 
-    \item Jádro ovládá jen přerušení
+    \item S \emph{optimalizacemi} se ladí se obtížněji
     \begin{itemize}
-      \item Vrstva UIO
-      \item Dokumentace: \href{http://blackfin.uclinux.org/doku.php?id=auto_generated_kernel_docs:uio-howto}{uio-howto}
-    \end{itemize}
+      \item Proměnné zmizely, konstanty se propagovaly, \dots
 
-    \pause
-
-    \item Jádro nedělá s HW nic
-    \begin{itemize}
-      \item Instrukcemi/voláními
+      \item Ale bez optimalizací je pomalý kód
       \begin{itemize}
-	\item Získání povolení: \code{ioperm} nebo \code{iopl}
-	\item Přímý přístup: \code{out+in}
+	\item Někdy i nepřeložitelný
       \end{itemize}
 
-      \item Soubory v \file{/sys/} (PCI)
+      \item V \cmd{gcc} 4.8 se objevilo \texttt{-Og}
       \begin{itemize}
-	\item \code{mmap}
-      \end{itemize}
-
-      \item Knihovny na přímou komunikaci s HW
-      \begin{itemize}
-	\item \file{libusb}, \file{libpciaccess}
+	\item Zapíná jen optimalizace, které neztěžují ladění
+	\item Nezapíná samotnou generaci ladicích informací!
+	\item Používá se v kombinaci s \texttt{-g...}
       \end{itemize}
     \end{itemize}
-  \end{enumerate}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \heading{Demo:} makra, \cmd{gdb} a \file{pb173-bin/09/mac.c}
 
 \end{frame}
 
-\section{I/O porty}
-
-\begin{frame}{Přístup instrukcemi/voláními}{I/O porty}
+\begin{frame}
+  \frametitle{Výpisy}
 
   \begin{itemize}
-    \item Porty jsou specifikum některých CPU (včetně \xes)
-    \begin{itemize}
-      \item Samostatná (malá) sběrnice
-      \item Speciální instrukce (\code{in}, \code{out} na \xes)
-      \item Je zde řadič klávesnice, PC spkr, časovače a ovladače přerušení,
-	ladicí port (\code{0x80} $\Rightarrow$ segmentový displej na desce),
-	\dots
-    \end{itemize}
+    \item Dump (\cmd{x}) a print (\cmd{p})
+    \item Lze použít s formátováním (\cmd{x/f} a \cmd{p/f}, kde \cmd{f} je
+      formát)
 
     \pause
 
-    \item Žádost o přístup: \code{ioperm}, \code{iopl}
-    \item Čtení: \code{inX}
-    \item Zápis: \code{outX}, kde X $\in\left\{ \text{\code{b}},\,
-      \text{\code{w}},\, \text{\code{l}} \right\}$ 
-    \item Dokumentace: \cmd{man ioperm} a \cmd{man inb} 
+    \item Formát jsou tři hodnoty
+    \begin{enumerate}
+      \item Počet vypisovaných hodnot
+      \item Formát vypisovaných hodnot
+      \begin{itemize}
+	\item \cmd{x}: hexa (podobně jako \code{printf})
+	\item \cmd{d}: decimálně
+	\item \cmd{u}: decimálně bez znaménka
+	\item \cmd{s}: řetězec
+	\item \cmd{a}: adresa
+	\item \cmd{i}: instrukce
+	\item Ostatní: viz \cmd{help x}
+      \end{itemize}
+
+      \item Velikost skupiny
+      \begin{itemize}
+	\item \cmd{b}: 1 bajt
+	\item \cmd{h}: 2 bajty
+	\item \cmd{w}: 4 bajty
+	\item \cmd{g}: 8 bajtů
+      \end{itemize}
+    \end{enumerate}
   \end{itemize}
 
 \end{frame}
@@ -100,92 +136,155 @@
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Zahrajte melodii na PC speaker} (doplňte
-    \file{pb173-bin/10/speaker.c})
+  \heading{Výpisy}
   \begin{enumerate}
-    \item Nastartujte si virtuální stroj (\file{pb173-bin/qemu-start})
-    \item Dopište tělo funkce \code{beep}
+    \item Otevřete si nějaký program v \cmd{gdb}
+    \item Spusťte (\cmd{start})
+    \item Vypište
     \begin{itemize}
-      \item Zapište \code{0xb6} na port \code{0x43}
-      \item Zapište \code{0x1234dd/hz} na port \code{0x42}
-      \item Zapište \code{(0x1234dd/hz) >> 8} na port \code{0x42}
-      \item Přečtěte port \code{0x61} (obsah spodních 2 bitů zahoďte)
-      \item Zapište přečtenou hodnotu \code{| 0x03} zpět na port \code{0x61}
+      \item Adresu aktuální instrukce (\cmd{p/a \$pc})
+      \item 20 instrukcí od aktuální (\cmd{x/20i \$pc})
+      \item 32 hexa byte hodnot na zásobníku (\cmd{\$sp})
+      \item 8 hexa giant hodnot na zásobníku
     \end{itemize}
-
-    \item Dopište tělo funkce \code{stop_beep}
-    \begin{itemize}
-      \item Přečtěte port \code{0x61}
-      \item Zapište \code{0} na spodní 2 bity portu \code{0x61}
-    \end{itemize}
-
-    \item Po všech zápisech a čteních čekejte alespoň 10 $\mu$s
-    \begin{itemize}
-      \item Máte k dispozici \code{usleep}
-    \end{itemize}
-
-    \item Přidejte do \code{main} volání \code{ioperm}
-    \item Spusťte
   \end{enumerate}
 
 \end{frame}
 
-\section{PCI zařízení}
 
 \begin{frame}
-  \frametitle{PCI zařízení}
+  \frametitle{Automatické výpisy}
 
   \begin{itemize}
-    \item PCI, PCI-X, PCIe
+    \item Přidání: \cmd{display}
+    \item Informace: \cmd{info display}
+    \item Lze nastavit několik automatických výpisů po každém příkazu
 
-    \pause
+    \item Parametry stejné jako \cmd{p} nebo \cmd{x}
+  \end{itemize}
 
-    \item Hierarchická sběrnice
+  \pause
+  \bigskip
+
+  \heading{Úkol:} vypište si aktuální instrukci po každém příkazu
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Vlákna a \cmd{gdb}}
+
+  \begin{itemize}
+    \item Informace: \cmd{info threads}
+    \item Přepnutí:  \cmd{thread <cislo>}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \heading{Demo:} \file{pb173-bin/09/thread.c}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Další informace}
+
+  \begin{itemize}
+    \item Spousta dalších informací v \cmd{info}
+    \item \cmd{functions}, \cmd{types}, \cmd{variables}, \cmd{locals}
+    \item \cmd{sources}, \cmd{line}, \cmd{macros}, \cmd{scope}
+    \item \cmd{symbol}
+    \item Další viz \cmd{help info}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Demo}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Změna běhu}
+
+  \begin{itemize}
+    \item \texttt{set}, \texttt{set variable}
+    \item Registry procesoru: \cmd{\$rax}, \cmd{\$rbx}, \dots
+    \item Proměnné \cmd{gdb}: \cmd{\$pc}, \cmd{\$sp}, \dots
+    \item Vnitřní proměnné: \cmd{\$ostatni}
     \begin{itemize}
-      \item Identifikace doména:bus:slot:funkce
-      \item Bridge (=routery)
+      \item Pro vlastní použití
     \end{itemize}
-
-    \pause
-
-    \item Konfigurační prostor
-    \begin{itemize}
-      \item Automatická konfigurace
-
-      \item ID zařízení (vendor, device), I/O prostory, IRQ
-      \begin{itemize}
-	\item \emph{Obsah} I/O -- specifikace zařízení (výrobce)
-      \end{itemize}
-
-      \item \cmd{lspci}
-    \end{itemize}
-
-    \pause
-
-    \item Podrobnosti v PCI specifikaci
+    \item Paměť: \cmd{\{typ\}adresa}
   \end{itemize}
 
 \end{frame}
 
-\section{\code{mmap} pro přímou komunikaci}
+\section{Ladění výkonnosti}
+\frame{\sectionpage}
+
+\subsection{Profilování}
 
 \begin{frame}
-  \frametitle{\code{mmap} pro přímou komunikaci s PCI}
+  \frametitle{Profilování}
 
-  \begin{itemize}
-    \item Každé PCI zařízení může mít:
+  \heading{Co zabírá nejvíce času při vykonávání?}
+  \begin{enumerate}
+    \item \cmd{gprof}
     \begin{itemize}
-      \item I/O porty (komunikace viz dříve)
-      \item \emph{Paměť ve fyzickém prostoru}
-      \item Přerušení, DMA, atd. (UIO)
+      \item Při překladu: \cmd{gcc -pg ...}
+      \item Potom se program spustí a data se uloží na disk
+      \item \cmd{gprof} data načte a zobrazí
+      \item Demo: dump
     \end{itemize}
 
-    \pause
-    \medskip
+    \item \cmd{perf}
+    \begin{itemize}
+      \item Používá čítače v procesoru (nutná podpora CPU)
+      \item Zahrnuje chování jádra
+      \item Umí pracovat s \cmd{gcc -pg} binárkami
+      \item Spuštění: \cmd{perf record -g -- binarka --volby}
+      \item Dokumentace: \url{http://perf.wiki.kernel.org}
+    \end{itemize}
 
-    \item Soubory \file{/sys/bus/pci/devices/*/resource*}
-    \item Mapují se pomocí \code{mmap}
-    \item Obsah: ve specifikaci konkrétního zařízení
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Profilování}
+  \begin{enumerate}
+    \item Projděte si \file{pb173-bin/09/prof.c}
+    \item Spusťte \file{prof_pg}
+    \item Prostudujte výstup \cmd{gprof -b prof_pg}
+
+    \bigskip
+
+    \item Nahrajte si výstup \cmd{perf}
+    \begin{itemize}
+      \item \cmd{perf record -g prof}
+    \end{itemize}
+    \item Zobrazte si výstup
+    \begin{itemize}
+      \item \cmd{perf report -g}
+    \end{itemize}
+    \item Zopakujte \cmd{perf} pro \file{prof_pg}
+  \end{enumerate}
+
+\end{frame}
+
+\subsection{Pokrytí kódu}
+
+\begin{frame}
+  \frametitle{Pokrytí kódu}
+
+  \heading{Která část kódu se vůbec nevykonává?}
+  \begin{itemize}
+    \item \cmd{gcov}
+    \item Při překladu: \cmd{gcc --coverage ...}
+    \item Potom se program spustí a data se uloží na disk
+    \item \cmd{gcov} data načte a zapíše \file{cov.c.gcov}
   \end{itemize}
 
 \end{frame}
@@ -193,147 +292,15 @@
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Komunikace s EDU zařízením}
+  \heading{Pokrytí kódu}
   \begin{enumerate}
-    \item Mapujte \file{resource0} PCI zařízení s ID \code{0x11e8} v \cmd{qemu}
-    \begin{itemize}
-      \item Jen v laboratoři na virtuálních strojích
-      \item Mapujte jako \code{volatile uint32_t *}
-    \end{itemize}
-
-    \item Vypište, co je na první a druhé pozici
-    \item Zapište nějaké číslo na druhou pozici
-    \item Vypište, co je na druhé pozici
-    \item Spusťte
-  \end{enumerate}
+  \item Projděte si \file{pb173-bin/09/cov.c}
+  \item Spusťte \file{cov}
+  \item Prostudujte výstup \cmd{gcov cov}
+  \item Prostudujte \file{cov.c.gcov}
+\end{enumerate}
 
 \end{frame}
 
-\section{Knihovny pro přímou komunikaci s HW}
-
-\begin{frame}
-  \frametitle{Knihovny pro přímou komunikaci s HW}
-
-  \begin{itemize}
-    \item Kromě \code{mmap} přístupu existují i knihovny
-    \item \file{libusb}, \file{libpciaccess}
-    \begin{itemize}
-      \item Jsou přenositelné
-      \item Poskytují lepší rozhraní
-      \item Pracují se soubory v \file{/proc} a \file{/sys}
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{\file{libpciaccess}}
-
-  \begin{itemize}
-    \item \cmd{gcc ... -lpciaccess} (\header{pciaccess.h})
-
-    \item Inicializace: \code{pci_system_init}
-    \item Deinicializace: \code{pci_system_cleanup}
-
-    \pause
-    \medskip
-
-    \item Vytvoření iterátoru (\code{struct pci_device_iterator *})
-    \begin{itemize}
-      \item Vím ID: \code{pci_id_match_iterator_create}
-      \item Vím slot: \code{pci_slot_match_iterator_create}
-    \end{itemize}
-
-    \item Procházení iterátoru: \code{pci_device_next}
-    \begin{itemize}
-      \item Vrací \code{struct pci_device *} (a \code{NULL} nakonec)
-    \end{itemize}
-    \item Zničení iterátoru: \code{pci_iterator_destroy}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Výpis PCI zařízení pomocí \file{libpciaccess}}
-  \begin{enumerate}
-    \item Volejte \code{pci_system_init}
-    \item Vytvořte iterátor
-    \begin{itemize}
-      \item S parametrem \code{NULL}, tj.\ projdi všechny
-    \end{itemize}
-
-    \item Projděte zařízení
-
-    \item Pro každé vypište číslo
-    \begin{itemize}
-      \item Domény
-      \item Sběrnice
-      \item Zařízení
-      \item Funkce
-    \end{itemize}
-
-    \item Spusťte a zkontrolujte s \cmd{lspci -nn}
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{\file{libpciaccess} a zařízení}
-
-  \begin{itemize}
-    \item Před další prací je nutné inicializovat \code{struct pci_device}
-    \begin{itemize}
-      \item Pomocí \code{pci_device_probe}
-      \item Potom lze pracovat s dalšími prvky \code{struct pci_device}
-      \begin{itemize}
-        \item \code{vendor_id}, \code{device_id}, \code{irq}, \dots
-      \end{itemize}
-    \end{itemize}
-
-    \pause
-    \medskip
-
-    \item Mapování regionu: \code{pci_device_map_range}
-    \begin{itemize}
-      \item Mapuje region do paměti
-      \item Podobné \code{mmap} regionu z dnešního cvičení
-    \end{itemize}
-
-    \pause
-    \medskip
-
-    \item Konfigurační prostor
-    \begin{itemize}
-      \item Zapisuje BIOS/je v ROM
-      \item Informace o zařízení
-      \item Čtení: \code{pci_device_cfg_read*}
-      \item Zápis: \code{pci_device_cfg_write*}
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Práce s EDU pomocí \file{libpciaccess}}
-  \begin{enumerate}
-    \item Mapujte si 0.\ region
-    \begin{itemize}
-      \item \code{pci_device_map_range}
-      \item Mapujte jako \code{volatile uint32_t *}
-      \item Podobně jako \code{mmap} předtím
-    \end{itemize}
-
-    \item Vypište, co je na první a \emph{třetí} pozici
-    \item Zapište nějaké malé číslo na třetí pozici
-    \item Počkejte, než bude osmá pozice \code{0}
-    \item Vypište, co je na třetí pozici
-    \item Spusťte
-  \end{enumerate}
-
-\end{frame}
 
 \end{document}
