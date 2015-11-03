@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{VI. Datové typy}
-\date{21. 10. \the\year}
+\date{5. 11. \the\year}
 
 \begin{document}
 
@@ -43,11 +43,15 @@
   \begin{itemize}
   \item \code{char}, \code{short}, \code{int}, \code{long},
     \code{long long} (+ \code{unsigned})
-  \item \code{u8}, \code{u16}, \code{u32}, \code{u64},
-    \code{__u8}, \code{__u16}, \code{__u32}, \code{__u64}
-  \item \code{s8}, \code{s16}, \code{s32}, \code{s64},
-    \code{__s8}, \code{__s16}, \code{__s32}, \code{__s64}
+  \addtocounter{beamerpauses}{1}
+  \item<+-> \code{u8}, \code{u16}, \code{u32}, \code{u64}\uncover<+->{,
+    \code{__u8}, \code{__u16}, \code{__u32}, \code{__u64}}
+  \item<.(-1)-> \code{s8}, \code{s16}, \code{s32}, \code{s64}\uncover<.->{,
+    \code{__s8}, \code{__s16}, \code{__s32}, \code{__s64}}
   \end{itemize}
+
+  \addtocounter{beamerpauses}{-1}
+  \pause
 
   \begin{block}{\code{sizeof} základních typů pro různé architektury}
   \begin{center}
@@ -90,34 +94,42 @@ x86\_64     & 8    & 8    & 8    \\ \hline
 
   \heading{Pro práci s fyzickou adresou \texttt{long}/ukazatel nestačí}
   \begin{itemize}
-  \item Ale \code{u64} může být zbytečné (čisté 32-bity)
-  \item Proto speciální typy (\emph{POZOR})
-  \begin{itemize}
-  \item \code{phys_addr_t} (RAM)
-  \item \code{dma_addr_t} (RAM, ale IOMMU!)
-  \item \code{resource_size_t} (PCI prostor apod.)
-  \item Anebo \code{long}, ale pak v něm uchovávat \code{pfn}
-    (\code{phys/PAGE_SIZE})
-  \end{itemize}
+    \item Ale \code{u64} může být zbytečné (čisté 32-bity)
+
+    \pause
+
+    \item Proto speciální typy (\emph{POZOR})
+    \begin{itemize}
+      \item \code{phys_addr_t} (RAM, za MMU)
+      \item Anebo \code{long}, ale pak v něm uchovávat \code{pfn}
+	(\code{phys/PAGE_SIZE})
+
+      \pause
+
+      \item \code{dma_addr_t} (RAM, před IOMMU)
+      \item \code{resource_size_t} (PCI prostor apod.)
+    \end{itemize}
   \end{itemize}
 
   \pause
   \medskip
 
-  \heading{Úkol:} opravte typy v pb173/06 (první TODO)
+  \heading{Úkol:} opravte typy v pb173/06 (jen první TODO)
 
 \end{frame}
 
 \begin{frame}[fragile]
   \frametitle{Pořadí bytů}
 
-  \begin{block}{Číslo \code{0x12345678} v paměti}
+  \begin{block}{Číslo \code{0x12345678} reprezentované v paměti}
   \begin{center}
-  \begin{tabular}{l|llll}
-Adresa:       &    0 &    1 &    2 &    3 \\ \hline
-Big-endian    & 0x12 & 0x34 & 0x56 & 0x78 \\
-Little-endian & 0x78 & 0x56 & 0x34 & 0x12 \\
-Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
+   \begin{tabular}{l|l|llll}
+\multirow{2}{*}{\textbf{Pořadí}} & \textbf{Příklad} &
+  \multicolumn{4}{c}{\textbf{Offset v paměti}} \\
+              & \textbf{architektury}       &    0 &    1 &    2 &    3 \\\hline
+Big-endian    & \texttt{arm}, \texttt{s390} & 0x12 & 0x34 & 0x56 & 0x78 \\
+Little-endian & \texttt{arm}, \xes          & 0x78 & 0x56 & 0x34 & 0x12 \\
+Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
   \end{tabular}
   \end{center}
   \end{block}
@@ -125,16 +137,19 @@ Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
   \pause
   \bigskip
 
-  \heading{Pro typy o velikosti větší než 1 je nutné vědět pořadí}
+  \heading{Pro typy o velikosti větší než 1 je nutné znát pořadí}
   \begin{itemize}
-  \item Interpretace dat z/do zařízení
-  \item Specifikace
-  \begin{itemize}
-  \item x86: LE
-  \item PowerPC: LE nebo BE (dle nastavení CPU)
-  \item PCI: LE
-  \item Síťový provoz: BE
-  \end{itemize}
+    \item Interpretace dat z/do zařízení
+
+    \pause
+
+    \item Specifikace
+    \begin{itemize}
+      \item CPU (příklady nahoře)
+      \item PCI: LE
+      \item Síťový provoz: BE
+      \item \dots
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -143,12 +158,18 @@ Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
   \frametitle{Funkce pro pořadí bytů}
 
   \begin{itemize}
-  \item \header{asm/byteorder.h}
-  \item \code{__leXX}, \code{__beXX}
-  \item \code{cpu_to_leXX}, \code{cpu_to_beXX}
-  \item \code{leXX_to_cpu}, \code{beXX_to_cpu}
-  \item $\text{\code{XX}}\in\left\{\text{\code{16}},\text{\code{32}},\text{\code{64}}\right\}$
-  \item \code{ntohs}, \code{ntohl}, \code{htons}, \code{htonl}
+    \item \header{asm/byteorder.h}
+    \item \code{__leXX}, \code{__beXX}
+
+    \pause
+
+    \item \code{cpu_to_leXX}, \code{cpu_to_beXX}
+    \item \code{leXX_to_cpu}, \code{beXX_to_cpu}
+    \item $\text{\code{XX}}\in\left\{\text{\code{16}},\text{\code{32}},\text{\code{64}}\right\}$
+
+    \pause
+
+    \item \code{ntohs}, \code{ntohl}, \code{htons}, \code{htonl}
   \end{itemize}
 
   \pause
@@ -171,16 +192,19 @@ Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
 
     \item Díra na konci adresového prostoru
     \begin{itemize}
-      \item Tj. nevalidní ukazatel (dereference by způsobila pád)
-      \item Např. \code{0xfffffffffff00000-0xffffffffffffffff} (x86\_64)
+      \item Tj.\ nevalidní ukazatel (dereference by způsobila pád)
+      \item Např.\ \code{0xfffffffffff00000-0xffffffffffffffff} (x86\_64)
       \item Lze použít k zakódování chyby
     \end{itemize}
 
     \pause
 
-    \item \code{void *ptr=ERR_PTR(-Eerror)}
-    \item \code{IS_ERR(ptr)} $\Rightarrow$ \code{int err=PTR_ERR(ptr)}
-    \item \code{IS_ERR(NULL)=false}
+    \item \code{void *ptr = ERR_PTR(-Eerror)}
+    \item \code{IS_ERR(ptr)} $\Rightarrow$ \code{int err = PTR_ERR(ptr)}
+
+    \pause
+
+    \item \code{IS_ERR(NULL)} je \code{false}
   \end{itemize}
 
   \pause
@@ -199,22 +223,28 @@ Mixed-endian  & 0x34 & 0x12 & 0x78 & 0x56 \\
   \frametitle{Seznam I.}
 
   \begin{itemize}
-  \item \header{linux/list.h}
-  \item \code{struct list_head} (obsahuje \code{prev}, \code{next})
-  \begin{itemize}
-  \item \emph{Jak samotný seznam (počátek), tak jeho prvky}
+    \item \header{linux/list.h}
+    \item \code{struct list_head} (obsahuje \code{prev}, \code{next})
+    \begin{itemize}
+      \item \emph{Jak samotný seznam (počátek), tak jeho prvky}
+    \end{itemize}
+
+    \pause
+
+    \item \code{LIST_HEAD(my_list)}$_S$, \code{INIT_LIST_HEAD(\&my_list)}$_D$
+
+    \pause
+
+    \item \code{list_add(co, kam)}, \code{list_add_tail},
+      \code{list_del}
+    \item \code{list_move}, \code{list_move_tail}
   \end{itemize}
 
   \pause
 
-  \item \code{LIST_HEAD(my_list)}, \code{INIT_LIST_HEAD(\&my_list)}
-  \item \code{list_add(co, kam)}, \code{list_add_tail},
-    \code{list_del}
-  \item \code{list_move}, \code{list_move_tail}
-  \end{itemize}
-
+  \begin{block}{Příklad}
   \begin{center}
-  \begin{tabular}{ll}
+  \begin{tabular}{l|l}
   \begin{lstlisting}[language=C]
 struct my_struct {
   int a;
@@ -226,11 +256,13 @@ LIST_HEAD(my_list);
 struct my_struct *s;
 s = kmalloc(sizeof(*s), GFP_KERNEL);
 if (!s) { ... }
+s->a = 10;
 list_add(&s->list, &my_list);
 /* list_add_tail(&s->list, &my_list); */
   \end{lstlisting}
   \end{tabular}
   \end{center}
+  \end{block}
 
   \pause
   \medskip
@@ -243,14 +275,24 @@ list_add(&s->list, &my_list);
   \frametitle{Seznam II.}
 
   \begin{itemize}
-  \item \header{linux/list.h}
-  \item \code{list_empty}
-  \item \code{list_entry}, \code{list_first_entry}, \\
-    \code{list_for_each_entry(...) \{ ... \}} (jako \code{for}), \\
-    \code{list_for_each_entry_reverse(...) \{ ... \}}
-  \item \code{*_safe} varianty -- pokud měním aktuální člen seznamu
+    \item \header{linux/list.h}
+    \item \code{list_empty}
+
+    \pause
+
+    \item Jedna položka: \code{list_entry}, \code{list_first_entry}
+    \item Iterace:
+      \code{list_for_each_entry(...) \{ ... \}} (jako \code{for}), \\
+      \code{list_for_each_entry_reverse(...) \{ ... \}}
+
+    \pause
+
+    \item \code{*_safe} varianty -- pokud měním aktuální člen seznamu
   \end{itemize}
 
+  \pause
+
+  \begin{block}{Příklad}
   \begin{lstlisting}
 struct my_struct *s, *s1;
 s = list_first_entry(&my_list, struct my_struct, list);
@@ -259,6 +301,7 @@ s = list_entry(s->list.next, struct my_struct, list);
 list_for_each_entry(s, &my_list, list) { s->a; }
 list_for_each_entry_safe(s, s1, &my_list, list) { list_del(&s->list); }
   \end{lstlisting}
+  \end{block}
 
   \pause
   \medskip

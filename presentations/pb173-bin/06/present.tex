@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{V. DWARF}
-\date{15. 10. 2013}
+\date{5. 11. \the\year}
 
 \begin{document}
 
@@ -58,8 +58,8 @@
     \node [die] (CU) {
       \textbf{DIE} \\
       type = compile\_unit \\
-      comp\_dir = /tmp/test \\
       name = test.c \\
+      comp\_dir = /tmp/test \\
       producer = GCC
     };
     \node [die, below=of CU] (FUN1) {
@@ -74,7 +74,7 @@
       name = fun \\
       type = int
     } edge[diee] (CU);
-    \node [die, right=1.4cm of FUN1] (TYPE) {
+    \node [die, right=1.23cm of FUN1] (TYPE) {
       \textbf{DIE} \\
       type = base\_type \\
       name = int \\
@@ -93,10 +93,13 @@
     \item DWARF je v ELFu uložený v \code{.debug_*} sekcích
     \begin{itemize}
       \item \code{.debug_info}: všechny DIE z lesa stromů
-      \item \code{.debug_abbrev}: formát \code{.debug_info} (Figure 48 v DWARF)
-      \item \code{.debug_types}: popis datových typů
-      \item \code{.debug_str}: řetězce odkazované z \code{.debug_info}
+      \item \code{.debug_abbrev}: formát \code{.debug_info} (Figure 48 v DWARF4)
+
+      \pause
+
       \item \code{.debug_line}: překlad instrukce $\leftrightarrow$ řádek kódu
+      \item \code{.debug_loc}: popis maker
+      \item \code{.debug_str}: řetězce odkazované z \code{.debug_info}
     \end{itemize}
 
     \pause
@@ -131,7 +134,8 @@
     \begin{itemize}
       \item Podpora nových standardů DWARF
       \item Lepší rozhraní
-      \item Základní: \file{libdw} (\header{elfutils/libdw.h})
+      \item Základní: \file{libdw} (\header{elfutils/libdw.h} +
+        \header{dwarf.h})
       \item Nadstavba: \file{libdwfl} (\header{elfutils/libdwfl.h})
       \item \emph{Tuto budeme používat}
     \end{itemize}
@@ -145,11 +149,16 @@
   \begin{itemize}
     \item Knihovny jsou součástí elfutils
     \item Lze je používat střídavě (jako \code{elf} a \code{gelf})
+
+    \pause
+
     \item Inicializace: \code{Dwfl *dwfl_begin(const Dwfl_Callbacks *cb)}
     \begin{itemize}
       \item \code{.section_address = dwfl_offline_section_address}
       \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
+
+    \pause
 
     \item Ukončení: \code{void dwfl_end(Dwfl *dwfl)}
     \item Poslední chyba: \code{dwfl_errmsg(-1)}
@@ -159,7 +168,6 @@
     \item Dokumentace
     \begin{itemize}
       \item V hlavičkových souborech
-      \item PDF ze slajdů
     \end{itemize}
 
     \item Knihovny při překladu: \cmd{gcc ... -ldw}
@@ -194,13 +202,13 @@
 
   \heading{Načtení ELFu s DWARFem uvnitř}
   \begin{itemize}
-    \item \code{Dwfl_Module *dwfl_report_offline(Dwfl *dwfl,
-      const char *name, const char *file_name, int fd)}
+    \item \code{Dwfl_Module *dwfl_report_offline(...)}
     \begin{itemize}
-      \item \code{dwfl}: návratová hodnota z \code{dwfl_begin}
-      \item \code{name}: cokoliv (např.\ \lstinline@""@)
-      \item \code{file_name}: jméno souboru
-      \item \code{fd}: \lstinline|-1| (nebo souborový deskriptor, pak
+      \item \code{Dwfl *dwfl}: návratová hodnota z \code{dwfl_begin}
+      \item \code{const char *name}: pojmenování modulu (např.\ 
+        \code{file_name})
+      \item \code{const char *file_name}: jméno souboru
+      \item \code{int fd}: \lstinline|-1| (nebo souborový deskriptor, pak
 	\code{file_name == ""})
     \end{itemize}
 
@@ -211,20 +219,22 @@
 
   \heading{Průchod stromů (jednotlivých Compilation Unit)}
   \begin{itemize}
-    \item \code{Dwarf_Die *dwfl_nextcu(Dwfl *dwfl, Dwarf_Die *lastcu,
-      Dwarf_Addr *bias)}
+    \item \code{Dwarf_Die *dwfl_nextcu(...)}
     \begin{itemize}
-      \item \code{dwfl}: návratová hodnota z \code{dwfl_begin}
-      \item \code{lastcu}: poslední CU
-      \item \code{bias}: přičítá se k adresám, které vrací \file{libdw}
+      \item \code{Dwfl *dwfl}: návratová hodnota z \code{dwfl_begin}
+      \item \code{Dwarf_Die *lastcu}: \code{NULL} nebo předchozí CU
+      \item \code{Dwarf_Addr *bias}: přičítá se k adresám, které vrací
+        \file{libdw}
     \end{itemize}
 
   \end{itemize}
 
+  \begin{block}{Příklad}
     \begin{lstlisting}
-mod = dwfl_report_offline(dwfl, "", argv[1], -1);
+Dwfl_Module *mod = dwfl_report_offline(dwfl, argv[1], argv[1], -1);
 while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
     \end{lstlisting}
+  \end{block}
 
 %
 %    \item Získání struktury \code{Dwarf} (pro funkce \file{libdw}):
@@ -242,7 +252,7 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
   \begin{enumerate}
     \item Přidávejte kód mezi \code{dwfl_begin} a \code{dwfl_end}
     \item Zavolejte \code{dwfl_report_offline}
-    \item Iterujte přes CU DIE \code{dwfl_nextcu}
+    \item Iterujte přes CU DIE pomocí \code{dwfl_nextcu}
     \begin{itemize}
       \item Spočítejte z kolika souborů je objekt přeložen
     \end{itemize}
@@ -257,8 +267,8 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
 
   \heading{Debugging Information Entry}
   \begin{itemize}
-    \item Typ/tag \code{DW_TAG_*}
-    \item Z DIE: \code{int dwarf_tag (Dwarf_Die *die)}
+    \item Typ celého DIE: \code{DW_TAG_*}
+    \item Z DIE: \code{int dwarf_tag(Dwarf_Die *die)}
     \begin{itemize}
       \item \code{DW_TAG_compile_unit}: DIE o souboru
       \item \code{DW_TAG_subprogram}: DIE o funkci
@@ -268,7 +278,7 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
 
     \pause
 
-    \item Seznam trojic
+    \item Seznam atributů = trojic
     \begin{itemize}
       \item O co jde: \code{DW_AT_*}
       \begin{itemize}
@@ -288,15 +298,15 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
     \end{itemize}
   \end{itemize}
 
-  \begin{textblock*}{5cm}(9.3cm,1.2cm)
+  \begin{textblock*}{5cm}(8.8cm,1.2cm)
   \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
   \begin{tikzpicture}
     \node [die] (CU) {
       \textbf{DIE} \\
       type = compile\_unit \\
-      comp\_dir = /tmp/test \\
-      name = test.c \\
-      producer = GCC
+      {\uncover<2->{comp\_dir (str) = /tmp/test}} \\
+      {\uncover<2->{name (str) = test.c}} \\
+      {\uncover<2->{producer (str) = GCC}}
     };
   \end{tikzpicture}
   \end{textblock*}
@@ -337,14 +347,14 @@ DW_TAG_subprogram
 
   \heading{Iterace přes všechny atributy v jednom DIE}
   \begin{itemize}
-    \item \code{ptrdiff_t dwarf_getattrs(Dwarf_Die *die, int
-      (*callback)(Dwarf_Attribute *, void *), void *arg, ptrdiff_t offset)}
+    \item \code{ptrdiff_t dwarf_getattrs(...)}
     \begin{itemize}
-      \item \code{die}: z \code{dwfl_nextcu}
-      \item \code{callback}: vaše funkce, která se zavolá pro každý atribut v
-	DIE
-      \item \code{arg}: něco, co se předá do \code{callback} jako 2.\ parametr
-      \item \code{offset}: \code{0}
+      \item \code{Dwarf_Die *die}: z \code{dwfl_nextcu}
+      \item \code{int (*callback)(Dwarf_Attribute *, void *)}: vaše funkce,
+        která se zavolá pro každý atribut v DIE
+      \item \code{void *arg}: něco, co se předá do \code{callback} jako 2.\ 
+        parametr
+      \item \code{ptrdiff_t offset}: \code{0}
     \end{itemize}
 
   \end{itemize}
@@ -354,17 +364,17 @@ DW_TAG_subprogram
 
   \heading{Operace nad atributem}
   \begin{itemize}
-    \item O co jde: \code{dwarf_whatattr}
+    \item O co jde: \code{dwarf_whatattr(Dwarf_Attribute *attr)}
     \begin{itemize}
       \item Vrací \code{DW_AT_*} (\code{DW_AT_name} apod.)
     \end{itemize}
 
-    \item Typ obsahu: \code{dwarf_whatform}
+    \item Typ obsahu: \code{dwarf_whatform(Dwarf_Attribute *attr)}
     \begin{itemize}
       \item Vrací \code{DW_FORM_*} (\code{DW_FORM_string} apod.)
     \end{itemize}
 
-    \item Obsah: \code{dwarf_form*}
+    \item Obsah: \code{dwarf_form*(Dwarf_Attribute *attr)}
     \begin{itemize}
       \item Např.\ \code{dwarf_formstring}
     \end{itemize}
@@ -376,20 +386,23 @@ DW_TAG_subprogram
   \frametitle{Atributy DIE -- příklad}
 
   \begin{lstlisting}
-static int cb(Dwarf_Attribute *attr, void *ptr)
+static int dump_die_attr(Dwarf_Attribute *attr, void *ptr)
 {
   printf("AT=%x FORM=%x\n", dwarf_whatattr(attr), dwarf_whatform(attr));
   if (dwarf_whatform(attr) == DW_FORM_strp)
-    printf("name=%s\n", dwarf_formstring(attr));
+    printf("  name=%s\n", dwarf_formstring(attr));
   return DWARF_CB_OK;
 }
 
-...
+static void dump_dwfl(Dwfl *dwfl)
+{
+  Dwarf_Die *die = NULL;
+  Dwarf_Addr bias;
 
   while ((die = dwfl_nextcu(dwfl, die, &bias))) {
-    dwarf_getattrs(die, cb, NULL, 0);
-  }
-  \end{lstlisting}
+    dwarf_getattrs(die, dump_die_attr, NULL, 0);
+}
+  \end{lstlisting}%stopzone
 
 \end{frame}
 
@@ -416,7 +429,7 @@ static int cb(Dwarf_Attribute *attr, void *ptr)
 \begin{frame}
   \frametitle{Průchod skoro-stromem}
 
-  \heading{Iterace přes všechny atributy v jednom DIE}
+  \heading{Procházení okolních DIE}
   \begin{itemize}
     \item \code{int dwarf_child(Dwarf_Die *die, Dwarf_Die *result)}
     \begin{itemize}
@@ -424,6 +437,8 @@ static int cb(Dwarf_Attribute *attr, void *ptr)
       \item Vrací 0 (OK), 1 (žádný potomek), -1 (chyba)
       \item \code{result} musí být ukazatel na lokální proměnnou
     \end{itemize}
+
+    \pause
 
     \item \code{int dwarf_siblingof(Dwarf_Die *die, Dwarf_Die *result)}
     \begin{itemize}
@@ -440,7 +455,7 @@ static int cb(Dwarf_Attribute *attr, void *ptr)
 
   \heading{Výpis potomků CU}
   \begin{enumerate}
-    \item Vezměte 1. potomka od CU (\code{dwarf_child})
+    \item Vezměte 1.\ potomka od CU (\code{dwarf_child})
     \item Iterujte přes sourozence potomka (\code{dwarf_siblingof})
     \item Pro všechny potomky vypište typ DIE (\code{dwarf_tag})
     \begin{itemize}
@@ -448,7 +463,7 @@ static int cb(Dwarf_Attribute *attr, void *ptr)
       \item Potom vypisujte v textové podobě
     \end{itemize}
 
-    \item Rozšiřte na celý podstrom, nejen  první úroveň
+    \item Rozšiřte na celý podstrom, nejen první úroveň
     \item Přeložte a spusťte
   \end{enumerate}
 
