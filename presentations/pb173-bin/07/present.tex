@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{VI. Linker skripty}
-\date{21. 10. \the\year}
+\date{11. 11. \the\year}
 
 \begin{document}
 
@@ -69,6 +69,8 @@
       \item Verzování: \code{VERSION}
       \item \dots
     \end{itemize}
+
+    \pause
 
     \item Komentáře
     \begin{itemize}
@@ -139,6 +141,7 @@
     \item Spusťte program
     \begin{itemize}
       \item Bude fungovat jen pokud \cmd{sysctl vm.mmap_min_addr} je 0
+      \item Pokud není, změňte
     \end{itemize}
   \end{enumerate}
 
@@ -148,22 +151,34 @@
   \frametitle{Sekce}
 
   \begin{itemize}
-    \item \code{SECTIONS}
-    \item Záznamy typu \code{.vystupni_sekce : \{ *(.vstupni_sekce) \}}
-    \item \code{/DISCARD/} je specíální výstupní sekce
+    \item Blok \code{SECTIONS \{ ... \}}
+    \item Záznamy typu \code{.vystupni_sekce : \{ soubor(.vstupni_sekce) \}}
+    \begin{itemize}
+      \item \code{soubor} může být \code{*}
+    \end{itemize}
+
+    \pause
+
+    \item \code{/DISCARD/} je speciální výstupní sekce
+    \begin{itemize}
+      \item Obsah se zahodí
+    \end{itemize}
   \end{itemize}
 
   \medskip
+  \pause
 
+  \begin{block}{Příklad}
   \begin{lstlisting}
 SECTIONS
 {
   .text   : { *(.text) }
-  .data   : { *(.data) }
+  .data   : { *(.data) soubor.o(.data.special) }
   .bss    : { *(.bss) }
   /DISCARD/ : { *(.debug*) *(.comment*) *(.eh_frame*) }
 }
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -203,13 +218,14 @@ SECTIONS
     \item Pro každou adresu lze vložit symbol
     \begin{itemize}
       \item \code{symbol = .;}
-      \item V kódu pak \code{extern void *symbol;}
+      \item V kódu pak \code{extern unsigned long symbol;}
     \end{itemize}
   \end{itemize}
 
   \medskip
   \pause
 
+  \begin{block}{Příklad}
   \begin{lstlisting}
 SECTIONS
 {
@@ -219,6 +235,7 @@ SECTIONS
   .data 0x50000 : { *(.data) }
 }
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -230,8 +247,10 @@ SECTIONS
     \item Rozšiřte zdrojový soubor o další 2 funkce, tedy:
     \begin{itemize}
       \item 1 (původní): s nekonečným cyklem, dejte ji do sekce \code{.text.t2}
-      \item 2: bude volat \code{extern void my_fun(void)}, do sekce \code{.text.t1}
-      \item 3: bude volat adresu \code{0x401000} (bude \code{ENTRY})
+      \item 2: bude volat \code{extern void my_fun(void)}, do sekce
+        \code{.text.t1}
+      \item 3: bude volat adresu \code{0x401000}, nastavte \code{ENTRY} na
+        její jméno
     \end{itemize}
     \item Rozšiřte skript
     \begin{itemize}
@@ -256,19 +275,27 @@ SECTIONS
 \section{Verzování funkcí}
 \frame{\sectionpage}
 
-\begin{frame}[fragile]
-  \frametitle{Verzování funkcí}
+\begin{frame}[fragile]{Verzování funkcí}
 
   \begin{itemize}
     \item Pro zachování zpětné kompatibility knihovních funkcí
     \begin{itemize}
-      \item Knihovny, které jsou udržované opravují chyby
+      \item V knihovnách se v průběhu času opravují chyby
+
+      \pause
+
       \begin{itemize}
-	\item Ale někteří uživatelé spoléhali na ,,chyby''
+	\item Ale někteří ,,uživatelé'' knihovny spoléhali na chyby
       \end{itemize}
+
+      \pause
+
       \item Jak zachovat zpětnou kompatibilitu nějaké funkce?
     \end{itemize}
     \item Chceme 2 funkce s týmž názvem, ale s jinou funkcionalitou
+    \begin{itemize}
+      \item Podle verze použité při linkování
+    \end{itemize}
   \end{itemize}
 
   \smallskip
@@ -280,19 +307,20 @@ SECTIONS
       \begin{lstlisting}
 void fun()
 {
-  puts("X");
+  puts("OLD");
 }
       \end{lstlisting} &
       \begin{lstlisting}
 void fun()
 {
-  puts("Y");
+  puts("NEW");
 }
       \end{lstlisting} \\ \hline
+      \footnotesize{libX v1} & \footnotesize{libX v2} \\ \hline
     \end{tabular}
 
     \pause
-    \bigskip
+    \smallskip
     \bigskip
 
     \heading{Řešením jsou linker skripty s verzováním}
@@ -306,7 +334,7 @@ void fun()
   \begin{itemize}
     \item Každé funkci lze ve skriptu:
     \begin{itemize}
-      \item Přiřadit verzi
+      \item Přiřadit verzi (\code{fun} v1, \code{fun} v2 nebo výchozí)
       \item Určit její viditelnost
     \end{itemize}
 
@@ -341,7 +369,7 @@ void fun()
 
   \heading{Obsah sekce \code{VERSION} ve skriptech}
   \begin{itemize}
-    \item Strom verzí
+    \item Strom verzí -- dědičnost
     \item Uzly obsahují funkce
     \item Uzly mohou obsahovat i označení viditelnosti
     \begin{itemize}
@@ -353,6 +381,7 @@ void fun()
   \medskip
   \pause
 
+  \begin{block}{Příklad}
   \begin{lstlisting}
 VERS_1.1 {
   global:
@@ -365,6 +394,7 @@ VERS_1.2 {
   new_functionality_fun;
 } VERS_1.1; /* inheritance */
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -383,6 +413,7 @@ VERS_1.2 {
 
   \medskip
 
+  \begin{block}{Příklad}
   \begin{lstlisting}
 void fun_old() {
   puts("OLD");
@@ -394,6 +425,7 @@ void fun_new() {
 }
 asm(".symver fun_new,fun@@VERS_2");
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -402,15 +434,16 @@ asm(".symver fun_new,fun@@VERS_2");
 
   \heading{Verzování}
   \begin{enumerate}
-    \item Otevřete si \file{pb173-bin/06/}
+    \item Otevřete si \file{pb173-bin/07/}
     \item Projděte 3 verze knihovny \file{vers\{1,2,3\}.c}
     \begin{itemize}
       \item Definuje funkci \code{bubak}
-      \item \code{bubak} v nich má 3 různé sémantiky
+      \item \code{bubak} v nich má 3 různé sémantiky podle verze
     \end{itemize}
     \item Projděte soubor, který ji používá \file{x.c}
     \begin{itemize}
       \item Volá funkci \code{bubak}
+      \item (Pro 3.\ verzi předává i parametr)
     \end{itemize}
     \item Přeložte
     \begin{itemize}

@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{VII. Komunikace s HW}
-\date{4. 11. \the\year}
+\date{11. 11. \the\year}
 
 \begin{document}
 
@@ -39,8 +39,7 @@
 
 \subsection{I/O -- porty}
 
-\begin{frame}
-  \frametitle{I/O -- porty}
+\begin{frame}{I/O}{Porty}
 
   \heading{Porty}
   \begin{itemize}
@@ -49,6 +48,8 @@
       \item Závislé na architektuře
       \item Speciální instrukce (\code{in}, \code{out} na x86)
     \end{itemize}
+
+    \pause
 
     \item Samostatná (malá) sběrnice
     \begin{itemize}
@@ -63,10 +64,9 @@
   \heading{API}
   \begin{itemize}
   \item \header{linux/io.h}, \header{linux/ioport.h}
-  \item Vytvoření: \code{request_region}, \code{release_region}
+  \item Požadavek: \code{request_region}, \code{release_region}
   \item R/W: \code{inX(port)}, \code{outX(co, port)}, kde
     $\text{\code{X}}\in\left\{\text{\code{b}},\text{\code{w}},\text{\code{l}}\right\}$
-  \item Vícenásobné R/W: \code{insX}, \code{outsX}
   \end{itemize}
 
   \medskip
@@ -79,8 +79,7 @@
 
 \subsection{I/O -- MMIO}
 
-\begin{frame}
-  \frametitle{I/O -- MMIO}
+\begin{frame}{I/O}{MMIO}
 
   \heading{Memory Mapped I/O}
   \begin{itemize}
@@ -97,30 +96,28 @@
   \begin{itemize}
     \item \header{linux/io.h}, \header{linux/ioport.h}
 
-    \item Vytvoření: \code{request_mem_region}, \code{release_mem_region}
+    \item Požadavek: \code{request_mem_region}, \code{release_mem_region}
     \begin{itemize}
       \item \file{/proc/iomem}
     \end{itemize}
 
-    \item Mapování: \code{virt=ioremap(phys)}, \code{iounmap(virt)}
+    \pause
+
+    \item Mapování: \code{virt = ioremap(phys)}, \code{iounmap(virt)}
     \begin{itemize}
       \item \code{/proc/vmallocinfo} (novější jádra)
     \end{itemize}
 
+    \pause
+
     \item R/W: \code{readX(odkud)}, \code{writeX(co, kam)}, kde
       $\text{\code{X}}\in\left\{\text{\code{b}},\text{\code{w}},\text{\code{l}},\text{\code{q}}\right\}$
-    \item Vícenásobné R/W: \code{memcpy_fromio}, \code{memcpy_toio}
+    \begin{itemize}
+      \item \pozor: nelze číst jako z paměti (optimalizace, pořadí bytů, \dots)
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
-
-%\begin{frame}
-%  \frametitle{Root}
-%
-%  \heading{Respektujte soukromí}\\
-%  pb173/marktwain
-%
-%\end{frame}
 
 \section{PCI zařízení}
 \frame{\sectionpage}
@@ -147,7 +144,7 @@
 
       \item ID zařízení (vendor, device), I/O prostory, IRQ
       \begin{itemize}
-	\item \emph{Obsah} I/O -- specifikace zařízení (výrobce)
+	\item \emph{Obsah} I/O prostorů -- specifikace zařízení (výrobce)
       \end{itemize}
 
       \item \cmd{lspci}
@@ -167,6 +164,8 @@
     \item \header{linux/pci.h}, \doc{Documentation/pci/*}
     \item \code{struct pci_dev}, \code{struct pci_bus}
 
+    \pause
+
     \item \code{pci_\{set,get\}_drvdata}
     \begin{itemize}
       \item Uloží/načte programátorova data do/z \code{struct pci_dev}
@@ -176,10 +175,13 @@
 
     \item Referenční počet
     \begin{itemize}
-      \item Zvýšit: \code{pci_dev_get}
-      \item Snížit: \code{pci_dev_put}
       \item PCI zařízení může být (fyzicky) odebráno ze systému
       \item Ale \code{struct pci_dev} zůstává, pokud reference $> 0$
+
+      \pause
+
+      \item Zvýšit: \code{pci_dev_get}
+      \item Snížit: \code{pci_dev_put}
     \end{itemize}
 
     \pause
@@ -203,8 +205,10 @@
     \item \code{pci_get_device} (vendor, device)
   \end{itemize}
 
+  \pause
+
   \begin{block}{Iterace přes zařízení}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 struct pci_dev *pdev = NULL;
 
 while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
@@ -293,8 +297,7 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Operace s PCI}
+\begin{frame}{Práce s PCI}
 
   \heading{Probe}
   \begin{itemize}
@@ -304,14 +307,21 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
       \item Do té doby nelze některé vlastnosti pdev používat (irq)
     \end{itemize}
 
-    \item Rezervace a mapování I/O (první část cvičení)
+    \pause
+
+    \item Rezervace a mapování I/O (jako v první části cvičení)
     \begin{itemize}
-      \item Vytvoření: \code{pci_request_region}, \code{pci_request_regions}
+      \item Požadavek: \code{pci_request_region}, \code{pci_request_regions}
       \item Mapování: \code{pci_ioremap_bar} -- alias pro
 	\code{ioremap(pci_resource_start(), pci_resource_len())}
     \end{itemize}
 
+    \pause
+
     \item Nastavení/detekce zařízení
+      \begin{itemize}
+	\item Závisí na zařízení
+      \end{itemize}
   \end{itemize}
 
   \pause
