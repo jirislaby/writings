@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{VIII. Přerušení}
-\date{11. 11. \the\year}
+\date{19. 11. \the\year}
 
 \begin{document}
 
@@ -73,6 +73,7 @@
   \item \code{del_timer_sync} (\emph{POZOR})
   \end{itemize}
 
+  \begin{block}{Příklad}
   \begin{lstlisting}
 static void my_fun(unsigned long data);
 static DEFINE_TIMER(my_timer, my_fun, 0, 30);
@@ -86,12 +87,14 @@ static void my_fun(unsigned long data)
 ...
   del_timer_sync(&my_timer);
   \end{lstlisting}
+  \end{block}
 
-  \pause
-  \medskip
-
-  \heading{Úkol:} Každou vteřinu, kdy je modul v systému, vypsat \code{HZ} a
-  \code{jiffies}
+  \begin{textblock*}{4.1cm}(8.2cm,6.5cm)
+    \begin{onlyenv}<2->
+      \heading{Úkol:} Každou vteřinu, kdy je modul v systému, vypsat \code{HZ}
+      (\code{\%u}) a \code{jiffies} (\code{\%lu})
+    \end{onlyenv}
+  \end{textblock*}
 
 \end{frame}
 
@@ -100,29 +103,24 @@ static void my_fun(unsigned long data)
 \begin{frame}
   \frametitle{Pozdržení vykonávání kódu}
 
-  \heading{Čekání na událost trvající pevně danou dobu}
+  \heading{Čekání na událost trvající pevně danou dobu} (\header{linux/delay.h})
   \begin{enumerate}
-  \item Spánek
-  \begin{itemize}
-  \item Zapojení časovače a plánovače
-  \item Rozlišení: $\sim 10\,\,\mu$s až 10 ms (HW-závislé)
-  \end{itemize}
-  \item Busy-waiting
-  \begin{itemize}
-  \item Smyčka
-  \item Rozlišení: ns
-  \end{itemize}
+    \item Spánek
+    \begin{itemize}
+      \item Zapojení časovače (tikni za \dots) a plánovače (\dots a vzbuď mě)
+      \item Rozlišení: $\sim 10\,\,\mu$s až 10 ms (HW-závislé)
+      \item \code{ssleep}, \code{msleep}, \code{usleep_range}
+    \end{itemize}
+
+    \pause
+
+    \item Busy-waiting
+    \begin{itemize}
+      \item Smyčka
+      \item Rozlišení: ns
+      \item \code{mdelay}, \code{udelay}, \code{ndelay}
+    \end{itemize}
   \end{enumerate}
-
-  \pause
-  \medskip
-
-  \heading{API}
-  \begin{itemize}
-  \item \header{linux/delay.h}
-  \item ad 1. \code{ssleep}, \code{msleep}, \code{usleep_range}
-  \item ad 2. \code{mdelay}, \code{udelay}, \code{ndelay}
-  \end{itemize}
 
   \pause
   \medskip
@@ -134,7 +132,8 @@ static void my_fun(unsigned long data)
 
   \pause
   \medskip
-  \heading{Úkol:} spěte 1 vteřinu v \code{module_init} a vyzkoušejte vložením
+
+  \heading{Úkol:} spěte 3 vteřiny v \code{module_init} a vyzkoušejte vložením
     modulu
 
 \end{frame}
@@ -147,6 +146,9 @@ static void my_fun(unsigned long data)
   \heading{Při potřebě vykonat kód, který nelze vykonat teď}
   \begin{itemize}
     \item Držím zámek, jsem v přerušení, \dots
+
+    \pause
+
     \item Není nutno specifikovat pevně daný moment
     \begin{itemize}
       \item (Narozdíl od časovačů)
@@ -158,8 +160,8 @@ static void my_fun(unsigned long data)
 
   \heading{2 druhy}
   \begin{enumerate}
-  \item Workqueue
-  \item Tasklet
+    \item Workqueue
+    \item Tasklet
   \end{enumerate}
 
   \heading{Rozdíly}
@@ -175,23 +177,30 @@ static void my_fun(unsigned long data)
   \frametitle{Workqueue}
 
   \begin{itemize}
-  \item Speciální \emph{proces} volající funkce ve frontě
-  \begin{itemize}
-    \item Globální, společný pro všechny -- většinou stačí
-    \item Vlastní -- pro speciální případy
-  \end{itemize}
-  \item Lze v něm spát
-  \item Spustí se, až se plánovač rozhodne
-  \begin{itemize}
-    \item Lze specifikovat minimální prodlevu
-  \end{itemize}
-  \item \doc{Documentation/workqueue.txt}
+    \item \doc{Documentation/workqueue.txt}
+
+    \item Speciální \emph{proces} volající funkce řazené do fronty
+    \begin{itemize}
+      \item Globální, společný pro všechny -- většinou stačí
+
+      \pause
+
+      \item Vlastní -- pro speciální případy
+    \end{itemize}
+
+    \pause
+
+    \item Lze v něm spát
+
+    \item Spustí se, až se plánovač rozhodne
+    \begin{itemize}
+      \item Lze specifikovat minimální prodlevu
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Workqueue API}
+\begin{frame}{Workqueue}{API}
 
   \begin{itemize}
     \item \header{linux/workqueue.h}, \code{struct work_struct}
@@ -212,12 +221,12 @@ static void my_fun(unsigned long data)
       \item Vytvoření procesu: \code{create_workqueue},
 	\code{destroy_workqueue}
       \item Zařazení do fronty: \code{queue_work}
-      \item Vyřazení z fronty: \code{cancel_work_sync} (stejně)
+      \item Vyřazení z fronty: \code{cancel_work_sync} (tj.\ stejně)
     \end{itemize}
 
     \pause
 
-    \item Delayed (s min. prodlevou): \code{*_delayed_work}
+    \item Delayed (s garantovanou prodlevou): \code{*_delayed_work}
   \end{itemize}
 
   \pause
@@ -288,7 +297,7 @@ static void my_fun(unsigned long data)
     \begin{itemize}
       \item Zjistí zdroj a zavolá odpovídající ovladač (jeho obsluhu přerušení)
       \begin{itemize}
-	\item Přerušeni je identifikováno číslem (IRQ)
+	\item Přerušení je identifikováno číslem (IRQ)
       \end{itemize}
 
       \item Vynuluje přerušení na řadiči přerušení
@@ -313,6 +322,7 @@ static void my_fun(unsigned long data)
   \item \file{/proc/interrupts}
   \end{itemize}
 
+  \begin{block}{Příklad}
   \begin{lstlisting}
 static irqreturn_t my_handler(int irq, void *data)
 { /* data == my_data */
@@ -325,6 +335,7 @@ static int my_probe(struct pci_dev *pdev, ...)
   ret = request_irq(pdev->irq, my_handler, IRQF_SHARED, "my", my_data);
 }
   \end{lstlisting}
+  \end{block}
 
   \pause
 
