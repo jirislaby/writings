@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{IX. mmap}
-\date{18. 11. \the\year}
+\date{26. 11. \the\year}
 
 \begin{document}
 
@@ -38,12 +38,13 @@
   \frametitle{Mapování paměti jádra}
 
   \heading{Předání dat do/z procesu}
-  \begin{itemize}
-  \item Známe: \code{read}, \code{write}, \code{ioctl}, \ldots
-  \item U všeho nutné kopírování dat
-  \begin{itemize}
-  \item \code{copy_\{from,to\}_user} apod.
-  \end{itemize}
+    \begin{itemize}
+      \item Známe: \code{read}, \code{write}, \code{ioctl}, \dots
+
+      \item U všeho nutné kopírování dat
+      \begin{itemize}
+	\item \code{copy_\{from,to\}_user} apod.
+      \end{itemize}
   \end{itemize}
 
   \pause
@@ -53,17 +54,13 @@
   \begin{itemize}
     \item Namapování stránek do procesu
     \item Proces používá kus stejné paměti jako jádro
-    \item \emph{Syscall:} \code{mmap}
   \end{itemize}
 
-  \begin{block}{Prototyp systémového volání \code{mmap}}
+  \pause
+
+  \begin{block}{Systémové volání \code{mmap} (uživatelský prostor)}
   \begin{lstlisting}
-void *mmap(void *addr,
-    size_t len,
-    int prot,
-    int flags,
-    int fd,
-    off_t off);
+void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off);
   \end{lstlisting}
   \end{block}
 
@@ -88,6 +85,7 @@ void *mmap(void *addr,
 
     \item Mapování /dev/zero
     \begin{itemize}
+      \item \code{len} a \code{prot} stejné
       \item \code{flags} \dots\ \code{MAP_PRIVATE}
       \item \code{fd} \dots\ deskriptor otevřeného /dev/zero
     \end{itemize}
@@ -106,14 +104,16 @@ void *mmap(void *addr,
 	int prot, int flags, int fd, off_t off)}}
     \end{itemize}
 
-    \item V jádře jedna položka v \code{struct file_operations}
+    \pause
+
+    \item V jádře (opět) jedna položka v \code{struct file_operations}
     \begin{itemize}
       \item \footnotesize{\code{int mmap(struct file *filp,
 	struct vm_area_struct *vma)}}
 
       \pause
 
-      \item Parametry jsou v \code{struct vm_area_struct}
+      \item Parametry jsou předány přes \code{struct vm_area_struct}
     \end{itemize}
   \end{itemize}
 
@@ -124,7 +124,7 @@ void *mmap(void *addr,
   unsigned long vm_start; /* addr or random when addr is NULL */
   unsigned long vm_end;   /* vm_end = vm_start+len */
   unsigned long vm_pgoff; /* vm_pgoff = off/PAGE_SIZE */
-  unsigned long vm_flags; /* vm_flags = encoded(flags|prot) */
+  unsigned long vm_flags; /* vm_flags = encoded(flags|prot), see VM_READ etc. */
   pgprot_t vm_page_prot;  /* only for remap_* functions */
   ...
   const struct vm_operations_struct *vm_ops; /* later ... */
@@ -150,7 +150,7 @@ void *mmap(void *addr,
   \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
   \end{itemize}
 
-  \begin{block}{Příklad použití}
+  \begin{block}{Příklad}
   \begin{lstlisting}
 int my_init(void)
 {
@@ -186,9 +186,10 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
     \item Vystavit (mapovat) stránky v \code{mmap}
     \begin{itemize}
-      \item První dvojice RO, druhá R/W (ověření \code{prot})
-      \item $0 \leq \text{\code{pgoff}} < 2$ $\Rightarrow$ jedno mapování
-      \item $2 \leq \text{\code{pgoff}} < 4$ $\Rightarrow$ druhé mapování
+      \item První dvojice RO, druhá R/W (ověřte
+        \code{prot}, tj.\ \code{vma->vm_flags})
+      \item $0 \leq \text{\code{vma->pgoff}} < 2$ $\Rightarrow$ jedno mapování
+      \item $2 \leq \text{\code{vma->pgoff}} < 4$ $\Rightarrow$ druhé mapování
     \end{itemize}
 
     \item Z userspace 2$\times$ \code{mmap} s \code{off} \code{0} a
@@ -265,6 +266,9 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
   \begin{lstlisting}
 int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 { /* my_data == vma->vm_private_data; */
+  \end{lstlisting}
+  \begin{uncoverenv}<2->
+  \begin{lstlisting}
   unsigned long offset = vmf->pgoff << PAGE_SHIFT;
   struct page *page;
 
@@ -274,6 +278,9 @@ int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
   get_page(page);
   vmf->page = page;
   return 0;
+  \end{lstlisting}
+  \end{uncoverenv}
+  \begin{lstlisting}
 }
 
 struct vm_operations_struct my_vm_ops = {

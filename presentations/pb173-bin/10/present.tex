@@ -28,8 +28,177 @@
 
 \end{frame}
 
-\section{Ještě více \cmd{gdb}}
+\section{\cmd{gdb}}
 \frame{\sectionpage}
+
+\begin{frame}
+  \frametitle{Debugger \cmd{gdb}}
+
+  \begin{itemize}
+    \item Pracuje s ELFem a DWARFem
+
+    \item Používá systémové volání \code{ptrace}
+    \begin{itemize}
+      \item Sleduje proces
+      \item Upravuje vykonávání
+      \item Čte a mění paměť
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Podpora Python skriptů
+    \item Spuštění: \cmd{gdb --volby_gdb --args binarka --volby_binarky}
+    \item Nápověda: \cmd{help}
+    \item Manuál: \href{https://sourceware.org/gdb/current/onlinedocs/gdb/}{GDB
+      User Manual}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Příkazy \cmd{gdb}}{Operace s během}
+
+  \begin{itemize}
+    \item Spustit: \cmd{run}
+    \item Spustit po \code{main}: \cmd{start}
+    \item Přerušit: signálem (např.\ Ctrl-c)
+    \item Pokračovat po návrat z funkce: \file{finish}
+    \item Pokračovat: \file{continue}
+
+    \pause
+
+    \item Krokovat s vnořením: \cmd{step} (po řádcích), \cmd{stepi} (po
+      instrukcích)
+    \item Krokovat bez vnoření: \cmd{next} (po řádcích), \cmd{nexti} (po
+      instrukcích)
+
+    \item Konec: \cmd{quit}
+
+    \medskip
+    \pause
+
+    \item Opakování předchozího příkazu: ENTER
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Úkol:} spusťte si \cmd{yes} v \cmd{gdb} a přerušte. Vyzkoušejte si
+  \file{finish} a \file{continue}. Zkuste krokovat po instrukcích hlavní cyklus
+  \cmd{yes}. Poté \cmd{quit}.
+
+\end{frame}
+
+\begin{frame}{Příkazy \cmd{gdb}}{Výpisy}
+
+  \begin{itemize}
+    \item Zásobník volání: \cmd{where}
+    \begin{itemize}
+      \item Pohyb po rámcích zásobníku: \cmd{up}, \cmd{down}
+    \end{itemize}
+
+    \pause
+
+    \item Programu: \cmd{list} (jen s ladicími informacemi)
+    \item Assembleru: \cmd{disassemble}
+    \item Paměti: \cmd{print}
+    \item HexDump: \cmd{x}
+    \item Ostatní: \cmd{info registers}, \file{info break}, \dots
+  \end{itemize}
+
+  \bigskip
+
+  Většina příkazů akceptuje parametry -- výpis lokací, proměnných, registrů atd.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpisy v \cmd{gdb}}
+  \begin{enumerate}
+    \item Přeložte si \file{pb173-bin/09/}
+    \item Spusťte \file{debug} (mělo by dojít k pádu)
+    \item Otevřete \file{debug} v \cmd{gdb}
+    \item Spusťte (\cmd{run})
+
+    \item Prohlédněte si, kde došlo k pádu (vypište):
+    \begin{itemize}
+      \item Zásobník volání (\cmd{where})
+      \item Místo pádu (\cmd{list} s parametrem \code{soubor:radek})
+      \item Disassembly (\cmd{disassemble} s parametrem \code{adresa})
+      \item Proměnnou \code{b} (\cmd{print b})
+      \item Proměnnou \code{argc} v \code{main} (\cmd{up} a \cmd{print argc})
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Příkazy \cmd{gdb}}{Breakpointy}
+
+  \begin{itemize}
+    \item Příkaz: \file{break}
+    \item Parametr
+    \begin{itemize}
+      \item Adresa
+      \item Funkce
+      \item soubor:radek
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Úkol}
+  \begin{enumerate}
+    \item Přidejte breakpoint na začátek \code{main} a spusťte (\cmd{run})
+    \item Krokujte až k pádu (\cmd{next})
+    \item Zopakujte pro \code{step} a také \code{stepi}
+  \end{enumerate}
+\end{frame}
+
+\subsection{Obrazy paměti}
+
+\begin{frame}
+  \frametitle{Obrazy paměti a \cmd{gdb}}
+
+  \begin{itemize}
+    \item Jádro při pádu zapíše obraz paměti (,,coredump'')
+    \begin{itemize}
+      \item Nutno zvýšit limit velikosti (bývá 0): \cmd{ulimit -c}
+      \item Cíl, kam se ukládají: \cmd{sysctl kernel.core_pattern}
+    \end{itemize}
+
+    \pause
+
+    \item Potom se dá analyzovat v \cmd{gdb}
+    \begin{itemize}
+      \item \cmd{gdb --core=core_soubor --args binarka --volby_binarky}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s obrazem paměti}
+  \begin{enumerate}
+    \item Nastavte limit na obrazy na \code{unlimited} (\cmd{ulimit -c})
+    \item Podívejte se, kam se obraz uloží (\cmd{sysctl kernel.core_pattern})
+    \item Spusťte program z předchozího příkladu
+    \item Otevřete v \cmd{gdb} s obrazem paměti (\cmd{gdb --core=<core>
+      ./debug})
+    \item Vypište si podobné informace jako předtím
+    \begin{itemize}
+      \item \cmd{where}
+      \item \cmd{print b}
+      \item A podobně
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
 
 \begin{frame}
   \frametitle{Debugger \cmd{gdb} (opakování)}
