@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{X. DMA}
-\date{26. 11. 2013}
+\date{3. 12. \the\year}
 
 \begin{document}
 
@@ -12,8 +12,6 @@
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%
-
-% TODO use pci_set_consistent_mask!
 
 \begin{frame}
   \frametitle{Paměť jinak II.}
@@ -64,14 +62,15 @@
 \begin{frame}
   \frametitle{Princip DMA}
 
-  \heading{Princip}
+  \heading{Princip\only<1>{ odesílání}\only<2>{ příjmu}}
   \begin{enumerate}
   \item Alokace (speciální) paměti
-  \item \emph{Pro TX}: vyplnění daty (paket, zvuk, data na disk, \dots)
+  \item<1> Vyplnění daty (paket, zvuk, data na disk, \dots)
   \item Předání ukazatele do zařízení
   \item Odstartování přenosu v zařízení
   \item Přerušení či jiná signalizace konce přenosu od zařízení
-  \item \emph{Pro RX}: práce s příchozími daty (paket, data z disku, \dots)
+  \item<2> Práce s příchozími daty (paket, data z disku, \dots)
+  \item Uvolnění (speciální) paměti
   \end{enumerate}
 
 \end{frame}
@@ -103,28 +102,44 @@
   \begin{lstlisting}
 int my_do_DMA(struct device *dev)
 {
-  dma_addr_t phys;
+  dma_addr_t dma;
   char *virt;
 
-  virt = dma_alloc_coherent(dev, 100, &phys, GFP_KERNEL);
+  virt = dma_alloc_coherent(dev, 100, &dma, GFP_KERNEL);
   if (!virt)
     return -ENOMEM;
   memset(virt, 0, 100);
-  my_HW_set_addr(dev, phys);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  my_HW_set_addr(dev, dma);
   my_HW_start_transfer(dev);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
   while (my_HW_working(dev)) /* polling */
     msleep(100);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
   pr_info("%s\n", virt);
-  dma_free_coherent(dev, 100, virt, phys);
+  dma_free_coherent(dev, 100, virt, dma);
   return 0;
 }
   \end{lstlisting} %stop_zone
 
-  \pause
-  \bigskip
+\end{frame}
 
-  \heading{Úkol:} alokujte a uvolněte pomocí \code{dma_*} 1 stránku paměti (v ovladači
-  EDU z předminula)
+\begin{frame}{Úkol}
+
+  \heading{Alokace DMA paměti}
+  \begin{enumerate}
+    \item Otevřete si ovladač EDU z předminula
+    \item V \code{probe} alokujte 1 stránku DMA paměti
+    \item Použijte PCI zařízení jako první parametr alokace
+    \item Vypište si virtuální, fyzickou a DMA adresu
+    \item V \code{remove} ji uvolněte
+  \end{enumerate}
 
 \end{frame}
 
@@ -137,6 +152,7 @@ int my_do_DMA(struct device *dev)
     \begin{itemize}
       \item Ne všechna zařízení zvládnou adresovat celý fyzický prostor
       \item \code{pci_set_dma_mask(pdev, DMA_BIT_MASK(27))}
+      \item \code{pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(27))}
     \end{itemize}
 
     \pause
@@ -150,20 +166,16 @@ int my_do_DMA(struct device *dev)
 
   \pause
 
+  \begin{block}{Příklad z \code{probe}}
   \begin{lstlisting}
-int my_probe(struct pci_dev *pdev, ...)
-{
-  dma_addr_t phys;
-  void *virt;
-  ... /* enable etc. here */
+  ... /* pci_enable etc. here */
   ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(27));
 
   pci_set_master(pdev);
 
   virt = dma_alloc_coherent(&pdev->dev, 100, &phys, GFP_KERNEL);
-  ...
-}
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -188,8 +200,8 @@ int my_probe(struct pci_dev *pdev, ...)
   \pause
   \bigskip
 
-  \heading{Úkol:} doplňte předešlou alokaci (o \code{set_dma_mask} a
-    \code{set_master})
+  \heading{Úkol:} doplňte předešlou alokaci o nastavení masek na správnou
+    hodnotu a zapnutí spravování sběrnice
 
 \end{frame}
 
@@ -217,8 +229,8 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
     \item \code{cmd} registr
     \begin{itemize}
       \item Zapisuje se po nastavení ostatních registrů
-      \item Zapisuje se \emph{jednou} s kombinací bitů
-      \item Bit 0: \code{RUN} (transfer now)
+      \item Zapisuje se \emph{jednou}, a to kombinací bitů
+      \item Bit 0: \code{RUN} (start transfer now)
       \item Bit 1: \code{DIRECTION} (0: from RAM to EDU, 1: from EDU to RAM)
       \item Bit 2: \code{RQINT} (generate an interrupt after the transaction)
     \end{itemize}
@@ -231,16 +243,15 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 
   \heading{Práce s DMA na EDU}
   \begin{enumerate}
-    \item Naalokovat stránku DMA prostoru
-    \item 10~B inicializovat textovým řetězcem
-    \item Přenést 10~B do lokální paměti EDU na adresu 0x40000
+    \item 10~B DMA paměti inicializujte textovým řetězcem
+    \item Přeneste 10~B do lokální paměti EDU na adresu 0x40000
     \begin{itemize}
-      \item Nastavit všechny 4 registry
+      \item Nastavte všechny 4 registry
       \item Bez přerušení (bez \code{RQINT})
-      \item Počkat na nulovou hodnotu bitu \code{RUN} (na dokončení přenosu)
+      \item Počkejte na nulovou hodnotu bitu \code{RUN} (na dokončení přenosu)
     \end{itemize}
 
-    \item Přenést 10~B z EDU na DMA stránku + 10
+    \item Přeneste 10~B z EDU na DMA stránku + 10
     \begin{itemize}
       \item Vznikne za sebou 2$\times$ stejný řetězec
     \end{itemize}
@@ -255,25 +266,31 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 
   \heading{DMA s přerušením} (část domácího)
   \begin{enumerate}
-    \item Rozšířit předchozí o přerušení
+    \item Rozšiřte předchozí o přerušení
     \begin{itemize}
-      \item Přidat ještě jeden přenos z EDU na DMA + 20
+      \item Přidejte ještě jeden přenos z EDU na DMA + 20
       \item Přenos bude s \code{RQINT}
     \end{itemize}
 
-    \item Obsloužit přerušení
+    \item Obslužte přerušení
     \begin{itemize}
       \item ACK přerušení
-      \item Iniciovat tasklet
+      \item Iniciujte tasklet
     \end{itemize}
-    \item V taskletu vypsat obsah DMA paměti + 20
-    \item DMA stránku vystavit přes \code{mmap}
+
+    \item V taskletu vypište obsah DMA paměti + 20
+    \item DMA stránku vystavte přes \code{mmap}
   \end{enumerate}
 
   \bigskip
 
-  \emph{POZOR} na prezenci a správnou posloupnost zabíjení taskletu, zákazu
-  přerušení, dealokace atd.
+  \emph{POZOR}
+  \begin{itemize}
+    \item Na prezenci a správnou posloupnost zabíjení taskletu, zákazu
+      přerušení, dealokace atd.
+    \item Na použití správné funkce pro převod na \code{struct page}/\code{pfn}
+      pro \code{mmap}
+  \end{itemize}
 
 \end{frame}
 
