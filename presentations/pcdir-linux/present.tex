@@ -15,11 +15,267 @@
   \tableofcontents
 \end{frame}
 
-\section{Zopakování syntaxe jazyka C}
+\section{Úvodní informace}
 \frame{\sectionpage}
 
-\begin{frame}{Zopakování syntaxe jazyka C}
-  význam ANSI C, výhody a nevýhody, direktivy preprocesoru
+\begin{frame}
+  \frametitle{Úvodní informace}
+  \begin{itemize}
+    \item Kurz = 3 dny
+
+    \pause
+
+    \item Lektor
+    \begin{itemize}
+      \item Vývoj jádra od r. 2005 (NetBSD, Linux)
+      \item Absolvent FI MU
+    \end{itemize}
+
+    \pause
+
+    \item Cíle kurzu
+    \begin{itemize}
+      \item Prohloubit znalosti programování v C
+      \item A Linuxu
+    \end{itemize}
+
+    \pause
+
+    \item Publikace s informacemi
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{S čím budeme pracovat?}
+
+  \heading{Hardware}
+  \begin{itemize}
+    \item Virtualizované stroje
+    \begin{itemize}
+      \item openSUSE Leap
+      \item Login/heslo: vyvoj/vyvoj nebo root/toor
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Software}
+  \begin{itemize}
+    \item \textsc{Gcc} (TUI)
+    \item Qt creator (GUI)
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Dokumentace}
+  \begin{itemize}
+    \item \href{https://gcc.gnu.org/onlinedocs/}{Manuál gcc}
+    \item Manuálové stránky
+    \item Standardy C (viz dále)
+
+    \pause
+
+    \item Google/Seznam/\dots
+  \end{itemize}
+
+\end{frame}
+
+\section{Syntaxe jazyka C}
+\frame{\sectionpage}
+
+\begin{frame}{Syntaxe jazyka C}
+
+  \begin{itemize}
+    \item Různé překladače = různá syntax
+    \begin{itemize}
+      \item \code{inline}, \code{...}, \code{pragma}, \code{__attribute__},
+	\code{asm goto}
+    \end{itemize}
+
+    \pause
+
+    \item Nutnost standardizace
+    \begin{itemize}
+      \item Alespoň základní syntax jazyka stejná pro všechny
+
+      \pause
+
+      \item ANSI normy: C89, C99, \dots
+      \item A rozšíření: GNU C, GNU C99, MS C, Intel C, \dots
+
+      \pause
+
+      \item POSIX: rozhraní OS, vlákna, \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Hlavní výhody a nevýhody C}
+
+  \heading{Výhody}
+  \begin{itemize}
+    \item Rozšířenost
+    \item Podpora ve většině OS, knihovnách a nástrojích
+
+    \pause
+
+    \item Rychlý (,,assembler s pár makry'')
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Nevýhody}
+  \begin{itemize}
+    \item Není objektově orientovaný
+    \begin{itemize}
+      \item Ale máme struktury
+    \end{itemize}
+
+    \pause
+
+    \item Jednoduše lze chybovat (v práci s paměti apod.)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Direktivy preprocesoru}
+
+  \begin{itemize}[<+->]
+    \item \code{#include} -- vložení souboru (\code{\"x.h\"} vs.\ \code{<x.h>})
+    \item \code{#define}, \code{#undef} -- definice/zrušení makra
+    \item \code{#if}, \code{#else}, \code{#elif}, \code{#endif} -- podmíněný
+      překlad
+    \item \code{#ifdef}, \code{#ifndef} -- ekvivalent
+      \code{#if defined}/\code{#if !defined}
+    \item \code{#error}, \code{#warning} -- vypiš chybu a ukonči překlad/vypiš
+      varování
+  \end{itemize}
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}
+#include "x.h"
+
+#ifdef X
+# define Y printf
+#elif defined(Y) && defined(Z)
+# warning Both Y and Z defined
+#else
+# error X undefined
+#endif
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Direktivy preprocesoru}
+  \begin{enumerate}
+    \item Stáhněte si repozitář pro tento kurz
+    \begin{itemize}
+      \item \cmd{git clone git://github.com/jirislaby/pcdir-linux.git}
+      \item Ve VM už je
+    \end{itemize}
+
+    \item Spusťte si QT creator
+    \item Otevřete si 01/main.pro z repozitáře
+
+    \item Upravujte \file{x.h}
+    \item Přinuťte překladač projít všechny tři větve z předcházejícího slajdu
+    \item Prostudujte výstup
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}[fragile]{Direktivy preprocesoru}
+
+  \begin{itemize}[<+->]
+    \item \code{__FILE__}, \code{__LINE__} -- soubor, řádek
+    \item \code{__DATE__}, \code{__TIME__} -- datum, čas
+    \item \code{__TIMESTAMP__} -- časová značka
+    \item \code{#pragma} -- \textsc{Gcc}: ,,we do not recommend the use of
+      pragmas''
+
+    \pause
+
+    \item \code{# macro operator} -- vytvoření řetězce z parametru makra
+    \item \code{## macro operator} -- zřetězení dvou parametrů makra
+  \end{itemize}
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}
+#define concat_underscore(x, y) x ## _ ## y
+
+void fun() {
+  write(concat_underscore(STDOUT, FILENO), "test", 4);
+}
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Direktivy preprocesoru 2}
+  \begin{enumerate}
+    \item Upravujte pouze definice \code{my_macro} a \code{my_macro2}!
+    \item Donuťte \code{main} vypisovat \cmd{__FILE__ je ex.c} atd.
+    \begin{itemize}
+      \item Včetně mezer
+    \end{itemize}
+
+    \item Donuťte \code{main} vypisovat i \cmd{__TIMESTAMP__}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Přepínače preprocesoru}
+
+  \heading{Přepínače příkazové řádky}
+  \begin{itemize}[<+->]
+    \item \cmd{\-Dmakro[=defn]} \cmd{\-Umakro} -- definice/zrušení makra
+    \item \cmd{\-E} -- zastaví překladač po preprocesoru
+    \item \cmd{\-I} -- adresář, kde ještě hledat hlavičky
+    \item \cmd{\-include file} -- \code{#include} z příkazové řádky
+    \item \cmd{\-nostdinc} -- překladač nehledá systémové hlavičky
+  \end{itemize}
+
+  \medskip
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[language=XML]
+gcc -DX=1 -DY -UX -include x.h
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Direktivy preprocesoru 3}
+  \begin{enumerate}
+    \item Obalte vaše definice v \file{01/x.h} blokem
+    \begin{itemize}
+      \item \code{\#if 0}
+      \item \code{\#endif}
+    \end{itemize}
+
+    \item Přinuťte překladač projít všechny tři větve
+    \begin{itemize}
+      \item Tentokrát pomocí přepínačů příkazové řádky
+      \item Editujte \file{main.pro}
+      \item Přidejte \code{QMAKE_CFLAGS += ...}
+    \end{itemize}
+
+  \end{enumerate}
 \end{frame}
 
 \section{Filosofie programování systému UNIX/Linux}
