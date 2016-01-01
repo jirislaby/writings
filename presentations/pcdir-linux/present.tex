@@ -181,7 +181,7 @@
     \item Stáhněte si repozitář pro tento kurz
     \begin{itemize}
       \item \cmd{git clone git://github.com/jirislaby/pcdir-linux.git}
-      \item Ve VM už je
+      \item Ve VM už je, ale proveďte \cmd{git pull}
     \end{itemize}
 
     \item Spusťte si QT creator
@@ -265,6 +265,7 @@ gcc -DX=1 -DY -UX -include x.h
     \item Obalte vaše definice v \file{01/x.h} blokem
     \begin{itemize}
       \item \code{\#if 0}
+      \item \code{...}
       \item \code{\#endif}
     \end{itemize}
 
@@ -272,7 +273,7 @@ gcc -DX=1 -DY -UX -include x.h
     \begin{itemize}
       \item Tentokrát pomocí přepínačů příkazové řádky
       \item Editujte \file{main.pro}
-      \item Přidejte \code{QMAKE_CFLAGS += ...}
+      \item Přidejte \code{QMAKE_CFLAGS += ...} (přepínač \cmd{\-D})
     \end{itemize}
 
   \end{enumerate}
@@ -281,32 +282,663 @@ gcc -DX=1 -DY -UX -include x.h
 \section{Filosofie programování systému UNIX/Linux}
 \frame{\sectionpage}
 
-\begin{frame}{Filosofie programování systému UNIX/Linux}
-  význam open-source, jednoduchost
+\begin{frame}{Filosofie programování systému UNIX/Linux}{Proč open-source?}
+
+  \begin{itemize}[<+->]
+    \item Průhlednost
+    \begin{itemize}
+      \item Co je uvnitř jabber protokolu?
+
+      \pause
+
+      \item A ICQ?
+    \end{itemize}
+
+    \item Bezpečnost
+    \begin{itemize}
+      \item Každý může nahlížet a revidovat kód
+    \end{itemize}
+
+    \item Jednoduchá úprava/oprava
+
+    \item Dostupnost dokumentace
+    \begin{itemize}
+      \item Většinou
+    \end{itemize}
+
+    \item Často otevřené standardy
+    \begin{itemize}
+      \item Např.\ Libreoffice a formát dokumentů
+    \end{itemize}
+
+    \item Cena
+    \begin{itemize}
+      \item Nainstaluj, vyzkoušej a nech si/zahoď (trial)
+    \end{itemize}
+
+  \end{itemize}
+
 \end{frame}
 
 \section{Chyby a jejich ošetření}
 \frame{\sectionpage}
 
-\begin{frame}{Chyby a jejich ošetření}
-  základy ladění programu
+\begin{frame}[fragile]{Chyby}
+
+  \begin{itemize}
+    \item Vždy ošetřujte návratové hodnoty
+    \begin{itemize}
+      \item Dokumentace prozradí jak
+
+      \pause
+
+      \item Ošetřovat \code{close}?
+    \end{itemize}
+
+    \pause
+
+    \item Typické návratové hodnoty
+    \begin{itemize}
+      \item \code{\-1}: chyba pro \code {open}, \code{close}, \dots
+      \begin{itemize}
+	\item Proměnná \code{errno} (\header{errno.h}) obsahuje kód chyby
+      \end{itemize}
+
+      \pause
+
+      \item \code{0}: EOF pro \code{read}, \code{write}
+
+      \pause
+
+      \item Závislé na parametru: \code {ioctl} apod.
+    \end{itemize}
+
+    \pause
+
+    \item Výpis chyby
+    \begin{itemize}
+      \item \code{strerror} (C89), \code{perror} (C89), \code{err} (BSD),
+        \code{warn} (BSD), \dots
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}
+int main(void) {
+  int fd = open("/dev/zero", O_RDONLY);
+  if (fd < 0)
+    err(1, "open failed");
+}
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Ošetření chyb}
+  \begin{enumerate}
+    \item Použijte příklad z předchozího slajdu
+    \item Opravte varování
+    \item Přidejte hlavičkové soubory
+    \begin{itemize}
+      \item Pro \code{open}: \header{sys/types.h}, \header{sys/stat.h},
+        \header{fcntl.h}
+      \item Pro \code{err}: \header{err.h}
+    \end{itemize}
+    \item Otevřete soubor, který neexistuje (např.\ \file{/nothing})
+    \item A který nemáte právo otevřít (např.\ \file{/dev/sda})
+    \item Pozorujte chyby na výstupu
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Ladění funkčnosti}
+
+  \begin{itemize}
+    \item Výpisy
+    \begin{itemize}
+      \item \code{printf} a příbuzné
+    \end{itemize}
+
+    \pause
+
+    \item Monitorování chování
+    \begin{itemize}
+      \item \cmd{gdb} (a nadstavby), \cmd{ltrace}, \cmd{strace},
+	\cmd{valgrind}, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Post-mortem
+    \begin{itemize}
+      \item \file{core} soubor (obraz paměti)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Tracery}
+
+  \begin{itemize}
+    \item Sledují události a vypisují je
+    \item \cmd{ltrace}: sleduje knihovní volání
+    \item \cmd{strace}: sleduje systémová volání
+
+    \pause
+
+    \item Používají systémové volání \code{ptrace}
+    \begin{itemize}
+      \item \cmd{ltrace} si nastaví breakpointy na všechny externí symboly z
+	ELFu
+      \item \cmd{strace} jednoduše použije \code{PTRACE_SYSCALL}
+    \end{itemize}
+
+    \pause
+
+    \item Spuštění: \cmd{\{s,l\}trace binarka --volby}
+    \item Další parametry
+    \begin{itemize}
+      \item \texttt{-e}: filtr (\texttt{-e write})
+      \item \texttt{-f}: sleduje i potomky
+      \item \texttt{-o}: výstup do souboru
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práce s tracery}
+  \begin{enumerate}
+    \item Projděte si \file{04/main.c}
+    \item Přeložte
+
+    \item Spusťte nejdříve s \cmd{ltrace}
+    \begin{itemize}
+      \item Kolik je volání \code{fwrite} do \file{libc}?
+    \end{itemize}
+
+    \item Spusťte s \cmd{strace}
+    \begin{itemize}
+      \item Kolik je volání \code{write} do jádra?
+      \item $\Rightarrow$ \file{libc} bufferuje
+    \end{itemize}
+
+    \item Pomocí \cmd{ltrace} zjistěte, jak velký buffer \file{libc} používá
+    \begin{itemize}
+      \item V cyklu vypisujte znak pomocí \code{fwrite}
+      \item Použijte volbu \texttt{-S}
+    \end{itemize}
+
+    \item Pomocí \cmd{strace} ověřte totéž
+    \begin{itemize}
+      \item Pozorujte třetí parametr \code{write}
+    \end{itemize}
+  \end{enumerate}
+
 \end{frame}
 
 \section{Základní nástroje vývojáře}
 \frame{\sectionpage}
 
 \begin{frame}{Základní nástroje vývojáře}
-  překladač cc, gcc, základní parametry překladu, úvod do „vi“
+
+  \begin{itemize}
+    \item Editor
+    \begin{itemize}
+      \item \cmd{vim}
+      \item QT creator
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Překladač
+    \begin{itemize}
+      \item \textsc{Gcc}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
 \end{frame}
 
-\section{Práva běžícího programu a uživatelské informace}
+\begin{frame}{\cmd{vim}}
+
+  \begin{itemize}
+    \item Spuštění: \cmd{vim soubor.c}
+
+    \pause
+
+    \item Několik módů
+
+    \pause
+
+    \item Normální mód -- po spuštění
+    \begin{itemize}
+      \item Přijímá příkazy
+      \item Uložení: \cmd{:w}
+      \item Ukončení: \cmd{:q}, \cmd{:wq} = \cmd{:x}
+    \end{itemize}
+
+    \pause
+
+    \item Vkládací (insert) mód
+    \begin{itemize}
+      \item Editace souboru psaním
+      \item Přepnutí stiskem \cmd{i}, \cmd{I}, \cmd{a}, \cmd{o}, atd., podle
+        požadované pozice, kde začít psát
+      \item \cmd{ESC} vrací do normálního módu
+    \end{itemize}
+
+    \pause
+
+    \item Poslední záchrana: \cmd{ESC}, \cmd{ESC}, \cmd{:q!}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Překladač}
+
+\begin{center}
+  \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick,above]
+  \begin{tikzpicture}[node distance=5mm, font=\footnotesize]
+      \node [tl_state] (S) [align=center] {\file{.c} \\ \file{.h}};
+      \onslide<2->{\node [tl_state] (PREP) [right=9mm of S] {\file{.i}}
+	edge [pre] node {\cmd{cpp}} (S);}
+      \onslide<3->{\node [tl_state] (ASM) [right=9mm of PREP] {\file{.s}}
+	edge [pre] node {\cmd{cc1}} (PREP);}
+      \onslide<4->{\node [tl_state] (OBJ) [right=9mm of ASM] {\file{.o}}
+	edge [pre] node {\cmd{as}} (ASM);}
+      \onslide<5->{\node [tl_state] (LIB) [right=of OBJ] {\file{lib*}};}
+      \onslide<5->{\node [tl_phase] (LD) [below=of OBJ] {\cmd{ld}}
+	edge [pre] node {} (LIB)
+	edge [pre] node {} (OBJ);}
+      \onslide<6->{\node [tl_state] (OBJ) [left=of LD] {\file{a.out}}
+	edge [pre] node {} (LD);}
+  \end{tikzpicture}
+\end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\textsc{gcc}}
+
+  \begin{itemize}
+    \item GNU C
+
+    \pause
+
+    \item Pro překlad C, assembleru a hlavičkových souborů
+
+    \pause
+
+    \item Pro linkování
+
+    \pause
+
+    \item Důležité volby
+    \begin{itemize}
+      \item \texttt{-E} -- spusť jen preprocesor a skonči
+      \item \texttt{-S} -- generuj assembleru
+      \item \texttt{-c} -- generuj objektový soubor
+      \item \texttt{-x} -- definujeme jazyk souboru, když nelze určit dle
+	přípony (\texttt{-x c soubor\_v\_C -x assembler soubor\_v\_asm})
+      \item \texttt{-O} -- optimalizace (\texttt{-O0}, \texttt{-O2}, \dots)
+      \item \texttt{-W} -- varování (\texttt{-Wall}, \dots)
+      \item \texttt{-g} -- ladicí informace (\texttt{-g0}, \texttt{-ggdb},
+        \dots)
+    \end{itemize}
+
+    \pause
+
+    \item Dokumentace
+    \begin{itemize}
+      \item Offline: \textsc{info}/\textsc{pinfo}
+      \item Na webu: \href{https://gcc.gnu.org/onlinedocs/}{\textit{Using the
+	GNU Compiler Collection}}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Volání \textsc{gcc}}
+  \begin{enumerate}
+    \item Pomocí roury přeložte \code{main}, který něco vypíše, do objektu
+    \begin{itemize}
+      \item \cmd{echo -e '}\code{\#include <stdio.h>\\n int main() \{ puts("Hello"); return 0; \}}\cmd{' | ...}
+    \end{itemize}
+
+    \item Spusťte všechny tři fáze (\texttt{-E}, \texttt{-S} a \texttt{-c})
+      postupně jako samostatné příkazy propojené rourami
+    \begin{itemize}
+      \item \cmd{echo ... | gcc -E ...}
+      \item \cmd{echo ... | gcc -E ... | gcc -S ... }
+      \item \cmd{echo ... | gcc -E ... | gcc -S ... | gcc -c ...}
+    \end{itemize}
+
+    \item Pozorujte \texttt{-E} a \texttt{-S} výstupy
+    \item Zapněte optimalizace \texttt{-O2} a pozorujte oba výstupy znovu
+    \begin{itemize}
+      \item Mění optimalizace oba výstupy?
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\section{Práva procesu a uživatelé}
 \frame{\sectionpage}
 
-\begin{frame}{Práva běžícího programu a uživatelské informace}
-  volání getuid, setuid; funkce z hlavičkových souborů shadow.h, passwd.h, ověření přihlašovacího hesla
+\begin{frame}{ID procesu}
+
+  \begin{itemize}
+    \item Každý proces má 2$\times$ tři ID
+    \begin{itemize}
+      \item Čísla s typem \code{uid_t} a \code{gid_t} (\header{sys/types.h})
+
+      \pause
+
+      \item Uživatel (UID) vs.\ skupina (GID)
+
+      \pause
+
+      \item Reálné ID -- kdo vlastní proces
+
+      \pause
+
+      \item Efektivní ID -- co proces může, tj.\ použito ke kontrolám
+
+      \pause
+
+      \item Uložené ID -- ID vlastníka pro S-ID binárky
+
+      \pause
+
+      \item (FS ID -- specifické pro Linux, použito pro kontrolu operací na FS)
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Funkce pro čtení ID (\header{unistd.h}, \header{sys/types.h})}
+  \begin{center}
+  \begin{tabular}{|c|c|c|c|} \hline
+		      & \textbf{Reálné} & \textbf{Efektivní} & \textbf{Uložené} \\ \hline
+    \textbf{Uživatel} & \code{getuid}   & \code{geteuid} & \code{getresuid} \\ \hline
+    \textbf{Skupina}  & \code{getgid}   & \code{getegid} & \code{getresgid}\\ \hline
+  \end{tabular}
+  \end{center}
+  \end{block}
+
 \end{frame}
 
-Práce se soubory funkcemi standardních knihoven (stdlib), práce se soubory voláním jádra, význam file-descriptoru, standardní vstup a výstup, zamykání souborů apod.
+\begin{frame}{Úkol}
+
+  \heading{Práce s ID}
+  \begin{enumerate}
+    \item Prostudujte \file{06/main.c}
+    \item Přeložte
+    \item Spusťte jako uživatel i jako root
+
+    \item Nastavte programu set-uid bit
+    \begin{itemize}
+      \item Jako root: \cmd{chmod u+s main}
+    \end{itemize}
+
+    \item Spusťte jako uživatel i jako root
+
+    \item Nastavte vlastníka na 0 (root)
+    \begin{itemize}
+      \item Jako root: \cmd{chown 0 main}
+    \end{itemize}
+
+    \item Spusťte jako uživatel i jako root
+    \item Jak se mění výstup?
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{ID procesu}{Změna}
+
+  \begin{block}{Funkce pro změnu ID (\header{unistd.h}, \header{sys/types.h},
+    \header{sys/fsuid.h})}
+  \begin{center}
+  \begin{tabular}{|c|c|c|c|c|} \hline
+		      & \textbf{Reálné} & \textbf{Efektivní} & \textbf{Uložené}  & \textbf{FS} \\ \hline
+    \textbf{Uživatel} & \code{setuid}   & \code{seteuid} & \code{setresuid} & \code{setfsuid} \\ \hline
+    \textbf{Skupina}  & \code{setgid}   & \code{setegid} & \code{setresgid} & \code{setfsgid} \\ \hline
+  \end{tabular} \\[1ex]
+  \end{center}
+  \end{block}
+
+  \begin{itemize}
+    \item Obyčejný uživatel: \code{setuid} nastavuje \emph{efektivní} ID!
+    \begin{itemize}
+      \item Jenom root může měnit reálné ID
+    \end{itemize}
+
+    \pause
+
+    \item root: \code{setuid} nastavuje všechny tři!
+    \begin{itemize}
+      \item Nelze \code{setuid(100); setuid(0);}
+
+      \pause
+
+      \item Tedy: nutno použít \code{seteuid}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Změna ID}
+  \begin{enumerate}
+    \item Upravujte předchozí program
+    \item Po výpisu ID změňte reálné ID na ID uživatele vyvoj
+    \begin{itemize}
+      \item ID uživatele si zjistěte pomocí \cmd{id -u}
+    \end{itemize}
+
+    \item Vypište opět ID
+    \item Změňte reálné ID na 0
+    \item Vypište opět ID
+    \item Spusťte jako uživatel i jako root
+    \item Nastavte programu set-uid bit a vlastníka na 0 (root)
+    \item Spusťte jako uživatel
+    \item Nyní měňte efektivní ID
+    \item Spusťte jako uživatel i jako root
+    \item Nastavte programu set-uid bit a vlastníka na 0 (root)
+    \item Spusťte jako uživatel
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Záznamy uživatelů}
+
+  \begin{itemize}
+    \item Informace o uživatelích (\doc{man passwd}) a skupinách (\doc{man
+      group})
+
+    \pause
+
+    \item Textové soubory (ale můžou být i distribuované -- LDAP apod.)
+
+    \pause
+
+    \item \file{/etc/passwd}
+    \begin{itemize}
+      \item \code{name:pwd:UID:GID:GECOS:directory:shell}
+    \end{itemize}
+
+    \item \file{/etc/shadow}
+    \begin{itemize}
+      \item \code{name:pwd:lchg:min:max:warn:inact:expire:flag}
+    \end{itemize}
+
+    \pause
+
+    \item \file{/etc/group}
+    \begin{itemize}
+      \item \code{group_name:password:GID:user_list}
+    \end{itemize}
+
+    \pause
+
+    \item Editace pomocí \cmd{vipw} a \cmd{vigr}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Záznamy uživatelů}{Čtení záznamů passwd}
+
+  \begin{itemize}
+    \item Hlavičkový soubor: \header{pwd.h}
+    \item \code{struct passwd} dole
+
+    \pause
+
+    \item Podle ID: \code{getpwuid}
+    \item Podle jména: \code{getpwnam}
+
+    \pause
+
+    \item Iterace: \code{getpwent}, \code{endpwent}
+  \end{itemize}
+
+  \begin{uncoverenv}<1->
+  \begin{block}{\code{struct passwd}}
+  \begin{lstlisting}
+char   *pw_name;       /* username */
+char   *pw_passwd;     /* user password */
+uid_t   pw_uid;        /* user ID */
+gid_t   pw_gid;        /* group ID */
+char   *pw_gecos;      /* user information */
+char   *pw_dir;        /* home directory */
+char   *pw_shell;      /* shell program */
+  \end{lstlisting}
+  \end{block}
+  \end{uncoverenv}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Čtení záznamů uživatelů}
+  \begin{enumerate}
+    \item Vypište celkový počet uživatelů v systému
+    \item Vypište informace o uživateli root a vyvoj
+    \begin{itemize}
+      \item ID uživatele
+      \item ID skupiny
+      \item GECOS
+      \item Domovský adresář
+    \end{itemize}
+
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Záznamy uživatelů}{Čtení záznamů group a shadow}
+
+  \begin{itemize}
+    \item Hlavičkový soubor: \header{pwd.h} a \header{shadow.h}
+    \item \code{struct passwd} dole
+
+    \pause
+
+    \item Podle ID: \code{getpwuid}
+    \item Podle jména: \code{getpwnam}
+
+    \pause
+
+    \item Iterace: \code{getpwent}, \code{endpwent}
+  \end{itemize}
+
+  \begin{uncoverenv}<1->
+  \begin{block}{\code{struct group} a \code{struct spwd}}
+  \begin{tabular}{c|c}
+  \begin{lstlisting}
+char  *gr_name;   /* group name */
+char  *gr_passwd; /* group password */
+gid_t  gr_gid;    /* group ID */
+char **gr_mem;    /* NULL-terminated
+                     array of pointers
+                     to names of
+                     group members */
+  \end{lstlisting} &
+  \begin{lstlisting}
+char *sp_namp;  /* user login name */
+char *sp_pwdp;  /* encrypted password */
+long sp_lstchg; /* last password change */
+long sp_min;    /* days until change allowed. */
+long sp_max;    /* days before change required */
+long sp_warn;   /* days warning for expiration */
+long sp_inact;  /* days before account inactive */
+long sp_expire; /* date when account expires */
+unsigned long sp_flag; /* reserved for future
+                          use */
+  \end{lstlisting}
+  \end{tabular}
+  \end{block}
+  \end{uncoverenv}
+
+\end{frame}
+
+\begin{frame}{Záznamy uživatelů}{Ověření hesla}
+
+  \begin{itemize}
+    \item \header{pwd.h}, \header{shadow.h}
+  \end{itemize}
+
+  ověření přihlašovacího hesla
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Záznamy uživatelů}
+  \begin{enumerate}
+    \item Pomocí roury přeložte \code{main}, který něco výpíše, do objektu
+
+    \item Spusťte všechny tři fáze (\texttt{-E}, \texttt{-S} a \texttt{-c})
+      postupně jako samostatné příkazy propojené rourami
+    \begin{itemize}
+      \item \cmd{echo ... | gcc -E ... | gcc -S ... | gcc -c ...}
+    \end{itemize}
+
+    \item Pozorujte \texttt{-E} a \texttt{-S} výstupy
+    \item Zapněte optimalizace \texttt{-O2} a pozorujte oba výstupy znovu
+    \begin{itemize}
+      \item Mění optimalizace oba výstupy?
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\section{Práce se soubory}
+\frame{\sectionpage}
+
+\begin{frame}{Práce se soubory}{Pomocí stdlib}
+Práce se soubory funkcemi standardních knihoven (stdlib)
+\end{frame}
+
+\begin{frame}{Práce se soubory}{Pomocí jádra}
+práce se soubory voláním jádra, význam file-descriptoru, standardní vstup a
+výstup, zamykání souborů apod.
+\end{frame}
+
 \section{Údržba souborů a adresářů}
 \frame{\sectionpage}
 
