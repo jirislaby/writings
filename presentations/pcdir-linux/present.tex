@@ -854,16 +854,21 @@ char   *pw_shell;      /* shell program */
 
   \begin{itemize}
     \item Hlavičkový soubor: \header{pwd.h} a \header{shadow.h}
-    \item \code{struct passwd} dole
+    \item \code{struct group} a \code{struct spwd} dole
 
     \pause
 
-    \item Podle ID: \code{getpwuid}
-    \item Podle jména: \code{getpwnam}
+    \item Podle ID: \code{getgrgid}
+    \item Podle jména: \code{getgrnam}, \code{getspnam}
 
     \pause
 
-    \item Iterace: \code{getpwent}, \code{endpwent}
+    \item Iterace: \code{getgrent}, \code{endgrent}, \code{getspent},
+      \code{endspent}
+
+    \pause
+
+    \item \emph{shadow může číst jen root}
   \end{itemize}
 
   \begin{uncoverenv}<1->
@@ -896,33 +901,57 @@ unsigned long sp_flag; /* reserved for future
 
 \end{frame}
 
-\begin{frame}{Záznamy uživatelů}{Ověření hesla}
+\begin{frame}{Uživatelé a hesla}{PAM}
 
   \begin{itemize}
-    \item \header{pwd.h}, \header{shadow.h}
-  \end{itemize}
+    \item Pluggable Authentication Modules -- PAM (\doc{man 8 pam})
+    \item Konfigurovatelný, modulární
+    \item Knihovna \file{libpam}, moduly v \file{/lib*/security/},
+      konfigurace v \file{/etc/pam.conf} a \file{/etc/pam.d/*}
 
-  ověření přihlašovacího hesla
+    \pause
+
+    \item \header{security/pam\_appl.h}
+
+    \item Inicializace knihovny: \code{pam_start}
+    \begin{itemize}
+      \item \code{service_name} -- soubor v \file{/etc/pam.d/}
+      \item \code{user} -- uživatel nebo \code{NULL}
+      \item \code{pam_conversation} -- struktura s naší komunikační funkcí
+      \item \code{pamh} -- držátko, návratová hodnota
+      \item Vrací \code{PAM_SUCCESS} nebo chybu $\rightarrow$
+        \code{pam_strerror}
+    \end{itemize}
+
+    \pause
+
+    \item Deinicializace: \code{pam_end}
+    \begin{itemize}
+      \item \code{pamh} -- držátko z \code{pam_start}
+      \item \code{pam_status} -- návratová hodnota z poslední PAM funkce
+    \end{itemize}
+
+  \end{itemize}
 
 \end{frame}
 
 \begin{frame}{Úkol}
 
-  \heading{Záznamy uživatelů}
+  \heading{Inicializace PAM}
   \begin{enumerate}
-    \item Pomocí roury přeložte \code{main}, který něco výpíše, do objektu
-
-    \item Spusťte všechny tři fáze (\texttt{-E}, \texttt{-S} a \texttt{-c})
-      postupně jako samostatné příkazy propojené rourami
+    \item Inicializujte PAM (\code{pam_start})
     \begin{itemize}
-      \item \cmd{echo ... | gcc -E ... | gcc -S ... | gcc -c ...}
+      \item Jako \code{service_name} použijte \code{\"su\"}
+      \item Jako \code{user} použijte \code{\"vyvoj\"}
+      \item Ověřujte návratovou hodnotu
     \end{itemize}
 
-    \item Pozorujte \texttt{-E} a \texttt{-S} výstupy
-    \item Zapněte optimalizace \texttt{-O2} a pozorujte oba výstupy znovu
+    \item Ukončete PAM (\code{pam_end})
+    \item Přeložte a linkujte s \cmd{\-lpam}
     \begin{itemize}
-      \item Mění optimalizace oba výstupy?
+      \item \code{QMAKE_LDFLAGS += -lpam} v \file {main.pro}
     \end{itemize}
+    \item Vyzkoušejte
   \end{enumerate}
 
 \end{frame}
