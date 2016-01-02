@@ -953,7 +953,7 @@ unsigned long sp_flag; /* reserved for future
       \item \code{int (*conv)(int num_msg, const struct pam_message **msg,
         struct pam_response **resp, void *appdata_ptr)}
       \item Alokuje \code{*resp} o počtu \code{num_msg} (\code{calloc})
-      \item Do \code{(*resp)[x].resp} vkládá odpovědi na \code{msg[x]->msg} 
+      \item Do \code{(*resp)[x].resp} vkládá odpovědi na \code{msg[x]->msg}
     \end{itemize}
 
     \pause
@@ -1252,6 +1252,7 @@ fclose(file);
 
   \heading{Otevřete soubor}
   \begin{enumerate}
+    \item Pracujte v \file{06} z repozitáře
     \item Otevřete pro čtení neexistující \file{text.txt}
     \begin{itemize}
       \item Ověřte návratovou hodnotu
@@ -1732,7 +1733,7 @@ struct flock {
       \item Pro čtení i zápis
     \end{itemize}
 
-    \item Zamčete rozsah 10--20 bajtů pro zápis
+    \item Zamkněte rozsah 10--20 bajtů pro zápis
     \begin{itemize}
       \item Pro zápis
       \item Neblokujícím zámkem
@@ -1750,15 +1751,413 @@ struct flock {
 \section{Soubory a adresáře}
 \frame{\sectionpage}
 
-\begin{frame}{Údržba souborů a adresářů}
-  odkazy (linky), práva souborů a adresářů, vytváření a manipulace s nimi apod.
+\begin{frame}{Odkazy}
+
+  \begin{itemize}
+    \item Více jmen pro jeden soubor
+
+    \pause
+
+    \item Dva druhy
+    \begin{enumerate}
+      \item Tvrdé
+      \begin{itemize}
+	\item Jen jiné jméno stejného uzlu
+	\item Proto jen uvnitř jednoho FS
+	\item Demo: \cmd{ls}
+      \end{itemize}
+
+      \pause
+
+      \item Symbolické
+      \begin{itemize}
+	\item ,,Soubor s cestou k cíli''
+      \end{itemize}
+    \end{enumerate}
+
+    \pause
+
+    \item V shellu
+    \begin{itemize}
+      \item Vytvoření: \cmd{ln} a \cmd{ln -s}
+      \item Výpis: \cmd{ls -l}
+    \end{itemize}
+
+    \pause
+
+    \item Hlavička: \header{unistd.h}
+    \item Tvrdé: \code{int link(const char *oldpath, const char *newpath)}
+    \item Symbolické: \code{int symlink(const char *target,
+      const char *linkpath)}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Odkazy}
+  \begin{enumerate}
+    \item Vytvořte odkazy na libovolný soubor
+    \begin{itemize}
+      \item Oba druhy
+    \end{itemize}
+
+    \item Spusťte
+    \item Pomocí \cmd{ls -l} zjistěte velikost obou
+    \begin{itemize}
+      \item Vytvořte symbolický odkaz na stejný soubor ale předřaďte \file{./}
+      \item Zvýšila se velikost odkazu? O kolik?
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Práva souborů a adresářů}
+
+  \begin{itemize}
+    \item Kdo může soubory číst, zapisovat, spouštět
+
+    \pause
+
+    \item Každý soubor a adresář má
+    \begin{itemize}
+      \item ID vlastníka (UID)
+      \item ID skupiny (GID)
+    \end{itemize}
+
+    \pause
+
+    \item Práva jsou
+    \begin{itemize}
+      \item Pro vlastníka (u), skupinu (g) a ostatní (o)
+      \item Pro čtení (r), zápis (w), spuštění (x)
+      \item Zapsáno typicky jako ugo: rwxrwxrwx
+    \end{itemize}
+
+    \pause
+
+    \item V shellu
+    \begin{itemize}
+      \item Změna: \cmd{chown} (vlastníka), \cmd{chgrp} (skupiny),
+        \cmd{chmod} (práv)
+      \item Výpis: \cmd{ls -l}
+    \end{itemize}
+
+    \pause
+
+    \item Hlavička: \header{sys/stat.h}
+    \item Práva: \code{int chmod(const char *pathname, mode_t mode)}
+    \item Uživatel/skupina: \code{int chown(const char *pathname, uid_t owner,
+      gid_t group)}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práva}
+  \begin{enumerate}
+    \item Nastavte práva binárky main jen pro spuštění
+    \item Spusťte
+    \item Spusťte znovu
+    \begin{itemize}
+      \item S novými právy
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Vytváření a manipulace}
+
+ \begin{itemize}
+   \item Vytvoření adresáře: \code{int mkdir(const char *pathname, mode_t mode)}
+   \item Vytvoření souboru: \code{open} s \code{O_CREAT} nebo \code{creat}
+
+   \pause
+
+   \item Vytvoření dočasného souboru
+   \begin{itemize}
+     \item FILE: \code{FILE *tmpfile()} (\header{stdio.h})
+     \item fd: \code{int mkstemp(char *template)} (\header{stdlib.h})
+   \end{itemize}
+
+   \pause
+
+   \item Smazání: \code{int remove(const char *filename)}
+
+   \pause
+
+   \item Přejmenování: \code{int rename(const char *oldname,
+     const char *newname)}
+ \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Manipulace soubory}
+  \begin{enumerate}
+    \item Vytvořte si dočasný soubor
+    \begin{itemize}
+      \item Použijte \code{mkstemp}
+    \end{itemize}
+
+    \item Vypište jméno
+    \item Spěte 10 vteřin
+    \begin{itemize}
+      \item Mezitím si soubor vypište v shellu
+    \end{itemize}
+
+    \item Soubor odstraňte
+    \item Soubor zavřete
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Procházení adresářů}
+
+  \begin{itemize}
+    \item Otevření: \code{DIR *opendir(const char *dirname)}
+    \item Čtení: \code{struct dirent *readdir(DIR *dp)}
+    \begin{itemize}
+      \item Opakované volání postupně prochází adresář
+    \end{itemize}
+    \item Zavření: \code{int closedir(DIR *dp)}
+  \end{itemize}
+
+  \begin{block}{struct dirent}
+  \begin{lstlisting}
+struct dirent {
+  ino_t d_ino;       /* inode number */
+  char  d_name[256]; /* filename */
+};
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Průchod adresáře}
+  \begin{enumerate}
+    \item Otevřete si nějaký adresář
+    \item Vypište položky adresáře
+    \item Vyzkoušejte
+    \item Jak jsou položky seřazeny?
+    \item Jsou vráceny vždy ve stejném pořadí?
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Typy položek}
+
+  \begin{itemize}
+    \item \code{struct dirent} může mít položku \code{d_type}
+    \begin{itemize}
+      \item Ale není v žádném standardu
+    \end{itemize}
+
+    \pause
+
+    \item \code{int stat(const char *pathname, struct stat *buf)}
+  \end{itemize}
+
+  \begin{block}{struct stat}
+  \begin{lstlisting}
+mode_t    st_mode;        /* protection */
+nlink_t   st_nlink;       /* number of hard links */
+uid_t     st_uid;         /* user ID of owner */
+gid_t     st_gid;         /* group ID of owner */
+off_t     st_size;        /* total size, in bytes */
+struct timespec st_atim;  /* time of last access */
+struct timespec st_mtim;  /* time of last modification */
+struct timespec st_ctim;  /* time of last status change */
+...
+  \end{lstlisting}
+  \end{block}
+
+  \begin{itemize}
+    \item \code{mode} obsahuje i typ
+    \begin{itemize}
+      \item Makra \code{S_ISREG}, \code{S_ISDIR}, \code{S_ISLNK}, \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Typy položek}
+  \begin{enumerate}
+    \item Upravujte předchozí úkol
+    \item Pro každou vypsanou položku navíc vypište
+    \begin{itemize}
+      \item Práva -- v osmičkové soustavě
+      \item Typ položky (r, l, d)
+      \item Velikost položky
+      \item Vlastníka a skupinu
+      \item Čas poslední změny
+    \end{itemize}
+
+    \item Vyzkoušejte
+  \end{enumerate}
+
 \end{frame}
 
 \section{Argumenty funkce main}
 \frame{\sectionpage}
 
-\begin{frame}{Argumenty funkce main}
-  zpracování parametrů pomocí funkce getopt, proměnné atd.
+\begin{frame}{Vstup od uživatele}
+
+  \begin{itemize}
+    \item Jak může program přijímat vstupní data?
+
+    \pause
+
+    \item Standardní vstup
+    \item Soubory
+    \item Síť
+    \item IPC
+    \item Signály
+    \item Příkazová řádka
+    \item Proměnné prostředí
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Argumenty funkce \code{main}}
+
+  \begin{itemize}
+    \item \code{main} má
+    \begin{itemize}
+      \item 0 parametrů
+      \item 2 parametry (\code{int, char **}): řetězce z příkazové řádky
+      \item 3 parametry (\code{int, char **, char **}): navíc proměnné
+        prostředí
+      \begin{itemize}
+	\item Není zcela standardní (C89 zmiňuje)
+	\item Alternativa: \code{getenv} (\header{stdlib.h})
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item \code{int main(int argc, char **argv, char **envp)}
+    \begin{itemize}
+      \item \code{argc} -- počet prvků v poli \code{argv}
+      \item \code{argv} -- parametry příkazové řádky (ukončené \code{NULL})
+      \begin{itemize}
+	\item Při \code{argc > 0}, \code{argv[0]} obsahuje jméno binárky
+	\item \code{argv[1]} je 1.\ parametr příkazové řádky
+      \end{itemize}
+      \item \code{envp} -- proměnné prostředí (ukončené \code{NULL})
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Výpis parametrů main}
+  \begin{enumerate}
+    \item Projděte a vypište všechny parametry příkazové řádky
+    \item Projděte, spočítejte proměnné prostředí a vypište počet
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\code{getopt}}
+
+  \begin{itemize}
+    \item Parametry jsou typicky
+    \begin{itemize}
+      \item \cmd{\-pismeno} \cmd{\-pismeno argument}
+      \item \cmd{\--slovo} \cmd{\--slovo argument} \cmd{\--slovo=argument}
+
+      \pause
+
+      \item \cmd{\--} -- ukončení přepínačů
+      \begin{itemize}
+	\item Jak smazat soubor \file{\-X}?
+      \end{itemize}
+
+      \pause
+
+      \item Následují soubory ke zpracování
+
+      \pause
+
+      \item Např.\ \cmd{gcc -c --sysroot=/gcc -- a.b}
+    \end{itemize}
+
+    \pause
+
+    \item Zpracovat můžeme parametry ručně
+
+    \pause
+
+    \item \code{int getopt(int argc, char *const argv[],
+      const char *optstring)} (\header{unistd.h})
+    \begin{itemize}
+      \item \code{argc}, \code{argv} -- z mainu
+      \item \code{optstring} -- řetězec všech podporovaných přepínačů
+      \begin{itemize}
+	\item Dvojtečka za přepínačem -- povinný argument
+	\item Dvoj-Dvojtečka za přepínačem -- nepovinný argument
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad \code{optstring}}
+Pro podporu \cmd{\-g}, \cmd{\-E}, \cmd{\-I} v \textsc{Gcc}, by \code{optstring}
+byl \code{\"g::EI:\"}.
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práce s \code{getopt}}
+  \begin{enumerate}
+    \item Napište podporu pro parametry příkazové řádky
+    \begin{itemize}
+      \item \cmd{\-a} bez parametru
+      \item \cmd{\-b} s povinným parametrem
+      \item \cmd{\-c} s nepovinným parametrem
+    \end{itemize}
+
+    \item Vypište, pokud byl některý zadán
+    \begin{itemize}
+      \item A případně parametr
+    \end{itemize}
+
+    \item Vypište zbytek parametrů
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Proměnné prostředí}
+
+  \begin{itemize}
+    \item \code{main} má
+    \begin{itemize}
+      \item 3 parametry: navíc proměnné prostředí
+    \end{itemize}
+
+    \pause
+
+    \item \code{int fcntl(int fd, int cmd, ... /* arg */ )}
+    \begin{itemize}
+      \item Hlavička: \header{unistd.h}, \header{fcntl.h}
+    \end{itemize}
+  \end{itemize}
+
 \end{frame}
 
 \section{Paměť}
