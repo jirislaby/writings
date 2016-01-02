@@ -906,21 +906,54 @@ unsigned long sp_flag; /* reserved for future
   \begin{itemize}
     \item Pluggable Authentication Modules -- PAM (\doc{man 8 pam})
     \item Konfigurovatelný, modulární
-    \item Knihovna \file{libpam}, moduly v \file{/lib*/security/},
-      konfigurace v \file{/etc/pam.conf} a \file{/etc/pam.d/*}
 
     \pause
 
-    \item \header{security/pam\_appl.h}
+    \item Knihovna \file{libpam} (\cmd{\-lpam} při linkováni)
+
+    \pause
+
+    \item Moduly v \file{/lib*/security/}
+    \begin{itemize}
+      \item Podpora passwd/shadow, LDAP, Kerberos, Samba, \dots
+      \item Nastavení limitů, proměnných prostředí, xauth, \dots
+      \item Omezení shellu, času příhlášení, \dots
+      \item Informace o mailech při přihlášení, motd, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Konfigurace v \file{/etc/pam.conf} a \file{/etc/pam.d/*}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Programování a PAM}{Inicializace PAM}
+
+  \begin{itemize}
+    \item Hlavička: \header{security/pam\_appl.h}
 
     \item Inicializace knihovny: \code{pam_start}
     \begin{itemize}
-      \item \code{service_name} -- soubor v \file{/etc/pam.d/}
+      \item \code{service_name} -- konfigurační soubor v \file{/etc/pam.d/}
       \item \code{user} -- uživatel nebo \code{NULL}
-      \item \code{pam_conversation} -- struktura s naší komunikační funkcí
+      \item \code{pam_conversation} -- struktura s naší konverzační funkcí
       \item \code{pamh} -- držátko, návratová hodnota
+
+      \pause
+
       \item Vrací \code{PAM_SUCCESS} nebo chybu $\rightarrow$
         \code{pam_strerror}
+    \end{itemize}
+
+    \pause
+
+    \item Konverzační funkce (\doc{man 3 pam\_conv})
+    \begin{itemize}
+      \item \code{int (*conv)(int num_msg, const struct pam_message **msg,
+        struct pam_response **resp, void *appdata_ptr)}
+      \item Alokuje \code{*resp} o počtu \code{num_msg} (\code{calloc})
+      \item Do \code{(*resp)[x].resp} vkládá odpovědi na \code{msg[x]->msg} 
     \end{itemize}
 
     \pause
@@ -935,6 +968,36 @@ unsigned long sp_flag; /* reserved for future
 
 \end{frame}
 
+\begin{frame}[fragile]{Programování a PAM}{Konverzace a PAM}
+
+  \begin{block}{Konverzace a PAM}
+  \begin{uncoverenv}<2->
+  \begin{lstlisting}
+static int my_conv(int num_msg, const struct pam_message **msg,
+                struct pam_response **resp, void *appdata_ptr)
+{
+    int a;
+    for (a = 0; a < num_msg; a++)
+        printf("msg%.2d: %s\n", a, msg[a]->msg);
+    return PAM_CONV_ERR; /* PAM_SUCCESS when resp is successfully filled */
+}
+  \end{lstlisting}
+  \end{uncoverenv}
+  \begin{lstlisting}
+int main(void)
+{
+  const struct pam_conv pam_conv = {
+    .conv = my_conv,
+  };
+  pam_handle_t *pamh;
+
+  ret = pam_start("su", "vyvoj", &pam_conv, &pamh);
+...
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
 \begin{frame}{Úkol}
 
   \heading{Inicializace PAM}
@@ -943,6 +1006,7 @@ unsigned long sp_flag; /* reserved for future
     \begin{itemize}
       \item Jako \code{service_name} použijte \code{\"su\"}
       \item Jako \code{user} použijte \code{\"vyvoj\"}
+      \item V konverzační funkci vypište zprávy a vraťte chybu
       \item Ověřujte návratovou hodnotu
     \end{itemize}
 
@@ -950,7 +1014,51 @@ unsigned long sp_flag; /* reserved for future
     \item Přeložte a linkujte s \cmd{\-lpam}
     \begin{itemize}
       \item \code{QMAKE_LDFLAGS += -lpam} v \file {main.pro}
+      \item V repozitáři už je
     \end{itemize}
+
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item Nemělo by dojít k chybě
+      \item Zatím se konverzační funkce nezavolá
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Programování a PAM}{Ověření hesla}
+
+  \begin{itemize}
+    \item Ověření hesla: \code{pam_authenticate}
+    \begin{itemize}
+      \item \code{pamh} -- držátko z \code{pam_start}
+      \item \code{flags} -- obvykle \code{0}
+      \item Vrací \code{PAM_SUCCESS} nebo chybu $\rightarrow$
+        \code{pam_strerror}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Ověření hesla -- PAM}
+  \begin{enumerate}
+    \item Ověřte heslo uživatele vyvoj
+    \begin{itemize}
+      \item Volejte \code{pam_authenticate}
+    \end{itemize}
+
+    \item Vypište návratovou hodnotu
+
+    \item Dopište konverzační funkci
+    \begin{itemize}
+      \item Alokujte paměť pro odpověď (\code{resp})
+      \item Paměť uvolňuje PAM, vy ne
+      \item Do odpovědi na ,,Password:'' vložte duplikát řetězce hesla
+	(\code{strdup})
+    \end{itemize}
+
     \item Vyzkoušejte
   \end{enumerate}
 
@@ -959,16 +1067,687 @@ unsigned long sp_flag; /* reserved for future
 \section{Práce se soubory}
 \frame{\sectionpage}
 
-\begin{frame}{Práce se soubory}{Pomocí stdlib}
-Práce se soubory funkcemi standardních knihoven (stdlib)
+\begin{frame}{Práce se soubory}
+
+  \heading{Několik úrovní}
+  \begin{enumerate}
+    \item Pomocí stdlib
+    \begin{itemize}
+      \item Funkce standardních knihoven, typicky v libc
+      \item Přenositelné, standardizované od C89
+      \item Využívají vnitřně typ 2 dole
+    \end{itemize}
+
+    \pause
+
+    \item Pomocí jádra
+    \begin{itemize}
+      \item Funkce libc
+      \item Přenositelné, standardizované, ale jen POSIX
+      \item Využívají vnitřně typ 3 dole
+    \end{itemize}
+
+    \pause
+
+    \item Pomocí jádra přímo
+    \begin{itemize}
+      \item Bez libc
+      \item Instrukcemi systémového volání
+      \item Nepřenositelné, nestandardizované
+    \end{itemize}
+  \end{enumerate}
+
 \end{frame}
+
+\subsection*{Práce se soubory pomocí stdlib}
+\frame{\subsectionpage}
+
+\begin{frame}{Typy souborů}
+
+  \begin{itemize}
+    \item Soubory s binárními daty
+    \begin{itemize}
+      \item Při zápisu a čtení nejsou data nijak měněna
+    \end{itemize}
+
+    \pause
+
+    \item Soubory s textovými daty
+    \begin{itemize}
+      \item Binární data, ale interpretovaná
+      \item Při čtení a zápisu můžou být některé bajty nahrazeny/změněny
+
+      \pause
+
+      \item Na Linuxu a jiných POSIX systémech ne
+      \begin{itemize}
+	\item Pozor na kompatibilitu s Windows!
+	\item Na Windows se nahrazují konce řádků
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Vlaječka při otevírání
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Práce se soubory}{Pomocí stdlib}
+
+  \begin{enumerate}
+    \item Otevření souboru
+    \begin{itemize}
+      \item \code{fopen}
+      \item Získáme držátko k souboru (\code{FILE *})
+    \end{itemize}
+
+    \pause
+
+    \item Čteme/zapisujeme z/do souboru
+    \begin{itemize}
+      \item \code{fscanf}, \code{fprintf}, \code{fread}, \code{fwrite}, \dots
+      \item Potřebují držátko k souboru
+    \end{itemize}
+
+    \pause
+
+    \item Ukončíme práci se souborem (zavřeme soubor)
+    \begin{itemize}
+      \item \code{fclose}
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Jak otevřít soubor -- mód otevření}
+
+  \begin{itemize}
+    \item Mód otevření volíme dle požadovaného chování (\doc{man fopen})
+
+    \pause
+
+    \item Čtení z existujícího souboru: \code{\"r\"}
+    \item Vytvoření nového souboru a zápis do něj: \code{\"w\"}
+
+    \pause
+
+    \item Zápis na konec existujícího souboru: \code{\"a\"}
+
+    \pause
+
+    \item Čtení i zápis do nového souboru: \code{\"w+\"}
+
+    \item Čtení i zápis do existujícího souboru
+    \begin{itemize}
+      \item Čtení i zápis kdekoli: \code{\"r+\"}
+      \item Čtení kdekoli, zápis na konec: \code{\"a+\"}
+    \end{itemize}
+
+    \pause
+
+    \item Práce v binárním režimu namísto textového: \code{\"b\"} na konec módu
+    \begin{itemize}
+      \item Např.\ \code{\"rb\"}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Otevření souboru}
+
+  \begin{itemize}
+    \item \code{FILE *fopen(const char *filename, const char *mode)}
+    \begin{itemize}
+
+      \item \code{filename} -- cesta k souboru
+      \begin{itemize}
+	\item Relativní: \file{test.txt}, \file{../test.txt}
+	\item Absolutní: \file{/tmp/test.txt}
+      \end{itemize}
+
+      \pause
+
+      \item \code{mode} -- mód otevření
+      \begin{itemize}
+	\item Dle předchozího slajdu
+      \end{itemize}
+
+      \pause
+
+      \item Návratová hodnota -- držátko k souboru
+      \begin{itemize}
+	\item Při chybě: \code{NULL}
+	\item Nemusíme znát definici \code{FILE} (interní záležitost OS)
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Pozor na znak \code{\\} v řetězci cesty
+    \begin{itemize}
+      \item C pokládá \code{\\} za speciální znak, nutno použít escape sekvenci
+	\code{\\\\}
+      \item Např.\ soubor \file{test\\1.txt} $\rightarrow$
+        \code{\"test\\\\1.txt\"}
+    \end{itemize}
+
+    \pause
+
+    \item Zavření: \code{fclose(FILE *drzatko_z_open)}
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+FILE *file = fopen("test.txt", "r");
+fclose(file);
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Otevřete soubor}
+  \begin{enumerate}
+    \item Otevřete pro čtení neexistující \file{text.txt}
+    \begin{itemize}
+      \item Ověřte návratovou hodnotu
+    \end{itemize}
+
+    \item Zavřete
+    \item Vyzkoušejte
+    \item Opravte, abyste otevírali správný \file{test.txt}
+    \item Znovu vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{FILE} je platformně závislá}
+
+  \begin{center}
+  \begin{tabular}{|c|c|} \hline
+  Linux & Windows \\ \hline
+  \begin{lstlisting}
+typedef struct _IO_FILE {
+  int _flags;
+  char *_IO_read_ptr;
+  char *_IO_read_end;
+  char *_IO_read_base;
+  char *_IO_write_base;
+  char *_IO_write_ptr;
+  char *_IO_write_end;
+  char *_IO_buf_base;
+  char *_IO_buf_end;
+...
+} FILE;
+  \end{lstlisting} &
+  \begin{lstlisting}[showlines]
+typedef struct _iobuf {
+  char *_ptr;
+  int _cnt;
+  char *_base;
+  int _flag;
+  int _file;
+  int _charbuf;
+  int _bufsiz;
+  char *_tmpfname;
+} FILE;
+
+
+  \end{lstlisting} \\ \hline
+  \end{tabular}
+
+  \bigskip
+  \bigskip
+  \pause
+
+  \heading{Nespoléhejte na položky \code{FILE}!}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Čtení ze souboru}
+
+  \begin{itemize}
+    \item Čte se z aktuální pozice v souboru
+    \begin{itemize}
+      \item Po přečtení se pozice posune těsně za přečtená data
+    \end{itemize}
+
+    \pause
+
+    \item Konec souboru
+    \begin{itemize}
+      \item Funkce vracejí \code{EOF}
+      \item \code{feof} vrací nenulu
+    \end{itemize}
+
+    \pause
+
+    \item Načtení jednoho znaku
+    \begin{itemize}
+      \item \code{int getc(FILE *stream)}
+    \end{itemize}
+
+    \pause
+
+    \item Načtení jedné řádky (ukončené \code{\\n})
+    \begin{itemize}
+      \item \code{char *fgets(char *str, int num, FILE *stream)}
+    \end{itemize}
+
+    \pause
+
+    \item Formátované čtení do proměnných
+    \begin{itemize}
+      \item \code{int fscanf(FILE *stream, const char *format, ...)}
+    \end{itemize}
+
+    \pause
+
+    \item Blokové čtení na binární úrovni
+    \begin{itemize}
+      \item \code{size_t fread(void *ptr, size_t size, size_t count,
+        FILE *stream)}
+      \item Načte blok bajtů o zadané délce: \code{size * count}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Čtení ze souboru}{Příklad}
+
+  \begin{block}{Čtení po znacích}
+  \begin{lstlisting}
+#include <err.h>
+#include <stdio.h>
+
+int main(void) {
+  FILE *file;
+  int value;
+
+  file = fopen("test.txt", "r");
+  if (!file)
+    err(1, "fopen");
+
+  while ((value = getc(file)) != EOF)
+    putchar(chvalue);
+
+  fclose(file);
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Čtení souboru}
+  \begin{enumerate}
+    \item Otevřený soubor čtěte
+    \item Vypište počet řádků v souboru
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Zápis do souboru}
+
+  \begin{itemize}
+    \item Zapisuje se na aktuální pozici v souboru
+    \begin{itemize}
+      \item Po zápisu se pozice posune těsně za zapsaná data
+    \end{itemize}
+
+    \pause
+
+    \item Zápis jednoho znaku
+    \begin{itemize}
+      \item \code{int putc(int character, FILE *stream)}
+    \end{itemize}
+
+    \pause
+
+    \item Zápis řetězce
+    \begin{itemize}
+      \item \code{int fputs(const char *str, FILE *stream)}
+    \end{itemize}
+
+    \pause
+
+    \item Formátovaný zápis
+    \begin{itemize}
+      \item \code{int fprintf(FILE *stream, const char *format, ...)}
+    \end{itemize}
+
+    \pause
+
+    \item Blokový zápis na binární úrovni
+    \begin{itemize}
+      \item \code{size_t fwrite (const void* ptr, size_t size, size_t count,
+	FILE *stream)}
+      \item Zapíše blok bajtů ptr o zadané délce: \code{size * count}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Zápis do souboru}{Příklad}
+
+  \begin{block}{Formátovaný zápis po znacích}
+  \begin{lstlisting}
+#include <err.h>
+#include <stdio.h>
+
+struct fruit {
+  char sort[32];
+  float size;
+};
+
+void my_write() {
+  struct fruit f = { "Orange", 2.5 };
+  FILE *file;
+
+  file = fopen("avat.txt", "w");
+  if (!file)
+    err(1, "fopen");
+  fprintf(file, "%.2f kg of %s\n", f.size, f.sort);
+  fclose(file);
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Zápis do souboru}
+  \begin{enumerate}
+    \item Zapište počet řádků v souboru na konec souboru
+    \begin{itemize}
+      \item I s novým řádkem
+    \end{itemize}
+    \item Vyzkoušejte
+    \item Vypište si soubor
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Změna pozice v souboru}
+
+  \begin{itemize}
+    \item Aktuální pozici v souboru lze měnit bez čtení/zápisu
+    \item \code{int fseek(FILE *stream, long offset, int whence)}
+    \begin{itemize}
+      \item \code{offset} -- zadaný offset vzhledem k \code{whence}
+      \item \code{SEEK_SET} -- začátek souboru
+      \item \code{SEEK_CUR} -- aktuální pozice
+      \item \code{SEEK_END} -- konec souboru
+    \end{itemize}
+
+    \pause
+
+    \item \code{void rewind(FILE *stream)}
+    \begin{itemize}
+      \item Přesune aktuální pozici na začátek souboru
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Změna aktuální pozice v soubor}
+  \begin{enumerate}
+    \item Přečtěte a vypište 10 bajtů ze souboru
+    \item Přesuňte se na 2. bajt v souboru, přečtěte 10 a vypište
+    \item Opakujte 10$\times$ a zvyšujte pozici o 1
+    \item Vypište posledních 30 bajtů ze souboru
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{stdin, stdout, stderr}
+
+  \begin{itemize}
+    \item Standardní držátka k souboru
+    \item Automaticky otevřeny a zavřeny systémem
+
+    \pause
+
+    \item \code{printf() == fprintf(stdout)}
+    \item \code{scanf() == fscanf(stdin)}
+    \item \code{getchar() == getc(stdin)}
+    \item \dots
+  \end{itemize}
+
+\end{frame}
+
+\subsection*{Práce se soubory pomocí jádra}
+\frame{\subsectionpage}
 
 \begin{frame}{Práce se soubory}{Pomocí jádra}
-práce se soubory voláním jádra, význam file-descriptoru, standardní vstup a
-výstup, zamykání souborů apod.
+
+  \begin{itemize}
+    \item Práce se soubory na nižší úrovni
+    \item Standardizované v POSIX
+
+    \pause
+
+    \item Držátko je nyní \code{int}
+    \begin{itemize}
+      \item Přímá komunikace s jádrem
+    \end{itemize}
+
+    \pause
+
+    \item Otevření: \code{int open(const char *pathname, int flags)}
+    \begin{itemize}
+      \item \doc{man 2 open}
+      \item Hlavičky: \header{sys/types.h}, \header{sys/stat.h},
+        \header{fcntl.h}
+      \item \code{pathname} -- cesta k souboru
+      \item \code{flags} -- jedno z \code{O_RDONLY}, \code{O_WRONLY},
+        \code{O_RDWR}, popř.\ \code{|} s dalšími
+      \item Návratová hodnota -- záporná je chyba, jinak fd
+    \end{itemize}
+
+    \pause
+
+    \item Zavření: \code{int close(int fd)} (\doc{man 2 close},
+      \header{unistd.h})
+
+    \pause
+
+    \item Otevřené deskriptory: \code{STDIN_FILENO}, \code{STDOUT_FILENO} a
+      \code{STDERR_FILENO}
+  \end{itemize}
+
 \end{frame}
 
-\section{Údržba souborů a adresářů}
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Otevření souboru}
+  \begin{enumerate}
+    \item Otevřete pomocí \code{open} \file{/dev/zero}
+    \item Ošetřete návratovou hodnotu
+    \item Zavřete
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Čtení a zápis}
+
+  \begin{itemize}
+    \item Čtení: \code{ssize_t read(int fd, void *buf, size_t count)}
+    \begin{itemize}
+      \item \code{fd} -- držátko z open
+      \item \code{buf} -- zásobník, kam číst
+      \item \code{count} -- počet bajtů
+      \item Návratová hodnota
+      \begin{itemize}
+	\item \code{\-1}: chyba
+	\item \code{0}: konec souboru
+	\item kladné: počet opravdu přečtených bajtů
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Zápis: \code{ssize_t write(int fd, const void *buf, size_t count)}
+    \begin{itemize}
+      \item \code{fd} -- držátko z open
+      \item \code{buf} -- zásobník, odkud zapisovat
+      \item \code{count} -- počet bajtů
+      \item Návratová hodnota
+      \begin{itemize}
+	\item \code{\-1}: chyba
+	\item kladné: počet opravdu přečtených bajtů
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Čtení a zápis}
+  \begin{enumerate}
+    \item Předchozí úkol z \code{open} nezahazujte
+    \item Dopisujte před něj
+    \item Čtěte ze standardního vstupu
+    \item Vypisujte na standarní výstup
+    \item Opakujte dokud nedojdete na konec souboru
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item \code{EOF} vyrobíte stiskem Ctrl-D (opakovaným uprostřed řádku)
+    \end{itemize}
+
+    \item Můžete vyzkoušet napojit test.txt na standardní vstup
+    \begin{itemize}
+      \item \cmd{./main < test.txt}
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Mapování souboru}
+
+  \begin{itemize}
+    \item Celý soubor lze namapovat jako kus paměti
+    \item Potenciálně rychlejší přístup
+
+    \pause
+
+    \item \code{void *mmap(void *addr, size_t length, int prot, int flags,
+      int fd, off_t offset)}
+    \begin{itemize}
+      \item Hlavička: \header{sys/mman.h}
+      \item \code{addr} -- kam namapovat, typicky \code{NULL} (tj.\ ,,někam'')
+      \item \code{length} -- počet bajtů
+      \item \code{prot} -- \code{PROT_EXEC}, \code{PROT_READ},
+        \code{PROT_WRITE}, \code{PROT_NONE}
+      \item \code{flags} -- \code{MAP_SHARED}, \code{MAP_PRIVATE}, \dots
+      \item Návratová hodnota: \code{MAP_FAILED} nebo adresa
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Alokace pomocí \code{mmap}}
+  \begin{enumerate}
+    \item Namapujte otevřené \file{/dev/zero}
+    \begin{itemize}
+      \item \code{len} \dots\ 20M
+      \item \code{prot} \dots\ \code{PROT_READ | PROT_WRITE}
+      \item \code{flags} \dots\ \code{MAP_PRIVATE}
+      \item \code{fd} -- držátko \file{/dev/zero} z open
+    \end{itemize}
+
+    \item Zapište do paměti nějaký řetězec
+    \item Vypište adresu paměti
+    \item Vypište obsah paměti
+    \begin{itemize}
+      \item Tj.\ řetězec
+    \end{itemize}
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Zamykání souborů}
+
+  \begin{itemize}
+    \item Lze zamknout část souboru
+    \begin{itemize}
+      \item Pro čtení: ostatní můžou číst, nikdo nesmí zapisovat
+      \item Pro zápis: nikdo jiný nesmí číst ani zapisovat
+    \end{itemize}
+
+    \pause
+
+    \item \code{int fcntl(int fd, int cmd, ... /* arg */ )}
+    \begin{itemize}
+      \item Hlavička: \header{unistd.h}, \header{fcntl.h}
+      \item \code{fd} -- držátko z open
+      \item \code{cmd} -- \code{F_SETLK} (neblokující) nebo \code{F_SETLKW}
+        (blokující)
+      \item \code{arg} -- ukazatel na \code{struct flock}
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{struct flock}
+  \begin{lstlisting}
+struct flock {
+  short l_type;    /* F_RDLCK, F_WRLCK, F_UNLCK */
+  short l_whence;  /* How to interpret l_start:
+                      SEEK_SET, SEEK_CUR, SEEK_END */
+  off_t l_start;   /* Starting offset for lock */
+  off_t l_len;     /* Number of bytes to lock */
+};
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Zamykání souborů}
+  \begin{enumerate}
+    \item Otevřete si \code{test.txt}
+    \begin{itemize}
+      \item Pro čtení i zápis
+    \end{itemize}
+
+    \item Zamčete rozsah 10--20 bajtů pro zápis
+    \begin{itemize}
+      \item Pro zápis
+      \item Neblokujícím zámkem
+    \end{itemize}
+
+    \item Spěte 10 vteřin
+    \item Vyzkoušejte spuštěním 2 instancí
+    \begin{itemize}
+      \item 1 musí selhat
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\section{Soubory a adresáře}
 \frame{\sectionpage}
 
 \begin{frame}{Údržba souborů a adresářů}
@@ -1045,44 +1824,19 @@ výstup, zamykání souborů apod.
   programování terminálu pomocí ncurses, programování CGI
 \end{frame}
 
-\begin{frame}
-  \frametitle{S čím budeme pracovat?}
+\begin{frame}{Úkol}
 
-  \heading{Software}
-  \begin{itemize}
-  \item GIT
-  \begin{itemize}
-  \item Úvod do GITu dnes
-  \item Podrobněji: \url{http://book.git-scm.com/}
-  \end{itemize}
-
-  \item Zdroje jádra
-  \begin{itemize}
-  \item Použijeme předinstalované z RPM (\file{/usr/src/kernels/})
-  \item \url{http://git.kernel.org/} (od 2.6.12)
-  \item \texttt{full-history-linux} GIT (od 0.01 do 2.6.26)
-  \end{itemize}
-
-  \item \textsc{Qemu}
-  \begin{itemize}
-  \item HW k práci s PCI, I/O, na přerušení, DMA\dots
-  \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
+  \heading{XX}
   \begin{enumerate}
-  \item V \code{exit} funkci naalokujte 1000 bytů (\code{kmalloc})
-  \item Udělejte do nich \code{strcpy} ,,Bye''
-  \item Vypište paměť jako řetězec (\code{printk} a \code{\%s})
-  \item Uvolněte paměť
-  \item Vložte a odeberte modul ze systému (\cmd{insmod} a \cmd{rmmod})
-  \item \cmd{dmesg}
-  \item Můžete provést \cmd{commit} a \cmd{push}
+    \item V \code{exit} funkci naalokujte 1000 bytů (\code{kmalloc})
+    \item Udělejte do nich \code{strcpy} ,,Bye''
+    \item Vypište paměť jako řetězec (\code{printk} a \code{\%s})
+    \item Uvolněte paměť
+    \item Vložte a odeberte modul ze systému (\cmd{insmod} a \cmd{rmmod})
+    \item \cmd{dmesg}
+    \item Můžete provést \cmd{commit} a \cmd{push}
   \end{enumerate}
+
 \end{frame}
 
 \end{document}
