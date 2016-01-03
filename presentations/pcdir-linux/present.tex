@@ -15,6 +15,8 @@
   \tableofcontents
 \end{frame}
 
+\iffalse
+
 \section{Úvodní informace}
 \frame{\sectionpage}
 
@@ -2069,7 +2071,7 @@ struct timespec st_ctim;  /* time of last status change */
 
 \end{frame}
 
-\begin{frame}{\code{getopt}}
+\begin{frame}{Parametry příkazové řádky}
 
   \begin{itemize}
     \item Parametry jsou typicky
@@ -2079,7 +2081,7 @@ struct timespec st_ctim;  /* time of last status change */
 
       \pause
 
-      \item \cmd{\--} -- ukončení přepínačů
+      \item Ukončení přepínačů: \cmd{\--}
       \begin{itemize}
 	\item Jak smazat soubor \file{\-X}?
       \end{itemize}
@@ -2087,11 +2089,13 @@ struct timespec st_ctim;  /* time of last status change */
       \pause
 
       \item Následují soubory ke zpracování
-
-      \pause
-
-      \item Např.\ \cmd{gcc -c --sysroot=/gcc -- a.b}
     \end{itemize}
+
+    \pause
+
+    \begin{block}{Příklad}
+      \cmd{gcc -c --sysroot=/gcc-root/ -- a.c}
+    \end{block}
 
     \pause
 
@@ -2099,6 +2103,14 @@ struct timespec st_ctim;  /* time of last status change */
 
     \pause
 
+    \item Anebo pomocí funkcí \code{getopt} (POSIX), \code{getopt_long} (GNU)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\code{getopt}}
+
+  \begin{itemize}
     \item \code{int getopt(int argc, char *const argv[],
       const char *optstring)} (\header{unistd.h})
     \begin{itemize}
@@ -2108,7 +2120,27 @@ struct timespec st_ctim;  /* time of last status change */
 	\item Dvojtečka za přepínačem -- povinný argument
 	\item Dvoj-Dvojtečka za přepínačem -- nepovinný argument
       \end{itemize}
+
+      \pause
+
+      \item Návratová hodnota: písmeno přepínače, \code{'?'} (neznámý), nebo
+        \code{\-1} po zpracování všech
     \end{itemize}
+
+    \pause
+
+    \item \code{extern char *optarg} -- argument přepínače (když má \code{':'})
+
+    \pause
+
+    \item \code{extern int optind} -- index aktuálně zpracovávaného přepínače
+
+    \pause
+
+    \item \code{extern int opterr} -- má \code{getopt} vypisovat chyby? (při
+      \code{'?'})
+    \item \code{extern int optopt} -- písmeno chybného přepínače (při
+      \code{'?'})
   \end{itemize}
 
   \pause
@@ -2124,6 +2156,7 @@ byl \code{\"g::EI:\"}.
 
   \heading{Práce s \code{getopt}}
   \begin{enumerate}
+    \item Upravujte 09 z repozitáře
     \item Napište podporu pro parametry příkazové řádky
     \begin{itemize}
       \item \cmd{\-a} bez parametru
@@ -2133,11 +2166,64 @@ byl \code{\"g::EI:\"}.
 
     \item Vypište, pokud byl některý zadán
     \begin{itemize}
-      \item A případně parametr
+      \item A případně parametr (\code{optarg})
+    \end{itemize}
+
+    \item Vypište, který parametr nebyl rozpoznán
+    \begin{itemize}
+      \item \code{optopt}
     \end{itemize}
 
     \item Vypište zbytek parametrů
-    \item Spusťte
+    \begin{itemize}
+      \item Ne-přepínačů (tj.\ bez \code{\-})
+      \item Od \code{optind} po \code{argc}
+    \end{itemize}
+
+    \item Spusťte a vyzkoušejte
+    \begin{itemize}
+      \item Zkuste i \cmd{./main -a -b povinny s1 -cx s2 s3}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{getopt_long}}
+
+  \begin{itemize}
+    \item \code{int getopt_long(int argc, char *const argv[],} \\
+      \code{const char *optstring, const struct option *longopts,
+      int *longindex)} (\header{getopt.h})
+    \begin{itemize}
+      \item \code{longopts} -- pole struktur definujících dlouhé přepínače
+      \item \code{longindex} -- ukazatel do \code{longopts}
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{\code{struct option}}
+  \begin{lstlisting}
+const char *name;    /* support --name */
+int         has_arg; /* 0: no   1: required   2: optional */
+int        *flag;    /* NULL -> getopt_long returns 'val' */
+int         val;     /* return value if flag is NULL */
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práce s \code{getopt_long}}
+  \begin{enumerate}
+    \item Přepište podporu do \code{getopt_long}
+    \begin{itemize}
+      \item \cmd{\-a} bude ekvivalent \cmd{\--alpha}
+      \item \cmd{\-b} bude ekvivalent \cmd{\--beta}
+      \item \cmd{\-c} bude ekvivalent \cmd{\--gamma}
+    \end{itemize}
+
+    \item Jinak se bude chovat stejně
+    \item Spusťte a vyzkoušejte
   \end{enumerate}
 
 \end{frame}
@@ -2145,34 +2231,1119 @@ byl \code{\"g::EI:\"}.
 \begin{frame}{Proměnné prostředí}
 
   \begin{itemize}
-    \item \code{main} má
+    \item Třetí paramentr \code{main}
     \begin{itemize}
-      \item 3 parametry: navíc proměnné prostředí
+      \item \code{char **envp}
+      \item Dvojice \code{PROMENNA=hodnota} (Demo: \cmd{env})
+
+      \pause
+
+      \item Ekvivalent je \code{extern char **environ}
     \end{itemize}
 
     \pause
 
-    \item \code{int fcntl(int fd, int cmd, ... /* arg */ )}
+    \item \code{char *getenv(const char *name)} (\header{stdlib.h})
     \begin{itemize}
-      \item Hlavička: \header{unistd.h}, \header{fcntl.h}
+      \item Pro \code{PROMENNA} vraci \code{hodnota}
     \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Proměnné prostředí}
+  \begin{enumerate}
+    \item Vypište poslední dvojici proměnných prostředí
+    \item Vypište hodnotu proměnné \code{USER}
+    \item Spusťte a vyzkoušejte
+  \end{enumerate}
 
 \end{frame}
 
 \section{Paměť}
 \frame{\sectionpage}
 
-\begin{frame}{Paměť}
-  alokace a uvolnění paměti, volání malloc, free, ladění paměti (ElectricFence)
+\begin{frame}{Dynamická alokace}{Motivace}
+
+  \begin{itemize}
+    \item U statické alokace jsou velikost a počet známy v době překladu
+    \begin{itemize}
+      \item \code{int array[100];}
+      \item \code{int a, b, c;}
+    \end{itemize}
+
+    \pause
+
+    \item Ne vždy jsou tyto informace známy
+    \begin{itemize}
+      \item Závislost na vstupu
+      \item Např.\ řetězec má typicky 20 znaků, ale může mít i 1000
+    \end{itemize}
+
+    \pause
+
+    \item Dynamická alokace
+    \begin{itemize}
+      \item Umožňuje vytvořit datovou položku až za běhu
+
+      \pause
+
+      \item Ale může selhat
+      \begin{itemize}
+	\item Linux je optimista -- selže málokdy
+	\item \cmd{sysctl vm.overcommit_memory}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Statická vs.\ dynamická alokace}
+
+  \begin{itemize}
+    \item \emph{Statická} alokace alokuje na zásobníku
+    \begin{itemize}
+      \item Automaticky se uvolňuje po dokončení bloku kódu
+      \begin{itemize}
+	\item Typicky konec funkce, konec podmínky \code{if}, cyklu \code{for},
+	  \dots
+      \end{itemize}
+
+      \pause
+
+      \item Výrazně rychlejší (obsah zásobníku je typicky v cache)
+      \item Využití pro krátkodobé proměnné/objekty
+
+      \pause
+
+      \item Např.\ \code{int array[100];}
+    \end{itemize}
+
+    \pause
+
+    \item \emph{Dynamická} alokace na haldě
+    \begin{itemize}
+      \item Zůstává do explicitního uvolnění (nebo konce aplikace)
+      \item Využití pro dlouhodobé paměťové entity
+
+      \pause
+
+      \item Např.\ \code{int *array = malloc(variable_len * sizeof(int));}
+    \end{itemize}
+
+    \pause
+
+    \item Specialitou je \emph{alokace polí} s variabilní délkou (od C99)
+    \begin{itemize}
+      \item Délka není známa v době překladu
+      \item Ale alokuje se na zásobníku a automaticky odstraňuje
+
+      \pause
+
+      \item Např.\ \code{int array[length];}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Alokace dynamické paměti}
+
+  \begin{itemize}
+    \item Hlavička: \header{stdlib.h}
+
+    \item \code{void *malloc(size_t size)}
+    \begin{itemize}
+      \item \code{size}: velikost k alokaci
+      \item Návratová hodnota: NULL při chybě, jinak adresa
+
+      \pause
+
+      \item Jeden souvislý blok
+      \item Na haldě
+      \item Paměť není inicializována (,,smetí'')
+    \end{itemize}
+
+    \pause
+
+    \item \code{void *calloc(size_t nmemb, size_t size)}
+    \begin{itemize}
+      \item \code{nmemb}: počet položek
+      \item \code{size}: velikost položky
+      \item Alokuje \code{nmemb * size}
+
+      \pause
+
+      \item Inicializuje paměť na 0
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Uvolnění dynamické paměti}
+
+  \begin{itemize}
+    \item \code{void free(void *ptr)}
+    \begin{itemize}
+      \item Uvolní alokovanou paměť
+      \begin{itemize}
+	\item \code{ptr} může být jen to, co vrátil \code{malloc} (i
+	  \code{NULL})
+	\item Tj.\ nelze uvolnit jen část \code{free(mem + 4)}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item \pozor
+    \begin{itemize}
+      \item Nelze přistupovat na paměť po zavolání \code{free}
+      \item \code{free} nemaže \emph{obsah} paměti
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Alokace paměti}
+  \begin{enumerate}
+    \item Alokujte 1 GiB paměti
+    \item Spěte 10 vteřin
+    \begin{itemize}
+      \item Mezitím pozorujte výstup \cmd{htop}/\cmd{top}/\cmd{free}
+      \item Změnila se velikost volné paměti?
+    \end{itemize}
+
+    \item Vyzkoušejte
+    \item Vysvětlete
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Změna dynamické paměti}
+
+  \begin{itemize}
+    \item \code{void *realloc(void *ptr, size_t size)}
+    \begin{itemize}
+      \item \code{(ptr == NULL)} $\Rightarrow$ \code{malloc(size)}
+      \item \code{(size == 0)} $\Rightarrow$ \code{free(ptr)}
+      \item \code{(ptr != NULL)} $\Rightarrow$ změna velikosti dynamické paměti
+	na \code{size}
+
+      \pause
+
+      \item Návratová hodnota: nemusí být stejná jako \code{ptr}
+    \end{itemize}
+
+    \pause
+
+    \item Obsah původního paměťového bloku je zachován
+
+    \pause
+
+    \item Při zvětšení je dodatečná paměť neinicializovaná
+    \begin{itemize}
+      \item Stejně jako při \code{malloc}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{memset}}
+
+  \begin{itemize}
+    \item Nastaví paměť na zadanou hodnotu
+
+    \pause
+
+    \item \code{void *memset(void *s, int c, size_t n)} (\header{string.h})
+    \begin{itemize}
+      \item \code{s} -- paměť k inicializaci
+      \item \code{c} -- hodnota (znak), kterou inicializovat
+      \item \code{n} -- velikost bloku k inicializaci
+      \begin{itemize}
+	\item často \code{sizeof()}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Řádově rychlejší než \code{for} cyklus
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+struct {
+  int a, b;
+} *array = malloc(sizeof(*array));
+memset(array, 0, sizeof(*array));
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Dynamická alokace}{Shrnutí}
+
+  \begin{enumerate}
+    \item Alokuje potřebný počet bajtů
+    \begin{itemize}
+      \item Pozor na správnou velikost
+      \item Typicky používáme \code{pocet_prvku * sizeof(prvek)}
+    \end{itemize}
+
+    \pause
+
+    \item Uložíme adresu paměti do ukazatele s požadovaným typem
+    \begin{itemize}
+      \item \code{int *array = malloc(100 * sizeof(*array))}
+    \end{itemize}
+
+    \pause
+
+    \item Po konci práce uvolníme
+    \begin{itemize}
+      \item \code{free(array)}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Správa paměti}
+  \begin{enumerate}
+    \item Otevřete si \file{10/main}
+    \item Alokujte si pole ukazatelů na řetězec
+    \item Čtěte ze vstupu text po řádcích
+
+    \item Pro každý řádek si alokujte paměť
+    \begin{itemize}
+      \item Můžete číst po znacích a postupně zvětšovat paměť, dokud nenarazíte
+	na \code{\\n}
+      \item Zvětšujte nejlépe na dvojnásobek nebo o nějakou konstantu
+        \code{> 10}
+    \end{itemize}
+
+    \item Ukazatel na paměť vložte na konec pole ukazatelů
+    \begin{itemize}
+      \item Musíte pole zvětšit, pokud se nový ukazatel nevejde
+    \end{itemize}
+
+    \item Při EOF všechny zadané řádky vypište
+    \begin{itemize}
+      \item Na začátek každého řádku předřaďte jeho délku
+    \end{itemize}
+
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Speciální alokace}
+
+  \begin{itemize}
+    \item \code{void *alloca(size_t size)}
+    \begin{itemize}
+      \item Hlavička: \header{alloca.h}
+      \item Není ani POSIX
+      \item Alokace na zásobníku
+      \item Uvolní se po ukončení funkce
+    \end{itemize}
+
+    \pause
+
+    \item \code{int brk(void *addr)}, \code {void *sbrk(intptr_t increment)}
+    \begin{itemize}
+      \item Hlavička: \header{unistd.h}
+      \item Není ani POSIX
+      \item Alokace v datové sekci
+
+      \pause
+
+      \item \code{malloc} používá pro malé alokace
+      \begin{itemize}
+	\item \code{mmap} pro velké
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Ladění paměti}
+
+  \begin{block}{Špatná správa paměti}
+  \begin{lstlisting}
+int main(void) {
+  char *mem1 = malloc(100);
+  char *mem2 = malloc(100);
+
+  free(mem2);
+  mem2[3] = 10;
+
+  return mem1[5];
+}
+  \end{lstlisting}
+  \end{block}
+
+  \pause
+  \medskip
+
+  \heading{Pomocníci}
+  \begin{enumerate}
+    \item \textsc{ElectricFence}
+    \item \textsc{Valgrind}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\textsc{ElectricFence}}
+
+  \begin{itemize}
+    \item Zachytává přístupy paměti
+    \begin{itemize}
+      \item Mimo alokovanou oblast
+      \item Po provedeném \code{free} na paměti
+    \end{itemize}
+
+    \pause
+
+    \item Knihovna, která se musí přilinkovat
+    \begin{itemize}
+      \item Buď \cmd{\-lefence} při linkování
+      \item Anebo \cmd{export LD_PRELOAD=libefence.so.0.0}
+
+      \pause
+
+      \item Nahradí \code{malloc}, \code{free}, \dots svými implementacemi
+    \end{itemize}
+
+    \pause
+
+    \item Odmapuje stránky
+    \begin{itemize}
+      \item Program začne padat
+      \item Na selhání stránkování
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{\textsc{ElectricFence}}
+  \begin{enumerate}
+    \item Otevřete si \file{10/memcheck}
+    \item Přeložte a spustťe
+    \begin{itemize}
+      \item Nemělo by dojít k pádu
+    \end{itemize}
+
+    \item Nyní zapněte \textsc{ElectricFence}
+    \begin{itemize}
+      \item Nastavte \cmd{LD_PRELOAD=libefence.so.0.0}
+      \item Nebo \code{QMAKE_LIBS=-lefence} v \file{.pro}
+    \end{itemize}
+
+    \item Spusťte
+    \item Opravte 2 chyby, na kterých \textsc{ElectricFence} způsobuje pád
+    \item Vyzkoušejte
+    \item Vraťte kód do původní podoby
+    \begin{itemize}
+      \item Pro \textsc{Valgrind}
+      \item Např.\ \cmd{git checkout HEAD memcheck.c}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\textsc{Valgrind}}
+
+  \begin{itemize}
+    \item Sleduje (zejména) operace s pamětí (\emph{Memcheck})
+    \begin{itemize}
+      \item Úniky paměti
+      \item Neinicializované a nezarovnané přístupy
+      \item Použití paměti po \code{free}
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Několik dalších modulů
+    \begin{itemize}
+      \item Callgrind: profiluje cache CPU
+      \item Massif: profiluje použití haldy
+      \item Další pro problémy se zámky atd.
+    \end{itemize}
+
+    \pause
+
+    \item Spuštění: \cmd{valgrind --volby_valgrindu binarka --volby_binarky}
+    \item Další parametry
+    \begin{itemize}
+      \item \cmd{\--tool}: výběr nástroje shora
+      \item \cmd{\--leak-check}: sledovat úniky paměti
+    \end{itemize}
+
+    \item Integrován do Qt creatoru
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práce s nástrojem \textsc{Valgrind}}
+  \begin{enumerate}
+    \item Spusťte memcheck v nástroji \textsc{Valgrind}
+    \begin{itemize}
+      \item V Qt creatoru: Analyze $\rightarrow$ Valgrind Memory Analyzer
+    \end{itemize}
+
+    \item Řiďte se pokyny na konci výpisu
+    \begin{itemize}
+      \item Vypište si všechny podrobnosti
+      \item Přidáváním navržených parametrů (,,Rerun with'')
+      \item V Qt creatoru: Tools $\rightarrow$ Options $\rightarrow$ Analyzer
+	$\rightarrow$ Show reachable and indirectly lost blocks
+    \end{itemize}
+
+    \item Opravte, aby si \textsc{Valgrind} nestěžoval
+  \end{enumerate}
+
 \end{frame}
 
 \section{Procesy}
 \frame{\sectionpage}
 
 \begin{frame}{Procesy}
-  definice, systém a plánování procesu, meziprocesová komunikace, roury (pipe), signály, zprávy, fronty zpráv, synchronizace procesů (semafory) atd.
+
+  \heading{Proces = běžící program}
+  \begin{itemize}
+    \item Kontext procesoru se samostatnou VM
+    \begin{itemize}
+      \item Vlákno nemá samostatnou VM, sdílí
+    \end{itemize}
+
+    \pause
+
+    \item OS má informace o každém procesu
+    \begin{itemize}
+      \item Stav procesu, Program counter
+      \item PID, PPID
+      \item UIDy, GIDy
+      \item Časy běhu
+      \item Reakce na signály, fronta signálů
+      \item Deskriptory otevřených souborů
+      \item Limity
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
 \end{frame}
+
+\begin{frame}{Základní informace o procesu}
+
+  \begin{itemize}
+    \item PID: \code{pid_t getpid(void)} (\header{unistd.h})
+    \item PPID: \code{pid_t getppid(void)} (\header{unistd.h})
+
+    \pause
+
+    \item ID: \code{getuid}, \code{getgid}, \code{geteuid}, \code{getegid},
+      \dots (opakování)
+
+    \pause
+
+    \item Časy běhu: \code{clock_t times(struct tms *buf)} (\header{sys/times.h})
+    \item Pracovní adresář: \code{char *getcwd(char *buf, size_t size)}
+      (\header{unistd.h})
+
+    \item \dots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Proces a paměť}
+
+  \begin{figure}
+    \input{spaces.pspdftex}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}{Vytvoření a zrušení procesu}
+
+  \begin{itemize}
+    \item \code{pid_t fork(void)} (\header{unistd.h})
+    \begin{itemize}
+      \item Vznikne nový proces (potomek)
+      \item Návratová hodnota
+      \begin{itemize}
+        \item \code{\-1} -- chyba
+        \item \code{0} -- \code{fork} se vrátil do potomka
+        \item \code{> 0} -- rodič a \code{fork} vrací PID potomka
+      \end{itemize}
+
+      \pause
+
+      \item Často následuje \code{exec} -- spuštění nové binárky
+    \end{itemize}
+
+    \pause
+
+    \item \code{void exit(int status)} (\header{stdlib.h})
+    \begin{itemize}
+      \item \code{status}: dostane rodič (v shellu \cmd{\$?})
+      \item Zánik procesu
+      \item Nikdy se nevrátí
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Vytváření procesů}
+  \begin{enumerate}
+    \item Vytvořte si 10 potomků
+    \item V každém potomkovi si vypište jeho PID a PID rodiče
+    \item Potomka ukončete
+
+    \item V rodiči spěte 10 vteřin
+    \begin{itemize}
+      \item Jaký stav mají po tuto dobu potomci?
+    \end{itemize}
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Čekání na potomky}
+
+  \begin{itemize}
+    \item Správný rodič by měl na své potomky počkat
+    \begin{itemize}
+      \item Než skončí
+      \item A pochovat je
+      \item Jinak vznikají zombie
+    \end{itemize}
+
+    \pause
+
+    \item \code{pid_t waitpid(pid_t pid, int *status, int options)}
+      (\header{sys/wait.h})
+    \begin{itemize}
+      \item \code{pid}: na koho čekat, \code{\-1} = na kohokoliv
+
+      \pause
+
+      \item \code{status}: co vrátil \code{main} nebo parametr \code{exit}
+      \begin{itemize}
+	\item Kromě návratové hodnoty i stav
+	\item Makra \code{WIFEXITED}, \code{WIFSIGNALED}, \dots
+      \end{itemize}
+
+      \pause
+
+      \item \code{options}: blokující čekání apod.
+      \item Návratová hodnota: PID potomka
+
+      \pause
+
+      \item \code{wait(status)} je \code{waitpid(-1, status, 0)}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Čekání na potomky}
+  \begin{enumerate}
+    \item Odstraňte spaní v předchozím příkladě
+    \item Přidejte spaní 1 vteřinu v potomkovi po výpise
+    \item V rodiči čekejte na potomky
+    \item Vypište jejich PID
+    \item Zjistěte, jak byly ukončeny a vypište
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Plánování procesu}
+
+  \begin{center}
+    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick,above]
+    \tikzstyle{post} = [pre,shorten <=0pt,shorten >=1pt,->]
+    \tikzstyle{empty} = [inner sep=0pt, minimum size=0pt]
+    \begin{tikzpicture}[node distance=20mm, font=\footnotesize]
+      \node [tl_state] (KERN) {Kernel Space};
+
+      \node (PREFORK) [left=30mm of KERN] {}
+        edge [post] node {\code{fork()}} (KERN);
+
+      \onslide<2->{\node [tl_state] (USER) [above left=18mm and 10mm of KERN] {User Space}
+        edge [post,right,in=120,out=0] node [xshift=1mm] {\code{return}} (KERN)
+        edge [pre,left,out=300] node [xshift=-5mm] {\code{syscall}/interrupt} (KERN);
+      }
+
+      \onslide<3->{\node [tl_state] (ZOMB) [above right=13mm and 10mm of KERN] {Zombie}
+        edge [pre,left,bend left=20] node [xshift=-1mm] {\code{exit()}} (KERN);
+      }
+
+      \onslide<4->{\node [empty] (DEAD) [above right=5mm of ZOMB] {}
+        edge [pre,in=70,out=180] node [yshift=1mm] {\code{wait()}} (ZOMB);
+      }
+
+      \onslide<5->{\node [tl_state] (RUN) [below left=of KERN] {Runnable}
+        edge [pre,dashed,bend right=20,in=170] node {} (KERN)
+        edge [post,left,bend left=20] node [xshift=-1mm] {\code{schedule()}} (KERN);
+      }
+
+      \onslide<6->{\node [tl_state] (S) [below right=10mm and 25mm of KERN] {Sleeping}
+        edge [pre,bend right=30,in=195] node [xshift=12mm,yshift=1mm] {\code{wait_event_interruptible()}} (KERN)
+        edge [post,right,bend left=20,in=170] node [xshift=-2mm,yshift=2mm] {\code{wake_up()}} (KERN);
+      }
+
+      \onslide<7->{\node [tl_state] (D) [below=25mm of KERN] {Delayed}
+        edge [pre,right,bend right=20] node [yshift=-7mm] {\code{wait_event()}} (KERN)
+        edge [post,left,bend left=20] node [yshift=-7mm] {\code{wake_up()}} (KERN);
+      }
+    \end{tikzpicture}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]{Signály}
+
+  \begin{itemize}
+    \item Signály předávané mezi procesy (\doc{man 7 signal}, \header{signal.h})
+    \begin{itemize}
+      \item Čísla: \code{SIGHUP}, \code{SIGINT}, \code{SIGKILL},
+	\code{SIGTERM}, \dots
+
+      \pause
+
+      \item Některé lze ignorovat, popř.\ jim nastavit akci
+    \end{itemize}
+
+    \pause
+
+    \item Rozesílání: \code{int kill(pid_t pid, int sig)}
+    \begin{itemize}
+      \item \code{pid}: koho zabít, \code{\-1} znamená všechny
+      \item \code{sig}: číslo signálu
+    \end{itemize}
+
+    \pause
+
+    \item Obsluha: \code{sighandler_t signal(int signum, sighandler_t handler)}
+    \begin{itemize}
+      \item \code{typedef void (*sighandler_t)(int)}
+      \item \pozor: některé funkce nejsou dostupné v obsluze!
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{Příklad (bez ošetření návratových hodnot)}
+  \begin{lstlisting}
+static void my_sig(int sig) { printf("Signal %d raised\n", sig); }
+int main(void) {
+  signal(SIGINT, my_sig);
+  raise(SIGINT); /* alias pro kill(getpid(), SIGINT); */
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Signály}
+  \begin{enumerate}
+    \item Přidejte obsluhu pro TERM
+    \begin{itemize}
+      \item Vypište PID
+    \end{itemize}
+
+    \item Prvním 5 potomkům pošlete signál TERM
+    \begin{itemize}
+      \item Zatímco spí
+    \end{itemize}
+
+    \item Důvod ukončení (výpis) by se pro těch 5 měl změnit
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\subsection*{Meziprocesová komunikace}
+\frame{\subsectionpage}
+
+\begin{frame}
+  \frametitle{Roury}
+
+  \begin{itemize}
+    \item Jednosměrná komunikace
+    \begin{itemize}
+      \item Jádro při \code{fork} kopíruje deskriptory
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{int pipe(int pipefd[2])} (\header{unistd.h})
+    \begin{itemize}
+      \item Vrací pole 2 deskriptorů (+ návratovou hodnotu)
+      \item Jeden pro potomka, druhý pro rodiče
+
+      \pause
+
+      \item Provede se \code{fork}
+      \item Zavřou se nepotřebné deskriptory
+      \item Čte se z prvního deskriptoru (\code{read})
+      \item Zapisuje se do druhého deskriptoru (\code{write})
+    \end{itemize}
+
+    \pause
+
+    \item \code{popen}=\code{pipe}+\code{fork}+\code{exec}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření ,,echa'' přes roury}
+  \begin{enumerate}
+    \item Vytvořte si 2 roury
+    \begin{itemize}
+      \item Pro obousměrnou komunikaci
+      \item Budete mít \code{fd1[2]} a \code{fd2[2]}
+    \end{itemize}
+    \item Proveďte \code{fork}
+    \item Zavřete nepotřebné deskriptory
+
+    \item V jednom procesu v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Do \code{fd1[1]} zapisujte měnící se text
+      \begin{itemize}
+	\item Např.\ \code{char buf[10] = "Hello";} a \code{(*buf)++;}
+      \end{itemize}
+      \item Z \code{fd2[0]} čtěte a vypisujte na standardní výstup
+    \end{itemize}
+
+    \item V druhém procesu (loopback):
+    \begin{itemize}
+      \item Čtěte z \code{fd1[0]}
+      \item A zapisujte to do \code{fd2[1]}
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Pojmenovaná roura}
+
+  \begin{itemize}
+    \item Soubor na disku
+    \item \cmd{mknod}/\cmd{mkpipe}
+    \item \heading{Demo}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Sdílená paměť}
+
+  \begin{itemize}
+    \item Mapování a sdílení paměti
+    \begin{itemize}
+      \item Jádro při \code{fork} kopíruje mapování
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření: \code{mmap} s \code{MAP_ANONYMOUS | MAP_SHARED}
+    \begin{itemize}
+      \item Provede se \code{fork}
+      \item Paměť je volně k dispozici oběma procesům
+      \item Jen pozor na optimalizace překladače
+      \begin{itemize}
+	\item \code{volatile}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření sdílené paměti}
+  \begin{enumerate}
+    \item Vytvořte si sdílené mapování
+    \item Proveďte \code{fork}
+
+    \item V jednom procesu v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém procesu:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\subsection*{Plná meziprocesová komunikace}
+\frame{\subsectionpage}
+
+\begin{frame}
+  \frametitle{IPC}
+
+  \begin{itemize}
+    \item Plná meziprocesová komunikace
+    \begin{itemize}
+      \item Sdílená paměť
+      \item Zprávy
+      \item Semafory
+    \end{itemize}
+
+    \pause
+
+    \item Výpis: \cmd{ipcs} (\heading{Demo})
+    \item Dokumentace: \cmd{man 5 ipc}
+    \item \header{sys/ipc.h}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{IPC}{Klíče}
+
+  \begin{itemize}
+    \item IPC pracuje s klíči (\code{key_t})
+    \item Procesy komunikují pomocí klíče
+    \begin{itemize}
+      \item Jen pokud mají stejný
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření klíče: \code{ftok} (\header{sys/ipc.h})
+    \begin{itemize}
+      \item Cesta k existujícímu uzlu na disku
+      \item Nějaké 8bitové nenulové číslo
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ \code{ftok(".", 'x')}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{IPC}{Sdílená paměť}
+
+  \begin{itemize}
+    \item \header{sys/shm.h}
+    \item Vytvoření: \code{shmget}
+    \begin{itemize}
+      \item Poslední parametr \code{IPC_CREAT}
+      \item Logický OR s právy (\code{0644} apod.)
+    \end{itemize}
+
+    \pause
+
+    \item Získaní adresy (attach): \code{shmat}
+    \item Navrácení adresy (detach): \code{shmdt}
+
+    \pause
+
+    \item Další operace: \code{shmctl}
+    \begin{itemize}
+      \item Informace: \code{SHM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření sdílené paměti (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+    \item Vytvořte si sdílený segment (\code{shmget})
+    \item Získejte adresu (\code{shmat})
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V obou proveďte \code{shmdt}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{IPC}{Zprávy}
+
+  \begin{block}{Formát zprávy}
+  \begin{lstlisting}
+struct my_message {
+  long mtype;   /* set to something > 0 */
+  ...
+};
+  \end{lstlisting}
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item \header{sys/msg.h}
+    \item Vytvoření fronty zpráv: \code{msgget}
+
+    \pause
+
+    \item Odeslání zprávy: \code{msgsnd}
+    \item Přijetí zprávy: \code{msgrcv}
+
+    \pause
+
+    \item Další operace: \code{msgctl}
+    \begin{itemize}
+      \item Informace: \code{MSG_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Posílání zpráv (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+
+    \item Vytvořte si frontu zpráv (\code{msgget})
+    \item Vytvořte si strukturu zprávy
+    \begin{itemize}
+      \item Musí obsahovat \code{long mtype}
+      \item Přidejte \code{char text[10]}
+    \end{itemize}
+
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do fronty (\code{msgsnd}) řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte frontu (\code{msgrcv}) a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{IPC}{Semafory}
+
+  \begin{itemize}
+    \item \header{sys/sem.h}
+    \item<+-> Meziprocesové zamykání/správa prostředků
+    \item<+-> Vytvoření semaforu: \code{semget}
+    \item<+-> Změna stavu semaforu: \code{semop}
+    \item<+-> Další operace: \code{semctl}
+    \begin{itemize}
+      \item \emph{Nastavení iniciální hodnoty}: \code{SETVAL} (spolu s
+	\code{union semun.val})
+      \item Informace: \code{SEM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+  \begin{uncoverenv}<3->
+  \begin{block}{Parametr \code{semop}}
+  \begin{lstlisting}
+struct sembuf {
+  ushort  sem_num;
+  short   sem_op;  /*  -  0  +  */
+  short   sem_flg;
+};
+  \end{lstlisting}
+  \end{block}
+  \end{uncoverenv}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce se semaforem (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+    \item Vytvořte 2 programy
+
+    \item Jeden program je tiskovým serverem
+    \begin{itemize}
+      \item Vytvořte si 1 semafor (\code{semget})
+      \item Obsluhuje 5 tiskáren (\code{shmctl} a \code{SETVAL})
+      \item Tisk trvá 10 vteřin
+    \end{itemize}
+
+    \item Druhý program je klientem
+    \begin{itemize}
+      \item Chce tisknout
+    \end{itemize}
+
+    \item Spusťte jeden server a více než 5 klientů
+    \begin{itemize}
+      \item Do 10 vteřin
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\fi
 
 \section{Vývojový nástroj make}
 \frame{\sectionpage}
@@ -2235,6 +3406,21 @@ byl \code{\"g::EI:\"}.
     \item \cmd{dmesg}
     \item Můžete provést \cmd{commit} a \cmd{push}
   \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Zdroje}
+
+  \heading{V těchto slajdech byly použity podklady}
+  \begin{itemize}
+    \item Z volně dostupných materiálů FI MU
+    \begin{itemize}
+      \item PB071 -- Úvod do jazyka C (Švenda, Slabý, et al.)
+      \item PB173 -- Tematicky zaměřený vývoj aplikací v jazyce C/C++ (Slabý)
+      \item PV065 -- UNIX -- programování a správa systému I (Kasprzak)
+      \item PV077 -- UNIX -- programování a správa systému II (Kasprzak)
+    \end{itemize}
+  \end{itemize}
 
 \end{frame}
 
