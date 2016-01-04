@@ -4234,11 +4234,13 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
       \item IPv4
       \begin{itemize}
 	\item 32bitové adresy
+	\item \doc{man 7 ip}
       \end{itemize}
 
       \item IPv6
       \begin{itemize}
 	\item 128bitové adresy
+	\item \doc{man 7 ipv6}
       \end{itemize}
     \end{enumerate}
   \end{itemize}
@@ -4249,7 +4251,7 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
   \heading{IPv4}
   \begin{itemize}
-    \item 32bitová, udává se jako 4 decimální čísla oddělené tečkou
+    \item 32bitová, udává se jako 4 desítková čísla oddělené tečkou
     \item Za lomítkem může být maska sítě
 
     \pause
@@ -4267,7 +4269,7 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
   \heading{IPv6}
   \begin{itemize}
-    \item 128bitová, udává se jako několik dvojic hexadecimální čísel
+    \item 128bitová, udává se jako několik dvojic šestnáctkových čísel
       oddělených dvojtečkou
     \begin{itemize}
       \item Nuly lze vynechat
@@ -4277,6 +4279,14 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
     \item Např.\ \cmd{2001:718:801:230::1/64}
   \end{itemize}
+
+  \pause
+
+  \begin{center}
+  \heading{Kdo si má adresu pamatovat?} \\
+  \pause
+  \heading{DNS}
+  \end{center}
 
 \end{frame}
 
@@ -4310,9 +4320,44 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
 \begin{frame}{Protokol TCP/IP}
 
+  \begin{itemize}
+    \item Jedna IP chce obsluhovat více služeb $\rightarrow$ TCP port
+    \begin{itemize}
+      \item 16bitové číslo -- 64k služeb
+    \end{itemize}
+
+    \pause
+
+    \item TCP spojení
+    \begin{itemize}
+      \item Server poslouchá
+      \begin{itemize}
+	\item Předem daný TCP port
+	\item Nebo náhodný, volný
+      \end{itemize}
+
+      \pause
+
+      \item Klient se připojí
+      \begin{itemize}
+	\item Musí vědět/umět zjistit IP adresu i TCP port
+      \end{itemize}
+
+      \pause
+
+      \item Vznikne čtveřice
+      \begin{itemize}
+	\item Zdrojová IP
+	\item Zdrojový TCP port
+	\item Cílová IP
+	\item Cílový TCP port
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
 \end{frame}
 
-\begin{frame}{Filozofie UNIXu a síť}
+\begin{frame}{UNIX a síť}
 
   \begin{itemize}
     \item Na UNIXu býval všechno soubor
@@ -4323,7 +4368,7 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
     \pause
 
-    \item I na síťové spojení se vytváří deskriptor
+    \item I na síťové spojení se vytváří souborový deskriptor
     \begin{itemize}
       \item Tzv.\ socket (\doc{man 7 socket})
     \end{itemize}
@@ -4331,16 +4376,214 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
 \end{frame}
 
+\begin{frame}[fragile]{Pořadí bytů a síť}
+
+  \begin{block}{Číslo \code{0x12345678} reprezentované v paměti}
+  \begin{center}
+   \begin{tabular}{l|l|llll}
+\multirow{2}{*}{\textbf{Pořadí}} & \textbf{Příklad} &
+  \multicolumn{4}{c}{\textbf{Offset v paměti}} \\
+              & \textbf{architektury}       &    0 &    1 &    2 &    3 \\\hline
+Big-endian    & \texttt{arm}, \texttt{s390}, síť & 0x12 & 0x34 & 0x56 & 0x78 \\
+Little-endian & \texttt{arm}, \xes          & 0x78 & 0x56 & 0x34 & 0x12 \\
+Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
+  \end{tabular}
+  \end{center}
+  \end{block}
+
+  \pause
+  \bigskip
+
+  \heading{Pro typy o velikosti větší než 1 je nutné znát pořadí}
+  \begin{itemize}
+    \item Interpretace dat z/do sítě
+
+    \pause
+
+    \item Funkce (\header{arpa/inet.h})
+    \begin{itemize}
+      \item \code{ntohs}, \code{ntohl} -- ze sítě
+      \item \code{htons}, \code{htonl} -- do sítě
+      \item \code{*s} -- \code{short} (16 bitů), \code{*l} -- \code{long}
+        (32 bitů)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\code{socket}}
+
+  \begin{itemize}
+    \item Otevření: \code{int socket(int domain, int type, int protocol)}
+    \begin{itemize}
+      \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h}
+      \item \code{domain}: protokol -- \code{AF_INET}, \code{AF_INET6}, \dots
+      \item \code{type}: \code{SOCK_STREAM} (TCP), \code{SOCK_DGRAM} (UDP), \dots
+      \item \code{protocol}: pokud je na výběr (NETLINK), jinak 0 (pro UDP i TCP)
+      \item Návratová hodnota: souborový deskriptor nebo \code{\-1} při chybě
+    \end{itemize}
+
+    \pause
+
+    \item Zavření: klasicky \code{close}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Otevření socketu}
+  \begin{enumerate}
+    \item Otevřete TCP socket na IPv4
+    \item Zavřete
+    \item Přeložte, vyzkoušejte
+    \item Zkopírujte si do dvou zdrojových souborů
+    \begin{itemize}
+      \item Zárodek klienta a serveru
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Adresování v Linuxu}
+
+  \begin{center}
+  \begin{tabular}{|l|l|} \hline
+  \textbf{Typ adresy} & \multicolumn{1}{|c|}{\textbf{Adresa v Linuxu}} \\ \hline
+  Obecná & \begin{lstlisting}
+struct sockaddr {
+  sa_family_t sa_family; /* AF_INET, AF_INET6, ... */
+  char sa_data[14];
+};
+  \end{lstlisting}
+  \\ \hline
+
+  \uncover<2->{IPv4} &
+  \begin{uncoverenv}<2->
+  \begin{lstlisting}
+struct sockaddr_in {
+  sa_family_t    sin_family; /* address family: AF_INET */
+  in_port_t      sin_port;   /* port in network byte order */
+  struct in_addr sin_addr;   /* internet address */
+};
+struct in_addr {
+  uint32_t       s_addr;     /* address in network byte order */
+};
+  \end{lstlisting}
+  \end{uncoverenv}
+  \\ \hline
+
+  \uncover<3->{IPv6} &
+  \begin{uncoverenv}<3->
+  \begin{lstlisting}
+struct sockaddr_in6 {
+  sa_family_t     sin6_family;   /* AF_INET6 */
+  in_port_t       sin6_port;     /* port number */
+  struct in6_addr sin6_addr;     /* IPv6 address */
+};
+struct in6_addr {
+  unsigned char   s6_addr[16];   /* IPv6 address */
+};
+  \end{lstlisting}
+  \end{uncoverenv}
+  \\ \hline
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
 \subsection*{Klient}
 \frame{\subsectionpage}
 
-\begin{frame}{Klient}
-
-  volání socket, connect, accept, listen atd.
+\begin{frame}[fragile]{Získání adresy}
 
   \begin{itemize}
-    \item XX
+    \item \code{int getaddrinfo(const char *node, const char *service, const
+      struct addrinfo *hints, struct addrinfo **res)}
+    \begin{itemize}
+      \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h},
+        \header{netdb.h}
+      \item \code{node}: cílový stroj
+      \item \code{service}: cílový port
+      \item \code{hints}: omezení, co hledat (IPv4, IPv6 apod.), nebo NULL
+      \item \code{res}: návratová hodnota
+      \item Návratová hodnota: 0 je OK, jinak číslo chyby
+      \begin{itemize}
+	\item \code{const char *gai_strerror(int errcode)}
+      \end{itemize}
+    \end{itemize}
+
+    \item<2-> Uvolnění: \code{void freeaddrinfo(struct addrinfo *res)}
   \end{itemize}
+
+  \begin{uncoverenv}<1->
+  \begin{block}{\code{struct addrinfo}}
+  \begin{lstlisting}
+int  ai_flags;              socklen_t        ai_addrlen;
+int  ai_family;             struct sockaddr *ai_addr;
+int  ai_socktype;           char            *ai_canonname;
+int  ai_protocol;           struct addrinfo *ai_next;
+  \end{lstlisting}
+  \end{block}
+  \end{uncoverenv}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Získání adres}
+  \begin{enumerate}
+    \item Doplňte do klienta z předchozího příkladu za vytvoření socketu
+    \item Použijte \code{getaddrinfo}
+    \item Zjistěte, kolik je k dispozici adres pro server \cmd{google.com}
+    \item Omezte se jen na TCP a port HTTP
+    \item Přeložte, vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Klient}
+
+  \begin{itemize}
+    \item Připojení: \code{int connect(int sockfd,} \\
+      \code{const struct sockaddr *addr, socklen_t addrlen)} %stopzone
+    \begin{itemize}
+      \item \code{sockfd}: návratová hodnota funkce \code{socket}
+      \item \code{addr}: adresa, kam se připojit
+      \item \code{addrlen}: velikost struktury adresy
+    \end{itemize}
+
+    \pause
+
+    \item Příjem: \code{read} nebo \code{ssize_t recv(int sockfd, void *buf,
+      size_t len, int flags)}
+
+    \item Vysílání: \code{write} nebo \code{ssize_t send(int sockfd, const void
+      *buf, size_t len, int flags)}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad (bez ošetření chyb)}
+  \begin{lstlisting}
+getaddrinfo("nekde", "neco", &hint, &ai);
+fd = connect(sockfd, ai->ai_addr, ai->ai_addrlen);
+write(fd, "ahoj", 4);
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Klient}
+  \begin{enumerate}
+    \item Připojte se na localhost na port ssh
+    \item Přečtěte ze socketu 20 znaků
+    \item Vypište je na standardní výstup
+    \item Vyzkoušejte
+    \item Co vám ssh server poslal?
+  \end{enumerate}
 
 \end{frame}
 
@@ -4349,40 +4592,77 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
 \begin{frame}{Server}
 
-  volání socket, connect, accept, listen atd.
+  \heading{Tři kroky}
+  \begin{enumerate}
+    \item Nastavení adresy a portu
+    \begin{itemize}
+      \item \code{int bind(int sockfd, const struct sockaddr *addr,}\\
+        \code{socklen_t addrlen)}
+      \begin{itemize}
+	\item \code{addr}: IP adresa se nastavuje často na \code{INADDR_ANY}
+	  (IPv4, host) nebo \code{in6addr_any}/\code{IN6ADDR_ANY_INIT} (IPv6,
+	  net)
+      \end{itemize}
+    \end{itemize}
 
-  \begin{itemize}
-    \item XX
-  \end{itemize}
+    \pause
 
-\end{frame}
+    \item Nastavení socketu jako pasivního (bude čekat na spojení)
+    \begin{itemize}
+      \item \code{int listen(int sockfd, int backlog)}
+      \begin{itemize}
+	\item \code{backlog}: kolik spojení může čekat na obsluhu
+      \end{itemize}
 
-\section{Doplňková témata}
-\frame{\sectionpage}
+      \item Od tohoto okamžiku bude fungovat \code{connect} na tento port
+    \end{itemize}
 
-\begin{frame}{Doplňková témata}
-  programování terminálu pomocí ncurses, programování CGI
+    \pause
 
-  \begin{itemize}
-    \item XX
-  \end{itemize}
+    \item Čekání na příchozí spojení
+    \begin{itemize}
+      \item \code{int accept(int sockfd, struct sockaddr *addr, } \\
+        \code{socklen_t *addrlen)}
+      \begin{itemize}
+	\item \code{addr}: návratová hodnota -- adresa toho, kdo se připojil
+      \end{itemize}
+
+      \item Volá se opakovaně pro obsluhu dalších spojení
+    \end{itemize}
+
+  \end{enumerate}
 
 \end{frame}
 
 \begin{frame}{Úkol}
 
-  \heading{XX}
+  \heading{Server -- echo}
   \begin{enumerate}
-    \item V \code{exit} funkci naalokujte 1000 bytů (\code{kmalloc})
-    \item Udělejte do nich \code{strcpy} ,,Bye''
-    \item Vypište paměť jako řetězec (\code{printk} a \code{\%s})
-    \item Uvolněte paměť
-    \item Vložte a odeberte modul ze systému (\cmd{insmod} a \cmd{rmmod})
-    \item \cmd{dmesg}
-    \item Můžete provést \cmd{commit} a \cmd{push}
+    \item Vytvořte server
+    \item Pro každé příchozí spojení vytvořte potomka
+    \item Rodič bude čekat na další spojení
+    \item Potomek obslouží spojení
+    \item Přečte ze socketu až 100 znaků
+    \item Pošle je zpět
+    \item Upravte klienta, aby po připojení něco poslal
+    \item Potom přečte ze socketu až 100 znaků
+    \item Vypíše je
+    \item Vyzkoušejte
   \end{enumerate}
 
 \end{frame}
+
+%\section{Doplňková témata}
+%\frame{\sectionpage}
+%
+%\begin{frame}{Doplňková témata}
+%  programování terminálu pomocí ncurses, programování CGI
+%
+%  \begin{itemize}
+%    \item XX
+%  \end{itemize}
+%
+%\end{frame}
 
 \begin{frame}{Zdroje}
 
