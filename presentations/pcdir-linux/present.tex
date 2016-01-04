@@ -3953,27 +3953,408 @@ gcc -fpic -shared -Wl,-soname,libmylib.so.1 -o libmylib.so.1.2.3 a.o b.o -lc
 
 \end{frame}
 
-\fi
-
 \section{Zdroje a limity}
 \frame{\sectionpage}
 
-\begin{frame}{Zdroje a limity}
-  limity pro běh procesu, priorita procesu
+\begin{frame}{Limity při kompilaci}
+
+  \begin{itemize}
+    \item \header{limits.h} -- \code{UINT_MAX}, \code{LONG_MAX}, \dots
+    \item \header{float.h} -- \code{FLT_MAX}, \code{DBL_MAX}, \dots
+    \item \dots
+  \end{itemize}
+
 \end{frame}
+
+\begin{frame}{Limity za běhu}
+
+  \begin{enumerate}
+    \item Nevázané k souborovému systému
+    \begin{itemize}
+      \item Obecné limity systému
+
+      \pause
+
+      \item \code{long sysconf(int name)} (\header{unistd.h})
+      \begin{itemize}
+	\item \code{name}: jméno limitu -- \code{_SC_ARG_MAX},
+	  \code{_SC_OPEN_MAX}, \code{_SC_PAGESIZE}, \dots
+	\item Návratová hodnota: limit
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Vázané k souborovému systému
+    \begin{itemize}
+      \item Často limity daného souborového systému pro danou položku
+      \begin{itemize}
+	\item Pro adresář (d)
+	\item Pro soubor (f)
+      \end{itemize}
+
+      \pause
+
+      \item \code{long pathconf(const char *path, int name)}
+	(\header{unistd.h})
+      \begin{itemize}
+	\item \code{path}: pro který soubor
+	\item \code{name}: jméno limitu -- \code{_PC_LINK_MAX} (f),
+	  \code{_PC_NAME_MAX} (d), \code{_PC_PATH_MAX} (d), \dots
+	\item Návratová hodnota: limit
+      \end{itemize}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Limity za běhu}
+  \begin{enumerate}
+    \item Zjistěte velikost stránky v systému
+    \item Vypište
+    \item Zjistěte maximální délku jména souboru a cesty
+    \item Vypište
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Limity procesu}
+
+  \begin{itemize}
+    \item Každý proces má limity, co smí
+    \begin{itemize}
+      \item Počet otevřených souborů
+      \item Velikost paměti, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Dva druhy limitů
+    \begin{itemize}
+      \item Hard: jen root může zvyšovat
+      \item Soft: uživatel může měnit až do výše hard
+    \end{itemize}
+
+    \pause
+
+    \item V shellu: \cmd{ulimit} (Demo)
+
+    \pause
+
+    \item \code{int getrlimit(int resource, struct rlimit *rlim)} a
+      \code{int setrlimit(int resource, const struct rlimit *rlim)}
+    \begin{itemize}
+      \item \code{resource}: který limit -- \code{RLIMIT_CPU},
+	\code{RLIMIT_STACK}, \dots
+      \item \code{rlim}: na co nastavit/návratová hodnota
+      \item Návratová hodnota: \code{0} -- OK, jinak chyba
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{\code{struct rlimit}}
+  \begin{lstlisting}
+rlim_t rlim_cur;  /* Soft limit */
+rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Limity za běhu}
+  \begin{enumerate}
+    \item Vypište si do dvou sloupců všechny limity
+    \begin{itemize}
+      \item \code{Soft0  Hard0}
+      \item \code{Soft1  Hard1}
+      \item \dots
+    \end{itemize}
+
+    \item Iterujte přes limity od limitu číslo \code{0}
+    \item Využijte \code{RLIM_NLIMITS} jako strop
+    \item Vyzkoušejte
+    \item Porovnejte výstup s \cmd{ulimit -a} a \cmd{ulimit -aH}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Priorita procesu}
+
+  \begin{itemize}
+    \item Některé procesy jsou výpočetně náročné
+
+    \pause
+
+    \item Ale nevadí jim, když je někdo upozadí
+
+    \pause
+
+    \item Každý proces má prioritu
+    \begin{itemize}
+      \item Priorita = 20 + nice (z pohledu jádra, demo)
+
+      \pause
+
+      \item Nice: iniciálně \code{0}, \code{< 0} zvyšuje prioritu, \code{> 0}
+	snižuje
+    \end{itemize}
+
+    \pause
+
+    \item Změna nice: \code{int nice(int inc)} (\header{unistd.h})
+    \begin{itemize}
+      \item \code{inc}: o kolik
+    \end{itemize}
+
+    \pause
+
+    \item Zjištění/nastavení: (\header{unistd.h}) \\
+      \code{int getpriority(int which, id_t who)} a
+      \code{int setpriority(int which, id_t who, int prio)}
+    \begin{itemize}
+      \item \pozor: pracují s nice!
+      \item \code{which}: čeho -- \code{PRIO_PROCESS}, \code{PRIO_PGRP},
+	\code{PRIO_USER}
+      \item \code{who}: kterého (procesu, skupiny procesů, uživatele)
+      \item \code{prio}: hodnota nice
+    \end{itemize}
+
+    \pause
+
+    \item Další speciální nastavení plánovače: \doc{man 7 sched}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Priorita procesu}
+  \begin{enumerate}
+    \item Vytvořte si program, který cyklí
+    \item Každou miliontou iteraci něco vypište
+    \begin{itemize}
+      \item Popř.\ číslo upravte podle rychlosti stroje
+    \end{itemize}
+
+    \item Před cyklem programu zvyšte nice
+    \begin{itemize}
+      \item Poběží s nižší prioritou
+    \end{itemize}
+
+    \item Program přeložte a spusťte čtyřikrát
+
+    \item Nyní spustťe 4 instance \cmd{cat /dev/zero >/dev/null}
+    \item Změnilo se chování vašeho programu?
+    \item Co se stane, když nice měnit nebudete?
+  \end{enumerate}
+
+\end{frame}
+
+\fi
 
 \section{Terminál}
 \frame{\sectionpage}
 
 \begin{frame}{Terminál}
   vlastnosti, nastavení, význam; program getpass; standardní vstup a výstup atd.
+
+  \begin{itemize}
+    \item XX
+  \end{itemize}
+
 \end{frame}
 
-\section{Programování v síti (protokol TCP/IP)}
+\section{Programování v síti}
 \frame{\sectionpage}
 
-\begin{frame}{Programování v síti (protokol TCP/IP)}
-  programování pro Internet, program server a klient, volání socket, conect, accept, listen atd.
+\begin{frame}{Programování v síti}
+
+  \begin{itemize}
+    \item Komunikace mezi vzdálenými stroji
+    \begin{itemize}
+      \item Ale i lokálně
+    \end{itemize}
+
+    \pause
+
+    \item Stroje můsí mít vzor, podle kterého komunikovat
+    \begin{itemize}
+      \item Tzv.\ protokol
+    \end{itemize}
+
+    \pause
+
+    \item Spousta protokolů
+    \begin{itemize}
+      \item ARP, RARP
+      \item \emph{IPv4, IPv6}
+      \begin{itemize}
+	\item DHCP, ICMP, \emph{TCP}, UDP
+      \end{itemize}
+
+      \item IPsec
+      \begin{itemize}
+	\item IPv4, IPv6
+      \end{itemize}
+
+      \item IPX
+      \begin{itemize}
+	\item SPX
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Protokol IP}
+
+  \begin{itemize}
+    \item Internet -- síť s přepojováním paketů pomocí IP
+
+    \pause
+
+    \item Směrovače -- spojují více sítí
+    \begin{itemize}
+      \item Směrování podle cílové sítě
+    \end{itemize}
+
+    \pause
+
+    \item Síť je homogenní, používá stejné protokoly
+
+    \pause
+
+    \item Dnes dvě verze
+    \begin{enumerate}
+      \item IPv4
+      \begin{itemize}
+	\item 32bitové adresy
+      \end{itemize}
+
+      \item IPv6
+      \begin{itemize}
+	\item 128bitové adresy
+      \end{itemize}
+    \end{enumerate}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Adresace v IP}
+
+  \heading{IPv4}
+  \begin{itemize}
+    \item 32bitová, udává se jako 4 decimální čísla oddělené tečkou
+    \item Za lomítkem může být maska sítě
+
+    \pause
+
+    \item Např.\ \cmd{10.0.0.1/24}
+    \begin{itemize}
+      \item Adresa \cmd{10.0.0.1}
+      \item Patří do sítě \cmd{10.0.0.255}
+      \begin{itemize}
+	\item Všichni v okolí mají adresu \cmd{10.0.0.X}
+	\item Nemůže přímo komunikovat s nikým jiným
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+  \heading{IPv6}
+  \begin{itemize}
+    \item 128bitová, udává se jako několik dvojic hexadecimální čísel
+      oddělených dvojtečkou
+    \begin{itemize}
+      \item Nuly lze vynechat
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ \cmd{2001:718:801:230::1/64}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Protokoly nad IP}
+
+  \heading{Nad IP nejčastěji}
+  \begin{itemize}
+    \item UDP -- nespojovaná
+    \begin{itemize}
+      \item Málo garancí -- nespolehlivá, ale bez latencí
+
+      \pause
+
+      \item Vhodná na zvuk, video, hry, kde výpadky nevadí
+    \end{itemize}
+
+    \pause
+
+    \item TCP -- spojovaná
+    \begin{itemize}
+      \item Garantuje pořadí paketů, ověřuje doručení -- spolehlivá, ale
+	vyšší latence
+
+	\pause
+
+      \item Vhodná na data
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Protokol TCP/IP}
+
+\end{frame}
+
+\begin{frame}{Filozofie UNIXu a síť}
+
+  \begin{itemize}
+    \item Na UNIXu býval všechno soubor
+
+    \pause
+
+    \item Na soubor existuje souborový deskriptor
+
+    \pause
+
+    \item I na síťové spojení se vytváří deskriptor
+    \begin{itemize}
+      \item Tzv.\ socket (\doc{man 7 socket})
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\subsection*{Klient}
+\frame{\subsectionpage}
+
+\begin{frame}{Klient}
+
+  volání socket, connect, accept, listen atd.
+
+  \begin{itemize}
+    \item XX
+  \end{itemize}
+
+\end{frame}
+
+\subsection*{Server}
+\frame{\subsectionpage}
+
+\begin{frame}{Server}
+
+  volání socket, connect, accept, listen atd.
+
+  \begin{itemize}
+    \item XX
+  \end{itemize}
+
 \end{frame}
 
 \section{Doplňková témata}
@@ -3981,6 +4362,11 @@ gcc -fpic -shared -Wl,-soname,libmylib.so.1 -o libmylib.so.1.2.3 a.o b.o -lc
 
 \begin{frame}{Doplňková témata}
   programování terminálu pomocí ncurses, programování CGI
+
+  \begin{itemize}
+    \item XX
+  \end{itemize}
+
 \end{frame}
 
 \begin{frame}{Úkol}
