@@ -15,8 +15,6 @@
   \tableofcontents
 \end{frame}
 
-\iffalse
-
 \section{Úvodní informace}
 \frame{\sectionpage}
 
@@ -4155,8 +4153,6 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
 
 \end{frame}
 
-\fi
-
 \section{Terminál}
 \frame{\sectionpage}
 
@@ -4166,7 +4162,7 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
     \item Historicky, uživatelé komunikovali se serverem pouze přes terminál
     \begin{itemize}
       \item Sériová linka
-      \item \file{/dev/ttyN}
+      \item \file{/dev/ttyN}, \file{/dev/ttySN}
     \end{itemize}
 
     \pause
@@ -4175,28 +4171,225 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
     \begin{itemize}
       \item Každé černé okénko v X, ssh připojení
       \item Ale pořad terminál
-      \item \file{/dev/ptyN}
+      \item \file{/dev/pts/*}
+    \end{itemize}
+
+    \pause
+
+    \item Jak zjistit, zda je souborový deskriptor terminál?
+
+    \pause
+
+    \begin{itemize}
+      \item \code{int isatty(int fd)} (POSIX, \header{unistd.h})
+      \begin{itemize}
+	\item \code{fd}: souborový deskriptor (např.\ \code{STDIN_FILENO})
+	\item Návratová hodnota: \code{1} -- \code{fd} je terminál, jinak
+	  \code{0} (\code{errno})
+      \end{itemize}
     \end{itemize}
 
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Režimy}
+\begin{frame}{Úkol}
 
-  \heading{Každý terminál má dva režimy}
+  \heading{Rozpoznání terminálu}
+  \begin{enumerate}
+    \item Zjistěte, zda je váš stdin a stdout terminál
+    \item Pokud ne, skončete s chybou
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item Zkuste i chybu přesměrováním
+      \item Např.\ \cmd{./main < /dev/null >/dev/null}
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Vlastnosti terminálu}
+
+  \begin{itemize}
+    \item \code{struct termios} (\header{termios.h}, \doc{man 3 termios})
+
+    \pause
+
+    \item Obsahuje téměř všechny vlastnosti terminálu
+    \begin{itemize}
+      \item Chybí např.\ velikost okna (viz dále)
+    \end{itemize}
+
+    \pause
+
+    \item V shellu: \code{stty} (Demo)
+
+    \pause
+
+    \item \code{int tcgetattr(int fd, struct termios *termios_p)} a \\
+      \code{int tcsetattr(int fd, int optional_actions,}\\
+      \code{const struct termios *termios_p)}
+    \begin{itemize}
+      \item \code{fd}: otevřený terminál, např.\ \code{STDOUT_FILENO}
+      \item \code{termios_p}: kam přečíst/odkud nastavit
+      \item \code{optional_actions}: kdy -- \code{TCSANOW} (teď),
+	\code{TCSADRAIN} (až je prázdný výstup), \code{TCSAFLUSH}
+	(\code{TCSADRAIN} + zahodí se vstup)
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{\code{struct termios}}
+  \begin{lstlisting}
+tcflag_t c_iflag;  /* input modes */            cc_t     c_cc[NCCS];  /* special characters */
+tcflag_t c_oflag;  /* output modes */
+tcflag_t c_cflag;  /* control modes (HW) */
+tcflag_t c_lflag;  /* local modes (user) */
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Rychlost terminálu}
+
+  \begin{itemize}
+    \item Baudy (bit/s)
+    \item 50, 75, \dots, 9600, 19200, 38400, 57600, 115200, \dots
+
+    \pause
+
+    \item Je součástí \code{struct termios}
+
+    \item Čtení: \code{speed_t cfgetispeed(const struct termios *termios)} a
+      \code{cfgetospeed}
+    \begin{itemize}
+      \item Zvlášť pro vstup a výstup
+      \item \code{termios}: struktura naplněná pomocí \code{tcgetattr}
+      \item Návratová hodnota: \emph{konstanta} pro rychlost -- \code{B50},
+        \code{B9600}, \dots
+      \item Typicky: \code{tcgetattr} + \code{cfgetispeed}
+    \end{itemize}
+
+    \pause
+
+    \item Zápis: \code{int cfsetispeed(struct termios *termios,} \\
+      \code{speed_t speed)}, \code{cfsetospeed}, \code{cfsetspeed} (jen BSD)
+    \begin{itemize}
+      \item \code{termios}: struktura naplněná pomocí \code{tcgetattr}
+      \item \code{speed}: \emph{konstanta} pro rychlost
+      \item Typicky: \code{tcgetattr} + \code{cfsetospeed} + \code{tcsetattr}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Rychlost terminálu}
+  \begin{enumerate}
+    \item Zjistěte, jaké rychlosti má váš (pseudo)terminál
+    \item Liší se vstupní a výstupní?
+    \item Vyzkoušejte
+    \item Zkuste nastavit vyšší rychlost
+
+    \item Něco se vám rozbilo?
+    \begin{itemize}
+      \item Spusťte v shellu \cmd{reset}
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Další vlastnosti}
+
+  \begin{itemize}
+    \item Nastavení speciálních znaků
+    \begin{itemize}
+      \item \code{intr} (Ctrl-C), \code{eof} (Ctrl-D), \code{stop} (Ctrl-S),
+        \code{start} (Ctrl-Q), \dots
+
+      \pause
+
+      \item \code{termios.c_cc[znak]}, kde \code{znak} je \code{VINTR},
+	\code{VEOF}, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Vlaječky (bitové masky)
+    \begin{itemize}
+      \item Pro vstup (\code{termios.c_iflag}) -- klávesnice, např.:
+      \begin{itemize}
+	\item \code{INLCR} -- přepis \code{\\n} na \code{\\r} na vstupu
+	\item \code{ICRNL} -- přepis \code{\\r} na \code{\\n} na vstupu
+      \end{itemize}
+
+      \pause
+
+      \item Pro výstup (\code{termios.c_oflag}) -- výpisy, např.:
+      \begin{itemize}
+	\item \code{ONLCR} -- přepis \code{\\n} na \code{\\r\\n} na výstupu
+	\item \code{OPOST} -- povolí pozměňování výstupu
+      \end{itemize}
+
+      \pause
+
+      \item Pro řízení HW (\code{termios.c_cflag}), např.:
+      \begin{itemize}
+	\item \code{CRTSCTS} -- zapne RTS/CTS
+      \end{itemize}
+
+      \pause
+
+      \item Pro lokální řízení (\code{termios.c_lflag}) -- rozhraní uživateli,
+        např.:
+      \begin{itemize}
+	\item \code{ECHO} -- má jít vstup hned na výstup?
+      \end{itemize}
+
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+if ((termios.c_cflag & CSIZE) == CS8)
+  puts("terminal ma 8bitove znaky");
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Rychlost terminálu}
+  \begin{enumerate}
+    \item Zjistěte, jestli vaše nastavení přepisuje \code{\\n} a \code{\\r}
+    \item Na vstupu i na výstupu
+    \item V obou směrech přepisu
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Režimy terminálu}
+
+  \heading{Každý terminál má dva režimy} (\code{termios.c_lflag \& ICANON})
   \begin{enumerate}
     \item Kanonický (\cmd{icanon})
     \begin{itemize}
       \item Zpracování po řádcích
       \begin{itemize}
 	\item Čekající na vstup ho dostanou po stisku Enter
-	\item A jen jeden
+	\item A přesně jeden řádek
       \end{itemize}
 
       \pause
 
       \item Implicitní mód
+      \item Vhodný pro shelly
     \end{itemize}
 
     \pause
@@ -4205,57 +4398,108 @@ rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
     \begin{itemize}
       \item Zpracování po znacích
       \item Vhodný pro editory
+
+      \pause
+
+      \item \code{void cfmakeraw(struct termios *termios)}
+      \begin{itemize}
+	\item Zadaným \code{termios} nastaví raw mód
+	\item Raw = nekanonický režim + další -- viz \doc{man cfmakeraw}
+      \end{itemize}
     \end{itemize}
 
   \end{enumerate}
 
 \end{frame}
 
-\begin{frame}{Další vlastnosti}
+\begin{frame}[fragile]{Velikost terminálu}
 
   \begin{itemize}
-    \item Rychlost
+    \item Dvě jednotky
     \begin{itemize}
-      \item Baudy (bit/s)
-      \item 50, 75, \dots, 9600, 19200, 38400, 57600, 115200, \dots
+      \item Ve znacích
+      \item V bodech (jen v grafice, jinak \code{0})
     \end{itemize}
 
     \pause
 
-    \item Nastavení speciálních znaků
+    \item \header{sys/ioctl.h}
+    \item Čtení: \code{int ioctl(int fd, TIOCGWINSZ, struct winsize *ws)}
     \begin{itemize}
-      \item Ctrl-C, Ctrl-D
+      \item \code{fd}: souborový deskriptor terminálu
+      \item \code{ws}: návratová hodnota
     \end{itemize}
 
     \pause
 
-    \item Vlaječky
+    \item Zápis: \code{int ioctl(int fd, TIOCSWINSZ, struct winsize *ws)}
     \begin{itemize}
-      \item Pro vstup -- klávesnice
-      \item Pro výstup -- výpisy
-      \item Pro řízení HW
-      \item Pro lokální řízení -- rozhraní uživateli
+      \item \code{fd}: souborový deskriptor terminálu
+      \item \code{ws}: na co nastavit velikost (jen \code{ws_row} a
+        \code{ws_col})
+      \item Nezmění velikost okna v X! (\cmd{echo -ne \\033\[8;Y;Xt}) %stopzone
     \end{itemize}
 
   \end{itemize}
 
+  \begin{block}{\code{struct winsize}}
+  \begin{lstlisting}
+unsigned short int ws_row;
+unsigned short int ws_col;
+unsigned short int ws_xpixel;
+unsigned short int ws_ypixel;
+  \end{lstlisting}
+  \end{block}
 \end{frame}
 
-\begin{frame}{\code{struct termios}}
+\begin{frame}{Úkol}
 
-  \begin{itemize}
-    \item ECHO
-  \end{itemize}
+  \heading{Rychlost terminálu}
+  \begin{enumerate}
+    \item Zjistěte, velikost terminálu
+    \item Ve znacích i bodech
+    \item Obslužte signál \code{SIGWINCH}
+    \item V obsluze vždy vypište velikost terminálu
+    \item V mainu spěte v cyklu
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item Zkuste měnit okno
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
-\begin{frame}{Dal}
+\begin{frame}{Čtení hesla}
 
-  \begin{itemize}
-    \item ECHO
-  \end{itemize}
+  \heading{Funkce \code{getpass} je zastaralá}
 
-  vlastnosti, nastavení, význam; program getpass; standardní vstup a výstup atd.
+  \pause
+
+  \begin{enumerate}
+    \item Vypne se \code{ECHO} ve \code{termios.c_lflag}
+
+    \pause
+
+    \item Uživatel napíše heslo = přečte se vstup
+    \begin{itemize}
+      \item Terminál ho nevypisuje
+    \end{itemize}
+
+    \pause
+
+    \item Zapne se \code{ECHO}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Čtení hesla}
+  \begin{enumerate}
+    \item Přečtěte od uživatele heslo
+    \item Potom ho vypište
+    \item Vyzkoušejte
+  \end{enumerate}
 
 \end{frame}
 
@@ -4742,17 +4986,51 @@ write(fd, "ahoj", 4);
 
 \end{frame}
 
-%\section{Doplňková témata}
-%\frame{\sectionpage}
-%
-%\begin{frame}{Doplňková témata}
-%  programování terminálu pomocí ncurses, programování CGI
-%
-%  \begin{itemize}
-%    \item XX
-%  \end{itemize}
-%
-%\end{frame}
+\begin{frame}{Multiplexing}
+
+  \heading{Jak přepínat mezi \code{read} a \code{write}}
+  \begin{itemize}
+    \item \code{int poll(struct pollfd *fds, nfds_t nfds, int timeout)} (\header{poll.h})
+    \begin{itemize}
+      \item \code{fds}: pole popisující, na které \code{fd} čekat (a jaké
+        události)
+      \item \code{nfds}: velikost pole \code{fds}
+      \item \code{timeout}: \code{NULL} nebo timeout
+      \item \code{fds} je po návratu patřičně upraveno
+    \end{itemize}
+
+    \pause
+
+    \item \code{int select(int nfds, fd_set *readfds, fd_set *writefds,
+      fd_set *exceptfds, struct timeval *timeout)} (\header{sys/select.h})
+    \begin{itemize}
+      \item \code{nfds}: nejvyšší číslo \code{fd} v množinách + 1
+      \item \code{readfds}: čekat, až je bude možno číst, nebo \code{NULL}
+      \item \code{writefds}: čekat, až do nich bude možno zapisovat, nebo
+	\code{NULL}
+      \item \code{exceptfds}: čekat, až nastane chyba, nebo \code{NULL}
+      \item Návratová hodnota: počet nastavených bitů v \code{readfds},
+	\code{writefds} a \code{exceptfds}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\section*{Doplňková témata}
+\frame{\sectionpage}
+
+\begin{frame}{Doplňková témata}
+
+  \begin{itemize}
+    \item Programování terminálu pomocí \file{ncurses}
+    \item Programování CGI
+  \end{itemize}
+
+\end{frame}
+
+\section*{Zdroje}
+\frame{\sectionpage}
 
 \begin{frame}{Zdroje}
 
