@@ -1,0 +1,625 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\input{class.tex}
+
+\let\Oldemph\emph
+\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
+\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
+\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
+\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
+\newcommand{\pozor}{\emph{POZOR}}
+
+\mode<presentation>
+{
+\usetheme{Madrid}
+}
+
+\setbeamertemplate{navigation symbols}{}
+
+\usepackage[czech]{babel}
+\usepackage[utf8x]{inputenc}
+\usepackage{helvet}
+\usepackage{mathptmx}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[final]{listings}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage[absolute,overlay]{textpos}
+\usepackage{xspace}
+\usetikzlibrary{arrows, positioning}
+
+\uselanguage{czech}
+\deftranslation[to=czech]{Section}{Sekce}
+
+\tikzset{tl_state/.style={rounded corners, thick, draw, minimum height=6mm,
+	minimum width=12mm, bottom color=black!15, top color=black!5}}
+\tikzset{tl_phase/.style={thick, draw, minimum size=8mm}}
+\tikzset{tl_edge/.style={<-, >=stealth', semithick}}
+
+\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
+	breakatwhitespace=true,escapeinside={(*@}{@*)},
+	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
+	commentstyle=\color{blue}, columns=flexible, language=C}
+
+\newcommand{\cmd}[2][]{\lstinline[columns=fullflexible, language=bash,
+	basicstyle=\ttfamily, #1]$#2$}
+\newcommand{\code}[2][]{\lstinline[columns=fullflexible, basicstyle=\ttfamily,
+	#1]$#2$}
+\newcommand{\file}[2][]{\code[language=XML, #1]{#2}}
+
+\newcommand{\xes}{\texttt{x86}\xspace}
+\newcommand{\make}{\texttt{make}\xspace}
+\newcommand{\cmake}{\texttt{cmake}\xspace}
+
+\title[PB071 -- Překlad]{PB071 -- Úvod do jazyka C}
+
+\author{Jiri~Slaby}
+
+\institute[Fakulta informatiky, MU]{Fakulta informatiky \\
+Masarykova univerzita}
+
+\subtitle{Překladové systémy}
+\date{2. 5. \the\year}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Obsah přednášky}
+  \tableofcontents
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Úvod a motivace}
+\frame{\sectionpage}
+
+\begin{frame}{Úvod}
+
+  \begin{itemize}
+    \item Máme zdrojové soubory
+
+    \pause
+
+    \item Chceme binárku
+
+    \pause
+
+    \item Použijeme překladač
+    \begin{itemize}
+      \item \cmd{gcc *.c}
+    \end{itemize}
+
+    \pause
+
+    \item \heading{Demo:} jádro
+
+    \pause
+
+    \item Chceme raději nějaký nástroj
+    \begin{itemize}
+      \item Popis, jak sestavit projekt
+
+      \pause
+
+      \item Ale jaký?
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Překladové systémy}
+
+  \heading{Spousta řešení}
+  \begin{itemize}
+
+    \item Svoje vlastní
+    \begin{itemize}
+      \item Skripty v bashi, perlu, pythonu
+
+      \pause
+
+      \item \emph{Vždy} peklo
+
+      \pause
+
+      \begin{itemize}
+	\item \emph{Nikdy} nevynalézejte kolo
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Cizí
+    \begin{itemize}
+      \item Udržované nástroje
+
+      \pause
+
+      \item \make, \cmake, \texttt{qmake}, \dots
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Obecný princip}
+
+\begin{center}
+  \heading{Popis závislostí + popis výroby} \\[1ex]
+
+  \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick,above]
+  \tikzstyle{post} = [pre,->,shorten >=1pt, shorten <=0pt]
+  \begin{tikzpicture}[node distance=7mm, font=\footnotesize]
+      \node [tl_state] (BIN) {\file{binary}};
+
+      \onslide<2->{
+	\node [tl_state] (O2) [below=of BIN] {\file{impl.o}}
+	  edge [pre] node {} (BIN);
+	\node [tl_state] (O1) [left=of O2] {\file{main.o}}
+	  edge [pre] node (LDP) {} (BIN);
+	\node [tl_state] (LIB1) [right=of O2] {\file{libX.so}}
+	  edge [pre] node {} (BIN);
+      }
+
+      \onslide<3->{
+	\node [tl_state] (C2) [below=of O2] {\file{impl.c}}
+	  edge [pre] node {} (O2);
+	\node [tl_state] (C1) [below=of O1] {\file{main.c}}
+	  edge [pre] node (GCCP) {} (O1);
+      }
+
+      \onslide<4->{
+	\node [tl_state] (H1) [below=of C1] {\file{stdio.h}}
+	  edge [pre] node {} (C1);
+	\node [tl_state] (H2) [below=of C2] {\file{impl.h}}
+	  edge [pre] node {} (C2)
+	  edge [pre] node {} (C1);
+      }
+
+      \onslide<5->{
+	\draw [pre,out=310,in=230] (H1) edge (H2);
+	\node [tl_state] (SW) [below=of H2,align=center]
+	  {Parametry překladače \\
+	  (\cmd{\-D apod.})}
+	  edge [pre,dashed,out=40,in=0] node {} (C2)
+	  edge [pre,dashed] node {} (H2);
+      }
+
+      \onslide<6->{
+        \node (GCC) [left=of GCCP] {\cmd{gcc}}
+	  edge [post,dashed,color=red] node {} (GCCP);
+
+        \node (LD) [left=of LDP] {\cmd{ld}}
+	  edge [post,dashed,color=red] node {} (LDP);
+
+        \node (EX) [below=5mm of LIB1,xshift=8mm,align=center] {Musí \\ existovat}
+	  edge [post,dashed,color=red] node {} (LIB1);
+      }
+
+  \end{tikzpicture}
+\end{center}
+
+\end{frame}
+
+\section{Vývojový nástroj make}
+\frame{\sectionpage}
+
+\begin{frame}{Vývojový nástroj \make}
+
+  \begin{itemize}
+    \item Pravidla pro překlad projektu
+    \begin{itemize}
+      \item V textové formě
+    \end{itemize}
+    \item \cmd{make} pravidla načte, vyhodnotí a spustí
+
+    \pause
+
+    \item Mezi pravidly jsou typicky závislosti
+    \begin{itemize}
+      \item Viz předchozí slajd
+    \end{itemize}
+
+    \pause
+
+    \item \cmd{make} hledá \file{Makefile}, popř.\ \file{makefile} v lokálním
+      adresáři
+    \begin{itemize}
+      \item \cmd{\-f} mění název souboru
+      \item \cmd{\-C} mění adresář
+    \end{itemize}
+
+    \pause
+
+    \item \url{https://www.gnu.org/software/make/manual/make.html}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makefile}{Pravidla}
+
+  \begin{itemize}
+    \item Pravidla: \code{cil: zavislosti}
+    \begin{itemize}
+      \item Implicitně se začne vyhodnocením prvního v souboru
+
+      \pause
+
+      \item Ale lze specifikovat na příkazové řádce: \cmd{make cil}
+    \end{itemize}
+
+    \pause
+
+    \item Pravidla můžou mít akce, jak \code{cil} vyrobit ze
+      \code{zavislosti}
+    \begin{itemize}
+      \item Na dalším řádku za pravidlem, \emph{odsazené tabulátorem}
+
+      \pause
+
+      \item Volá se shell
+
+      \pause
+
+      \item Jinak se použije implicitní akce
+    \end{itemize}
+  \end{itemize}
+
+  \begin{onslide}<1->
+  \begin{block}{Příklad}
+  \begin{lstlisting}[language=make]
+all: main
+
+main: main.o impl.o
+       gcc -omain main.o impl.o
+  \end{lstlisting}
+  \end{block}
+  \end{onslide}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Hello world Makefile}
+  \begin{enumerate}
+    \item Napište jednoduchý Makefile
+    \item V něm budou 3 pravidla
+    \begin{itemize}
+      \item \code{p1}, \code{p2}, \code{p3}
+    \end{itemize}
+    \item Každé vypíše své jméno
+    \item Každé z nich vyvolejte
+    \begin{itemize}
+      \item Z příkazové řádky
+    \end{itemize}
+
+    \item Nyní mezi nimi vytvořte závislosti
+    \begin{itemize}
+      \item Ať se vypíše po řadě \code{p1}, \code{p2}, \code{p3}
+    \end{itemize}
+    \item Nyní spusťte jen samotný \cmd{make}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makefile}{Proměnné}
+
+  \begin{itemize}
+    \item Nastavení proměnných
+    \begin{itemize}
+      \item Na příkazové řádce
+      \item V souboru: \code{CC=gcc}
+    \end{itemize}
+
+    \pause
+
+    \item Reference pomocí \code{\$(...)}
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[language=make]
+CFLAGS=-Wall
+
+all: main
+
+main: main.o impl.o
+       $(CC) -omain main.o impl.o
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Proměnné v Makefile}
+  \begin{enumerate}
+    \item Vytvořte nové pravidlo \file{m.o}
+    \item Bude záviset na \file{main.c}
+    \item Bude překládat \file{main.c} na \file{m.o}
+    \item Bude brát v úvahu proměnné \code{CC} a \code{CFLAGS}
+    \item Upravte jedno z předchozích \code{p*} pravidel, aby záviselo na
+      \file{m.o}
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item Zkuste předat různé \code{CFLAGS}
+      \item Nezapomeňte pozměnit alespoň čas souboru (\cmd{touch main.c})
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makefile}{Obecná pravidla}
+
+  \begin{itemize}
+    \item \code{\%} je zástupný symbol
+    \item Lze psát pravidla: \code{\%.o: \%.c}
+
+    \pause
+
+    \item Jak ale zjistit jména souborů?
+    \begin{itemize}
+      \item \code{\$@} -- jméno cíle
+      \item \code{\$<} -- jméno první závislosti
+      \item \code{\$^} -- jména všech závislostí
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[language=make]
+%.o: %.c
+       $(CC) -c -o$@ $<
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Obecná pravidla v Makefile}
+  \begin{enumerate}
+    \item Vytvořte nové pravidlo k překladu z \file{.c} do \file{.o}
+    \item Bude brát v úvahu proměnné \code{CC} a \code{CFLAGS}
+    \item Kromě \code{CFLAGS} bude překládat s \cmd{\-W}
+    \item Upravte jedno z předchozích \code{p*} pravidel, aby záviselo na
+      \file{main.o}
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makefile}{Vnitřní příkazy}
+
+  \begin{itemize}
+    \item Make má vnitřní příkazy
+    \begin{itemize}
+      \item \cmd{\$(prikaz parametry)}
+    \end{itemize}
+
+    \pause
+
+    \item \code{shell command}
+    \begin{itemize}
+      \item Spustí shell a vykoná v něm příkaz \code{command}
+    \end{itemize}
+
+    \pause
+
+    \item \cmd{wildcard pattern}
+    \begin{itemize}
+      \item Expanduje \cmd{pattern} (\cmd{*} ne \cmd{\%}) a vrací seznam
+    \end{itemize}
+
+    \pause
+
+    \item \cmd{patsubst pattern,replacement,text}
+    \begin{itemize}
+      \item Nahraď v \cmd{text} všechny výskyty \cmd{pattern} za
+        \cmd{replacement}
+    \end{itemize}
+
+    \pause
+
+    \item \dots
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[language=make]
+PATH=$(shell pwd)
+SOURCES=$(wildcard *.c)
+OBJS=$(patsubst %.c,%.o,$(SOURCES))
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Vnitřní příkazy v Makefile}
+  \begin{enumerate}
+    \item Přeložte všechny \file{.c} (\cmd{wildcard}) v aktuálním adresáři do
+      \file{.o} (\cmd{patsubst})
+    \item Slinkujte všechny \file{.o} do jedné binárky
+
+    \item Vytvořte si 2 zdrojové soubory
+    \begin{itemize}
+      \item Jeden s funkcí \code{main}
+      \item Druhý s funkcí, která je volána z \code{main}
+    \end{itemize}
+
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Makefile}{Nevýhody}
+
+  \begin{itemize}
+    \item Nutno popsat všechny závislosti
+
+    \pause
+
+    \item \cmd{make clean} ručně
+
+    \pause
+
+    \item Rychlost
+    \begin{itemize}
+      \item Není lineární vzhledem k počtu souborů
+    \end{itemize}
+
+    \pause
+
+    \item Složitý zápis komplikovanějších pravidel
+    \begin{itemize}
+      \item Např.\ neexistuje explicitní podpora pro podadresáře
+    \end{itemize}
+
+    \pause
+
+    \item Méně přenositelný
+
+    \pause
+
+    \item Může být příliš upovídaný
+  \end{itemize}
+
+\end{frame}
+
+\section{Autotools, CMake}
+\frame{\sectionpage}
+
+\begin{frame}{Generátory}
+
+  \begin{itemize}
+    \item Nadstavby nad \make (a ostatními)
+    \begin{itemize}
+      \item Často generují \file{Makefile} pro \make
+    \end{itemize}
+
+    \pause
+
+    \item Podpora externích závislostí
+    \begin{itemize}
+      \item Je v dosahu překladač C?
+      \item Umí překladač C99?
+      \item Je v systému knihovna X?
+      \item Máme hlavičku \file{Y.h}?
+    \end{itemize}
+
+    \pause
+
+    \item Podpora podadresářů
+
+    \pause
+
+    \item Konfigurace uživatelem
+    \begin{itemize}
+      \item Ne/chci ve výsledné binárce podporu pro X
+      \item Ne/optimalizuj při překladu (ne/chci ladit)
+    \end{itemize}
+
+    \pause
+
+    \item \dots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Nástroje Autotools}
+
+  \heading{Tři nástroje}
+  \begin{enumerate}
+    \item \texttt{Autoconf}
+    \begin{itemize}
+      \item Vyhledání externích závislostí
+      \item Konfigurace uživatelem
+      \item Z popisu v \file{configure.ac} generuje skript \file{configure}
+      \item \url{http://www.gnu.org/software/autoconf/manual/}
+    \end{itemize}
+
+    \pause
+
+    \item \texttt{Automake}
+    \begin{itemize}
+      \item Popis překladu (včetně rozdělení do podadresářů)
+      \item Z popisu v \file{Makefile.am} generuje \file{Makefile.in}
+      \item \url{http://www.gnu.org/software/automake/manual/}
+    \end{itemize}
+
+    \pause
+
+    \item \texttt{Libtool}
+    \begin{itemize}
+      \item Podpora pro tvorbu knihoven na různých POSIX systémech
+      \item \url{https://www.gnu.org/software/libtool/manual/}
+    \end{itemize}
+  \end{enumerate}
+
+  \pause
+  \medskip
+
+  \heading{Výsledek: jeden \file{configure} a mnoho \file{Makefile.in}}
+
+  \pause
+  \medskip
+
+  \heading{Uživatel spustí \cmd{./configure} a dostane mnoho \file{Makefile}}
+
+\end{frame}
+
+\begin{frame}[fragile]{Překladový systém \cmake}
+
+  \begin{itemize}
+    \item Popis konfigurace a překladu v jednom
+    \begin{itemize}
+      \item Soubory \file{CMakeLists.txt}
+      \item Znáte z cvičení (\file{kontr_lessons})
+    \end{itemize}
+
+    \pause
+
+    \item \url{https://cmake.org/cmake/help/latest/}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[language=make]
+cmake_minimum_required(VERSION 2.8.11)
+project(my_project)
+
+set(CMAKE_C_FLAGS "-std=c99 -pedantic -Wall -Wextra")
+
+add_subdirectory(my_lib)
+add_executable(main main.c impl.c)
+target_link_libraries(main LINK_PUBLIC my_lib)
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\section{Závěr}
+\frame{\sectionpage}
+
+\begin{frame}{Závěr a diskuse}
+
+  \begin{center} \Large
+    \heading{Nepište překladové systémy na vlastní pěst} \\[2em]
+
+    \pause \huge
+
+    Děkuji za pozornost! \\[1em]
+    Dotazy?
+  \end{center}
+
+\end{frame}
+
+\end{document}
