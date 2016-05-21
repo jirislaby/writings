@@ -1,0 +1,283 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}
+  \frametitle{Paměť jinak II.}
+
+  \heading{LDD3 kap. 15 (zastaralá)}
+
+  \iffimuni {
+    \bigskip
+
+    \heading{Minule}
+    \begin{itemize}
+      \item Mapování paměti jádra (\code{mmap})
+    \end{itemize}
+
+    \tableofcontents
+  } \fi
+
+\end{frame}
+
+\mysection{Přímý přístup do paměti (DMA)}
+
+\begin{frame}
+  \frametitle{DMA}
+
+  \heading{Přímý přístup do paměti}
+  \begin{itemize}
+    \item Prozatím jsme ze/do zařízení četli/zapisovali přes CPU
+    \begin{itemize}
+      \item Tj.\ standardními operacemi s (přemapovanou) pamětí
+    \end{itemize}
+
+    \pause
+
+    \item Velké přenosy = velká zátěž CPU
+    \begin{itemize}
+      \item Cykly, čekání na pomalou sběrnici atd.
+    \end{itemize}
+
+    \pause
+
+    \item Místo toho naprogramujeme HW, aby přenášel data sám
+    \begin{itemize}
+      \item Nutná podpora HW (sběrnice -- arbitrace, zařízení -- přenosy)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Princip DMA}
+
+  \heading{Princip\only<1>{ odesílání}\only<2>{ příjmu}}
+  \begin{enumerate}
+  \item Alokace (speciální) paměti
+  \item<1> Vyplnění daty (paket, zvuk, data na disk, \dots)
+  \item Předání ukazatele do zařízení
+  \item Odstartování přenosu v zařízení
+  \item Přerušení či jiná signalizace konce přenosu od zařízení
+  \item<2> Práce s příchozími daty (paket, data z disku, \dots)
+  \item Uvolnění (speciální) paměti
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{DMA v Linuxu}{Alokace}
+
+  \heading{API alokace}
+  \begin{itemize}
+  \item \header{linux/dma-mapping.h}, \doc{Documentation/DMA-*}
+  \item \code{dma_alloc_coherent}, \code{dma_free_coherent}
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \footnotesize{\code{void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp)}}\\[-0.3em]
+  \begin{itemize}
+  \item \code{dev} -- zařízení, které bude k paměti přistupovat
+    (\code{NULL} pokud neznáme)
+  \item \code{size} -- velikost, jakou požadujeme
+  \item \code{dma_handle} -- DMA adresa (návratová hodnota) -- \emph{pro zařízení}
+  \item návratová hodnota -- virtuální adresa -- \emph{pro nás}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{DMA v Linuxu}{Příklad}
+
+  \begin{lstlisting}
+int my_do_DMA(struct device *dev)
+{
+  dma_addr_t dma;
+  char *virt;
+
+  virt = dma_alloc_coherent(dev, 100, &dma, GFP_KERNEL);
+  if (!virt)
+    return -ENOMEM;
+  memset(virt, 0, 100);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  my_HW_set_addr(dev, dma);
+  my_HW_start_transfer(dev);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  while (my_HW_working(dev)) /* polling */
+    msleep(100);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  pr_info("%s\n", virt);
+  dma_free_coherent(dev, 100, virt, dma);
+  return 0;
+}
+  \end{lstlisting} %stop_zone
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Alokace DMA paměti}
+  \begin{enumerate}
+    \item Otevřete si ovladač EDU z předminula
+    \item V \code{probe} alokujte 1 stránku DMA paměti
+    \item Použijte PCI zařízení jako první parametr alokace
+    \item Vypište si virtuální, fyzickou a DMA adresu
+    \item V \code{remove} ji uvolněte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{DMA pro PCI}
+
+  \heading{Navíc}
+  \begin{itemize}
+    \item Nastavení masky adres
+    \begin{itemize}
+      \item Ne všechna zařízení zvládnou adresovat celý fyzický prostor
+      \item \code{pci_set_dma_mask(pdev, DMA_BIT_MASK(27))}
+      \item \code{pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(27))}
+    \end{itemize}
+
+    \pause
+
+    \item Zapnutí ,,spravování sběrnice''
+    \begin{itemize}
+      \item Tj.\ zařízení umí samo iniciovat přenosy apod.
+      \item \code{pci_set_master(pdev)}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad z \code{probe}}
+  \begin{lstlisting}
+  ... /* pci_enable etc. here */
+  ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(27));
+
+  pci_set_master(pdev);
+
+  virt = dma_alloc_coherent(&pdev->dev, 100, &phys, GFP_KERNEL);
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{EDU a DMA}
+
+  \begin{itemize}
+    \item Zvládá 28bitové adresy
+    \item DMA řadič napojený na PCI sběrnici a lokální paměť v EDU
+    \begin{itemize}
+      \item Lokální paměť na adrese 0x40000
+      \item Velikost 4096~B
+    \end{itemize}
+
+    \item Generuje přerušení 8 (\code{0x100}) na kartě
+    \begin{itemize}
+      \item Po dokončení přenosu
+      \item (Jen je-li vyžádáno před přenosem)
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Úkol:} doplňte předešlou alokaci o nastavení masek na správnou
+    hodnotu a zapnutí spravování sběrnice
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{EDU DMA registry}
+
+\begin{block}{Specifikace baru 0 (pokračování z předminula)}
+\begin{center}
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents & Meaning \\ \hline\hline
+0x0080 & 4B  & R/W & src      & Source address \\ \hline
+0x0088 & 4B  & R/W & dst      & Destination address \\ \hline
+0x0090 & 4B  & R/W & count    & Transfer count \\ \hline
+0x0098 & 4B  & R/W & cmd      & Command register \\ \hline
+\end{tabular}
+\end{table}
+\end{center}
+\end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item \code{cmd} registr
+    \begin{itemize}
+      \item Zapisuje se po nastavení ostatních registrů
+      \item Zapisuje se \emph{jednou}, a to kombinací bitů
+      \item Bit 0: \code{RUN} (start transfer now)
+      \item Bit 1: \code{DIRECTION} (0: from RAM to EDU, 1: from EDU to RAM)
+      \item Bit 2: \code{RQINT} (generate an interrupt after the transaction)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s DMA na EDU}
+  \begin{enumerate}
+    \item 10~B DMA paměti inicializujte textovým řetězcem
+    \item Přeneste 10~B do lokální paměti EDU na adresu 0x40000
+    \begin{itemize}
+      \item Nastavte všechny 4 registry
+      \item Bez přerušení (bez \code{RQINT})
+      \item Počkejte na nulovou hodnotu bitu \code{RUN} (na dokončení přenosu)
+    \end{itemize}
+
+    \item Přeneste 10~B z EDU na DMA stránku + 10
+    \begin{itemize}
+      \item Vznikne za sebou 2$\times$ stejný řetězec
+    \end{itemize}
+
+    \item Vypište DMA stránku + 10
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{DMA s přerušením} \iffimuni (část domácího) \fi
+  \begin{enumerate}
+    \item Rozšiřte předchozí o přerušení
+    \begin{itemize}
+      \item Přidejte ještě jeden přenos z EDU na DMA + 20
+      \item Přenos bude s \code{RQINT}
+    \end{itemize}
+
+    \item Obslužte přerušení
+    \begin{itemize}
+      \item ACK přerušení
+      \item Iniciujte tasklet
+    \end{itemize}
+
+    \item V taskletu vypište obsah DMA paměti + 20
+    \item DMA stránku vystavte přes \code{mmap}
+  \end{enumerate}
+
+  \bigskip
+
+  \emph{POZOR}
+  \begin{itemize}
+    \item Na prezenci a správnou posloupnost zabíjení taskletu, zákazu
+      přerušení, dealokace atd.
+    \item Na použití správné funkce pro převod na \code{struct page}/\code{pfn}
+      pro \code{mmap}
+  \end{itemize}
+
+\end{frame}

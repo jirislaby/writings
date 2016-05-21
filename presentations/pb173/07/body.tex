@@ -1,0 +1,386 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}
+  \frametitle{Komunikace s HW}
+
+  \heading{LDD3 kap. 9 a 12}
+
+  \iffimuni
+    \bigskip
+
+    \tableofcontents
+  \fi
+
+\end{frame}
+
+\mysection{I/O}
+
+\begin{frame}
+  \frametitle{I/O}
+  \heading{Na x86: 2 přístupy}
+  \begin{itemize}
+  \item Porty
+  \item Memory Mapped I/O
+  \end{itemize}
+
+\end{frame}
+
+\iffalse
+\subsection{I/O -- porty}
+\fi
+
+\begin{frame}{I/O}{Porty}
+
+  \heading{Porty}
+  \begin{itemize}
+    \item Speciální adresový prostor
+    \begin{itemize}
+      \item Závislé na architektuře
+      \item Speciální instrukce (\code{in}, \code{out} na x86)
+    \end{itemize}
+
+    \pause
+
+    \item Samostatná (malá) sběrnice
+    \begin{itemize}
+      \item Na x86: řadič klávesnice, PC spkr, staré časovače a ovladače
+      přerušení, ladicí port (\code{0x80} $\Rightarrow$ segmentový displej
+      na desce), \dots
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/io.h}, \header{linux/ioport.h}
+  \item Požadavek: \code{request_region}, \code{release_region}
+  \item R/W: \code{inX(port)}, \code{outX(co, port)}, kde
+    $\text{\code{X}}\in\left\{\text{\code{b}},\text{\code{w}},\text{\code{l}}\right\}$
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \heading{Demo:} pb173/07 \\
+  \heading{Úkol:} Přečíst port 0x80, zapsat do něj 1B a znovu přečíst
+
+\end{frame}
+
+\iffalse
+\subsection{I/O -- MMIO}
+\fi
+
+\begin{frame}{I/O}{MMIO}
+
+  \heading{Memory Mapped I/O}
+  \begin{itemize}
+    \item Součástí fyzického adresového prostoru
+    \item Přístup standardním čtením/zápisem
+    \begin{itemize}
+      \item Nutnost přemapovat na virtuální adresy
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \heading{API}
+  \begin{itemize}
+    \item \header{linux/io.h}, \header{linux/ioport.h}
+
+    \item Požadavek: \code{request_mem_region}, \code{release_mem_region}
+    \begin{itemize}
+      \item \file{/proc/iomem}
+    \end{itemize}
+
+    \pause
+
+    \item Mapování: \code{virt = ioremap(phys)}, \code{iounmap(virt)}
+    \begin{itemize}
+      \item \code{/proc/vmallocinfo} (novější jádra)
+    \end{itemize}
+
+    \pause
+
+    \item R/W: \code{readX(odkud)}, \code{writeX(co, kam)}, kde
+      $\text{\code{X}}\in\left\{\text{\code{b}},\text{\code{w}},\text{\code{l}},\text{\code{q}}\right\}$
+    \begin{itemize}
+      \item \pozor: nelze číst jako z paměti (optimalizace, pořadí bytů, \dots)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\mysection{PCI zařízení}
+
+\begin{frame}
+  \frametitle{PCI zařízení}
+
+  \begin{itemize}
+    \item PCI, PCI-X, PCIe
+
+    \pause
+
+    \item Hierarchická sběrnice
+    \begin{itemize}
+      \item Identifikace doména:bus:slot:funkce
+      \item Bridge (=routery)
+    \end{itemize}
+
+    \pause
+
+    \item Konfigurační prostor
+    \begin{itemize}
+      \item Automatická konfigurace
+
+      \item ID zařízení (vendor, device), I/O prostory, IRQ
+      \begin{itemize}
+	\item \emph{Obsah} I/O prostorů -- specifikace zařízení (výrobce)
+      \end{itemize}
+
+      \item \cmd{lspci}
+    \end{itemize}
+
+    \pause
+
+    \item Podrobnosti v PCI specifikaci
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{PCI zařízení v jádře}
+
+  \begin{itemize}
+    \item \header{linux/pci.h}, \doc{Documentation/pci/*}
+    \item \code{struct pci_dev}, \code{struct pci_bus}
+
+    \pause
+
+    \item \code{pci_\{set,get\}_drvdata}
+    \begin{itemize}
+      \item Uloží/načte programátorova data do/z \code{struct pci_dev}
+    \end{itemize}
+
+    \pause
+
+    \item Referenční počet
+    \begin{itemize}
+      \item PCI zařízení může být (fyzicky) odebráno ze systému
+      \item Ale \code{struct pci_dev} zůstává, pokud reference $> 0$
+
+      \pause
+
+      \item Zvýšit: \code{pci_dev_get}
+      \item Snížit: \code{pci_dev_put}
+    \end{itemize}
+
+    \pause
+
+    \item Identifikace (ID) zařízení
+    \begin{itemize}
+      \item \code{pci_dev->vendor}, \code{pci_dev->device}, \dots
+      \item \code{PCI_ANY_ID} značí jakékoliv ID (při hledání)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Hledání zařízení}
+  \framesubtitle{Iterátory (starší)}
+
+  \begin{itemize}
+    \item Dovoluje přístup k zařízení více ovladači
+    \item Nepodporuje hotplug
+    \item \code{pci_get_device} (vendor, device)
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Iterace přes zařízení}
+  \begin{lstlisting}
+struct pci_dev *pdev = NULL;
+
+while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
+  pr_info("%2.x:%.2x.%.2x\n",
+          pdev->bus->number,
+          PCI_SLOT(pdev->devfn),
+          PCI_FUNC(pdev->devfn));
+}
+  \end{lstlisting} %stopzone
+  \end{block}
+
+  \pause
+  \medskip
+
+  \heading{Úkol:} vypsat všechna zařízení v systému (jejich
+  \emph{vendor+device} ID)
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Hledání zařízení}
+  \framesubtitle{Událostmi}
+
+  \begin{itemize}
+    \item Registrace háčků a seznamu chtěných zařízení
+    \begin{itemize}
+      \item Seznam: \code{struct pci_device_id} (vendor, device, atd.)
+      \item Háčky: \code{struct pci_driver} (probe, remove, suspend, atd.)
+    \end{itemize}
+    \item \code{pci_register_driver}, \code{pci_unregister_driver}
+  \end{itemize}
+
+  \begin{block}{\footnotesize Události a PCI zařízení}
+  \begin{lstlisting}[language=C]
+static struct pci_device_id my_table[] = {
+  { PCI_DEVICE(VENDOR1, DEVICE1) }, { PCI_DEVICE(VENDOR1, DEVICE2) },
+  { PCI_DEVICE(0x8086, PCI_ANY_ID), .driver_data = 1 },
+  { 0, }
+};
+MODULE_DEVICE_TABLE(pci, my_table);
+static struct pci_driver my_pci_driver = {
+  .name = "my_driver",   .id_table = my_table,   .probe = my_probe,
+};
+int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
+  pr_info("%2.x %lu\n", pdev->bus->number, id->driver_data);
+  return 0;
+}
+  \end{lstlisting} %stopzone
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Navázání PCI zařízení}
+  \begin{enumerate}
+    \item \header{linux/pci.h}
+
+    \item Definice \code{struct pci_device_id}
+    \begin{itemize}
+      \item \cmd{lspci -nn} a najít EDU a jeho vendor+device ID
+    \end{itemize}
+
+    \item Definice \code{struct pci_driver}
+    \begin{itemize}
+      \item \code{probe}, \code{remove}, \code{name}, \code{id_table}
+    \end{itemize}
+
+    \item Definice háčků (viz definici \code{struct pci_driver})
+    \begin{itemize}
+      \item \scriptsize{\code{int (*probe)(struct pci_dev *, const struct pci_device_id *)}}
+      \item \scriptsize{\code{void (*remove)(struct pci_dev *)}}
+    \end{itemize}
+
+    \item V probe a remove vypsat
+    \begin{itemize}
+      \item \code{pdev->bus->number}
+      \item \code{PCI_SLOT(pdev->devfn)}
+      \item \code{PCI_FUNC(pdev->devfn)}
+    \end{itemize}
+
+    \item Zavolat \code{pci_register_driver} a \code{pci_unregister_driver}
+    \item Vložit a odebrat modul (a zkontrolovat \cmd{dmesg})
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Práce s PCI}
+
+  \heading{Probe}
+  \begin{itemize}
+    \item Inicializace PCI zařízení
+    \begin{itemize}
+      \item \code{pci_enable_device}
+      \item Do té doby nelze některé vlastnosti pdev používat (irq)
+    \end{itemize}
+
+    \pause
+
+    \item Rezervace a mapování I/O (jako v první části cvičení)
+    \begin{itemize}
+      \item Požadavek: \code{pci_request_region}, \code{pci_request_regions}
+      \item Mapování: \code{pci_ioremap_bar} -- alias pro
+	\code{ioremap(pci_resource_start(), pci_resource_len())}
+    \end{itemize}
+
+    \pause
+
+    \item Nastavení/detekce zařízení
+      \begin{itemize}
+	\item Závisí na zařízení
+      \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Remove}
+  \begin{itemize}
+    \item Opak Probe
+    \item \code{iounmap}, \code{pci_release_region}(\code{s}),
+      \code{pci_disable_device}
+  \end{itemize}
+
+\end{frame}
+
+\mysection{Zobecnění na jiné sběrnice}
+
+\begin{frame}
+  \frametitle{Zobecnění}
+
+  \heading{Většina ostatních sběrnic funguje stejně}
+  \begin{itemize}
+  \item USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \dots
+  \item Nějaké probe/remove
+  \item Seznam ID
+  \item Registrace ,,ovladače''
+  \end{itemize}
+
+\end{frame}
+
+\mysection{EDU karta}
+
+\begin{frame}
+  \frametitle{Specifikace baru 0 karty EDU}
+
+\begin{block}{Specifikace baru 0 karty EDU}
+%\footnotesize
+\begin{center}
+\begin{tabular}{|l|l|l|l|} \hline
+Offset & Len & R/W & Meaning \\ \hline\hline
+0x0000 & 4B  & R   & ID \& Revision \\ \hline
+0x0004 & 4B  & R/W & Inverted value \\ \hline
+0x0008 & 4B  & R/W & Factorial \\ \hline
+0x0020 & 4B  & R   & Status    \\ \hline
+\end{tabular}
+\end{center}
+\end{block}
+
+\begin{itemize}
+\item ID \& Revision: \code{0xRRrr00edu}, RR -- major, rr -- minor
+\item Inverted value: zapsané číslo se obrátí (operátor \code{\~})
+\item Faktoriál: vypočte se faktoriál (je nutné počkat na status bit)
+\item Status: 0. bit -- probíhá výpočet faktoriálu
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vyčtení identifikace karty EDU a práce s ní}
+  \begin{enumerate}
+  \item Povolení zařízení (\code{pci_enable_device})
+  \item Rezervace baru 0 (\code{pci_request_region})
+  \item Vypsat fyzickou adresu baru 0 a porovnat s \code{lspci}
+  \item Přemapovat bar 0 (\code{ioremap})
+  \item Přečíst a rozkódovat identifikaci a revizi (\code{readX})
+  \item Ověřit živost karty pomocí invertovacího registru
+  \item Uklidit v remove (unmap, release, disable)
+  \end{enumerate}
+
+\end{frame}
