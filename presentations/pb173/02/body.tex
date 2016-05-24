@@ -49,10 +49,10 @@
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
-  \heading{V userspace: pomocí \textit{funkce} \code{syscall} vypsat nějakou
-  informaci}
+\begin{frame}{Úkol}
+
+  \heading{V userspace: pomocí \textit{funkce} \code{syscall} vypište nějakou
+    informaci}
   \begin{enumerate}
     \item Inspirujte se v \file{pb173/02/syscalls/c.c}
     \item Použijte \code{syscall} a \code{__NR_write}
@@ -102,7 +102,7 @@
       \item Znakové (ostatní)
       \begin{itemize}
 	\item Komunikace po znacích (bajtech)
-	\item \emph{Zbytek tohoto cvičení}
+	\item \emph{Zbytek \iffimuni tohoto cvičení \else této sekce \fi}
       \end{itemize}
 
       \pause
@@ -186,7 +186,7 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   if (count == 0)
     return -EINVAL;
   *offp += count; /* remember position for the next time */
-  return count; /* "written" all */
+  return count; /* we "wrote" all bytes */
 }
   \end{lstlisting}
 
@@ -200,10 +200,10 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
   \begin{enumerate}
   \item Definice \code{struct file_operations}
-  \item Vytvoření funkcí dle prototypu z \code{file_operations} (lxr)
+  \item Vytvořte funkce dle prototypu z \code{file_operations} (lxr)
   \begin{itemize}
     \item Open a release s nějakým \code{printk} a \code{return}
-    \item Read a write prozatím jen \code{return}
+    \item Read a write prozatím jen s \code{return}
     \item Návratové hodnoty
     \begin{itemize}
       \item Open a release vracejí 0 (žádná chyba)
@@ -215,27 +215,28 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
   \item Jen zkuste přeložit
   \end{enumerate}
-\end{frame}
 
+\end{frame}
 
 \begin{frame}
   \frametitle{Vytvoření znakového zařízení}
 
   \begin{itemize}
-  \item LDD3 3. a 6. kapitola
+  \item LDD3 3.\ a 6.\ kapitola
   \item 2--3 kroky
 
   \begin{enumerate}
   \item Registrace rozsahu major+minor (v \code{module_init})
     \begin{itemize}
-    \item \code{alloc_chrdev_region}, \code{register_chrdev_region},
+    \item Buď \code{alloc_chrdev_region} (chci čísla přidělit), anebo
+      \code{register_chrdev_region} (čísla mám), nakonec
       \code{unregister_chrdev_region} (\header{linux/fs.h})
     \item Přidání záznamu do \file{/proc/devices}
     \end{itemize}
 
   \pause
 
-  \item Registrace jednotlivých minorů (při objevení zařízení)
+  \item Registrace jednotlivých minorů (při připojení zařízení)
     \begin{itemize}
     \item \code{cdev_init}, \code{cdev_add}, \code{cdev_del}
       (\header{linux/cdev.h})
@@ -249,7 +250,7 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
     \begin{itemize}
     \item \code{device_create}, \code{device_destroy}
       (\header{linux/device.h})
-    \item Předem je potřeba vytvořit \code{class} (\code{module_init})
+    \item Předem je potřeba vytvořit \code{class} (v \code{module_init})
     \end{itemize}
   \end{enumerate}
 
@@ -257,12 +258,11 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
   \heading{Vytvoření znakového zařízení}
   \begin{enumerate}
-  \item Definujte si globální \code{struct cdev}
+  \item Definujte si globální \code{struct cdev} (znakové zařízení)
 
   \item V \code{module_init}
   \begin{itemize}
@@ -271,9 +271,9 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
       \item \code{dev} je návratová hodnota typu \code{dev_t}
       \item Vypište si \code{MAJOR(dev)} a \code{MINOR(dev)}
     \end{itemize}
-    \item Zavolejte \code{cdev_init} na svou globální \code{struct cdev}
-    \item Zavolejte \code{cdev_add} na svou globální \code{struct cdev} a
-      \code{dev}
+    \item Inicializujte svou globální \code{struct cdev} (\code{cdev_init})
+    \item Přidejte svoje \code{struct cdev} do systému (\code{cdev_add} a
+      \code{dev} shora)
   \end{itemize}
 
   \item V \code{module_exit}
@@ -295,14 +295,14 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
   \begin{itemize}
   \item Něco, čemu nelze věřit (NULL, ukazatel do tabulek oprávnění, \dots)
-  \item Nutnost kontroly \emph{POZOR}
+  \item \emph{POZOR}: nutnost kontroly
 
   \pause
 
   \item \code{copy_from_user}, \code{copy_to_user}
   \begin{itemize}
     \item ,,\code{memcpy}'' s kontrolou
-    \item Vracejí počet \emph{NEzkopírovaných} znaků (0 znamená OK)
+    \item Vracejí počet \emph{NEzkopírovaných} znaků (tj.\ 0 znamená OK)
   \end{itemize}
 
   \pause
@@ -359,13 +359,15 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
   \item Potřebujeme
     \begin{itemize}
-    \item Definici misc zařízení (\code{struct miscdevice})
-    \item Opět \code{struct file_operations}
-    \item \code{struct cdev} není třeba
+      \item Definici misc zařízení (\code{struct miscdevice}) -- minor číslo,
+        jméno zařízení v \file{/dev}, atd.
+      \item Opět \code{struct file_operations}
+      \item \code{struct cdev} není třeba
     \end{itemize}
-  \item \code{misc_register}, \code{misc_deregister}
-  \item Objeví se v \file{/proc/misc} a \file{/dev}
-  \item \header{linux/miscdevice.h}
+    \item \code{int misc_register(struct miscdevice *misc)}
+    \item \code{void misc_deregister(struct miscdevice *misc)}
+    \item Objeví se v \file{/proc/misc} a \file{/dev}
+    \item \header{linux/miscdevice.h}
   \end{itemize}
 
 \end{frame}
@@ -375,16 +377,17 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
   \heading{Vytvořit misc zařízení}
   \begin{enumerate}
-  \item Definice \code{struct miscdevice}
-  \begin{itemize}
-    \item \code{minor = MISC_DYNAMIC_MINOR} (automaticky přidělit)
-    \item \code{name} -- jméno vytvářeného zařízení
-    \item \code{fops} -- vaše \code{struct file_operations}
-  \end{itemize}
-  \item \code{misc_register/deregister} do \code{module_init/exit}
-  \item \cmd{make} a \cmd{insmod}
-  \item Ověřte vytvoření v \file{/proc/misc}
-  \item Vyzkoušejte \cmd{cat /dev/<name>} (jméno shora)
+    \item Definujte si nějakou \code{struct miscdevice}
+    \begin{itemize}
+      \item \code{minor = MISC_DYNAMIC_MINOR} (automaticky přidělit)
+      \item \code{name} -- jméno vytvářeného zařízení
+      \item \code{fops} -- vaše \code{struct file_operations}
+    \end{itemize}
+
+    \item \code{misc_register/deregister} do \code{module_init/exit}
+    \item \cmd{make} a \cmd{insmod}
+    \item Ověřte vytvoření v \file{/proc/misc}
+    \item Vyzkoušejte \cmd{cat /dev/<name>} (jméno shora)
   \end{enumerate}
 \end{frame}
 
