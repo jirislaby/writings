@@ -274,7 +274,7 @@
 \begin{frame}[fragile]{Zdrojové a hlavičkové soubory}{Příklad}
 
   \begin{center}
-  \begin{tabular}{|l|l|} \hline 
+  \begin{tabular}{|l|l|} \hline
   Zdrojový soubor & Hlavičkový soubor \\
   \file{main.c} & \file{main.h} \\ \hline
   \begin{lstlisting}
@@ -1832,6 +1832,416 @@ int div(int a, int b) {
 
 \end{frame}
 
+% Hlavičkové soubory skipped
+
+\fi
+
+\section{Pointery (ukazatele)}
+\frame{\sectionpage}
+
+\begin{frame}{Pamět}
+
+  \begin{itemize}
+    \item Paměť obsahuje velké množství buněk s fixní délkou
+    \begin{itemize}
+      \item Adresovatelné typicky na úrovni 8 bitů == 1 bajt
+    \end{itemize}
+
+    \pause
+
+    \item V paměti mohou být umístěny entity
+    \begin{itemize}
+      \item Proměnné, řetězce, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Entita může zabírat více než jeden buňku
+    \begin{itemize}
+      \item Např.\ proměnná typu \code{short} zabírá na \xes 16 bitů (2 bajty)
+      \item Adresa entity v paměti je dána první buňkou, kde je entita
+        umístěna
+    \end{itemize}
+
+    \pause
+
+    \item Adresy jsou typicky uváděny jako hexadecimální čísla
+    \begin{itemize}
+      \item Adresy na \xes zabírají 4 bajty, na 64-bitu 8 bajtů
+      \item Na konkrétní délky nespoléhejte!
+      \item Příklady adres: \code{0x00100000}, \code{0xffffffff81385c33}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Organizace paměti}
+
+  \begin{itemize}
+    \item Kód, instrukce
+    \begin{itemize}
+      \item Nemění se
+    \end{itemize}
+
+    \pause
+
+    \item Data
+    \begin{itemize}
+      \item Většina se nemění, jsou přímo v binárce
+      \item Globální proměnné (mění se)
+    \end{itemize}
+
+    \pause
+
+    \item Zásobník (stack)
+    \begin{itemize}
+      \item Mění se pro každou funkci (stack-frame)
+      \item Lokální proměnné
+    \end{itemize}
+
+    \pause
+
+    \item Halda (heap)
+    \begin{itemize}
+      \item Dynamicky alokované proměnné
+      \item Mění se při každém \code{malloc}, \code{free}
+    \end{itemize}
+
+  \end{itemize}
+
+  % XXX obrazek
+
+\end{frame}
+
+\begin{frame}{Proměnná}{Opakování}
+
+  \begin{itemize}
+    \item Každá proměnná má svou adresu v paměti
+
+    \pause
+
+    \item Pomocí názvu proměnné můžeme číst/zapisovat z/do této paměti
+    \begin{itemize}
+      \item Např. \code{cislo = 3;}
+    \end{itemize}
+
+    \pause
+
+    \item Překladač nahrazuje jméno proměnné její adresou
+    \begin{itemize}
+      \item Typicky relativní k zásobníku
+      \item \code{movl \$3, -4(\%rbp)}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+%\begin{frame}{Proměnná na zásobníku}
+%
+%  \begin{itemize}
+%    \item POZOR: Zásobník je zde znázorněn „učebnicovým“ způsobem (růst „nahoru“)
+%    \item C kód: int promennaX = -213;
+%    \item Asembler kód: \code{movl \$0xffffff2b,0xc(\%esp)}
+%  \end{itemize}
+%
+%\end{frame}
+
+\begin{frame}{Operátor \code{\&}}
+
+  \begin{itemize}
+    \item Operátor \code{\&} vrací adresu svého argumentu
+    \begin{itemize}
+      \item Místo v paměti, kde je argument uložen
+    \end{itemize}
+
+    \pause
+
+    \item Výsledek lze přiřadit do proměnné typu ukazatel
+      \item \code{int cislo = 3;}
+      \item \code{int *p = \&promennaX;}
+  \end{itemize}
+
+  % XXX obrazek
+
+\end{frame}
+
+\begin{frame}{Proměnná typu ukazatel}
+
+  \begin{itemize}
+    \item Proměnná Y typu ukazatel je stále jen proměnná
+    \begin{itemize}
+      \item Tato proměnná je na adrese X
+      \item Tj.\ na adrese X je uložena adresa někoho cizího (Y)
+    \end{itemize}
+
+    \pause
+
+%    \item Pro kompletní specifikaci proměnné není dostačující
+%    \begin{itemize}
+%      \item chybí datový typ pro data na adrese Y
+%    \end{itemize}
+%
+%    \pause
+
+    \item Jak se má paměť na adrese Y interpretovat?
+    \begin{itemize}
+      \item Datový typ pro data na adrese X je ale známý
+      \item Je to adresa
+    \end{itemize}
+
+    \pause
+
+    \item Neinicializovaný ukazatel
+    \begin{itemize}
+      \item V paměti na adrese X je ,,smetí''
+    \end{itemize}
+
+    \pause
+
+    \item Nulový ukazatel (\code{int *a = NULL;})
+    \begin{itemize}
+      \item V paměti na adrese X je \code{0}
+    \end{itemize}
+
+    \pause
+
+    \item Pozor na \code{int *a, b;}
+    \begin{itemize}
+      \item \code{a} je \code{int *}, \code{b} jen \code{int}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+%\begin{frame}{Proměnná typu ukazatel na typ}
+%
+%operátor & vrátí adresu
+%  \begin{itemize}
+%\item C kód: int* pX = &promennaX;
+% argumentu (zde promennaX)
+%\item Asembler kód:
+%\item lea
+% 0x8(%esp),%eax
+%\item mov
+% %eax,0xc(%esp)
+%  \end{itemize}
+%
+%\end{frame}
+
+\begin{frame}{Operátor dereference *}
+
+  \begin{itemize}
+    \item Pracuje nad proměnnými typu ukazatel
+    \begin{itemize}
+      \item Podívej se na adresu v proměnné X jako na hodnotu typu Y
+    \end{itemize}
+
+    \pause
+
+    \item Zpřístupní hodnotu, na kterou ukazatel ukazuje
+    \begin{itemize}
+      \item Nikoli vlastní hodnotu ukazatele (což je adresa)
+      \item Ukazatel ale může ukazovat na hodnotu, která se interpretuje zase
+        jako adresa (např.\ \code{int **})
+    \end{itemize}
+
+    \pause
+
+    \item Příklady dereference typu (není reálné C)
+    \begin{itemize}
+      \item \code{&int} je \code{int *}
+      \item \code{*(int *)} je \code{int}
+      \item \code{*(int **)} je \code{int *}
+      \item \code{**(int **)} je \code{int}
+      \item \code{*(\&int)} je \code{int}
+      \item \code{**(\&\&int)} je \code{int}
+    \end{itemize}
+
+    \pause
+
+    \item Pokud je dereference použita jako l-hodnota, tak se mění odkazovaná
+      hodnota, nikoli adresa ukazatele
+    \begin{itemize}
+      \item \code{int *pX; pX = 10;} (typicky špatně -- nechceme měnit ukazatel)
+      \item \code{int *pX; *pX = 10;} (typicky OK -- chceme měnit hodnotu,
+        která je na adrese na kterou \code{pX} ukazuje)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+% \begin{frame}{Způsob předávání funkčních argumentů}
+%
+% Proměnné a ukazatele - ukázka
+% int promennaX = -213;
+% (promennaX je adresa schránky 1,
+% obsahuje -213)
+% int* pX = &promennaX;
+% (pX je adresa schránky 2, obsahuje
+% adresu schránky 1)
+% obsah paměti
+% -213
+% 1
+% adresa paměti
+% 1
+% 2
+% int** ppX = &pX;
+% (ppX je adresa schránky 3,
+% obsahuje adresu schránky 2, která
+% obsahuje adresu schránky 1)
+% 2
+%  3
+%   \begin{itemize}
+% \item print(*pX); vypíše? (-213)
+% \item print(promennaX); vypíše? (-213) print(*ppX); vypíše? 1
+% \item print(pX); vypíše? 1
+%  \item print(&pX); vypíše? 2
+% \item print(ppX); vypíše? 2
+%  \item print(*(&pX)); vypíše? 1
+%   \end{itemize}
+%
+% \end{frame}
+
+\begin{frame}{Segmentation fault}
+
+  \begin{itemize}
+    \item Proměnná typu ukazatel obsahuje adresu
+    \begin{itemize}
+      \item \code{int cislo = 3; int *pX = &cislo;}
+    \end{itemize}
+
+    \pause
+
+    \item Adresa nemusí být přístupná našemu programu
+    \begin{itemize}
+      \item \code{pX = 12345678; // nejspis neni nase adresa}
+    \end{itemize}
+
+    \pause
+
+    \item Pokusu o přístup mimo povolenou paměť = pád
+    \begin{itemize}
+      \item \code{*pX = 20;}
+      \item \emph{Segmentation fault}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Více ukazatelů na stejné místo v paměti}
+
+  \begin{itemize}
+    \item Není principiální problém
+    \begin{itemize}
+      \item \code{int cislo = 3;}
+      \item \code{int *pX = \&cislo;}
+      \item \code{int *pX2 = \&cislo;}
+      \item \code{int *pX3 = \&cislo;}
+    \end{itemize}
+
+    \pause
+
+    \item Všechny ukazatele mohou místo v paměti měnit
+    \begin{itemize}
+      \item \code{*pX3 = 1; *pX = 10;}
+    \end{itemize}
+
+    \pause
+
+    \item Je nutné hlídat, zda si navzájem nepřepisují hodnoty
+    \begin{itemize}
+      \item Logická chyba v programu
+      \item Problém při použití paralelních vláken
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Problém s předáváním hodnotou}
+
+\begin{block}{Příklad}
+\begin{center}
+\begin{tabular}{l|l}
+\begin{lstlisting}
+void foo(int X) {
+  X = 3;
+  // X is now 3
+}
+int main() {
+  int x = 0;
+  foo(x);
+  // :( x is (magically) back to 0
+  return 0;
+}
+\end{lstlisting}
+&
+\begin{onslide}<2->
+\begin{lstlisting}
+void foo(int *P) {
+  *P = 3;
+}
+int main() {
+  int x = 0;
+  foo(&x);
+  // x is 3
+  return 0;
+}
+\end{lstlisting}
+\end{onslide}
+\end{tabular}
+\end{center}
+\end{block}
+
+  \onslide<1->
+
+  \begin{itemize}
+    \item Po zániku lokální proměnné se změna nepropaguje mimo tělo funkce
+
+    \pause
+
+    \item Řešením je předávat adresu proměnné
+    \begin{itemize}
+      \item A modifikovat hodnotu na této adrese, namísto lokální proměnné
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Argumenty předávané hodnotou ukazatele}
+
+  \begin{itemize}
+    \item S využitím ukazatelů můžeme předat výstup přes vstupní argumenty
+
+    \pause
+
+    \item Pokud je vstupním argumentem ukazatel:
+    \begin{enumerate}
+      \item Vznikne lokální proměnná P typu ukazatel
+      \item Předává se hodnotou, do P se zkopíruje hodnota (tj.\ adresa,
+        např.\ X)
+      \item Pomocí operátoru dereference \code{*} můžeme modifikovat paměť na
+        adrese X (\code{*P == X})
+      \item Lokální proměnná P na konci funkce zaniká
+      \item Hodnota na adrese X je ale modifikována
+    \end{enumerate}
+
+    \pause
+
+    \item Změna provedená ve funkci zůstává i po jejím ukončení
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Pointery (ukazatele)}
+
+pointer typu void, pole (jedno i vícerozměrné), pointer na funkci
+
+\end{frame}
+
+\end{document}
+
 \begin{frame}{Argumenty funkce \code{main}}
 
   \begin{itemize}
@@ -1873,19 +2283,6 @@ int div(int a, int b) {
       \item \code{argv[1]}: první parametr
     \end{itemize}
   \end{itemize}
-
-\end{frame}
-
-% Hlavičkové soubory skipped
-
-\fi
-
-\section{Pointery (ukazatele)}
-\frame{\sectionpage}
-
-\begin{frame}{Pointery (ukazatele)}
-
-princip ukazatelů, použití, pointer typu void, pole (jedno i vícerozměrné), pointer jako parametr funkce (předávání parametru hodnotou vs. odkazem), pointer na funkci
 
 \end{frame}
 
