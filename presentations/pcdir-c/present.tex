@@ -2279,43 +2279,255 @@ for (int i = 0; i < 10; i++)
 
 \end{frame}
 
+\begin{frame}{Zjištění velikosti pole}
+
+  \begin{itemize}
+    \item Jak zjistit, kolik prvků se nachází v poli?
+    \item Jak zjistit, kolik bajtů je potřeba na uložení pole?
+
+    \pause
+
+    \item Jazyk C obecně neuchovává velikost pole
+    \begin{itemize}
+      \item Např.\ Java uchovává prostřednictvím \code{pole.length}
+    \end{itemize}
+
+    \pause
+
+    \item Velikost pole si proto musíme pamatovat
+    \begin{itemize}
+      \item Dodatečná proměnná
+    \end{itemize}
+
+    \pause
+
+    \item V některých případech lze využít operátor \code{sizeof}
+    \begin{itemize}
+      \item \pozor, nefunguje u ukazatelů -- vrátí velikost ukazatele, ne pole
+
+      \pause
+
+      \item \pozor, nefunguje u pole předaného do funkce
+
+      \pause
+
+      \item Nespoléhejte, pamatujte si velikost v separátní proměnné
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Využití operátoru \code{sizeof}}
+
+  \begin{itemize}
+    \item \code{sizeof(pole)}
+    \begin{itemize}
+      \item Velikost paměti obsazené polem v \emph{bajtech}
+    \end{itemize}
+
+    \pause
+
+    \item \code{sizeof(ukazatel)}
+    \begin{itemize}
+      \item Velikost ukazatele (typicky 4 nebo 8 bajtů)
+    \end{itemize}
+
+    \pause
+
+    \item Pozor, pole v C nehlídá meze!
+    \begin{itemize}
+      \item Čtení/zápis mimo alokovanou paměť může způsobit pád nebo nežádoucí
+	změnu jiných dat
+      \item \code{int array[10]; array[100] = 1; // runtime exception}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Pole vs. hodnota}
+
+  \begin{itemize}
+    \item Jaký je rozdíl mezi ukazatelem na místo v paměti
+      obsahujícím hodnotu typu integer a proměnnou
+      typu pole integerů?
+    \begin{itemize}
+      \item \code{int myInt = 3;}
+      \item \code{int *pMyInt = \&myInt;}
+      \item \code{int myIntArray[100];}
+    \end{itemize}
+
+    \pause
+
+    \item Jméno pole bez \code{[]} vrací adresu na začátek pole
+
+    \pause
+
+    \item Co vrací \code{\&myIntArray}?
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Jednorozměrné pole}
+
+  \begin{itemize}
+    \item Jednorozměrné pole lze implementovat pomocí ukazatele na souvislou
+      oblast v paměti
+    \begin{itemize}
+      \item \code{int array[10];}
+    \end{itemize}
+
+    \pause
+
+    \item Jednotlivé prvky pole jsou v paměti za sebou
+
+    \pause
+
+    \item Proměnná typu pole obsahuje adresu prvního prvku pole
+    \begin{itemize}
+      \item \code{int *pArray = array;}
+      \item \code{int *pArray = \&array[0];}
+    \end{itemize}
+
+    \pause
+
+    \item Indexuje se od 0
+    \begin{itemize}
+      \item n-tý prvek je na pozici \code{[n-1]}
+    \end{itemize}
+
+    \pause
+
+    \item Pole v C nehlídá přímo meze při přístupu!
+    \begin{itemize}
+      \item \code{int array[10]; array[100] = 1;}
+      \item Pro kompilátor OK, může nastat výjimka při běhu (ale nemusí!)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Jednorozměrné pole}{Proměnná délka}
+
+  \begin{itemize}
+    \item Dynamická alokace -- bude probíráno později
+    \begin{itemize}
+      \item Proměnná typu ukazatel \code{int *pArray;}
+      \item Místo na pole získáváme (a odebíráme) pomocí speciálních funkcí na
+	haldě
+      \item \code{malloc()}, \code{free()}
+    \end{itemize}
+
+    \pause
+
+    \item Deklarace pole s variabilní délkou
+    \begin{itemize}
+      \item Variable length array (VLA)
+      \item Až od C99
+      \item Alokuje se na zásobníku
+      \item Není nutné se starat o uvolnění (lokální proměnná)
+      \item Nedoporučuje se pro příliš velká pole (použít haldu)
+    \end{itemize}
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+int arraySize = 20;
+scanf("%d", &arraySize);
+int arrayLocal[arraySize];
+arrayLocal[10] = 9;
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Ukazatelová aritmetika}
+
+  \begin{itemize}
+    \item Aritmetické operátory prováděné nad ukazateli
+    \item Využívá se faktu, že \code{array[X]} je definováno jako
+      \code{*(array + X)}
+
+    \pause
+
+    \item Operátor \code{+} přičítá k adrese na úrovni prvků pole
+    \begin{itemize}
+      \item Nikoli na úrovni bajtů!
+      \item Obdobně pro -, *, /, ++ ...
+    \end{itemize}
+
+    \pause
+
+    \item Adresu počátku pole lze přiřadit do ukazatele
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Ukazatelová aritmetika}{Otázky}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+int myArray[10];
+for (int i = 0; i < 10; i++)
+  myArray[i] = i+10;
+int *pArray = myArray + 5;
+\end{lstlisting}
+\end{block}
+
+  \begin{itemize}[<+->]
+    \item Co vrátí \code{myArray[10]}?
+    \item Co vrátí \code{myArray[3]}?
+    \item Co vrátí \code{myArray + 3}?
+    \item Co vrátí \code{*(pArray - 2)}?
+    \item Co vrátí \code{pArray - myArray}?
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Typické problémy při práci s poli}
+
+  \begin{itemize}
+    \item Zápis do pole bez specifikace místa
+    \begin{itemize}
+      \item \code{int array[10]; array = 1;}
+      \item Proměnnou typu pole nelze naplnit (rozdíl oproti ukazateli)
+    \end{itemize}
+
+    \pause
+
+    \item Zápis těsně za konec pole, častý ,,N+1'' problém
+    \begin{itemize}
+      \item \code{int array[N]; array[N] = 1;}
+      \item V C pole se indexuje od 0
+    \end{itemize}
+
+    \pause
+
+    \item Zápis za konec pole
+    \begin{itemize}
+      \item Např.\ důsledek ukazatelové aritmetiky nebo chybného cyklu
+      \item \code{int array[10]; array[someVariable + 5] = 1;}
+    \end{itemize}
+
+    \pause
+
+    \item Zápis před začátek pole
+    \begin{itemize}
+      \item Méně časté, ukazatelová aritmetika
+    \end{itemize}
+
+    \pause
+
+    \item Čtení/zápis mimo alokovanou paměť může způsobit pád nebo nežádoucí
+      změnu jiných dat (která se zde nachází)
+    \begin{itemize}
+      \item \code{int array[10]; array[100] = 1; // runtime exception}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
 \end{document}
-
-\begin{frame}{Argumenty předávané hodnotou ukazatele}
-
-Zjištění velikosti pole
- Jak zjistit, kolik prvků se nachází v poli?
- Jak zjistit, kolik bajtů je potřeba na uložení pole?
- Jazyk C obecně neuchovává velikost pole
-● Např. Java uchovává prostřednictvím pole.length
- Velikost pole si proto musíme pamatovat
-● Dodatečná proměnná
- (V některých případech lze využít operátor sizeof)
-●
- Pozor, nefunguje u ukazatelů - vrátí velikost ukazatele, ne pole
-●
- Pozor, funguje jen u pole deklarovaného s pevnou velikostí
-●
- Pozor, nefunguje u pole předaného do funkce
-●
- Nespoléhejte, pamatujte si velikost v separátní proměnné.
-
-\end{frame}
-
-\begin{frame}{Argumenty předávané hodnotou ukazatele}
-
-Využití operátoru sizeof()
- sizeof(pole)
-● velikost paměti obsazené polem v bajtech
-● funguje jen pro statická pole, jinak velikost ukazatele
- sizeof(ukazatel)
-● velikost ukazatele (typicky 4 nebo 8 bajtů)
- Pozor, pole v C nehlídá meze!
-● čtení/zápis mimo alokovanou paměť může způsobit
-pád nebo nežádoucí změnu jiných dat
-● int array[10]; array[100] = 1; // runtime exception
-
-\end{frame}
 
 \begin{frame}{Pointery (ukazatele)}
 
