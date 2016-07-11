@@ -1834,8 +1834,6 @@ int div(int a, int b) {
 
 % Hlavičkové soubory skipped
 
-\fi
-
 \section{Pointery (ukazatele)}
 \frame{\sectionpage}
 
@@ -2452,7 +2450,7 @@ arrayLocal[10] = 9;
     \item Operátor \code{+} přičítá k adrese na úrovni prvků pole
     \begin{itemize}
       \item Nikoli na úrovni bajtů!
-      \item Obdobně pro -, *, /, ++ ...
+      \item Obdobně pro \code{\-}, \code{*}, \code{/}, \code{++}, \dots
     \end{itemize}
 
     \pause
@@ -3141,38 +3139,47 @@ SEE ALSO
 
   \begin{itemize}
     \item Nedostatečně velký cílový řetězec
-      \item např. strcpy
+    \begin{itemize}
+      \item Např.\ při \code{strcpy}
+    \end{itemize}
+
+    \pause
+
     \item Chybějící koncová nula
-      \item následné funkce nad řetězcem nefungují korektně
-      \item vznikne např. nevhodným přepisem (N+1 problém)
+    \begin{itemize}
+      \item Následné funkce nad řetězcem nefungují korektně
+      \item Vznikne např.\ nevhodným přepisem (N+1 problém)
+    \end{itemize}
+
+    \pause
+
     \item Nevložení koncové nuly
-      \item strncpy
+    \begin{itemize}
+      \item Např.\ při \code{strncpy}
+    \end{itemize}
+
+    \pause
+
     \item Délka/velikost řetězce bez místa pro koncovou nulu
-      \item strlen
-    \item if (myString4 == "Hello") { }
-      \item chybné, porovnává hodnotu ukazatelů, nikoli obsah řetězců
-      \item nutno použít if (strcmp(myString, “Hello”) == 0) { }
-    \item Sčítání řetězců pomocí + (sčítá ukazatele namísto obsahu)
-  \end{itemize}
+    \begin{itemize}
+      \item Např.\ při \code{strlen}
+    \end{itemize}
 
-\end{frame}
+    \pause
 
-\end{document}
+    \item \code{if (str == "Hello") \{ ... \}}
+    \begin{itemize}
+      \item Špatně, porovnává hodnotu ukazatelů, nikoli obsah řetězců
+      \item Nutno použít \code{if (strcmp(str, "Hello") == 0) \{ ... \}}
+    \end{itemize}
 
-\begin{frame}{Pole řetězců}
+    \pause
 
-  \begin{itemize}
-    \item Pole ukazatelů na řetězce
-    \item Typicky nepravoúhlé (řetězce jsou různé dlouhé)
-    \item Použití často pro skupinu konstantních řetězců
-      \item např. dny v týdnu
-      \item char* dayNames[] = {"Pondeli", "Utery", "Streda"};
-	\item pole se třemi položkami typu char*
-	\item dayNames[0] ukazuje na konstantní řetězec "Pondeli"
-    \item Co způsobí strcpy(dayNames[0], "Ctvrtek");?
-      \item zapisujeme do paměti s konstantním řetězcem
-      \item pravděpodobně způsobí pád, je vhodné nechat kontrolovat překladačem
-	(klíčové slovo const -- viz. dále)
+    \item Spájení řetězců pomocí \code{+}
+    \begin{itemize}
+      \item Sčítá ukazatele namísto obsahu
+    \end{itemize}
+
   \end{itemize}
 
 \end{frame}
@@ -3180,33 +3187,212 @@ SEE ALSO
 \begin{frame}[fragile]{Problémy s řetězci}{Příklad}
 
 \begin{lstlisting}
-void demoStringProblems() {
   char myString1[] = "Hello";
   strcpy(myString1, "Hello world");
   puts(myString1);
+\end{lstlisting}
+\begin{lstlisting}
   char myString2[] = "Hello";
   myString2[strlen(myString2)] = '!';
   puts(myString2);
+\end{lstlisting}
+\begin{lstlisting}
   char myString3[] = "Hello";
   strncpy(myString3, "Hello world", sizeof(myString3));
+\end{lstlisting}
+\begin{lstlisting}
   char myString4[] = "Hello";
   char myString5[strlen(myString4)];
   strcpy(myString4, myString5);
+\end{lstlisting}
+\begin{lstlisting}
   char myString6[] = "Hello";
   if (myString6 == "Hello") { }
-  char* dayNames[] = {"Pondeli", "Utery", "Streda"};
+\end{lstlisting}
+\begin{lstlisting}
+  char *dayNames[] = {"Pondeli", "Utery", "Streda"};
   puts(dayNames[0]);
   strcpy(dayNames[0], "Ctvrtek");
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}{Pole řetězců}
+
+  \begin{itemize}
+    \item Pole ukazatelů na řetězce
+    \item Typicky nepravoúhlé (řetězce jsou různé dlouhé)
+    \item Použití často pro skupinu konstantních řetězců
+    \begin{itemize}
+      \item Např.\ dny v týdnu
+      \item \code{char *days[] = \{ "Pondeli", "Utery", "Streda" \};}
+      \begin{itemize}
+	\item Pole se třemi položkami typu \code{char *}
+	\item \code{days[0]} ukazuje na konstantní řetězec \code{\"Pondeli"}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Co způsobí \code{strcpy(days[0], "Ctvrtek")}?
+    \begin{itemize}
+      \item Zapisujeme do paměti s konstantním řetězcem
+      \item Pravděpodobně způsobí pád
+      \item Vhodné kontrolovat překladačem (viz dále klíčové slovo \code{const})
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\subsection*{Klíčové slovo const}
+\frame{\subsectionpage}
+
+\begin{frame}[fragile]{Klíčové slovo const}
+
+  \begin{itemize}
+    \item Zavedeno pro zvýšení robustnosti kódu
+    \begin{itemize}
+      \item Chceme označit proměnnou, která nesmí být změněna
+      \item Typicky konstanta, např.\ počet měsíců v roce
+    \end{itemize}
+
+    \pause
+
+    \item Kontroluje přímo překladač
+    \pause
+    \begin{itemize}
+      \item A navíc může optimalizovat
+    \end{itemize}
+
+    \pause
+
+    \item Používejte kdykoliv je to možné
+
+    \pause
+
+    \item Dokumentační účel
+    \begin{itemize}
+      \item Jiný programátor získá lepší představu o ,,ne/proměnných''
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void fun(const int *pParam) {
+  //const int a, b = 0; // error, uninitialized const 'a'
+  const int numMonthsInYear = 12;
+  printf("Number of months in year: %d", numMonthsInYear);
+
+  numMonthsInYear = 13; // error: assignment of read-only variable
+  *pParam = 1; // error: assignment of read-only location
+}
+\end{lstlisting} %stopzone
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Řetězcové literály}
+
+  \begin{itemize}
+    \item \code{puts("ahoj");}
+    \begin{itemize}
+      \item Řetězec \code{\"ahoj"} je uložen v konstantní sekci
+      \item Je typu \code{char *}, ale zároveň v konstantní sekci
+      \begin{itemize}
+	\item Při zápisu pravděpodobně pád programu
+      \end{itemize}
+    \end{itemize}
+
+    \onslide<4->
+
+    \item Používejte tedy \code{const char *}
+    \begin{itemize}
+      \item Překladač hlídá pokus o zápis do konstantní sekce
+      \item \code{const char *dayNames[] = \{ "Pondeli", "Utery", "Streda" \}}
+    \end{itemize}
+  \end{itemize}
+
+  \onslide<2->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+char *get_string() { return "Unmodifiable string"; }
+const char *get_const_string() { return "Unmodifiable string"; }
+\end{lstlisting}
+\onslide<3->
+\begin{lstlisting}
+void fun() {
+  char *value = get_string();
+  value[1] = 'x'; // read-only memory write -- problem
+  char *value2 = get_const_string(); // error: invalid conversion
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{const ukazatel}
+
+  \begin{itemize}
+    \item Konstantní je pouze hodnota označené proměnné
+    \begin{itemize}
+      \item Platí i pro ukazatel včetně dereference
+      \item \code{int value = 10; const int *pValue = \&value;}
+    \end{itemize}
+
+    \pause
+
+    \item Není konstantní objekt proměnnou odkazovaný
+    \begin{itemize}
+      \item \code{const} je ,,plytké''
+      \item Konstantní proměnnou lze modifikovat přes nekonstantní ukazatel
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+const int value = 10;
+const int *pValue = &value;
+int *pValue2 = &value;
+
+value = 10; // error
+*pValue = 10; // error
+*pValue2 = 10; // possible
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Předání const ukazatele do funkce}
+
+\begin{lstlisting}
+void foo(const int *carray) {
+  // error: assignment of read-only location 'carray'
+  carray[0] = 1;
+  // warning: initialization discards qualifiers from pointer target type
+  int *tmp = carray;
+  // possible, but unwanted! (array was const, tmp is not)
+  tmp[0] = 1;
+}
+
+int main() {
+  int array[10];
+  foo(array);
+  return 0;
 }
 \end{lstlisting}
 
 \end{frame}
 
-\begin{frame}{Pointery (ukazatele)}
-
-pointer typu void, pointer na funkci
-
-\end{frame}
+\subsection*{Argumenty funkce \code{main}}
+\frame{\subsectionpage}
 
 \begin{frame}{Argumenty funkce \code{main}}
 
@@ -3252,6 +3438,298 @@ pointer typu void, pointer na funkci
 
 \end{frame}
 
+\subsection*{Funkční ukazatel}
+\frame{\subsectionpage}
+
+\begin{frame}{Funkční ukazatel}{Motivace}
+
+  \begin{itemize}
+    \item Antivirus umožňuje provést analýzu souborů
+    \begin{itemize}
+      \item Funkce \code{int Analyze(const char *filePath);}
+    \end{itemize}
+
+    \pause
+
+    \item Antivirus běží na pozadí a analyzuje všechny soubory při jejich čtení
+      nebo zápisu na disk
+
+    \pause
+
+    \item Jak ale antivirus zjistí, že má soubor analyzovat?
+    \begin{itemize}
+      \item Trvalé monitorování všech souborů je nemožné
+      \item Vložení funkce \code{Analyze()} do všech programů nemožné
+    \end{itemize}
+
+    \pause
+
+    \item Obsluha souborového systému čtení i zápis zná
+    \begin{itemize}
+      \item Antivirus si může zaregistrovat funkci \code{Analyze} na událost
+	čtení/zápis
+    \end{itemize}
+
+    \pause
+
+    \item Jak registrovat?
+    \begin{itemize}
+      \item Funkční ukazatel (callback)
+    \end{itemize}
+
+    \pause
+
+    \item Událostmi řízené programování
+    \begin{itemize}
+      \item ,,Event-driven''
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Funkční ukazatele}
+
+  \begin{itemize}
+    \item Funkční ukazatel obsahuje adresu umístění kódu funkce
+    \begin{itemize}
+      \item Namísto běžné hodnoty je na adrese kód funkce
+    \end{itemize}
+
+    \pause
+
+    \item Ukazatel na funkci získáme pomocí operátoru \code{\&}
+    \begin{itemize}
+      \item \code{\&Analyze // bez kulatych zavorek}
+    \end{itemize}
+
+    \pause
+
+    \item Ukazatel na funkci lze uložit do proměnné
+    \begin{itemize}
+      \item \code{navratovy_typ (*jmeno_promenne)(typy argumentu)}
+      \item Např. \code{int (*pAnalyze)(const char *) = \&Analyze;}
+    \end{itemize}
+
+    \pause
+
+    \item Ukazatel na funkci lze zavolat jako funkci
+    \begin{itemize}
+      \item \code{pAnalyze("C:\\autoexec.bat");}
+    \end{itemize}
+
+    \pause
+
+    \item Ukazatel na funkci může být parametr jiné funkce
+    \begin{itemize}
+      \item \code{void foo(int neco, int (*pFnc)(float, float));}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Funkční ukazatel}{Signatura}
+
+  \begin{itemize}
+    \item Důležitá je signatura funkce
+    \begin{itemize}
+      \item Typ a počet argumentů, typ návratové hodnoty, volací konvence
+      \item Jméno funkce není důležité
+    \end{itemize}
+
+    \pause
+
+    \item Do funkčního ukazatele s danou signaturou můžeme přiřadit adresy
+      všech funkcí se stejnou signaturou
+
+    \onslide<5->
+
+    \item Neodpovídající signatury kontroluje překladač
+  \end{itemize}
+
+\onslide<3->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+int Analyze (const char *filePath) {}
+int Ahoj (const char *filePath) {}
+\end{lstlisting}
+\onslide<4->
+\begin{lstlisting}
+int main(void) {
+  int (*pFnc)(const char *) = &Analyze;
+  pFnc("c:\\autoexec.bat");
+  pFnc = &Ahoj; // mozne take jako: pFnc = Ahoj;
+  pFnc("c:\\autoexec.bat");
+  return 0;
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Funkční ukazatel}{Využití}
+
+  \begin{itemize}
+    \item Podpora ,,plug-inů'' v systému (např.\ antivirus)
+    \begin{itemize}
+      \item Plug-in zaregistruje svůj callback na žádanou událost
+      \begin{itemize}
+	\item Např.\ antivirus na událost „přístup k souboru na disku“
+      \end{itemize}
+
+      \pause
+
+      \item Při výskytu události systém zavolá zaregistrovaný callback
+    \end{itemize}
+
+    \pause
+
+    \item V systému lze mít několik antivirů
+    \begin{itemize}
+      \item Seznam funkčních ukazatelů na funkce
+      \item Seznam zaregistrovaných funkcí \code{Analyze()}
+    \end{itemize}
+
+    \pause
+
+    \item Jak systém pozná, že není žádný antivirus?
+
+    \pause
+
+    \begin{itemize}
+      \item Žádný zaregistrovaný callback
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Funkční ukazatel}{Využití}
+
+  \heading{Podpora abstrakce (např.\ I/O zařízení)}
+  \begin{itemize}
+    \item Program si nastaví funkční ukazatel pro výpis hlášení
+    \begin{itemize}
+      \item Na obrazovku, na display, na tiskárnu, do souboru, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Provádí volání nastaveného ukazatele
+    \begin{itemize}
+      \item Nikoli výběr funkce dle typu výstupu
+    \end{itemize}
+
+    \pause
+
+    \item Simulace pozdní vazby známé z OO jazyků
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+//printScreen(), printLCD(), printPrinter(), printFile()...
+void (*myPrint)(const char*);
+myPrint = &printLCD;
+myPrint("Hello world");
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Funkční ukazatel}{Využití}
+
+  \heading{Aplikace různých funkcí na interval prvků}
+  \begin{itemize}
+    \item Např.\ simulace \code{for_each} známého z jiných jazyků
+    \item Přehlednější a rychlejší než switch nad každým prvkem
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+int add2(int value) { return value + 2; }
+int minus3(int value) { return value - 3; }
+
+void for_each(int* array, int arrayLen, int(*fnc)(int)) {
+  for (int i = 0; i < arrayLen; i++)
+    array[i] = fnc(array[i]);
+}
+int main(){
+  const int arrayLen = 10;
+  int myArray[arrayLen] = {0};
+  for_each(myArray, arrayLen, &add2);
+  for_each(myArray, arrayLen, &minus3);
+  return 0;
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Funkční ukazatele}{Konvence volání}
+
+  \begin{itemize}
+    \item Při funkčním volání musí být
+    \begin{itemize}
+      \item Někdo zodpovědný za úklid zásobníku (lokální proměnné)
+      \item Definováno pořadí argumentů
+    \end{itemize}
+
+    \pause
+
+    \item Tzv.\ konvence volání
+    \begin{itemize}
+      \item Uklízí volající funkce (cdecl) -- default pro C/C++ programy
+      \item Uklízí volaná funkce (stdcall) -- např.\ Win32 API
+    \end{itemize}
+
+    \pause
+
+    \item GCC: \code{void foo(int a, char b) __attribute__((cdecl));}
+    \item Microsoft, Borland: \code{void __cdecl foo(int a, char b);}
+
+    \pause
+
+    \item Při nekompatibilní kombinaci dochází k porušení zásobníku
+    \item Více na
+    \begin{itemize}
+      \item \url{http://en.wikipedia.org/wiki/X86_calling_conventions}
+      \item \url{http://cdecl.org/}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Samostudium -- detaily funkčních ukazatelů}
+
+  \heading{Lars Engelfried, The Function Pointer Tutorials}
+  \begin{itemize}
+    \item \url{http://www.newty.de/fpt/index.html}
+    \item \url{http://www.newty.de/fpt/zip/e_fpt.pdf}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Pointery (ukazatele)}
+
+XXX pointer typu void
+
+\end{frame}
+
+\fi
+
+\section{Práce s pamětí}
+\frame{\sectionpage}
+
+\begin{frame}{Práce s pamětí}
+
+Práce s pamětí v jazyce C , dynamická alokace pamětí (malloc), paměťové třídy (static, extern, register), struktury
+
+\end{frame}
+
+\end{document}
+
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
 
@@ -3277,15 +3755,6 @@ otevírání a zavírání souborů, základní operace se soubory
 
 význam, direktivy podmíněného překladu, vložení hlavičkového souboru, direktiva
 \code{\#include} a \code{\#define}, makra
-
-\end{frame}
-
-\section{Práce s pamětí}
-\frame{\sectionpage}
-
-\begin{frame}{Práce s pamětí}
-
-Práce s pamětí v jazyce C , dynamická alokace pamětí (malloc), paměťové třídy (static, extern, register), struktury
 
 \end{frame}
 
