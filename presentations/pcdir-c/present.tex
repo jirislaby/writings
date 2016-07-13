@@ -3840,6 +3840,7 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
     \item Statická data (static)
     \begin{itemize}
       \item Většina se nemění, jsou přímo v binárce
+      \item Řetězce, konstanty (nemění se)
       \item Globální proměnné (mění se)
     \end{itemize}
 
@@ -3847,7 +3848,7 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
     \item Zásobník (stack)
     \begin{itemize}
-      \item Mění se pro každou funkci
+      \item Mění se pro každý blok (a funkci)
       \item Lokální proměnné
     \end{itemize}
 
@@ -3865,41 +3866,13 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
 \input{../pcdir-linux/dynmem.tex}
 
-\end{document}
+\begin{frame}{Ilustrace statické vs.\ dynamické alokace}
 
-\begin{frame}{Dynamická alokace}{Shrnutí}
-
-  \begin{enumerate}
-    \item Alokuje potřebný počet bajtů
-    \begin{itemize}
-      \item (musíme správně vypočíst)
-      \item typicky používáme počet_prvků*sizeof(prvek)
-    \end{itemize}
-
-    \pause
-
-    \item Uložíme adresu paměti do ukazatele s požadovaným typem
-    \begin{itemize}
-      \item int* array = malloc(100 * sizeof(int));
-    \end{itemize}
-
-    \pause
-
-    \item Po konci práce uvolníme
-    \begin{itemize}
-      \item free(array);
-    \end{itemize}
-
-  \end{enumerate}
+XXX TODO
 
 \end{frame}
 
-\begin{frame}{Ilustrace statické vs. dynamické alokace}
-
-
-\end{frame}
-
-\begin{frame}{Memory leaks}
+\begin{frame}{Úniky paměti}
 
   \begin{itemize}
     \item Dynamicky alokovaná paměť musí být uvolněna
@@ -3910,80 +3883,103 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
     \pause
 
-    \item Valgrind – nástroj pro detekci memory leaks (mimo jiné)
+    \item Valgrind -- nástroj pro detekci úniků paměti (mimo jiné)
     \begin{itemize}
-      \item valgrind -v --leak-check=full testovaný_program
-      \item lze využít např. Eclipse Valgrind plugin
-      \item není funkční port pro Windows :(
+      \item \cmd{valgrind -v --leak-check=full testovany_program}
+      \item Lze využít \qtc plug-in
+      \item Není funkční port pro Windows!
     \end{itemize}
 
     \pause
 
     \item Microsoft Visual Studio
     \begin{itemize}
-      \item automaticky zobrazuje detekované memory leaks v debug režimu
+      \item Automaticky zobrazuje detekované úniků paměti v režimu ladění
     \end{itemize}
 
     \pause
 
-    \item Detekované memory leaks ihned odstraňujte
+    \item Detekované úniky paměti ihned odstraňujte
     \begin{itemize}
-      \item stejně jako v případě warningu
-      \item nevšimnete si jinak nově vzniklých
-      \item obtížně dohledáte místo alokace
+      \item Stejně jako v případě warningu
+      \item Nevšimnete si jinak nově vzniklých
+      \item Obtížně dohledáte místo alokace
     \end{itemize}
 
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Memory leaks}{Demo}
+\begin{frame}[fragile]{Úniky paměti}{Demo}
 
   \begin{itemize}
     \item Násobná alokace do stejného ukazatele
+
+    \pause
+
     \item Dealokace nad modifikovaným ukazatelem
   \end{itemize}
 
+\onslide<1->
+
+%\begin{block}{Příklad}
+\begin{lstlisting}
 #include <stdlib.h>
-int main(int argc, char* argv[]) {
-  int* pArray = NULL;
-  const int arrayLen = 25;
-  pArray = malloc(arrayLen * sizeof(int));
-  if ((argc == 2) && atoi(argv[1]) == 1) {
-    pArray = malloc(arrayLen * sizeof(int));
+
+int main(int argc, char *argv[]) {
+  const int array_len = 25;
+  int *array;
+  array = malloc(array_len * sizeof(int));
+  if (argc == 2) {
+    array = malloc(array_len * sizeof(int));
   }
-  if (pArray) { free(pArray); pArray = NULL; }
-
-  int* pArray2 = 0;
-  pArray2 = malloc(arrayLen * sizeof(int));
-  pArray2 += 20; // chyba
-  if (pArray2) { free(pArray2); pArray2 = NULL; }
-
+  free(pArray);
+\end{lstlisting}
+\begin{onslide}<2->
+\begin{lstlisting}
+  int *array2;
+  array2 = malloc(array_len * sizeof(int));
+  array2 += 20; // zdroj chyby
+  free(array2); // chyba
+\end{lstlisting}
+\end{onslide}
+\begin{lstlisting}
   return 0;
 }
+\end{lstlisting}
+%\end{block}
 
 \end{frame}
 
-\begin{frame}{Předávání hodnotou a hodnotou ukazatele}
+\begin{frame}[fragile]{Předávání hodnotou a hodnotou ukazatele}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void value_passing_demo(int arg_value1, int *arg_value2) {
+  arg_value1 = 5;
+  *arg_value2 = 7;
+}
 
 int main() {
-  int myValue1 = 1;
-  int myValue2 = 1;
-  valuePassingDemo(myValue1, &myValue2);
+  int value1 = 1;
+  int value2 = 1;
+  value_passing_demo(value1, &value2);
 
   return 0;
 }
-void valuePassingDemo(int value, int* pValue) {
-  value = 5;
-  *pValue = 7;
-}
+\end{lstlisting}
+\end{block}
+
   \begin{itemize}
-    \item Proměnná value i pValue zaniká, ale zápis do myValue2 zůstává
+    \item Proměnná \code{arg_value1} i \code{arg_value2} zaniká, ale zápis do
+      \code{value2} zůstává
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Předávání alokovaného pole z funkce}
+\end{document}
+
+\begin{frame}[fragile]{Předávání alokovaného pole z funkce}
 
   \begin{itemize}
     \item Jak předat pole dyn. alokované ve funkci?
