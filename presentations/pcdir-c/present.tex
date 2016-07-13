@@ -3711,24 +3711,432 @@ int main(){
 
 \end{frame}
 
-\begin{frame}{Pointery (ukazatele)}
+\begin{frame}[fragile]{Přetypování ukazatelů}
 
-XXX pointer typu void
+\begin{lstlisting}
+float fArray[10];
+char *cArray = (char *)fArray;
+\end{lstlisting}
+
+  \begin{itemize}
+    \item Ukazatele lze přetypovat
+    \begin{itemize}
+      \item Bitové přetypování, mění se interpretace, nikoli hodnota
+    \end{itemize}
+
+    \pause
+
+    \item Po přetypování jsou data na odkazované adrese interpretována jinak
+    \begin{itemize}
+      \item Závislost na bitové reprezentaci datových typů
+    \end{itemize}
+
+    \pause
+
+%\begin{lstlisting}
+%float* fArray
+%fArray[0]
+% fArray[1]
+%0x12345678
+%...
+%char* cArray
+%cArray[2]
+%0x12345678
+%cArray[0]
+%cArray[1]
+%\end{lstlisting}
+
+    \item Pozor na požadavek standardu na ,,strict aliasing''
+    \begin{itemize}
+      \item Nesmí existovat dva ukazatele různého typu na stejnou paměť
+      \begin{itemize}
+	\item S výjimkou \code{(char *)} a \code{(void *)}
+      \end{itemize}
+
+      \item Omezuje možnost optimalizace překladačem
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Přetypování ukazatelů}{\texttt{void *}}
+
+  \begin{itemize}
+    \item Některé funkce mohou pracovat i bez znalosti datového typu
+    \begin{itemize}
+      \item Např.\ nastavení všech bitů na konkrétní hodnotu
+      \item Např.\ bitové operace (\code{^}, \code{\&}, \dots)
+    \end{itemize}
+
+    \pause
+
+    \item Je zbytečné definovat separátní funkci pro každý datový typ
+    \begin{itemize}
+      \item Namísto specifického typu ukazatele se použije \code{void *}
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void *memset(void *ptr, int value, size_t num);
+
+int array[100];
+memset(array, 0, sizeof(array));
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Přetypování ukazatelů}{Využití}
+
+  \begin{itemize}
+    \item Některé operace fungují na úrovni bitů
+    \begin{itemize}
+      \item Např.\ XOR, AND, \dots
+      \item Instrukce procesoru u \xes pracují na úrovni 32 bitů
+      \item Při práci na úrovni např.\ \code{char} (8 bitů) se nevyužívá celý
+	potenciál šířky registru (32 bitů)
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+unsigned char array[80];
+// Will execute 80 iterations
+for (int i = 0; i < sizeof(array); i++)
+  array[i] ^= 0x55;
+// Will execute only 20 iterations (x86)
+for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
+  ((unsigned int *)array)[i] ^= 0x55555555;
+\end{lstlisting}
+\end{block}
 
 \end{frame}
 
 \fi
 
+%skipped Typový systém z pb071_05_typydynalokace_2016.pdf
+
 \section{Práce s pamětí}
 \frame{\sectionpage}
+
+\begin{frame}{Organizace paměti}
+
+  \begin{itemize}
+    \item Instrukce (program)
+    \begin{itemize}
+      \item Nemění se
+    \end{itemize}
+
+    \pause
+
+    \item Statická data (static)
+    \begin{itemize}
+      \item Většina se nemění, jsou přímo v binárce
+      \item Globální proměnné (mění se)
+    \end{itemize}
+
+    \pause
+
+    \item Zásobník (stack)
+    \begin{itemize}
+      \item Mění se pro každou funkci
+      \item Lokální proměnné
+    \end{itemize}
+
+    \pause
+
+    \item Halda (heap)
+    \begin{itemize}
+      \item Mění se při každém \code{malloc}, \code{free}
+      \item Dynamicky alokované proměnné
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\input{../pcdir-linux/dynmem.tex}
+
+\end{document}
+
+\begin{frame}{Dynamická alokace}{Shrnutí}
+
+  \begin{enumerate}
+    \item Alokuje potřebný počet bajtů
+    \begin{itemize}
+      \item (musíme správně vypočíst)
+      \item typicky používáme počet_prvků*sizeof(prvek)
+    \end{itemize}
+
+    \pause
+
+    \item Uložíme adresu paměti do ukazatele s požadovaným typem
+    \begin{itemize}
+      \item int* array = malloc(100 * sizeof(int));
+    \end{itemize}
+
+    \pause
+
+    \item Po konci práce uvolníme
+    \begin{itemize}
+      \item free(array);
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Ilustrace statické vs. dynamické alokace}
+
+
+\end{frame}
+
+\begin{frame}{Memory leaks}
+
+  \begin{itemize}
+    \item Dynamicky alokovaná paměť musí být uvolněna
+    \begin{itemize}
+      \item dealokace musí být explicitně provedena vývojářem
+      \item (C nemá Garbage collector)
+    \end{itemize}
+
+    \pause
+
+    \item Valgrind – nástroj pro detekci memory leaks (mimo jiné)
+    \begin{itemize}
+      \item valgrind -v --leak-check=full testovaný_program
+      \item lze využít např. Eclipse Valgrind plugin
+      \item není funkční port pro Windows :(
+    \end{itemize}
+
+    \pause
+
+    \item Microsoft Visual Studio
+    \begin{itemize}
+      \item automaticky zobrazuje detekované memory leaks v debug režimu
+    \end{itemize}
+
+    \pause
+
+    \item Detekované memory leaks ihned odstraňujte
+    \begin{itemize}
+      \item stejně jako v případě warningu
+      \item nevšimnete si jinak nově vzniklých
+      \item obtížně dohledáte místo alokace
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Memory leaks}{Demo}
+
+  \begin{itemize}
+    \item Násobná alokace do stejného ukazatele
+    \item Dealokace nad modifikovaným ukazatelem
+  \end{itemize}
+
+#include <stdlib.h>
+int main(int argc, char* argv[]) {
+  int* pArray = NULL;
+  const int arrayLen = 25;
+  pArray = malloc(arrayLen * sizeof(int));
+  if ((argc == 2) && atoi(argv[1]) == 1) {
+    pArray = malloc(arrayLen * sizeof(int));
+  }
+  if (pArray) { free(pArray); pArray = NULL; }
+
+  int* pArray2 = 0;
+  pArray2 = malloc(arrayLen * sizeof(int));
+  pArray2 += 20; // chyba
+  if (pArray2) { free(pArray2); pArray2 = NULL; }
+
+  return 0;
+}
+
+\end{frame}
+
+\begin{frame}{Předávání hodnotou a hodnotou ukazatele}
+
+int main() {
+  int myValue1 = 1;
+  int myValue2 = 1;
+  valuePassingDemo(myValue1, &myValue2);
+
+  return 0;
+}
+void valuePassingDemo(int value, int* pValue) {
+  value = 5;
+  *pValue = 7;
+}
+  \begin{itemize}
+    \item Proměnná value i pValue zaniká, ale zápis do myValue2 zůstává
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Předávání alokovaného pole z funkce}
+
+  \begin{itemize}
+    \item Jak předat pole dyn. alokované ve funkci?
+    \begin{itemize}
+      \item ukazatel na ukazatel
+    \end{itemize}
+
+    \pause
+
+  \end{itemize}
+int main() {
+  int* pMyPointer = NULL;
+  allocateArrayDemo(pMyPointer, &pMyPointer);
+  free(pMyPointer);
+
+  return 0;
+}
+void allocateArrayDemo(int* pArray, int** ppArray) {
+  // address will be lost, memory leak
+  pArray = malloc(10 * sizeof(int));
+  // warning: integer from pointer – BAD
+  *pArray = malloc(10 * sizeof(int));
+  // OK
+  *ppArray = malloc(10 * sizeof(int));
+}
+
+\end{frame}
+
+\begin{frame}{Dynamická alokace}{Vícedimenzionální pole}
+
+  \begin{itemize}
+    \item 2D pole je pole ukazatelů na 1D pole
+    \item 3D pole je pole ukazatelů na pole ukazatelů na 1D pole
+  \end{itemize}
+
+void allocate2DArray() {
+  // 100 items array with elements int*
+  const int LEN = 100;
+  int** array2D = malloc(LEN * sizeof(int*));
+  for (int i = 0; i < LEN; i++) {
+    // allocated 1D array on position array2D[i]
+    // length is i+1 * 10
+    array2D[i] = malloc((i+1) * 10 * sizeof(int));
+  }
+  array2D[10][20] = 1;
+  // You need to free memory properly
+  for (int i = 0; i < LEN; i++) {
+    free(array2D[i]); array2D[i] = NULL;
+  }
+  free(array2D); array2D = NULL;
+}
+
+\end{frame}
+
+\begin{frame}{Dynamická alokace}{Zřetězený seznam}
+
+  \begin{itemize}
+    \item Struktura s „neomezenou“ velikostí
+    \begin{itemize}
+      \item položky na haldě
+      \item logicky propojené ukazateli
+      \item 13,7,13,-45,154
+    \end{itemize}
+
+    \pause
+
+    \item Položky nejsou v poli za sebou
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Dynamická alokace}{Poznámky}
+
+  \begin{itemize}
+    \item Při dealokaci nastavte proměnnou zpět na NULL
+    \begin{itemize}
+      \item Opakovaná dealokace nezpůsobí pád
+      \item Validitu ukazatele nelze testovat, ale hodnotu NULL ano
+    \end{itemize}
+
+    \pause
+
+    \item Dynamická alokace je důležitý koncept
+    \begin{itemize}
+      \item Je nutné znát a rozumět práci s ukazateli
+    \end{itemize}
+
+    \pause
+
+    \item Dynamicky alokovanou paměť přiřazujeme do ukazatele
+    \begin{itemize}
+      \item sizeof(pointer) vrací velikost ukazatele, nikoli velikost pole!
+    \end{itemize}
+
+    \pause
+
+    \item Dynamická (de-)alokace nechává paměť v původním stavu
+    \begin{itemize}
+      \item Neinicializovaná paměť \& zapomenuté klíče
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Alokace paměti}{Typy}
+
+  \begin{enumerate}
+    \item Paměť alokovaná v době překladu s pevnou délkou ve statické sekci
+    \begin{itemize}
+      \item typicky konstanty, řetězce, konstantní pole
+      \item const char* hello = "Hello World";
+      \item délka známa v době překladu
+      \item alokováno ve statické sekci programu (lze nalézt v nespuštěném
+	programu)
+    \end{itemize}
+
+    \pause
+
+    \item Paměť alokovaná za běhu na zásobníku, délka známa v době překladu
+    \begin{itemize}
+      \item lokální proměnné, lokální pole
+      \item paměť je alokována a dealokována automaticky
+      \item int array[10];
+    \end{itemize}
+
+    \pause
+
+    \item Paměť alokovaná za běhu na zásobníku, délka není známa v době překladu
+    \begin{itemize}
+      \item variable length array, od C99
+      \item paměť je alokována a dealokována automaticky
+      \item int array[userGivenLength];
+    \end{itemize}
+
+    \pause
+
+    \item Paměť alokovaná za běhu na haldě, délka není známa v době překladu
+    \begin{itemize}
+      \item alokace i dealokace explicitně prostřednictvím funkcí malloc a free
+      \item programátor musí hlídat uvolnění, jinak memory leak
+      \item int* array=malloc(userGivenLength*sizeof(int)); free(array);
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
 
 \begin{frame}{Práce s pamětí}
 
 Práce s pamětí v jazyce C , dynamická alokace pamětí (malloc), paměťové třídy (static, extern, register), struktury
 
 \end{frame}
-
-\end{document}
 
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
@@ -3760,12 +4168,6 @@ význam, direktivy podmíněného překladu, vložení hlavičkového souboru, d
 
 \section{Bitové operace}
 \frame{\sectionpage}
-
-\begin{frame}{Bitové operace}
-
-binární or, and, xor; bitové rotace, reálné využití
-
-\end{frame}
 
 \begin{frame}{Bitové operátory}
   \begin{itemize}
