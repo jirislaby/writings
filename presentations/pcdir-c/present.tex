@@ -4899,30 +4899,646 @@ paměťové třídy (static, extern, register)
 
 \end{frame}
 
-\fi
-
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
 
-\end{document}
+\begin{frame}{Standardní vstup a výstup}
+
+  \begin{itemize}
+    \item Koncept standardního vstupu a výstupu
+    \begin{itemize}
+      \item Program nemusí vědět, kdo mu dává vstupní data
+      \item Program nemusí vědět, kam vypisuje výstupní data
+      \item Defaultně standardní vstup == klávesnice
+      \item Defaultně standardní výstup == obrazovka
+    \end{itemize}
+
+    \pause
+
+    \item Zařízení vstupu/výstupu lze snadno zaměnit
+    \begin{itemize}
+      \item Standardní vstup ze souboru
+      \begin{itemize}
+	\item Windows: \cmd{program.exe < soubor.txt}
+	\item Unix: \cmd{./program < soubor.txt}
+      \end{itemize}
+      \item Standardní výstup do souboru
+      \begin{itemize}
+	\item Windows: \cmd{program.exe > output.txt}
+	\item Unix: \cmd{./program > output.txt}
+      \end{itemize}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Vstup a výstup v C}
+
+  \begin{itemize}
+    \item Základní možnosti vstupu a výstupu už známe
+    \begin{itemize}
+      \item Výstup na obrazovku (\code{puts}, \code{printf})
+      \item Vstup z klávesnice (\code{getc}, \code{scanf})
+    \end{itemize}
+
+    \pause
+
+    \item Funkce pro vstup a výstup jsou poskytovány standardní knihovnou
+      (\header{stdio.h})
+    \begin{itemize}
+      \item Nejsou tedy přímo součástí jazyka
+
+      \pause
+
+      \item Jsou ale součástí (téměř) vždy dostupné standardní knihovny
+      \begin{itemize}
+	\item Výjimkou jsou některé omezené (embedded) platformy nebo jádro OS
+	\item Lze překládat i bez standardních knihoven \code{gcc -nostdlib}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Binární data
+    \begin{itemize}
+      \item Jaké bajty zapíšeme, takové přečteme
+    \end{itemize}
+
+    \pause
+
+    \item Textová data
+    \begin{itemize}
+      \item Na nejnižší úrovni stále binární data, ale \emph{interpretovaná}
+	jako text
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Textová data}
+
+  \begin{itemize}
+    \item Použito pro vyjádření běžného textu
+
+    \pause
+
+    \item Písmena, číslice, mezery, oddělovače, závorky, \dots
+    \begin{itemize}
+      \item Tisknutelné znaky (ASCII $\geq$ 32)
+    \end{itemize}
+
+    \pause
+
+    \item Textová data narozdíl od binárních přímo interpretujeme
+    \begin{itemize}
+      \item S bajtem o hodnotě 71 pracujeme jako s písmenem ,,G''
+    \end{itemize}
+
+    \pause
+
+    \item Jak interpretovat ostatní (netextové) hodnoty?
+    \begin{itemize}
+      \item Různé zástupné symboly, pípnutí, \dots
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Nový řádek}
+
+  \begin{itemize}
+    \item \code{printf("Prvni radek \\n Druhy radek");}
+    \begin{itemize}
+      \item Nový řádek v C je speciální znak (\code{\\n})
+    \end{itemize}
+
+    \pause
+
+    \item Nový řádek -- implementačně závislé na OS
+    \begin{itemize}
+      \item Unix: \code{\\n} (ASCII = 10, new line)
+      \begin{itemize}
+	\item \code{\\n} posun dolů o jeden řádek
+      \end{itemize}
+
+      \item Windows: \code{\\r\\n} (ASCII = 13 10)
+      \begin{itemize}
+	\item \code{\\r} carriage return -- návrat válce psacího stroje doleva
+	\item \code{\\n} posun dolů o jeden řádek
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item \code{printf("Prvni radek \n");}
+    \begin{itemize}
+      \item Na Unixu: \code{Prvni radek \\n}
+      \item Na Windows: \code{Prvni radek \\r\\n}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Vyrovnávací paměť pro vstup a výstup}
+
+  \begin{itemize}
+    \item Data mezi producentem a konzumentem nemusí být přenesena ihned
+    \begin{itemize}
+      \item Text na obrazovku vypisován po řádcích
+      \item Data na disk zapisována po blocích
+      \item Z optimalizačních důvodů se nevolá konzument pro každý elementární
+	znak
+    \end{itemize}
+
+    \pause
+
+    \item Produkovaná data jsou ukládána do vyrovnávací paměti
+    \begin{itemize}
+      \item Tzv.\ buffering
+
+      \pause
+
+      \item Vyčtení proběhne při jejím zaplnění
+      \begin{itemize}
+	\item Nastavení aplikace nebo OS
+      \end{itemize}
+
+      \pause
+
+      \item Nebo externím vynucením
+      \begin{itemize}
+	\item \code{fflush(stdout)}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Práce s vyrovnávací pamětí}
+
+\begin{lstlisting}
+int get_put_char(){
+  printf("Zadavej znaky a pak Enter: ");
+  fflush(stdout); // force output of printf
+
+  int input;
+  while ((input = getchar()) != '\n') {
+    putchar(input + 1);
+    //fflush(stdout);
+  }
+  printf("\n"); // emit newline to indent program output
+
+  return 0;
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{printf}}{Podrobněji}
+
+  \begin{itemize}
+    \item Často používaná funkce ze standardní knihovny
+    \begin{itemize}
+      \item \footnotesize\url{http://www.cplusplus.com/reference/clibrary/cstdio/printf/}
+    \end{itemize}
+
+    \pause
+
+    \item \code{int printf(const char *format, ...);}
+    \begin{itemize}
+      \item \code{\%[flags][width][.precision][length]specifier}
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{table}
+{ \scriptsize
+\begin{tabular}{|l|l|l|} \hline
+\textbf{Specifier}   & \textbf{Výstup} & \textbf{Příklad} \\ \hline
+d nebo i& Signed decimal integer	 & 392 \\ \hline
+u	& Unsigned decimal integer	 & 7235 \\ \hline
+o	& Unsigned octal	 & 610 \\ \hline
+x	& Unsigned hexadecimal integer	 & 7fa \\ \hline
+X	& Unsigned hexadecimal integer (uppercase)	 & 7FA \\ \hline
+f	& Decimal floating point, lowercase	 & 392.65 \\ \hline
+e	& Scientific notation (mantissa/exponent), lowercase	 & 3.9265e+2 \\ \hline
+g	& Use the shortest representation: \%e or \%f	 & 392.65 \\ \hline
+c	& Character	 & a \\ \hline
+s	& String of characters	 & sample \\ \hline
+p	& Pointer address	 & b8000000 \\ \hline
+\%	& A \% followed by another \% character will write \% to the stream.	 & \% \\ \hline
+\end{tabular}
+}
+\caption{Tabulka běžných formátovacích znaků}
+\end{table}
+
+\end{frame}
+
+\begin{frame}[fragile]{Počet desetinných míst a délka čísla}
+
+  \begin{itemize}
+    \item Mezi symbol \code{\%} a specifikátor lze umístit dodatečné formátování
+    \begin{itemize}
+      \item \code{\%5.2f}
+    \end{itemize}
+
+    \pause
+
+    \item Omezení/rozšíření počtu vypisovaných desetinných míst
+    \begin{itemize}
+      \item Defaultně 6 desetinných míst
+      \item \code{\%.2f}, \code{\%.8f}, \code{\%.0f}
+    \end{itemize}
+
+    \pause
+
+    \item Zarovnání výpisu na zadaný celkový počet cifer
+    \begin{itemize}
+      \item Zarovná se mezerami
+      \item \code{\%10f}
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+#include <stdio.h>
+
+int main() {
+  float fValue = 3.1415926535;
+  printf("%f\n", fValue);           // prints 3.141593
+  printf("%.2f\n", fValue);         // prints 3.14
+  printf("%.8f\n", fValue);         // prints 3.14159274
+  printf("%10f\n", fValue);         // prints   3.141593
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Možnosti výpisu ukazatele a soustavy}
+
+  \begin{itemize}
+    \item Výpis ukazatele
+    \begin{itemize}
+      \item \code{printf("\%p", &value);}
+    \end{itemize}
+
+    \pause
+
+    \item Výpis vhodné číselné soustavy
+    \begin{itemize}
+      \item \code{\%d} desítková
+      \item \code{\%o} osmičková
+      \item \code{\%x} šestnáctková (často se uvádí jako \code{0x\%x}
+        $\rightarrow$ \code{0x30})
+    \end{itemize}
+
+  \end{itemize}
+
+  \onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+#include <stdio.h>
+
+int main() {
+  int value = 16;
+  printf("%p", &value);                    // prints e.g. 0x7ffc3204d1ec
+\end{lstlisting}
+\onslide<2->
+\begin{lstlisting}
+  printf("%d %o %x", value, value, value); // prints 16 20 10
+\end{lstlisting}
+\onslide<1->
+\begin{lstlisting}
+  return 0;
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{printf}}{Chybný formátovací řetězec}
+
+  \begin{itemize}
+    \item Pozor na chybný formátovací řetězec
+    \begin{itemize}
+      \item Formátování se provede, ale pro jiný typ
+%      \item Viz funkce s proměnným počtem parametrů
+%      \begin{itemize}
+%	\item \code{va_arg(arg, int)}
+%      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Typicky se vypíše chybná hodnota
+
+    \pause
+
+    \item Při chybné specifikaci \code{\%s} se výpíše smetí nebo dojde k pádu
+    \begin{itemize}
+      \item V paměti se hledá koncová nula
+    \end{itemize}
+
+    \pause
+
+    \item Překladač může upozornit varováním
+    \begin{itemize}
+      \item \texttt{warning: format ‘\%d’ expects argument of type ‘int’, but argument 2 has type ‘double’}
+      \item \emph{Neignorujte!}
+    \end{itemize}
+  \end{itemize}
+
+\onslide<2->
+\begin{block}{Příklad}
+\begin{lstlisting}
+float fValue = 3.1415926535;
+printf("%d\n", fValue);           // prints 803067992
+\end{lstlisting}
+\onslide<3->
+\begin{lstlisting}
+printf("%s\n", &fValue);          // prints *I@
+printf("%s\n", fValue);           // CRASH
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\subsection*{Formátované načítání ze vstupu}
+\frame{\subsectionpage}
+
+\begin{frame}[fragile]{\texttt{scanf}}
+
+  \code{int scanf(char *format, ...);}
+  \begin{itemize}
+    \item Analogie \code{printf}, ale pro načítání ze vstupu
+    \begin{itemize}
+      \item Ze standardního vstupu se čtou hodnoty
+
+      \pause
+
+      \item Ukládají se do poskytnutých argumentů
+      \begin{itemize}
+	\item Argumenty poskytnuty jako ukazatele
+      \end{itemize}
+
+      \pause
+
+      \item Formát obdobný jako pro \code{printf} (kromě počtu desetinných míst)
+    \end{itemize}
+
+    \pause
+
+    \item Více hodnot je na vstupu odděleno bílým znakem
+    \begin{itemize}
+      \item Mezera, tabulátor, \dots
+      \item \pozor: při čtení jsou bílé znaky zahazovány
+    \end{itemize}
+
+    \pause
+
+    \item \code{scanf} vrací počet načtených položek
+    \begin{itemize}
+      \item \code{EOF} (End Of File), pokud se nepodařilo načíst nic
+    \end{itemize}
+
+    \pause
+
+  \end{itemize}
+
+\onslide<1->
+\begin{block}{Příklad}
+\begin{lstlisting}
+int value;
+scanf("%d", &value);
+
+char small_string[50];
+scanf("%s", small_string);
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{scanf}}{Ukázka Avatar}
+
+\begin{lstlisting}
+enum weapon_t { sword, axe, bow };
+
+struct avatar_t {
+  char nick[32];
+  float energy;
+  enum weapon_t weapon;
+};
+
+void scanf_demo() {
+  struct avatar_t avat;
+  scanf("%s", avat.nick);
+  scanf("%f", &avat.energy);
+  scanf("%d", &avat.weapon);
+
+  printf("name=%s energy=%f weapon=%d\n", avat.nick, avat.energy, avat.weapon);
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Problematika ošetření délky vstupu}
+
+  \begin{itemize}
+    \item Ošetření vstupních dat je velmi důležitá věc
+    \begin{itemize}
+      \item Umožňuje korektně upozornit uživatele
+      \item Zamezuje nechtěnému chování programu
+      \item Zamezuje záměrnému útoku na program
+    \end{itemize}
+
+    \pause
+
+    \item \code{scanf} a řetězec
+    \begin{itemize}
+      \item Řetězec má omezenou délku, zadaný vstup může být delší
+
+      \pause
+
+      \item \code{\%50s} omezí načtenou délku na 50 znaků
+      \begin{itemize}
+	\item Koncová nula pak ale na 51. pozici!
+      \end{itemize}
+    \end{itemize}
+
+  \end{itemize}
+
+\onslide<2->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+char small_string[51];
+scanf("%s", small_string);
+\end{lstlisting}
+\onslide<3->
+\begin{lstlisting}
+scanf("%50s", small_string);
+printf("%s\n", small_string);
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Fuzz testování}
+
+  \heading{,,Fuzz'' testování}
+  \begin{itemize}
+    \item Zašlete programu náhodný vstup
+    \item Různá délka (i 100kB), různý obsah
+    \item Program padá $\Rightarrow$ problém
+    \item \textsc{Klee}, \textsc{Radamsa}, \textsc{MiniFuzz}, \textsc{Peach},
+      \dots
+  \end{itemize}
+
+\end{frame}
+
+\subsection*{Formátovaný zápis a čtení do/z řetězce}
+\frame{\subsectionpage}
+
+\begin{frame}[fragile]{\texttt{sprintf} a \texttt{sscanf}}
+
+  \begin{itemize}
+    \item \code{printf} a \code{scanf} pracují se standardním vstupem a výstupem
+
+    \pause
+
+    \item Namísto vstupu a výstupu lze použít pole znaků
+
+    \pause
+
+    \item \code{int sprintf(char *str, const char *format, ...);}
+    \begin{itemize}
+      \item Stejné jako \code{printf}, výstup jde ale do řetězce \code{str}
+      \item Vrací počet zapsaných \emph{znaků}
+      \item Pozor na celkovou délku výstupu
+    \end{itemize}
+
+    \pause
+
+    \item \code{int sscanf(const char *str, const char *format, ...);}
+    \begin{itemize}
+      \item Stejné jako \code{scanf}, výstup načítán z řetězce \code{str}
+      \item Vrací počet načtených \emph{položek}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{sprintf}}{Příklad}
+
+\begin{lstlisting}
+#include <stdio.h>
+
+enum weapon_t { sword, axe, bow };
+
+struct avatar_t {
+  char nick[32];
+  float energy;
+  enum weapon_t weapon;
+};
+
+int main() {
+  struct avatar_t avat = { "Hell", 100, axe };
+  char message[1000];
+\end{lstlisting}
+
+\onslide<2->
+
+\begin{lstlisting}
+  sprintf(message, "Avatar '%s' with energy %.2f is ready!", avat.nick, avat.energy);
+  puts(message);
+\end{lstlisting}
+
+\onslide<1->
+\begin{lstlisting}
+  return 0;
+}
+\end{lstlisting}
+
+\end{frame}
 
 \begin{frame}{Terminálový vstup a výstup}
 
-znakový a formátovaný vstup a výstup, funkce z hlavičkového souboru stdio.h
+znakový vstup a vystup
 
 \end{frame}
 
 \section{Práce se soubory}
 \frame{\sectionpage}
 
-\begin{frame}{Práce se soubory}
+\input{../pcdir-linux/stdlib-files.tex}
 
-otevírání a zavírání souborů, základní operace se soubory
+\begin{frame}{Vytváření a manipulace}
+
+  \begin{itemize}
+    \item Smazání: \code{int remove(const char *filename)}
+
+    \pause
+
+    \item Přejmenování: \code{int rename(const char *oldname,
+     const char *newname)}
+
+    \pause
+
+    \item Vytvoření dočasného souboru: \code{FILE *tmpfile()}
+  \end{itemize}
 
 \end{frame}
 
+\begin{frame}[fragile]{Soubor}{Testování konce}
+
+  \begin{itemize}
+    \item Používejte konstantu \code{EOF} (End Of File)
+    \item V dokumentaci je u funkcí vždy uveden případ výskytu a použití
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+#include <stdio.h>
+
+int main() {
+  FILE *file;
+  char fileName[] = "muj_soubor.txt";
+  if ((file = fopen(fileName, "r"))) {
+    int value;
+    while((value = getc(file)) != EOF)
+      putchar(value);
+
+    fclose(file);
+  }
+
+  return 0;
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\fi
+
 \section{Preprocesor}
 \frame{\sectionpage}
+
+\end{document}
 
 \begin{frame}{Preprocesor}
 
