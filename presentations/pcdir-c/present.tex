@@ -15,7 +15,7 @@
   \tableofcontents
 \end{frame}
 
-\iftrue
+\iffalse
 
 \section{Úvodní informace}
 \frame{\sectionpage}
@@ -1432,6 +1432,47 @@ tam:
 \end{onslide}
 \end{tabular}
 \end{center}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{goto}}
+
+  \begin{itemize}
+    \item Kód s \code{goto} typicky snižuje čitelnost a ztěžuje ladění
+    \begin{itemize}
+      \item Z pohledu na kód lze těžko říct, které části se provedou
+      \item Speciálně začátečníky svádí k nevhodnému stylu programování
+    \end{itemize}
+
+    \pause
+
+    \item C nepodporuje výjimky (na rozdíl od C++, Java, \dots)
+    \begin{itemize}
+      \item \code{goto} poskytuje rozumný způsob ošetření chyb
+      \begin{itemize}
+	\item Zejm.\ při násobném vnoření bloků
+      \end{itemize}
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void *mem = malloc(100);
+if (!mem)
+  goto err;
+int fd = open("/dev/null", O_RDONLY);
+if (fd < 0)
+  goto err_free;
+// ...
+err_free:
+  free(mem);
+err:
+  return -1;
+\end{lstlisting}
 \end{block}
 
 \end{frame}
@@ -4894,11 +4935,281 @@ union value_t value2 = {
 
 \end{frame}
 
-\begin{frame}{Práce s pamětí}
+\fi
 
-paměťové třídy (static, extern, register)
+\subsection*{Paměťové třídy}
+\frame{\subsectionpage}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{auto}}
+
+  \begin{itemize}
+    \item Výchozí paměťová třída pro lokální proměnné
+    \begin{itemize}
+      \item Automatický vznik na zásobníku
+      \item Automatické odstranění na konci bloku
+    \end{itemize}
+
+    \pause
+
+    \item V kódu se tedy explicitně neuvádí
+
+    \pause
+
+    \item \pozor: v C++11 má jiný význam
+
+  \end{itemize}
+
+\onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+auto int a = 10;
+\end{lstlisting}
+\end{block}
 
 \end{frame}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{static}}
+
+  \begin{itemize}
+    \item Proměnná deklarovaná se \code{static} zachová svou hodnotu i po konci
+      bloku s deklarací
+
+    \pause
+
+    \item Statické proměnné jsou inicializovány v době překladu
+    \begin{itemize}
+      \item Trvalé místo pro proměnnou stejně jako pro globální proměnné
+      \item Při novém ,,vzniku'' proměnné obsahuje poslední předešlou hodnotu
+    \end{itemize}
+
+    \pause
+
+    \item Hodnota proměnné je zachována jen v rámci 1 spuštění programu
+
+    \pause
+
+    \item Proměnná se \code{static} je lokální v rámci \emph{souboru}
+
+  \end{itemize}
+
+\onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void foo() {
+  static int a = 10;
+  printf("%d\n", a);
+  a += 10;
+}
+int main(void) {
+  foo(); // => 10
+  foo(); // => 20
+  foo(); // => 30
+  return 0;
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{volatile}}
+
+  \begin{itemize}
+    \item Proměnná může být měněna i mimo náš kód
+    \begin{itemize}
+      \item Rutinou přerušení, hardwarem, sdílená paměť, \dots
+      \item Z analýzy zdrojového kódu nelze určit místa změny proměnné
+    \end{itemize}
+
+    \pause
+
+    \item Nahráje hodnotu proměnné do registru před každou operací
+    \begin{itemize}
+      \item Překladač nemůže příliš optimalizovat
+    \end{itemize}
+
+  \end{itemize}
+
+\onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+volatile int a = 10;
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{register}}
+
+  \begin{itemize}
+    \item Doporučení pro překladač, aby proměnnou uložil v registru
+    \begin{itemize}
+      \item Před vykonáním instrukce musí být hodnoty do registru přeneseny
+    \end{itemize}
+
+    \pause
+
+    \item CPU má ale jen omezený počet registrů
+    \begin{itemize}
+      \item \code{register} je jen doporučení, překladač může ignorovat
+    \end{itemize}
+
+    \pause
+
+    \item Proměnné mohou být umístěny v registru i bez \code{register}
+    \begin{itemize}
+      \item Překladač sám analyzuje a vybere často používané proměnné
+      \item Tj.\ \code{register} nepoužívejte
+    \end{itemize}
+
+    \pause
+
+  \end{itemize}
+
+\onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+register int a = 10;
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+%\begin{frame}{Klíčové slovo \texttt{register}}{Příklad}
+%
+%\begin{lstlisting}
+%void foo4() {
+%  register int value = 10;
+%  printf("%d\n", value);
+%  value += 12;
+%}
+%\end{lstlisting}
+%
+%\end{frame}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{restrict}}
+
+  \begin{itemize}
+    \item Paměťová třída pouze pro ukazatel
+    \begin{itemize}
+      \item Slib překladači, že na cíl ukazuje výhradně tento ukazatel
+    \end{itemize}
+
+    \pause
+
+    \item Překladač může generovat optimálnější kód
+    \begin{itemize}
+      \item Např.\ nemusí nahrávat opakovaně hodnotu do registru
+      \begin{itemize}
+	\item Pokud je zřejmé, že nemohla být změněna
+      \end{itemize}
+
+      \item Příklad viz \url{http://en.wikipedia.org/wiki/Restrict}
+    \end{itemize}
+
+    \pause
+
+    \item Pokud předpoklad porušíme, dojde k nedefinovanému chování
+    \begin{itemize}
+      \item Nedoporučuje se používat
+    \end{itemize}
+
+  \end{itemize}
+
+\onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void foo(int *restrict pA, int *restrict pB, int *restrict pVal);
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{extern}}
+
+  \begin{itemize}
+    \item Proměnná/funkce je definovaná jinde (externě)
+    \begin{itemize}
+      \item Typicky v jiném zdrojovém souboru
+    \end{itemize}
+
+    \pause
+
+    \item Výchozí volba pro prototypy funkcí
+    \begin{itemize}
+      \item Po \code{\#include} hlavičky s prototypem může překladač
+	pokračovat
+      \begin{itemize}
+	\item Nemusí znát definici (implementaci) funkce
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Proměnná/implementace funkce se hledá až během linkování
+
+    \pause
+
+    \item Pro globální proměnné dostupné z několika zdrojových kódů
+    \begin{itemize}
+      \item Obecně by se nemělo vyskytovat moc často
+      \item Např.\ vhodné pro zámky
+    \end{itemize}
+
+  \end{itemize}
+
+\onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+extern int globalValue;
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Modifikátory u proměnných}{shrnutí}
+
+  \begin{itemize}
+    \item Dodatečné modifikátory mohou pomoci
+    \begin{itemize}
+      \item Optimalizovat rychlost (\code{register}, \code{restrict},
+        \code{const})
+
+      \pause
+
+      \item Zamezit chybám z optimalizace (\code{volatile})
+
+      \pause
+
+      \item Zamezit chybám programátora (\code{const})
+
+      \pause
+
+      \item Ovlivnit životní cyklus proměnné (\code{auto}, \code{static})
+
+      \pause
+
+      \item Změnit umístění proměnné (\code{register}, \code{extern})
+    \end{itemize}
+
+    \pause
+
+    \item Některé modifikátory jsou jen doporučení pro překladač
+
+    \pause
+
+    \item \emph{Nejprve piště korektní kód, optimalizujte až poté!}
+
+  \end{itemize}
+
+\end{frame}
+
+% skipped: Assert z pb071_12_preprocesorpametovetridy_2016.pdf
 
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
@@ -6160,8 +6471,6 @@ int main(void) {
   \end{itemize}
 
 \end{frame}
-
-\fi
 
 \section{Bitové operace}
 \frame{\sectionpage}
