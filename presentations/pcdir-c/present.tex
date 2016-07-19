@@ -5533,55 +5533,683 @@ int main() {
 
 \end{frame}
 
-\fi
+% skipped: knihovny, rekurze, time, rand, qsort, math, z
+% pb071_10_rekurzestdlibsc11_2016.pdf
+
+\subsection*{POSIX}
+\frame{\subsectionpage}
+
+\input{../pcdir-linux/posix-files.tex}
+
+% skipped errno, getopt z pb071_11_posix_2016.pdf
 
 \section{Preprocesor}
 \frame{\sectionpage}
 
-\end{document}
+\input{../pcdir-linux/gcc.tex}
+
+\begin{frame}{Preprocesor}{Motivace}
+
+  \begin{itemize}
+    \item Preprocesor předzpracuje zdrojový kód pro překladač
+
+    \pause
+
+    \item Potřebuje překladač zpracovávat poznámky?
+    \begin{itemize}
+      \item Ne, neovlivní nijak výsledný kód, lze odstranit
+    \end{itemize}
+
+    \pause
+
+    \item Musíme mít veškerý kód v jediném souboru?
+    \begin{itemize}
+      \item Ne, je výhodné dělit do podčástí (knihovny apod.)
+      \item Až před poskytnutím překladači jsou části kódu spojené
+    \end{itemize}
+
+    \pause
+
+    \item Jak říct, že funkce \code{printf} existuje, ale je v jiném souboru?
+    \begin{itemize}
+      \item Musíme uvést prototyp funkce pro překladač (deklarace)
+      \item Zbytečné psát prototyp \code{printf} v každém souboru
+
+      \pause
+
+      \item Preprocesor nám umožní snadno vkládat pomocí \code{\#include}
+    \end{itemize}
+
+    \pause
+
+    \item Chceme vždy překládat celý zdrojový kód?
+    \begin{itemize}
+      \item Např.\ platformě závislé části se přeloží jen na dané platformě
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Preprocesor}
+
+\begin{lstlisting}[columns=fixed,basicstyle=\scriptsize\ttfamily]
+#define _ F-->00 || F-OO--;
+long F = 00, OO = 00;
+main() {
+  F_OO();
+  printf("%1.3f\n", 4.*-F/OO/OO);
+}
+F_OO() {
+            _-_-_-_
+       _-_-_-_-_-_-_-_-_
+    _-_-_-_-_-_-_-_-_-_-_-_
+  _-_-_-_-_-_-_-_-_-_-_-_-_-_
+ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_
+  _-_-_-_-_-_-_-_-_-_-_-_-_-_
+    _-_-_-_-_-_-_-_-_-_-_-_
+       _-_-_-_-_-_-_-_-_
+            _-_-_-_
+} // from International Obfuscated C Code Contest
+\end{lstlisting} %stopzone
+
+\end{frame}
 
 \begin{frame}{Preprocesor}
 
-význam, direktivy podmíněného překladu, vložení hlavičkového souboru, direktiva
-\code{\#include} a \code{\#define}, makra
+  \begin{itemize}
+    \item Většina příkazů preprocesoru začíná znakem \code{\#}
+
+    \pause
+
+    \item Znak \code{\#} nemusí být na začátku řádku
+    \begin{itemize}
+      \item Ale nesmí před ním být žádný další token
+
+      \pause
+
+      \item NE: \code{int a = 1;} \code{\#define DEBUG}
+      \item Ano: ~~~~~~~~~~\code{\#define DEBUG}
+    \end{itemize}
+
+    \pause
+
+    \item Provádí textové náhrady nad zdrojovým kódem
+    \begin{itemize}
+      \item Jazykově nezávislé, ,,neví'' nic o syntaxi jazyka C
+    \end{itemize}
+
+    \pause
+
+    \item Příkazy preprocesoru jsou ze zpracovaného kódu odstraněny
+  \end{itemize}
 
 \end{frame}
+
+\begin{frame}{Preprocesor}{\texttt{\#include}}
+
+  \begin{itemize}
+    \item \code{\#include "vloz_me.h"}
+    \begin{itemize}
+      \item Namísto této řádky se vloží \emph{obsah} souboru \file{vloz_me.h}
+    \end{itemize}
+
+    \pause
+
+    \item Typicky pro vkládání hlavičkových souborů (\file{*.h})
+    \begin{itemize}
+      \item Standardní hlavičkové soubory: \code{\#include <soubor.h>}
+      \item V aktuálním adresáři: \code{\#include "soubor.h"}
+    \end{itemize}
+
+    \pause
+
+    \item Můžeme použít i pro vkládání obsahu jakýchkoli jiných souborů
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Preprocessor}{Makra bez parametrů}
+
+  \begin{itemize}
+    \item \code{\#define JMENO_MAKRA hodnota_makra}
+    \begin{itemize}
+      \item \code{JMENO_MAKRA} se v kódu nahradí za \code{hodnota_makra}
+    \end{itemize}
+
+    \pause
+
+    \item Označení jmen maker velkými písmeny je konvence
+    \begin{itemize}
+      \item Je zřejmé, co jsou makra
+    \end{itemize}
+
+    \pause
+
+    \item Často používáno pro konstanty
+    \begin{itemize}
+      \item \code{\#define ARRAYSIZE 10000}
+
+      \pause
+
+      \item Pro konstanty ale raději \code{const int ARRAYSIZE = 10000;}
+    \end{itemize}
+
+    \pause
+
+    \item Nahradí se jen samostatné tokeny, nikoli podčásti tokenu
+    \begin{itemize}
+      \item \code{int arraySize = ARRAYSIZE;}
+
+      \pause
+
+      \item \code{int arraySize = ARRAYSIZEBAD;} zůstane beze změny
+
+      \pause
+
+      \item \code{int array [ARRAYSIZE];} se změní na \code{int array [10000];}
+
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Rozsah platnosti makra}
+
+  \begin{itemize}
+    \item Makro je v kódu platné od řádku jeho uvedení
+    \begin{itemize}
+      \item Nahrazení proběhne až pro následující řádky
+      \item Pozor, makro může být platné i v dalších souborech
+        (\code{\#include})
+    \end{itemize}
+
+    \pause
+
+    \item Platnost makra lze zrušit pomocí \code{\#undef JMENO_MAKRA}
+
+    \onslide<4->
+
+    \item Makro lze definovat v kódu nebo jako přepínač překladu
+    \begin{itemize}
+      \item \code{\#define DEBUG}
+      \item \cmd{gcc -DJMENO_MAKRA} (např.\ \cmd{gcc -DDEBUG})
+      \item \cmd{gcc -DJMENO_MAKRA=hodnota_makra}
+        (např.\ \cmd{gcc -DARRAYSIZE=100})
+    \end{itemize}
+
+  \end{itemize}
+
+\onslide<2->
+
+\begin{block}{Příklad}
+\begin{center}
+\begin{tabular}{ll}
+\begin{lstlisting}
+int value = X;
+#define X 100
+value = X;
+#undef X
+value = X;
+\end{lstlisting}
+& ~~~$\rightarrow$~~~~
+\onslide<3->
+\begin{lstlisting}
+int value = X;
+
+value = 100;
+
+value = X;
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makro}{Redefinice}
+
+  \begin{itemize}
+    \item Makro může být předefinováno
+    \begin{itemize}
+      \item Často spíše nezáměrná chyba, proto varování překladače
+      \item \texttt{warning: "VALUE" redefined}
+
+\begin{lstlisting}
+#define VALUE 100
+#define VALUE 1000
+\end{lstlisting}
+    \end{itemize}
+
+    \pause
+
+    \item Pokud potřebujete předefinovat, oddefinujte nejprve předchozí
+\begin{lstlisting}
+#define VALUE 100
+#undef VALUE
+#define VALUE 1000
+\end{lstlisting}
+
+    \pause
+
+    \item Hodnota makra může být prázdná
+    \begin{itemize}
+      \item \code{\#define DEBUG}
+      \item Často použito pro podmíněný překlad (viz následující)
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Preprocesor}{Podmíněný překlad}
+
+  \begin{itemize}
+    \item Chceme vždy přeložit celý zdrojový kód?
+    \begin{itemize}
+      \item Ne nutně, část kódu se může vynechat
+      \item Chceme mít zároveň jediný zdrojový kód, ne několik podobných kopií
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ v ladicím režimu chceme dodatečné výpisy
+\begin{lstlisting}
+#ifdef DEBUG
+printf("Just testing");
+#endif
+\end{lstlisting}
+
+    \pause
+
+    \item Např.\ máme části programů závislé na platformě
+    \begin{itemize}
+      \item Little vs.\ big endian:
+        \code{\#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__}
+      \item Unix vs.\ Windows: \code{\#ifdef linux}
+    \end{itemize}
+
+    \pause
+
+    \item Příkazy preprocesoru pro podmíněný překlad
+    \begin{itemize}
+      \item \code{\#if}, \code{\#ifdef}, \code{\#ifndef}, \code{\#else},
+        \code{\#elif}, \code{\#endif}
+    \end{itemize}
+
+    \pause
+
+    \item Podmínky se vyhodnotí v době překladu!
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Ukázka \texttt{\#ifdef}}
+
+\begin{lstlisting}
+#include <stdlib.h>
+#include <stdio.h>
+
+#define VERBOSE // comment this to remove the print below
+/*
+ * We could call the compiler like this instead of the #define:
+ * gcc -DVERBOSE
+ *
+ * Or similarly in QtCreator, in a .pro file:
+ * DEFINES += VERBOSE
+ */
+int main(void) {
+  int a = 0;
+  int b = 0;
+  scanf("%d %d", &a, &b);
+
+#ifdef VERBOSE
+  printf("a=%d b=%d\n", a, b); // present in the binary only if VERBOSE is defined
+#endif
+  printf("a+b=%d\n", a + b);
+
+  return 0;
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Zamezení opakovanému vkládání souboru}
+
+  \begin{itemize}
+    \item Opakované vložení hlavičkového souboru je nepříjemné
+    \begin{itemize}
+      \item Překladač hlásí násobnou deklaraci maker, funkcí apod.
+      \item Obtížné pohlídat vkládání souboru jen jednou ,,manuálně''
+    \end{itemize}
+
+    \pause
+
+    \item Lze řešit podmíněným překladem
+    \begin{itemize}
+      \item Obsahu souboru podmíníme (zatím) nedefinovaným makrem
+      \item \code{\#ifndef JMENOSOUBORU_H}
+    \end{itemize}
+
+    \pause
+
+    \item Ve vkládaném souboru makro definujeme
+    \begin{itemize}
+      \item \code{\#define JMENOSOUBORU_H}
+    \end{itemize}
+
+    \pause
+
+    \item Při prvním vložení se obsah souboru vloží
+    \begin{itemize}
+      \item Definuje se také makro \code{JMENOSOUBORU_H}, které zamezí
+        2.\ rozvinutí
+    \end{itemize}
+
+    \pause
+
+    \item U souborů \file{*.c} se typicky nepoužívá
+    \begin{itemize}
+      \item Nepoužíváme \code{\#include "soubor.c"}, ale
+        \code{\#include "soubor.h"}
+    \end{itemize}
+
+  \end{itemize}
+
+\onslide<2->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+#ifndef _STDIO_H_ (*@\onslide<3->@*)
+#define _STDIO_H_ (*@\onslide<2->@*)
+// obsah souboru stdio.h
+#endif
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Preprocesor}{Makra s parametry}
+
+  \begin{itemize}
+    \item Makra můžeme použít jako náhražku funkcí
+    \begin{itemize}
+      \item Tzv.\ \textit{function-style macro}
+    \end{itemize}
+
+    \pause
+
+    \item \code{\#define JMENO_MAKRA(argumenty)} \code{telo_makra}
+
+    \pause
+
+    \item Preprocesor nahradí výskyty makra včetně zadaných argumentů
+    \begin{itemize}
+      \item Argumenty v definici se nahradí za argumenty z místa použití makra
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{center}
+\begin{tabular}{ll}
+\begin{lstlisting}
+#define ADD(a, b) (a + b)
+int main(void) {
+  int z = ADD(5, 7) * 3;
+  return 0;
+}
+\end{lstlisting}
+& $\rightarrow$~
+\begin{lstlisting}
+
+int main(void) {
+  int z = (5 + 7) * 3;
+  return 0;
+}
+\end{lstlisting}
+\end{tabular}
+\end{center}
+\end{block}
+
+\end{frame}
+
+%\begin{frame}{Preprocesor}{makra s parametry}
+%
+%XXX TODO
+%
+%\end{frame}
+
+\begin{frame}[fragile]{Makro vs.\ \texttt{inline} funkce}
+
+  \begin{itemize}
+    \item Makra s parametry typicky zavedeny z důvodu rychlosti
+    \begin{itemize}
+      \item Pokud je standardní funkce, musí se připravit zásobník, \dots
+      \item Např.\ jednoduché sečtení dvou čísel může znatelně zpomalovat
+    \end{itemize}
+
+    \pause
+
+    \item Při použití makra vložen přímo kód makra namísto volání
+
+    \pause
+
+    \item Překladač ale může sám vložit kód funkce namísto volání
+    \begin{itemize}
+      \item Tzv.\ \textit{inlining}
+      \item Rychlostní optimalizace na úkor paměti -- delší kód
+      \item Překladače jsou v optimalizaci obecně velice dobré!
+    \end{itemize}
+
+    \pause
+
+    \item Klíčovým slovem \code{inline} značíme funkci vhodnou pro vložení
+    \begin{itemize}
+      \item Překladač může ignorovat
+    \end{itemize}
+
+    \pause
+
+    \item Výrazně snazší ladění než v případě maker!
+
+  \end{itemize}
+
+\onslide<4->
+
+\begin{block}{Příklad}
+\begin{tabular}{ll}
+\begin{lstlisting}
+inline int add(int a, int b) {
+  return a + b;
+}
+\end{lstlisting}
+& ~~~~~~~~~~
+\begin{lstlisting}
+int main(void) {
+  int z = add(x, y);
+}
+\end{lstlisting}
+\end{tabular}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makra}{Problémy s typem}
+
+  \begin{itemize}
+    \item Makro nemá žádný typ
+    \begin{itemize}
+      \item Jde o textovou náhradu během preprocesování
+      \item Velmi náchylné na textové překlepy
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ pozor na
+\begin{lstlisting}
+#define ARRAYSIZE 10000;
+int array[ARRAYSIZE];
+\end{lstlisting}
+    \begin{itemize}
+      \item Hodnotou makra je zde \code{10000;} \code{// int array[10000;];}
+
+      \pause
+
+      \item Chyba, kterou odhalí už překladač
+    \end{itemize}
+
+    \pause
+
+    \item Překladač nemůže kontrolovat typovou správnost
+    \begin{itemize}
+      \item Zvyšuje se riziko nesprávné interpretace dat
+    \end{itemize}
+
+    \pause
+
+    \item Často problém kvůli automatickým implicitním konverzím
+    \begin{itemize}
+      \item Po automatické konverzi překladač neohlásí chybu
+
+      \pause
+
+      \item Paměť na adrese \code{100} je interpretována jako řetězec
+\begin{lstlisting}
+#define VALUE 100
+printf("%s", VALUE);
+\end{lstlisting}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Makra}{Problémy s rozvojem}
+
+  \begin{itemize}
+    \item Velký pozor na přesný výsledek rozvoje
+    \begin{itemize}
+      \item Používejte preventivní uzávorkování
+    \end{itemize}
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{tabular}{lll}
+
+\pause
+
+\begin{lstlisting}
+#define ADD(a, b) (*@\onslide<3->{\textcolor{red}{(}}@*)a + b(*@\onslide<3->{\textcolor{red}{)}}@*)
+int main(void) {
+  int z = ADD(5, 7) * 3;
+  return 0;
+}
+\end{lstlisting}
+& $\rightarrow$~ &
+\begin{lstlisting}
+
+int main(void) {
+  int z = (*@\onslide<3->{\textcolor{red}{(}}@*)5 + 7(*@\onslide<3->{\textcolor{red}{)}}@*) * 3;
+  return 0;
+}
+\end{lstlisting}
+\end{tabular}
+\end{block}
+
+\end{frame}
+
+\begin{frame}{Makra}{Shrnutí}
+
+  \begin{itemize}
+    \item Makra se vyhodnocují při překladu, nikoli při běhu
+    \item Snažte se minimalizovat jejich používání
+    \begin{itemize}
+      \item \code{\#include} je OK
+      \item \code{\#ifndef SOUBOR_H} je OK
+      \item \code{\#define MAX 10} -- raději \code{const int MAX = 10;}
+      \item \code{\#define VALUE_T int} -- lépe \code{typedef int value_t;}
+    \end{itemize}
+
+    \pause
+
+    \item Používejte \code{inline} funkce namísto funkčních maker
+    \begin{itemize}
+      \item \code{inline int add(int a, int b) \{ return a + b; \}} \\
+        namísto \\
+        \code{\#define ADD(a, b) ((a) + (b))}
+    \end{itemize}
+
+    \pause
+
+    \item Podmíněný překlad častý při využití platformě závislých operací
+
+  \end{itemize}
+
+\end{frame}
+
+\fi
 
 \section{Bitové operace}
 \frame{\sectionpage}
 
-\begin{frame}{Bitové operátory}
+\begin{frame}[fragile]{Bitové operátory}
+
   \begin{itemize}
-    \item \code{\&}, \code{|}, \code{\~}, \code{^}, \code{<<}, \code{>>}
-    \item Pracují jako logické operátory, ale na úrovni jednotlivých bitů operandů
+%    \item \code{\&}, \code{|}, \code{\~}, \code{^}, \code{<<}, \code{>>}
+    \item Pracují jako logické operátory
+    \begin{itemize}
+      \item Ale na úrovni jednotlivých bitů operandů
+    \end{itemize}
+
     \pause
 
     \item AND: \code{Z = X \& Y;}
-%     0110
-%     0110
-%     0110
-%     ~ 0110
-%    \& 1100
-%     | 1100
-%     \^ 1100
-%     = 1001
     \item OR: \code{Z = X | Y};
-%     = 0100
-%     = 1110
-%     = 1010
+
+    \pause
+
     \item XOR: \code{Z = X ^ Y};
-%     00000110
-%     00000110
-%    << 2
-%     >> 2
+
+    \pause
+
     \item INVERT: \code{Z = ~X};
-%     = 00011000
-%     = 00000001
+
+    \pause
+
     \item LSHIFT: \code{Z = X << 2;}
-%     bitový posun je ztrátový, pokud posunete
-%    jedničkový bit za hranici použitého datového typu
     \item RSHIFT: \code{Z = X >> 2;}
+    \begin{itemize}
+      \item Oba ztrátové při posunu bitů za hranici datového typu
+    \end{itemize}
+
   \end{itemize}
+
+\onslide<2->
+
+  \begin{table}
+  \begin{center}
+  \begin{tabular}{|l|c|c|c|c|c|c|} \hline
+\textbf{Hodnota}  & \code{0110} & \code{0110} & \onslide<3->{\code{0110}} &                           & \onslide<5->{\code{00000110}} & \onslide<5->{\code{00000110}} \\ \hline
+\textbf{Operátor} & \code{\&}   & \code{|}    & \onslide<3->{\code{^}}    & \onslide<4->{\code{\~}}   & \onslide<5->{\code{<<}}       & \onslide<5->{\code{>>}}       \\ \hline
+\textbf{Hodnota}  & \code{1100} & \code{1100} & \onslide<3->{\code{1100}} & \onslide<4->{\code{1100}} & \onslide<5->{\code{2}}        & \onslide<5->{\code{2}}        \\ \hline\hline
+\textbf{Výsledek} & \code{0100} & \code{1110} & \onslide<3->{\code{1010}} & \onslide<4->{\code{0011}} & \onslide<5->{\code{00011000}} & \onslide<5->{\code{00000001}} \\ \hline
+  \end{tabular}
+  \end{center}
+  \caption{Ilustrace bitových operátorů}
+  \end{table}
 
 \end{frame}
 
@@ -5592,16 +6220,14 @@ význam, direktivy podmíněného překladu, vložení hlavičkového souboru, d
     \begin{itemize}
       \item Např.\ do jednoho \code{int} (32b) uchováme 32 hodnot
       \item \code{unsigned int flags = 0x00000000;}
-      \item (Pozn.: jednotlivé bity odpovídají násobkům dvojky)
+      \item Pozn.: jednotlivé bity odpovídají násobkům dvojky
     \end{itemize}
 
     \pause
-%     0001
-%     | 0100
-%     = 0101
+
     \item Vložení hodnoty na pozici X
     \begin{itemize}
-      \item Vypočteme masku jako $2^{(X-1)}$ (indexujeme od 0, tedy $X - 1$)
+      \item Vypočteme masku jako $2^{(X-1)}$ (indexujeme od 0, proto $X - 1$)
       \begin{itemize}
 	\item Např.\ třetí bit $\rightarrow$ $2^2$ $\rightarrow$ 4
 	  $\rightarrow$ 0x04 hexadecimálně
@@ -5616,10 +6242,6 @@ význam, direktivy podmíněného překladu, vložení hlavičkového souboru, d
     \end{itemize}
 
     \pause
-%    0101
-%    \& 0100
-%    = 0100
-%     = TRUE
 
     \item Zjištění hodnoty z pozice X
     \begin{itemize}
@@ -5634,15 +6256,14 @@ význam, direktivy podmíněného překladu, vložení hlavičkového souboru, d
       \item Maska pro celý bajt je \code{255}, tedy \code{0xFF}
       \item \code{unsigned char lowByte = flags \& 0xFF;}
     \end{itemize}
-%     ...0101010000010101
-%     \& 11111111
-%     = ...0000000000010101
+
 %    \item ! Nepoužívejte se signed hodnotami (není fixní bitová reprezentace)
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}{Bitové operátory}{Využití}
+
   \begin{itemize}
     \item Operace nutné na úrovni bitů
     \begin{itemize}
@@ -5657,7 +6278,13 @@ význam, direktivy podmíněného překladu, vložení hlavičkového souboru, d
     \item Rychlé násobení mocninou dvojky $X \cdot 2^{posun}$
     \begin{itemize}
       \item $0011_2$ (3 dekadicky)
+
+      \pause
+
       \item $0011_2$ \code{<<} $1 \rightarrow 0110_2$ (6 dekadicky)
+
+      \pause
+
       \item $0011_2$ \code{<<} $2 \rightarrow 1100_2$ (12 dekadicky)
     \end{itemize}
 
@@ -5667,9 +6294,12 @@ význam, direktivy podmíněného překladu, vložení hlavičkového souboru, d
       \code{II}
     \begin{itemize}
       \item Např.\ záměna \code{\&} za \code{\&\&}
-      \item $1100_2$ \code{\&\&} $0011_2$ je TRUE
-      \item $1100_2$ \code{\&} $0011_2$ je FALSE
+      \begin{itemize}
+	\item $1100_2$ \code{\&\&} $0011_2$ je TRUE
+	\item $1100_2$ \code{\&} $0011_2$ je FALSE
+      \end{itemize}
     \end{itemize}
+
   \end{itemize}
 
 \end{frame}
