@@ -4,6 +4,9 @@
 
 \date{12.--14. 7. \the\year}
 
+\newif\ifpcdirlinux
+\pcdirlinuxfalse
+
 \begin{document}
 
 \frame{\titlepage}
@@ -15,7 +18,7 @@
   \tableofcontents
 \end{frame}
 
-\iffalse
+\iftrue
 
 \section{Úvodní informace}
 \frame{\sectionpage}
@@ -5326,6 +5329,7 @@ free(array.data);
     \end{itemize}
 
     \item Přeložte a spusťte
+    \item Úkol nezahazujte, bude v něm pokračovat
   \end{enumerate}
 
 \end{frame}
@@ -5832,6 +5836,45 @@ void fun(void); // the same
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Externí funkce a proměnná}
+  \begin{enumerate}
+    \item Přidejte si do projektu nový zdrojový soubor
+    \begin{itemize}
+      \item File $\rightarrow$ New File $\rightarrow$ C++ $\rightarrow$ C++
+        Source File
+      \item Zadejte název
+      \begin{itemize}
+	\item Např.\ \file{test.c}
+      \end{itemize}
+      \item Finish
+    \end{itemize}
+
+    \item Definujte zde proměnnou typu \code{int}
+
+    \item Definujte zde funkci, která inkrementuje proměnnou o 1
+
+    \item Z \code{main} funkce vypište proměnnou
+    \begin{itemize}
+      \item \code{extern int nazev;}
+    \end{itemize}
+
+    \item Z \code{main} funkce zavolejte vaši funkci
+    \begin{itemize}
+      \item \code{extern void nazev();}
+    \end{itemize}
+
+    \item Z \code{main} funkce vypište proměnnou
+    \begin{itemize}
+      \item Měla by být o 1 vyšší
+    \end{itemize}
+
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
 \begin{frame}{Modifikátory u proměnných}{Shrnutí}
 
   \begin{itemize}
@@ -5872,8 +5915,6 @@ void fun(void); // the same
 % skipped: Assert, Funkce s proměnným počtem argumentů z
 % pb071_12_preprocesorpametovetridy_2016.pdf
 
-\fi
-
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
 
@@ -5882,10 +5923,19 @@ void fun(void); // the same
   \begin{itemize}
     \item Koncept standardního vstupu a výstupu
     \begin{itemize}
-      \item Program nemusí vědět, kdo mu dává vstupní data
-      \item Program nemusí vědět, kam vypisuje výstupní data
-      \item Defaultně standardní vstup == klávesnice
-      \item Defaultně standardní výstup == obrazovka
+      \item Program nemusí vědět
+      \begin{itemize}
+	\item Kdo mu dává vstupní data
+	\item Kam vypisuje výstupní data
+      \end{itemize}
+
+      \pause
+
+      \item Výchozí
+      \begin{itemize}
+	\item Standardní vstup je klávesnice
+	\item Standardní výstup je obrazovka
+      \end{itemize}
     \end{itemize}
 
     \pause
@@ -5911,14 +5961,14 @@ void fun(void); // the same
 \begin{frame}{Vstup a výstup v C}
 
   \begin{itemize}
-    \item Základní možnosti vstupu a výstupu už známe
-    \begin{itemize}
-      \item Výstup na obrazovku (\code{puts}, \code{printf})
-      \item Vstup z klávesnice (\code{getc}, \code{scanf})
-    \end{itemize}
-
-    \pause
-
+%    \item Základní možnosti vstupu a výstupu už známe
+%    \begin{itemize}
+%      \item Výstup na obrazovku (\code{puts}, \code{printf})
+%      \item Vstup z klávesnice (\code{getc}, \code{scanf})
+%    \end{itemize}
+%
+%    \pause
+%
     \item Funkce pro vstup a výstup jsou poskytovány standardní knihovnou
       (\header{stdio.h})
     \begin{itemize}
@@ -5994,12 +6044,12 @@ void fun(void); // the same
 
     \item Nový řádek -- implementačně závislé na OS
     \begin{itemize}
-      \item Unix: \code{\\n} (ASCII = 10, new line)
+      \item Unix: \code{\\n} (ASCII 10, \textit{new line})
       \begin{itemize}
 	\item \code{\\n} posun dolů o jeden řádek
       \end{itemize}
 
-      \item Windows: \code{\\r\\n} (ASCII = 13 10)
+      \item Windows: \code{\\r\\n} (ASCII 13 10)
       \begin{itemize}
 	\item \code{\\r} carriage return -- návrat válce psacího stroje doleva
 	\item \code{\\n} posun dolů o jeden řádek
@@ -6008,7 +6058,7 @@ void fun(void); // the same
 
     \pause
 
-    \item \code{printf("Prvni radek \n");}
+    \item \code{printf("Prvni radek \\n");}
     \begin{itemize}
       \item Na Unixu: \code{Prvni radek \\n}
       \item Na Windows: \code{Prvni radek \\r\\n}
@@ -6059,7 +6109,7 @@ void fun(void); // the same
 \begin{frame}[fragile]{Práce s vyrovnávací pamětí}
 
 \begin{lstlisting}
-int get_put_char(){
+int get_put_char(void) {
   printf("Zadavej znaky a pak Enter: ");
   fflush(stdout); // force output of printf
 
@@ -6076,8 +6126,80 @@ int get_put_char(){
 
 \end{frame}
 
-\begin{frame}[fragile]{\texttt{printf}}{Podrobněji}
+\subsection*{Funkce pro vstup a výstup}
+\frame{\subsectionpage}
 
+\begin{frame}[fragile]{Výpis znaku -- \texttt{putchar}}
+
+  \code{int putchar(int c);} (\header{stdio.h})
+  \begin{itemize}
+    \item Podobná naší \code{print_character}
+
+    \pause
+
+    \item Vypíše na standardní výstup znak \code{c}
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void fun(const char *str) {
+  for (unsigned int a = 0; a < strlen(str); a++) {
+    print_character(str[a]); // ours
+    putchar(str[a]); // from the standard library
+  }
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Načtení znaku -- \texttt{getchar}}
+
+  \code{int getchar(void);} (\header{stdio.h})
+  \begin{itemize}
+    \item Načte ze standardního vstupu znak a vrátí ho
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void fun(void) {
+  while ((int c = getchar()) != '\n')
+    putchar(c);
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Výpis řetězce -- \texttt{puts}}
+
+  \code{int puts(const char *s);} (\header{stdio.h})
+  \begin{itemize}
+    \item Podobná naší \code{print_string}
+
+    \pause
+
+    \item Vypíše na standardní výstup řetězec \code{s}
+
+    \pause
+
+    \item Vloží nový řádek
+  \end{itemize}
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void fun(const char *str) {
+  print_string(str); // ours
+  puts(str); // from the standard library
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{printf}}
+
+  \code{int printf(const char *format, ...);}
   \begin{itemize}
     \item Často používaná funkce ze standardní knihovny
     \begin{itemize}
@@ -6086,14 +6208,40 @@ int get_put_char(){
 
     \pause
 
-    \item \code{int printf(const char *format, ...);}
+    \item Slouží k formátovanému výpisu parametrů
     \begin{itemize}
-      \item \code{\%[flags][width][.precision][length]specifier}
+      \item 1. parametr: řetězec obsahující \code{\%x}
+      \begin{itemize}
+	\item \code{\%[flags][width][.precision][length]specifier}
+      \end{itemize}
+
+      \pause
+
+      \item 2--n-tý parametr: parametry, které do řetězce vložit namísto
+        \code{\%x}
+      \item Počet \code{\%x} musí odpovídat počtu následujících parametrů
     \end{itemize}
 
+    \pause
+
+    \item Nevloží nový řádek
   \end{itemize}
 
-  \pause
+  \onslide<2->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void fun(int a, char c, const char *str) {
+  printf("ahoj\n");
+  printf("%d %c %d %s\n", a, c, c, str);
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{printf}}{Formátovací znaky}
+
 
 \begin{table}
 { \scriptsize
@@ -6148,9 +6296,7 @@ p	& Pointer address	 & b8000000 \\ \hline
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-#include <stdio.h>
-
-int main() {
+void fun(void) {
   float fValue = 3.1415926535;
   printf("%f\n", fValue);           // prints 3.141593
   printf("%.2f\n", fValue);         // prints 3.14
@@ -6185,20 +6331,18 @@ int main() {
   \onslide<1->
 
 \begin{block}{Příklad}
-\begin{lstlisting}
-#include <stdio.h>
-
-int main() {
+\begin{lstlisting}[belowskip=0pt]
+void fun(void) {
   int value = 16;
+
   printf("%p", &value);                    // prints e.g. 0x7ffc3204d1ec
 \end{lstlisting}
 \onslide<2->
-\begin{lstlisting}
+\begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   printf("%d %o %x", value, value, value); // prints 16 20 10
 \end{lstlisting}
 \onslide<1->
-\begin{lstlisting}
-  return 0;
+\begin{lstlisting}[aboveskip=0pt]
 }
 \end{lstlisting}
 \end{block}
@@ -6252,6 +6396,20 @@ printf("%s\n", fValue);           // CRASH
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Formátovaný výpis}
+  \begin{enumerate}
+    \item Přepracujte úkol s lidmi, aby používal \code{printf}
+    \begin{itemize}
+      \item Výpis atributů proveďte na jeden řádek
+    \end{itemize}
+
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
 \subsection*{Formátované načítání ze vstupu}
 \frame{\subsectionpage}
 
@@ -6265,9 +6423,9 @@ printf("%s\n", fValue);           // CRASH
 
       \pause
 
-      \item Ukládají se do poskytnutých argumentů
+      \item Ukládají se do poskytnutých parametrů
       \begin{itemize}
-	\item Argumenty poskytnuty jako ukazatele
+	\item Parametry poskytnuty jako ukazatele
       \end{itemize}
 
       \pause
@@ -6289,8 +6447,6 @@ printf("%s\n", fValue);           // CRASH
     \begin{itemize}
       \item \code{EOF} (End Of File), pokud se nepodařilo načíst nic
     \end{itemize}
-
-    \pause
 
   \end{itemize}
 
@@ -6372,11 +6528,25 @@ printf("%s\n", small_string);
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Formátované načítání}
+  \begin{enumerate}
+    \item Pokračujte v úkolu s lidmi
+    \item Jako první načtěte číslo, kolik osob máte vytvořit
+    \item Potom začněte vytvářet osoby
+    \item Přečtěte jméno každé osoby ze vstupu
+    \item Přeložte a spusťte
+    \item Můžete rozšířit na načítaní pohlaví a věku
+  \end{enumerate}
+
+\end{frame}
+
 \begin{frame}{Fuzz testování}
 
   \heading{,,Fuzz'' testování}
   \begin{itemize}
-    \item Zašlete programu náhodný vstup
+    \item Zašle programu náhodný vstup
     \item Různá délka (i 100kB), různý obsah
     \item Program padá $\Rightarrow$ problém
     \item \textsc{Klee}, \textsc{Radamsa}, \textsc{MiniFuzz}, \textsc{Peach},
@@ -6395,7 +6565,7 @@ printf("%s\n", small_string);
 
     \pause
 
-    \item Namísto vstupu a výstupu lze použít pole znaků
+    \item Namísto vstupu a výstupu lze použít řetězec
 
     \pause
 
@@ -6404,6 +6574,10 @@ printf("%s\n", small_string);
       \item Stejné jako \code{printf}, výstup jde ale do řetězce \code{str}
       \item Vrací počet zapsaných \emph{znaků}
       \item Pozor na celkovou délku výstupu
+
+      \pause
+
+      \item \code{snprintf} má parametr \code{size} pro \code{str}
     \end{itemize}
 
     \pause
@@ -6451,14 +6625,6 @@ int main() {
 
 \end{frame}
 
-\begin{frame}{Terminálový vstup a výstup}
-
-znakový vstup a vystup
-
-\end{frame}
-
-\end{document}
-
 \section{Práce se soubory}
 \frame{\sectionpage}
 
@@ -6484,7 +6650,7 @@ znakový vstup a vystup
 \begin{frame}[fragile]{Soubor}{Testování konce}
 
   \begin{itemize}
-    \item Používejte konstantu \code{EOF} (End Of File)
+    \item Používejte konstantu \code{EOF} (\textit{End Of File})
     \item V dokumentaci je u funkcí vždy uveden případ výskytu a použití
   \end{itemize}
 
@@ -6494,8 +6660,8 @@ znakový vstup a vystup
 
 int main() {
   FILE *file;
-  char fileName[] = "muj_soubor.txt";
-  if ((file = fopen(fileName, "r"))) {
+  char filename[] = "muj_soubor.txt";
+  if ((file = fopen(filename, "r"))) {
     int value;
     while((value = getc(file)) != EOF)
       putchar(value);
@@ -6534,7 +6700,7 @@ int main() {
 
     \item Potřebuje překladač zpracovávat poznámky?
     \begin{itemize}
-      \item Ne, neovlivní nijak výsledný kód, lze odstranit
+      \item Ne, neovlivní nijak výsledný kód, zahodí se
     \end{itemize}
 
     \pause
@@ -6684,11 +6850,11 @@ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
 
     \item Nahradí se jen samostatné tokeny, nikoli podčásti tokenu
     \begin{itemize}
-      \item \code{int arraySize = ARRAYSIZE;}
+      \item \code{int array_size = ARRAYSIZE;}
 
       \pause
 
-      \item \code{int arraySize = ARRAYSIZEBAD;} zůstane beze změny
+      \item \code{int array_size = ARRAYSIZEBAD;} zůstane beze změny
 
       \pause
 
@@ -6759,7 +6925,7 @@ value = X;
     \item Makro může být předefinováno
     \begin{itemize}
       \item Často spíše nezáměrná chyba, proto varování překladače
-      \item \texttt{warning: "VALUE" redefined}
+      \item \cmd{warning: "VALUE" redefined}
 
 \begin{lstlisting}
 #define VALUE 100
@@ -6861,6 +7027,19 @@ int main(void) {
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Direktivy preprocesoru}
+  \begin{enumerate}
+    \item Otevřete si \file{12/main.pro} z repozitáře
+
+    \item Upravujte \emph{pouze} \file{x.h}
+    \item Přinuťte překladač projít všechny tři větve v \file{main.c}
+    \item Prostudujte výstup překladače
+  \end{enumerate}
+
+\end{frame}
+
 \begin{frame}[fragile]{Zamezení opakovanému vkládání souboru}
 
   \begin{itemize}
@@ -6944,13 +7123,15 @@ int main(void) {
 \begin{tabular}{ll}
 \begin{lstlisting}
 #define ADD(a, b) (a + b)
+
 int main(void) {
   int z = ADD(5, 7) * 3;
   return 0;
 }
 \end{lstlisting}
-& $\rightarrow$~
+& $\rightarrow$~~~
 \begin{lstlisting}
+
 
 int main(void) {
   int z = (5 + 7) * 3;
@@ -6974,7 +7155,7 @@ int main(void) {
   \begin{itemize}
     \item Makra s parametry typicky zavedeny z důvodu rychlosti
     \begin{itemize}
-      \item Pokud je standardní funkce, musí se připravit zásobník, \dots
+      \item U funkcí se musí připravit zásobník, \dots
       \item Např.\ jednoduché sečtení dvou čísel může znatelně zpomalovat
     \end{itemize}
 
@@ -7122,7 +7303,7 @@ int main(void) {
 
     \pause
 
-    \item Používejte \code{inline} funkce namísto funkčních maker
+    \item Používejte \code{inline} funkce namísto maker s parametry
     \begin{itemize}
       \item \code{inline int add(int a, int b) \{ return a + b; \}} \\
         namísto \\
@@ -7136,6 +7317,8 @@ int main(void) {
   \end{itemize}
 
 \end{frame}
+
+\fi
 
 \section{Bitové operace}
 \frame{\sectionpage}
