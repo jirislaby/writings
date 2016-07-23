@@ -3963,7 +3963,7 @@ int main() {
 
 \end{frame}
 
-\fi
+% move before strings
 
 \subsection*{Funkční ukazatel}
 \frame{\subsectionpage}
@@ -4046,7 +4046,7 @@ int main() {
 
     \item Ukazatel na funkci může být i parametr jiné funkce
     \begin{itemize}
-      \item \code{void foo(int neco, int (*func)(float, float));}
+      \item \code{void foo(int neco, int (*func)(const char *));}
     \end{itemize}
 
   \end{itemize}
@@ -4061,6 +4061,10 @@ void fun(void) {
   \onslide<4->
 \begin{lstlisting}[belowskip=0pt]
   hacek("/etc/passwd");
+\end{lstlisting}
+  \onslide<5->
+\begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+  foo(0, hacek);
 \end{lstlisting}
   \onslide<3->
 \begin{lstlisting}[aboveskip=0pt]
@@ -4092,17 +4096,17 @@ void fun(void) {
 \onslide<3->
 
 \begin{block}{Příklad}
-\begin{lstlisting}
-int analyze(const char *filePath) {}
-int ahoj(const char *filePath) {}
+\begin{lstlisting}[belowskip=0pt]
+int analyze(const char *path) {}
+int ahoj(const char *path) {}
 \end{lstlisting}
 \onslide<4->
 \begin{lstlisting}
 int main(void) {
-  int (*pFnc)(const char *) = &analyze;
-  pFnc("c:\\autoexec.bat");
-  pFnc = &Ahoj; // mozne take jako: pFnc = Ahoj;
-  pFnc("c:\\autoexec.bat");
+  int (*fun)(const char *) = &analyze;
+  fun("/etc/passwd");
+  fun = &ahoj; // can be also simply: fun = ahoj;
+  fun("/etc/passwd");
   return 0;
 }
 \end{lstlisting}
@@ -4112,25 +4116,23 @@ int main(void) {
 
 \begin{frame}{Funkční ukazatel}{Využití}
 
+  \heading{Podpora \textit{plug-inů} v systému/programu (např.\ antivir)}
   \begin{itemize}
-    \item Podpora ,,plug-inů'' v systému (např.\ antivirus)
+    \item Plug-in zaregistruje svůj callback na žádanou událost
     \begin{itemize}
-      \item Plug-in zaregistruje svůj callback na žádanou událost
-      \begin{itemize}
-	\item Např.\ antivirus na událost „přístup k souboru na disku“
-      \end{itemize}
-
-      \pause
-
-      \item Při výskytu události systém zavolá zaregistrovaný callback
+      \item Např.\ antivirus na událost ,,přístup k souboru na disku''
     \end{itemize}
+
+    \pause
+
+    \item Při výskytu události systém zavolá zaregistrovaný callback
 
     \pause
 
     \item V systému lze mít několik antivirů
     \begin{itemize}
       \item Seznam funkčních ukazatelů na funkce
-      \item Seznam zaregistrovaných funkcí \code{analyze()}
+      \item Seznam zaregistrovaných funkcí \code{analyze}
     \end{itemize}
 
     \pause
@@ -4168,12 +4170,20 @@ int main(void) {
     \item Simulace pozdní vazby známé z OO jazyků
   \end{itemize}
 
+  \onslide<1->
+
 \begin{block}{Příklad}
 \begin{lstlisting}
-//printScreen(), printLCD(), printPrinter(), printFile()...
-void (*myPrint)(const char*);
-myPrint = &printLCD;
-myPrint("Hello world");
+// print_screen(), print_LCD(), print_printer(), print_file(), ...
+\end{lstlisting}
+  \onslide<2->
+\begin{lstlisting}
+int main() {
+  void (*emit)(const char *);
+  emit = &print_LCD;
+  emit("Hello world");
+  return 0;
+}
 \end{lstlisting}
 \end{block}
 
@@ -4184,23 +4194,28 @@ myPrint("Hello world");
   \heading{Aplikace různých funkcí na interval prvků}
   \begin{itemize}
     \item Např.\ simulace \code{for_each} známého z jiných jazyků
-    \item Přehlednější a rychlejší než switch nad každým prvkem
+    \item Přehlednější a rychlejší než \code{switch} nad každým prvkem
   \end{itemize}
 
+  \pause
+
 \begin{block}{Příklad}
-\begin{lstlisting}
+\begin{lstlisting}[belowskip=0pt]
 int add2(int value) { return value + 2; }
 int minus3(int value) { return value - 3; }
 
-void for_each(int* array, int arrayLen, int(*fnc)(int)) {
-  for (int i = 0; i < arrayLen; i++)
-    array[i] = fnc(array[i]);
+void for_each(int *array, int array_len, int(*fun)(int)) {
+  for (int i = 0; i < array_len; i++)
+    array[i] = fun(array[i]);
 }
+\end{lstlisting}
+\pause
+\begin{lstlisting}[aboveskip=0pt]
 int main(){
-  const int arrayLen = 10;
-  int myArray[arrayLen] = {0};
-  for_each(myArray, arrayLen, &add2);
-  for_each(myArray, arrayLen, &minus3);
+  const int array_len = 10;
+  int array[array_len] = { 0 };
+  for_each(array, array_len, &add2);
+  for_each(array, array_len, &minus3);
   return 0;
 }
 \end{lstlisting}
@@ -4221,8 +4236,8 @@ int main(){
 
     \item Tzv.\ konvence volání
     \begin{itemize}
-      \item Uklízí volající funkce (cdecl) -- default pro C/C++ programy
-      \item Uklízí volaná funkce (stdcall) -- např.\ Win32 API
+      \item Uklízí volající funkce (\code{cdecl}) -- výchozí pro C/C++ programy
+      \item Uklízí volaná funkce (\code{stdcall}) -- např.\ Win32 API
     \end{itemize}
 
     \pause
@@ -4258,22 +4273,11 @@ int main(){
 
 \begin{frame}[fragile]{Přetypování ukazatelů}
 
-\begin{lstlisting}
-float fArray[10];
-char *cArray = (char *)fArray;
-\end{lstlisting}
-
   \begin{itemize}
     \item Ukazatele lze přetypovat
     \begin{itemize}
-      \item Bitové přetypování, mění se interpretace, nikoli hodnota
-    \end{itemize}
-
-    \pause
-
-    \item Po přetypování jsou data na odkazované adrese interpretována jinak
-    \begin{itemize}
-      \item Závislost na bitové reprezentaci datových typů
+      \item Bitové přetypování
+      \item Mění se interpretace, nikoli hodnota
     \end{itemize}
 
     \pause
@@ -4291,17 +4295,29 @@ char *cArray = (char *)fArray;
 %cArray[1]
 %\end{lstlisting}
 
-    \item Pozor na požadavek standardu na ,,strict aliasing''
+    \item Pozor na požadavek standardu na \textit{strict aliasing}
     \begin{itemize}
       \item Nesmí existovat dva ukazatele různého typu na stejnou paměť
       \begin{itemize}
 	\item S výjimkou \code{(char *)} a \code{(void *)}
       \end{itemize}
 
+      \pause
+
       \item Omezuje možnost optimalizace překladačem
     \end{itemize}
 
   \end{itemize}
+
+  \onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+float f_array[10];
+char *c_array = (char *)f_array;
+c_array[0] = 1; // changed f_array[0] to some nonsense
+\end{lstlisting}
+\end{block}
 
 \end{frame}
 
@@ -4329,8 +4345,14 @@ char *cArray = (char *)fArray;
 \begin{lstlisting}
 void *memset(void *ptr, int value, size_t num);
 
-int array[100];
-memset(array, 0, sizeof(array));
+char X;
+memset(&X, 0, sizeof(X));
+
+int array1[100];
+memset(array1, 0, sizeof(array1));
+
+double array2[100];
+memset(array2, 0, sizeof(array2));
 \end{lstlisting}
 \end{block}
 
@@ -4342,9 +4364,9 @@ memset(array, 0, sizeof(array));
     \item Některé operace fungují na úrovni bitů
     \begin{itemize}
       \item Např.\ XOR, AND, \dots
-      \item Instrukce procesoru u \xes pracují na úrovni 32 bitů
+      \item Instrukce procesoru u \xes pracují na úrovni 32/64 bitů
       \item Při práci na úrovni např.\ \code{char} (8 bitů) se nevyužívá celý
-	potenciál šířky registru (32 bitů)
+	potenciál šířky registru (32/64 bitů)
     \end{itemize}
 
   \end{itemize}
@@ -4354,9 +4376,11 @@ memset(array, 0, sizeof(array));
 \begin{block}{Příklad}
 \begin{lstlisting}
 unsigned char array[80];
+
 // Will execute 80 iterations
 for (int i = 0; i < sizeof(array); i++)
   array[i] ^= 0x55;
+
 // Will execute only 20 iterations (x86)
 for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
   ((unsigned int *)array)[i] ^= 0x55555555;
@@ -4366,8 +4390,6 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 \end{frame}
 
 % skipped Typový systém z pb071_05_typydynalokace_2016.pdf
-
-\end{document}
 
 \section{Práce s pamětí}
 \frame{\sectionpage}
@@ -4399,7 +4421,7 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
     \pause
 
-    \item Halda (heap)
+    \item \emph{Halda (heap)}
     \begin{itemize}
       \item Mění se při každém \code{malloc}, \code{free}
       \item Dynamicky alokované proměnné
@@ -4417,21 +4439,43 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 %
 %\end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Načtení nekonečného vstupu}
+  \begin{enumerate}
+    \item Čtěte ze vstupu po znacích
+    \begin{itemize}
+      \item Funkce \code{getchar} (\header{stdio.h}), vrací \code{int}
+    \end{itemize}
+
+    \item Čtěte dokud nenarazíte na konec řádku \code{'\\n'}
+    \begin{itemize}
+      \item Alokujte si paměť (\code{malloc})
+      \item A pokud nestačí, rozšiřte (\code{realloc})
+    \end{itemize}
+
+    \item Řádek vypište
+    \item Paměť uvolněte
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
 \begin{frame}{Úniky paměti}
 
   \begin{itemize}
     \item Dynamicky alokovaná paměť musí být uvolněna
     \begin{itemize}
-      \item dealokace musí být explicitně provedena vývojářem
-      \item (C nemá Garbage collector)
+      \item C nemá \textit{Garbage collector}
+      \item Dealokace musí být explicitně provedena vývojářem
     \end{itemize}
 
     \pause
 
-    \item Valgrind -- nástroj pro detekci úniků paměti (mimo jiné)
+    \item \textsc{Valgrind} -- nástroj pro detekci úniků paměti (mimo jiné)
     \begin{itemize}
       \item \cmd{valgrind -v --leak-check=full testovany_program}
-      \item Lze využít \qtc plug-in
+      \item Lze používat uvnitř \qtcu
       \item Není funkční port pro Windows!
     \end{itemize}
 
@@ -4446,7 +4490,7 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
     \item Detekované úniky paměti ihned odstraňujte
     \begin{itemize}
-      \item Stejně jako v případě warningu
+      \item Stejně jako v případě varování překladače
       \item Nevšimnete si jinak nově vzniklých
       \item Obtížně dohledáte místo alokace
     \end{itemize}
@@ -4473,19 +4517,19 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
 int main(int argc, char *argv[]) {
   const int array_len = 25;
-  int *array;
-  array = malloc(array_len * sizeof(int));
+  int *array1;
+  array1 = malloc(array_len * sizeof(int));
   if (argc == 2) {
-    array = malloc(array_len * sizeof(int));
+    array1 = malloc(array_len * sizeof(int)); // the original array1 is lost
   }
-  free(pArray);
+  free(array1);
 \end{lstlisting}
 \begin{onslide}<2->
 \begin{lstlisting}
   int *array2;
   array2 = malloc(array_len * sizeof(int));
-  array2 += 20; // zdroj chyby
-  free(array2); // chyba
+  array2 += 20; // error source
+  free(array2); // error
 \end{lstlisting}
 \end{onslide}
 \begin{lstlisting}
@@ -4496,7 +4540,28 @@ int main(int argc, char *argv[]) {
 
 \end{frame}
 
-\begin{frame}[fragile]{Předávání hodnotou a hodnotou ukazatele}
+\begin{frame}{Úkol}
+
+  \heading{Práce s nástrojem \textsc{Valgrind}}
+  \begin{enumerate}
+    \item Otevřete si {08/main.pro}
+    \item Spusťte v nástroji \textsc{Valgrind}
+    \begin{itemize}
+      \item V \qtcu: Analyze $\rightarrow$ Valgrind Memory Analyzer
+    \end{itemize}
+
+    \item Vypište si všechny podrobnosti
+    \begin{itemize}
+      \item V \qtcu: Tools $\rightarrow$ Options $\rightarrow$ Analyzer
+	$\rightarrow$ Show reachable and indirectly lost blocks
+    \end{itemize}
+
+    \item Opravte, aby si \textsc{Valgrind} nestěžoval
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Předávání hodnotou a hodnotou ukazatele}{Opakování}
 
 \begin{block}{Příklad}
 \begin{lstlisting}
@@ -4525,7 +4590,7 @@ int main() {
 \begin{frame}[fragile]{Předávání alokovaného pole z funkce}
 
   \begin{itemize}
-    \item Jak předat pole dyn. alokované ve funkci?
+    \item Jak předat pole dynamicky alokované ve funkci?
     \begin{itemize}
       \item Ukazatel na ukazatel
     \end{itemize}
@@ -4534,7 +4599,7 @@ int main() {
 
   \pause
 
-\begin{block}{Ukázka}
+\begin{block}{Příklad}
 \begin{lstlisting}
 void allocate_array(int *p1, int **p2) {
   p1 = malloc(10 * sizeof(int)); // address will be lost, memory leak
@@ -4560,19 +4625,22 @@ int main() {
 
   \begin{itemize}
     \item 2D pole je pole ukazatelů na 1D pole
+
+    \pause
+
     \item 3D pole je pole ukazatelů na pole ukazatelů na 1D pole
   \end{itemize}
 
-  \pause
+  \onslide<1->
 
 \begin{block}{Ukázka}
 \begin{lstlisting}
 void allocate_2D_array() {
   const int rows = 100; // columns = row_index + 1;
-  int **array2D = malloc(rows * sizeof(int *)); // note (int *)
+  int **array2D = malloc(rows * sizeof(int *)); // note sizeof(int *)
   for (int i = 0; i < rows; i++) {
-    // allocate 1D array on position array2D[i]
-    array2D[i] = malloc((i + 1) * sizeof(int)); // note (int)
+    // allocate 1D array to array2D[i]
+    array2D[i] = malloc((i + 1) * sizeof(int)); // note sizeof(int)
   }
   array2D[10][5] = 1;
 
@@ -4631,12 +4699,12 @@ void allocate_2D_array() {
 
 \end{frame}
 
-\begin{frame}{Alokace paměti}{Typy}
+\begin{frame}{Alokace paměti}{Shrnutí typů}
 
   \begin{enumerate}
     \item Alokovaná v době překladu s pevnou délkou (známa při překladu)
     \begin{itemize}
-      \item Typicky konstanty, řetězce, konstantní pole
+      \item Konstanty, řetězce, konstantní pole, \dots
       \item \code{const char hello[] = "Hello World";}
       \item Alokováno v datové sekci programu (lze nalézt v binárce)
     \end{itemize}
@@ -4656,7 +4724,7 @@ void allocate_2D_array() {
     \begin{itemize}
       \item Variable length array, od C99
       \item Paměť je alokována a dealokována automaticky
-      \item \code{int array[userGivenLength];}
+      \item \code{int array[given_length];}
     \end{itemize}
 
     \pause
@@ -4673,14 +4741,26 @@ void allocate_2D_array() {
 
 \end{frame}
 
-\subsection*{Uživatelské datové typy}
-\frame{\subsectionpage}
+\section{Uživatelské datové typy}
+\frame{\sectionpage}
 
 \begin{frame}{Uživatelské datové typy}
 
   \begin{itemize}
     \item Známe primitivní datové typy
+    \begin{itemize}
+      \item \code{char}, \code{int}, \dots
+    \end{itemize}
+
+    \pause
+
     \item Známe pole primitivních datových typů
+    \begin{itemize}
+      \item \code{char []}, \code{int []}, \dots
+    \end{itemize}
+
+    \pause
+
     \item Můžeme vytvářet vlastní uživatelské datové typy:
     \begin{itemize}
       \item \code{enum}
@@ -4720,7 +4800,10 @@ void allocate_2D_array() {
     \item \code{enum} je typ proměnné umožňující omezit rozsah hodnot
     \begin{itemize}
       \item Povolené hodnoty specifikuje programátor
-      \item Kontrola v době překladu (ale jen pro pojmenované hodnoty)
+      \item Kontrola v době překladu
+      \begin{itemize}
+	\item Ale jen pro pojmenované hodnoty
+      \end{itemize}
     \end{itemize}
 
   \end{itemize}
@@ -4816,8 +4899,9 @@ enum race_t race1 = elf;
   \begin{itemize}
     \item Pro zpřehlednění zápisu konstant
     \begin{itemize}
-      \item elf, human a hobit přehlednější než 0, 1, 2
-      \item Přiřazení hodnoty, \code{switch}, \dots
+      \item \code{elf}, \code{human} a \code{hobit} přehlednější než \code{0},
+	\code{1}, \code{2}
+      \item Při přiřazení hodnoty, \code{switch}, \dots
     \end{itemize}
 
     \pause
@@ -4841,8 +4925,8 @@ enum race_t {
 };
 
 enum race_t race1 = elf;
-enum race_t race3 = chicken;
-enum race_t race2 = -15;
+enum race_t race3 = chicken; // error: 'chicken' undeclared here
+enum race_t race2 = -15;     // no error
 \end{lstlisting}
 \end{block}
 
@@ -4904,15 +4988,15 @@ enum race_t race2 = -15;
 
     \item Vytvoření proměnné: \code{struct jmeno_typu jmeno_promenne;}
     \begin{itemize}
-      \item \code{struct} nelze vynechat, výčet položek se opakovaně
-	nespecifikuje
+      \item Slovo \code{struct} nelze vynechat
     \end{itemize}
 
     \pause
 
     \item Velikost proměnné typu \code{struct}
     \begin{itemize}
-      \item Odpovídá součtu velikostí všech položek (+ případné zarovnání)
+      \item Odpovídá součtu velikostí všech položek
+      \item + případné zarovnání
     \end{itemize}
 
   \end{itemize}
@@ -4941,32 +5025,35 @@ struct avatar_t myAvatar = { "Hell", 100, axe };
   \begin{itemize}
     \item Při deklaraci proměnné
     \begin{itemize}
-      \item \code{struct avatar_t myAvatar = \{ "Hell", 100, axe \};}
-      \item Nelze \code{myAvatar = \{ "Hell", 100, axe \};}
+      \item \code{struct avatar_t avatar1 = \{ "Hell", 100, axe \};}
+      \item Nelze \code{avatar1 = \{ "Hell", 100, axe \};}
+      \begin{itemize}
 	\item Není konstanta typu \code{struct}
+      \end{itemize}
     \end{itemize}
 
     \pause
 
-    \item Po jednotlivých položkách
+    \item Při deklaraci pojmenovaným inicializátorem
     \begin{itemize}
-      \item \code{myAvatar.energy = 37;}
-      \item \code{myAvatar.weapon = bow;}
-      \item \code{strcpy(myAvatar.nick, "bubak");}
-    \end{itemize}
-
-    \pause
-
-    \item Pojmenovaným inicializátorem (od C99)
-    \begin{itemize}
+      \item Od C99
       \item \code{struct avatar_t avatar2 = \{ .energy = 107 \};}
+    \end{itemize}
+
+    \pause
+
+    \item Později, po jednotlivých položkách
+    \begin{itemize}
+      \item \code{avatar1.energy = 37;}
+      \item \code{avatar1.weapon = bow;}
+      \item \code{strcpy(avatar1.nick, "bubak");}
     \end{itemize}
 
     \pause
 
     \item Vynulováním paměti
     \begin{itemize}
-      \item \code{memset(\&avatar2, 0, sizeof(avatar2))}
+      \item \code{memset(\&avatar1, 0, sizeof(avatar1))}
     \end{itemize}
 
     \pause
@@ -4987,25 +5074,25 @@ struct avatar_t {
 \end{lstlisting}
 \onslide<2->
 \begin{lstlisting}
-void hitAvatar(struct avatar_t avatar, int amount) {
+void hit_avatar(struct avatar_t avatar, int amount) {
   avatar.energy -= amount;
 }
 \end{lstlisting}
 \onslide<3->
 \begin{lstlisting}
-void hitAvatar2(struct avatar_t* pAvatar, int amount) {
-  (*pAvatar).energy -= amount;
+void hit_avatar2(struct avatar_t *avatar, int amount) {
+  (*avatar).energy -= amount;
 }
 \end{lstlisting}
 \onslide<2->
 \begin{lstlisting}
 int main(void) {
-  struct avatar_t myAvatar = { "Hell", 100, axe };
-  hitAvatar(myAvatar, 10);
+  struct avatar_t avatar = { "Hell", 100, axe };
+  hit_avatar(avatar, 10);
 \end{lstlisting}
 \onslide<3->
 \begin{lstlisting}
-  hitAvatar2(&myAvatar, 10);
+  hit_avatar2(&avatar, 10);
 \end{lstlisting}
 \onslide<2->
 \begin{lstlisting}
@@ -5040,7 +5127,7 @@ int main(void) {
 
       \item Položka typu ukazatel
       \begin{itemize}
-	\item Zkopíruje se adresa (\emph{hodnota} ukazatele)
+	\item Zkopíruje se adresa, tj.\ \emph{hodnota} ukazatele
       \end{itemize}
     \end{itemize}
 
@@ -5057,9 +5144,9 @@ int main(void) {
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-struct avatar_t myAvatar = { "Hell", 100, axe };
-struct avatar_t avatar3;
-avatar3 = myAvatar;
+struct avatar_t avatar1 = { "Hell", 100, axe };
+struct avatar_t avatar2;
+avatar2 = avatar1;
 \end{lstlisting}
 \end{block}
 
@@ -5076,12 +5163,12 @@ avatar3 = myAvatar;
   \begin{itemize}
     \item Co když je kopírovaná položka ukazatel?
     \begin{itemize}
-      \item Zkopíruje se hodnota ukazatele (nikoli obsah odkazované paměti)
+      \item Zkopíruje se adresa, nikoli obsah odkazované paměti
 
       \pause
 
       \item Původní i nová struktura ukazují na společnou paměť
-      \item Navzájem si mohou přepisovat
+      \item Navzájem si mohou přepisovat data
       \item Pokud jedna uvolní, tak druhá ukazuje na neplatnou paměť
     \end{itemize}
 
@@ -5093,7 +5180,7 @@ avatar3 = myAvatar;
 
     \item Pokud chceme vytvořit samostatnou odkazovanou paměť
     \begin{itemize}
-      \item Vlastní položka \code{selfInfo} pro každého uživatele
+%      \item Vlastní položka \code{selfInfo} pro každého uživatele
       \item Tzv.\ ,,hluboká'' kopie
 
       \pause
@@ -5108,23 +5195,11 @@ avatar3 = myAvatar;
 
 \end{frame}
 
-\begin{frame}[fragile]{Využití struct: pole s pamatováním délky}
+\begin{frame}[fragile]{Využití \texttt{struct}: pole s pamatováním délky}
 
   \begin{itemize}
-    \item \code{array} + \code{length} vs. \code{struct \{ array, length \}}
+    \item \code{array} + \code{length} vs.\ \code{struct \{ array, length \}}
     \item Vhodné např.\ pro dynamicky alokované pole
-\begin{lstlisting}
-struct int_blob_t {
-  int* pData;
-  unsigned int length;
-};
-struct int_blob_t array;
-array.length = 100;
-array.pData = malloc(array.length * sizeof(int));
-for (int i = 0; i < array.length; i++)
-  array.pData[i] = i;
-free(array.pData);
-\end{lstlisting}
 
     \pause
 
@@ -5135,6 +5210,23 @@ free(array.pData);
     \end{itemize}
 
   \end{itemize}
+
+  \onslide<2->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+struct int_array {
+  int *data;
+  unsigned int length;
+};
+struct int_array array;
+array.length = 100;
+array.data = malloc(array.length * sizeof(int));
+for (int i = 0; i < array.length; i++)
+  array.data[i] = i;
+free(array.data);
+\end{lstlisting}
+\end{block}
 
 \end{frame}
 
@@ -5159,40 +5251,82 @@ free(array.pData);
     \item Do pole ukazatelů
     \begin{itemize}
       \item \code{struct avatar_t *avatars[10];}
+      \item \code{avatars[0] = malloc(sizeof(struct avatar_t));}
       \item \code{avatars[2] = malloc(sizeof(struct avatar_t));}
+      \item \dots
     \end{itemize}
 
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Operátor \texttt{->} vs. operátor \texttt{.}}
+\begin{frame}{Operátor \texttt{->}}
 
   \begin{itemize}
     \item Operátor \code{.} se použije pro přístup k položkám struktury
     \begin{itemize}
-      \item \code{struct avatar_t myAvatar;}
-      \item \code{myAvatar.energy = 10;}
+      \item \code{struct avatar_t a1;}
+      \item \code{a1.energy = 10;}
     \end{itemize}
 
     \pause
 
     \item Pokud strukturu alokujeme dynamicky, máme ukazatel na strukturu
     \begin{itemize}
-      \item \code{struct avatar_t *pMyAvatar = malloc(sizeof(struct avatar_t));}
+      \item \code{struct avatar_t *a2 = malloc(sizeof(struct avatar_t));}
       \item Operátor \code{.} nelze přímo použít
-      \item Musíme nejprve dereferencovat \code{(*pMyAvatar).energy = 10;}
+      \item Musíme nejprve dereferencovat \code{(*a2).energy = 10;}
     \end{itemize}
 
     \pause
 
     \item Pro zjednodušení je dostupný operátor \code{\->}
     \begin{itemize}
-      \item \code{(*pStruct).atribut} je ekvivalentní \code{pStruct->atribut}
-      \item \code{pMyAvatar->energy = 10;}
+      \item \code{(*str).atribut} je ekvivalentní \code{str->atribut}
+      \item \code{a2->energy = 10;}
     \end{itemize}
 
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{\code{struct} a dynamická alokace}
+  \begin{enumerate}
+    \item Definujte si vlastní výčet \code{pohlavi}
+    \begin{itemize}
+      \item Muž a žena
+    \end{itemize}
+
+    \item Definujte si vlastní strukturu \code{clovek}
+    \begin{itemize}
+      \item Jméno
+      \item Věk
+      \item Pohlaví (shora)
+    \end{itemize}
+
+    \item Alokujte si 10 lidí
+    \begin{itemize}
+      \item Mějte pole o 10 ukazatelích na člověka
+    \end{itemize}
+
+    \item Všem nastavte všechny tři atributy
+    \begin{itemize}
+      \item Liché jsou ženy
+      \item Věk = pořadí + 20
+      \item Jméno 1. nastavte na A, 2. na B, \dots
+    \end{itemize}
+
+    \item Projděte lidi a vypište pro ženy s lichým věkem všechny 3 atributy
+
+    \item Lidi v poli uvolněte
+    \begin{itemize}
+      \item Ověřte správnost \textsc{Valgrind}em
+    \end{itemize}
+
+    \item Přeložte a spusťte
+  \end{enumerate}
 
 \end{frame}
 
@@ -5225,9 +5359,9 @@ free(array.pData);
 \begin{block}{Příklad}
 \begin{lstlisting}
 typedef int muj_integer;           muj_integer cislo = 5;
-typedef int[8][8][8] cube;         cube myCube;
-typedef struct avatar_t avatar;    avatar myAvat1;
-typedef avatar *pAvatar;           pAvatar pMyAvat1 = NULL;
+typedef int[8][8][8] cube;         cube my_cube;
+typedef struct avatar_t avatar;    avatar my_avatar1;
+typedef avatar *p_avatar;          p_avatar my_avatar2 = NULL;
 \end{lstlisting}
 \end{block}
 
@@ -5235,7 +5369,7 @@ typedef avatar *pAvatar;           pAvatar pMyAvat1 = NULL;
 
 \begin{frame}[fragile]{Kombinace \texttt{typedef} + \texttt{struct}}
 
-  \code{typedef stary_typ novy_typ;}
+  \code{typedef typ nove_synonymum;}
 
 \begin{block}{Příklad}
 \begin{tabular}{lll}
@@ -5285,26 +5419,28 @@ queue mojePromenna;
 
       \pause
 
-      \item + případné zarovnání v paměti
+      \item + případné zarovnání
     \end{itemize}
 
     \pause
 
-    \item Pozor: dochází k reinterpretaci bitových dat
+    \item \pozor: dochází k reinterpretaci bitových dat
     \begin{itemize}
       \item Potenciální zdroj chyb a problémů
     \end{itemize}
 
-    \pause
-
-    \item Často kombinováno jako podčást struct s další položkou obsahující
-      datový typ
+%    \pause
+%
+%    \item Často kombinováno jako podčást \code{struct} s další položkou
+%      obsahující datový typ
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]{\texttt{struct} vs.\ \texttt{union} (rozložení paměti)}
 
+\begin{center}
+\begin{tabular}{ccc}
 \begin{lstlisting}
 struct energy_t {
   int iEnergy;
@@ -5312,7 +5448,7 @@ struct energy_t {
   unsigned char bEnergy[10];
 };
 \end{lstlisting}
-
+& ~~~~ &
 \begin{lstlisting}
 union energy_t {
   int iEnergy;
@@ -5320,10 +5456,23 @@ union energy_t {
   unsigned char bEnergy[10];
 };
 \end{lstlisting}
+\vspace{1em}
+\\
+  \begin{tabular}{|l|ll|} \hline
+    \code{iEnergy} & & \\ \hline
+    \multicolumn{2}{|l|}{\code{fEnergy}} & ~ \\ \hline
+    \multicolumn{3}{|l|}{\code{bEnergy}} \\ \hline
+  \end{tabular}
+  & &
+  \begin{tabular}{|l|l|l|} \hline
+    \code{iEnergy} & \code{f} & \code{b} \\ \hline
+  \end{tabular}
+\end{tabular}
+\end{center}
 
 \end{frame}
 
-\begin{frame}[fragile]{union}{Přístup na úrovni bajtů}
+\begin{frame}[fragile]{\texttt{union}}{Přístup na úrovni bajtů}
 
   \begin{itemize}
     \item Možnost snadno přistupovat k jednotlivým bajtům většího typu
@@ -5367,22 +5516,24 @@ union energy_t {
 };
 enum energy_type { integer, real };
 struct avatar_energy {
-  enum energy_type energyType;
+  enum energy_type energy_type;
   union energy_t energy;
 };
-struct avatar_energy avatEnerg = { .energyType = integer, .energy.iEnergy = 100 };
+struct avatar_energy avatar = { .energy_type = integer, .energy.iEnergy = 100 };
 \end{lstlisting}
 
 \pause
 
 \begin{lstlisting}
-switch (avatEnerg.energyType) {
-case integer:
-  printf("%d", avatEnerg.energy.iEnergy);
-  break;
-case real:
-  printf("%f", avatEnerg.energy.fEnergy);
-  break;
+void print_energy(struct avatar_energy avatar) {
+  switch (avatar.energy_type) {
+  case integer:
+    printf("%d\n", avatar.energy.iEnergy);
+    break;
+  case real:
+    printf("%f\n", avatar.energy.fEnergy);
+    break;
+  }
 }
 \end{lstlisting}
 
@@ -5395,7 +5546,7 @@ case real:
     \item Úspora paměti
     \begin{itemize}
       \item Ukládání více položek různých typů
-      \item Použit vždy maximálně jeden!
+      \item Použit je vždy maximálně jeden!
 
       \pause
 
@@ -5410,6 +5561,8 @@ case real:
     \end{itemize}
 
   \end{itemize}
+
+  \onslide<1->
 
 \begin{block}{Příklad}
 \begin{tabular}{ll}
@@ -5466,7 +5619,10 @@ union value_t value2 = {
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-auto int a = 10;
+void fun(void) {
+  auto int a = 10;
+  int b = 10; // the same as a
+}
 \end{lstlisting}
 \end{block}
 
@@ -5475,7 +5631,7 @@ auto int a = 10;
 \begin{frame}[fragile]{Klíčové slovo \texttt{static}}
 
   \begin{itemize}
-    \item Proměnná deklarovaná se \code{static} zachová svou hodnotu i po konci
+    \item Proměnná deklarovaná \code{static} zachová svou hodnotu i po konci
       bloku s deklarací
 
     \pause
@@ -5483,7 +5639,7 @@ auto int a = 10;
     \item Statické proměnné jsou inicializovány v době překladu
     \begin{itemize}
       \item Trvalé místo pro proměnnou stejně jako pro globální proměnné
-      \item Při novém ,,vzniku'' proměnné obsahuje poslední předešlou hodnotu
+      \item Při novém ,,vzniku'' proměnné obsahuje poslední hodnotu
     \end{itemize}
 
     \pause
@@ -5505,11 +5661,10 @@ void foo() {
   printf("%d\n", a);
   a += 10;
 }
-int main(void) {
+void fun(void) {
   foo(); // => 10
   foo(); // => 20
   foo(); // => 30
-  return 0;
 }
 \end{lstlisting}
 \end{block}
@@ -5539,6 +5694,9 @@ int main(void) {
 \begin{block}{Příklad}
 \begin{lstlisting}
 volatile int a = 10;
+
+while (a == 10) // waiting for somebody else to change it
+  msleep(100);
 \end{lstlisting}
 \end{block}
 
@@ -5564,7 +5722,7 @@ volatile int a = 10;
     \item Proměnné mohou být umístěny v registru i bez \code{register}
     \begin{itemize}
       \item Překladač sám analyzuje a vybere často používané proměnné
-      \item Tj.\ \code{register} nepoužívejte
+      \item Tj.\ \code{register} nepoužívejte, pokud nemusíte
     \end{itemize}
 
     \pause
@@ -5575,23 +5733,14 @@ volatile int a = 10;
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-register int a = 10;
+void fun(void) {
+  register int a = 10;
+  int b = 10;
+}
 \end{lstlisting}
 \end{block}
 
 \end{frame}
-
-%\begin{frame}{Klíčové slovo \texttt{register}}{Příklad}
-%
-%\begin{lstlisting}
-%void foo4() {
-%  register int value = 10;
-%  printf("%d\n", value);
-%  value += 12;
-%}
-%\end{lstlisting}
-%
-%\end{frame}
 
 \begin{frame}[fragile]{Klíčové slovo \texttt{restrict}}
 
@@ -5626,7 +5775,10 @@ register int a = 10;
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-void foo(int *restrict pA, int *restrict pB, int *restrict pVal);
+void foo(int *restrict a, int *restrict b, int *restrict c) {
+  int *d = a;
+  *d = 5; // undefined behaviour
+}
 \end{lstlisting}
 \end{block}
 
@@ -5657,9 +5809,9 @@ void foo(int *restrict pA, int *restrict pB, int *restrict pVal);
 
     \pause
 
-    \item Pro globální proměnné dostupné z několika zdrojových kódů
+    \item Externí proměnné jsou dostupné ve všech zdrojových kódech
     \begin{itemize}
-      \item Obecně by se nemělo vyskytovat moc často
+      \item Nemělo by se používat často
       \item Např.\ vhodné pro zámky
     \end{itemize}
 
@@ -5671,11 +5823,16 @@ void foo(int *restrict pA, int *restrict pB, int *restrict pVal);
 \begin{lstlisting}
 extern int globalValue;
 \end{lstlisting}
+\onslide<2->
+\begin{lstlisting}
+extern void fun(void);
+void fun(void); // the same
+\end{lstlisting}
 \end{block}
 
 \end{frame}
 
-\begin{frame}{Modifikátory u proměnných}{shrnutí}
+\begin{frame}{Modifikátory u proměnných}{Shrnutí}
 
   \begin{itemize}
     \item Dodatečné modifikátory mohou pomoci
@@ -5714,6 +5871,8 @@ extern int globalValue;
 
 % skipped: Assert, Funkce s proměnným počtem argumentů z
 % pb071_12_preprocesorpametovetridy_2016.pdf
+
+\fi
 
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
@@ -6297,6 +6456,8 @@ int main() {
 znakový vstup a vystup
 
 \end{frame}
+
+\end{document}
 
 \section{Práce se soubory}
 \frame{\sectionpage}
