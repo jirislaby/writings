@@ -329,22 +329,22 @@
 #include <stdio.h>
 
 #include "main.h"
-#include "lib.h"
 
 int main()
 {
-  print_string("Ahoj!");
+  puts("Ahoj!");
 
   return 0;
 }
   \end{lstlisting} &
   \begin{lstlisting}[showlines]
-#ifndef MAIN_H
-#define MAIN_H
 
 int main();
 
-#endif
+
+
+
+
 
 
 
@@ -541,7 +541,7 @@ int main()
       \item Např.\ odeberte z \file{main.c} \code{\#include}, náhodná písmena apod.
     \end{itemize}
 
-    \item Přeložte v \qtc
+    \item Přeložte v \qtcu
     \item Prozkoumejte, jak je \qtc\ hlásí
 
     \item Uveďte do přeložitelného stavu
@@ -724,7 +724,8 @@ int main()
     \item \code{unsigned}
     \begin{itemize}
       \item Změna na neznaménkový
-      \item Volný bit zvyšuje rozsah hodnot (\textasciitilde\ 2$\times$)
+%      \item Volný bit zvyšuje rozsah hodnot (\textasciitilde\ 2$\times$) XXX
+      \item Přesun rozsahu hodnot do kladných
       \item Např.\ \code{unsigned long cislo1}, \code{unsigned int cislo2}
     \end{itemize}
 
@@ -804,11 +805,19 @@ void fun() {
 
   \heading{Definice proměnných}
   \begin{enumerate}
-    \item Upravujte předchozí kód
+    \item Otevřete si \file{03/main.pro} z repozitáře
+    \begin{itemize}
+      \item Kvůli symbolickým odkazům je nutno zavřít a otevřít \qtc
+    \end{itemize}
+
     \item Definujte si 4 proměnné různého typu
     \item Vyzkoušejte si \code{unsigned}
     \item Některé rovnou inicializujte
     \item Do některých přiřaďte hodnotu operátorem \code{=} po definici
+    \begin{itemize}
+      \item Někde uvnitř \code{main}
+    \end{itemize}
+
     \item Přeložte
   \end{enumerate}
 
@@ -954,24 +963,18 @@ void fun() {
 
     \pause
 
-    \item \code{+}, \code{\-}, \code{*} (běžné)
+    \item \code{+}, \code{\-}, \code{*}, \code{/}
     \begin{itemize}
       \item \code{5 + prom; 365 * 24 * 60;}
-      \item \pozor: např.\ \code{*} má více významů (dále)
-    \end{itemize}
-
-    \pause
-
-    \item Operátor dělení \code{/}
-    \begin{itemize}
-      \item V závislosti na argumentech celočíselné nebo s desetinnou čárkou
 
       \pause
 
-      \item \code{celsius = 5.0 / 9.0 * (fahr - 32)}
+      \item V závislosti na argumentech celočíselné nebo s desetinnou čárkou
       \begin{itemize}
-	\item \pozor\ na celočíselné dělení (\code{5 / 9} je \code{0})
+	\item \code{celsius = 5.0 / 9.0 * (fahr - 32)}
+	\item \pozor\ na celočíselné dělení: \code{5 / 9} je \code{0}
       \end{itemize}
+
     \end{itemize}
 
     \pause
@@ -990,6 +993,7 @@ void fun() {
 
   \heading{Operátory}
   \begin{enumerate}
+    \item Pracujte uvnitř funkce \code{main}
     \item Definujte si proměnnou \code{kelvin} a uložte do ni \code{300}
       (stupňů)
     \item Definujte si proměnnou \code{celsius} a převeďte sem \code{kelvin}
@@ -1016,12 +1020,11 @@ void fun() {
     \item Operátory pro porovnání dvou operandů
     \begin{itemize}
       \item Výsledkem je logická hodnota
-      \item V C je (libovolná) nenulová hodnota pravda (tj.\ TRUE)
+
+      \pause
+
+      \item V C je (libovolná) \emph{nenulová} hodnota pravda (tj.\ TRUE)
       \item \code{0} je nepravda (tj.\ FALSE)
-      \begin{itemize}
-	\item \pozor\ na \code{0.0} v reálném čísle -- nemusí být přesně
-	  \code{0}
-      \end{itemize}
     \end{itemize}
 
     \pause
@@ -1046,10 +1049,11 @@ void fun(int prom) {
 \end{frame}
 
 \begin{frame}[fragile]{Porovnávací operátory}{Poznámky}
+
   \begin{itemize}
-    \item Pozor na záměnu \code{=} a \code{==}
+    \item \pozor\ na záměnu \code{=} a \code{==}
     \begin{itemize}
-      \item Chceme testovat, zda je prom rovno \code{0}
+      \item Chceme testovat, zda je \code{prom} rovno \code{0}
       \begin{itemize}
 	\item Správně \code{prom == 0}
       \end{itemize}
@@ -1066,8 +1070,8 @@ void fun(int prom) {
       \item Dostaneme varování překladače, pokud použito např.\ s
         \code{if}-\code{else}
       \begin{itemize}
-	\item \texttt{warning: suggest parentheses around assignment used as
-	  truth value}
+	\item \tinyL \texttt{warning: suggest parentheses around assignment
+	  used as truth value}
       \end{itemize}
 
     \end{itemize}
@@ -1187,11 +1191,39 @@ void fun(void) {
       \item Sekvenční body
       \begin{itemize}
 	\item Místa v programu, kde jsou ukončeny dopady předchozích výrazů
-	\item \url{http://publications.gbdirect.co.uk/c_book/chapter8/sequence_points.html}
+	\item \tinyL \url{http://publications.gbdirect.co.uk/c_book/chapter8/sequence_points.html}
       \end{itemize}
     \end{itemize}
 
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Zkrácené přiřazovací operátory}
+
+  \begin{itemize}
+    \item Často jsou výrazy ve tvaru \code{x = x OPERATOR y;}
+    \begin{itemize}
+      \item Např.\ \code{int prom = 0; prom = prom + 10;}
+    \end{itemize}
+
+    \pause
+
+    \item C má kompaktní operátory přiřazení
+    \begin{itemize}
+      \item \code{x OPERATOR= y;}
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+prom += 10;
+prom /= 3;
+prom %= 7;
+prom &= 0xFF;
+  \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -1236,34 +1268,6 @@ void fun(void) {
 
     \item Klíčové slovo \code{const} (později)
   \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{Zkrácené přiřazovací operátory}
-
-  \begin{itemize}
-    \item Často jsou výrazy ve tvaru \code{x = x OPERATOR y;}
-    \begin{itemize}
-      \item Např.\ \code{int prom = 0; prom = prom + 10;}
-    \end{itemize}
-
-    \pause
-
-    \item C má kompaktní operátory přiřazení
-    \begin{itemize}
-      \item \code{x OPERATOR= y;}
-    \end{itemize}
-
-  \end{itemize}
-
-  \begin{block}{Příklad}
-  \begin{lstlisting}
-prom += 10;
-prom /= 3;
-prom %= 7;
-prom &= 0xFF;
-  \end{lstlisting}
-  \end{block}
 
 \end{frame}
 
