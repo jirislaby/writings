@@ -1128,8 +1128,8 @@ void fun(int prom) {
   \begin{lstlisting}
 void fun(void) {
   int prom = 0;
-  if (prom = 0) puts("Never printed");
-  if (prom = 1) puts("Never say never!");
+  if (prom = 0) print_string("Never printed");
+  if (prom = 1) print_string("Never say never!");
 }
   \end{lstlisting}
   \end{block}
@@ -1391,8 +1391,6 @@ prom1 = 5 + prom1 * 18 % prom2 - prom1 == 2;
 
 \end{frame}
 
-\fi
-
 \section{Řídicí příkazy}
 \frame{\sectionpage}
 
@@ -1465,14 +1463,14 @@ prom1 = 5 + prom1 * 18 % prom2 - prom1 == 2;
   \begin{tabular}{ll}
   \begin{lstlisting}
 if (hodina < 10)
-  puts("Dobre rano");
+  print_string("Dobre rano");
 else
-  puts("Dobry den");
+  print_string("Dobry den");
   \end{lstlisting}
-  & ~~~~~~
+  & ~~~~
   \onslide<4->
   \begin{lstlisting}
-puts(hodina < 10 ? "Dobre rano" : "Dobry den");
+print_string(hodina < 10 ? "Dobre rano" : "Dobry den");
   \end{lstlisting}
   \end{tabular}
   \end{center}
@@ -1677,9 +1675,9 @@ if (mam_skoncit_program)
 \begin{lstlisting}
   if (mam_preskocit)
     goto tam;
-  puts("ahoj");
+  print_string("ahoj");
 tam:
-  puts("jsem tam");
+  print_string("jsem tam");
 \end{lstlisting}
 \end{tabular}
 \end{center}
@@ -1760,10 +1758,11 @@ err:
 switch (pismeno) {
 case 'A':
 case 'B':
-  printf("Zname pismeno: %c\n", pismeno);
+  print_string("Zname pismeno:");
+  print_character(pismeno);
   break;
 default:
-  puts("Neocekavane pismeno");
+  print_string("Neocekavane pismeno");
   break;
 }
 \end{lstlisting}
@@ -1778,7 +1777,7 @@ default:
     \item Blok lze využít jako nahrazení pro příkaz
     \begin{itemize}
       \item V místě, kde můžeme použít příkaz, lze použít i blok
-      \item Využito např.\ u řídících konstrukcí jako \code{if}-\code{else},
+      \item Využito např.\ u řídících konstrukcí jako \code{if}--\code{else},
 	cykly, \dots
     \end{itemize}
 
@@ -1801,14 +1800,14 @@ default:
 \begin{lstlisting}
 int main() {
   if (podminka) {
-    puts("Jsem v podmince");
+    print_string("Jsem v podmince");
     for (int a = 0; a < 10; a++) {
-      puts("Cyklim");
-      printf("a je %d\n", a);
+      print_string("Cyklim, a je:");
+      print_int(a);
     }
   }
 }
-\end{lstlisting} %stopzone
+\end{lstlisting}
 \end{block}
 
 \end{frame}
@@ -1816,8 +1815,9 @@ int main() {
 \begin{frame}[fragile]{Rozsah platnosti proměnných}
 
   \begin{itemize}
-    \item Část kódu, kde je proměnná použitelná (,,scope'')
+    \item Část kódu, kde je proměnná použitelná
     \begin{itemize}
+      \item Tzv. \textit{scope}
       \item Často koresponduje s blokem, ve kterém je proměnná deklarována
     \end{itemize}
 
@@ -1859,8 +1859,6 @@ int main((*@\alert<2>{int argc, char **argv}@*)) {
 \section{Funkce}
 \frame{\sectionpage}
 
-\end{document}
-
 \begin{frame}[fragile]{Funkce}{Motivace}
 
   \begin{itemize}
@@ -1891,20 +1889,20 @@ int main((*@\alert<2>{int argc, char **argv}@*)) {
 \begin{center}
 \begin{tabular}{lll}
 \begin{lstlisting}
-int main(void) {
-  printf("%f = %f\n", fahr,
-      (5.0 / 9.0) * (fahr - 32));
-  return 0;
+void convert(float fahr) {
+  print_float(fahr);
+  print_float((5.0 / 9.0) * (fahr - 32));
 }
 \end{lstlisting}
-& ~$\Rightarrow$~~~
+& $\Rightarrow$~~~
 \onslide<6->
 \begin{lstlisting}
 float f2c(float fahr) {
   return (5.0 / 9.0) * (fahr - 32);
 }
-int main(void) {
-  printf("%f = %f\n", n, f2c(n));
+void convert(float fahr) {
+  print_float(fahr);
+  print_float(f2c(fahr));
 }
 \end{lstlisting}
 \end{tabular}
@@ -1913,47 +1911,75 @@ int main(void) {
 
 \end{frame}
 
-\begin{frame}[fragile]{Funkce}{Deklarace}
+\begin{frame}[fragile]{Funkce}{Deklarace a definice}
 
   \begin{itemize}
     \item Známe již funkci \code{main}
     \begin{itemize}
-      \item \code{int main() \{ return 0; \}}
+      \item \code{int main(void) \{ return 0; \}}
     \end{itemize}
 
     \pause
 
-    \item Funkce musejí být deklarovány před prvním použitím
-    \begin{itemize}
-      \item Tj.\ před 1.\ příkazem v souboru obsahující volání funkce
-    \end{itemize}
+    \item Funkce je nutné \emph{deklarovat} před prvním použitím
 
     \pause
 
     \item Dva typy deklarace
-    \begin{itemize}
+    \begin{enumerate}
       \item Předběžná deklarace
       \item Deklarace a definice zároveň
-    \end{itemize}
-
-    \pause
-
-    \item Deklarace funkce (prototyp)
-    \begin{itemize}
-      \item \code{navratovy_typ jmeno_funkce(arg1, arg2, arg3...);}
-      \item Lze i bez uvedení jmen parametrů
-      \begin{itemize}
-	\item Pro prototyp nejsou důležité
-      \end{itemize}
-    \end{itemize}
+    \end{enumerate}
 
   \end{itemize}
 
+  \onslide<2->
+
 \begin{block}{Příklad}
 \begin{lstlisting}
+float f2c(float fahr) {
+  return (5.0 / 9.0) * (fahr - 32);
+}
+void convert(float fahr) {
+  print_float(fahr);
+  print_float(f2c(fahr));
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Funkce}{Deklarace}
+
+  \heading{Deklarace funkce (prototyp)}
+  \begin{itemize}
+    \item \code{navratovy_typ jmeno_funkce(arg1, arg2, arg3...);}
+
+    \onslide<4->
+
+    \item Lze i bez uvedení jmen parametrů
+    \begin{itemize}
+      \item Pro prototyp nejsou důležité
+    \end{itemize}
+  \end{itemize}
+
+  \onslide<2->
+
+\begin{block}{Příklad}
+\begin{lstlisting}[belowskip=0pt]
 float f2c(float fahr);
+\end{lstlisting}
+  \onslide<4->
+\begin{lstlisting}[aboveskip=0pt]
 float f2c(float);
-int main(void);
+void convert(float);
+\end{lstlisting}
+  \onslide<3->
+\begin{lstlisting}
+void convert(float fahr) {
+  print_float(fahr);
+  print_float(f2c(fahr));
+}
 \end{lstlisting}
 \end{block}
 
@@ -1961,16 +1987,14 @@ int main(void);
 
 \begin{frame}[fragile]{Funkce}{Definice}
 
+  \heading{Definice funkce (implementace těla -- kód)}
   \begin{itemize}
-    \item Implementace těla funkce (kód)
-
-    \pause
-
     \item Tělo uzavřeno v bloku pomocí \code{\{\}}
     \begin{itemize}
       \item Pozor, lokální proměnné zanikají
     \end{itemize}
 
+    \pause
     \pause
 
     \item Funkce končí provedením posledního příkazu bloku
@@ -2030,15 +2054,16 @@ float f2c(float fahr) { // declaration & definition
 float f2c(float fahr) {
   return (5.0 / 9.0) * (fahr - 32);
 }
-int main(void) {
-  printf("%f = %f\n", n, f2c(n));
+void convert(float fahr) {
+  print_float(fahr);
+  print_float(f2c(fahr));
 }
 \end{lstlisting}
 \end{block}
 
 \end{frame}
 
-\begin{frame}{Způsob předávání funkčních argumentů}
+\begin{frame}[fragile]{Předávání argumentů funkcím}
 
   \begin{itemize}
     \item Argument funkce je její lokální proměnná
@@ -2053,19 +2078,30 @@ int main(void) {
     \item Pořadí předávání argumentů funkci není definováno
     \begin{itemize}
       \item Tedy ani pořadí vyhodnocení výrazů před funkčním voláním
-      \item Např.\ \code{int i = 5; foo(i, ++i)} se vyhodnotí jako \\
-	\code{foo(5, 6)} nebo \code{foo(6, 6)}?
-    \end{itemize}
 
-    \pause
+      \pause
 
-    \item Problém: jak přenést hodnotu zpět z funkce?
-    \begin{itemize}
-      \item Návratovou hodnotou funkce
-      \item Argumenty předávaných hodnotou ukazatele
+      \item Jak se vyhodnotí příklad?
     \end{itemize}
 
   \end{itemize}
+
+  \onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}[belowskip=0pt]
+void fun(char c, int i) {
+  i = 5;
+\end{lstlisting}
+\onslide<3->
+\begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+  foo(i, ++i); // foo(5, 6) or foo(6, 6)?
+\end{lstlisting}
+\onslide<1->
+\begin{lstlisting}[aboveskip=0pt]
+}
+\end{lstlisting}
+\end{block}
 
 \end{frame}
 
@@ -2087,11 +2123,19 @@ int main(void) {
     \pause
 
     \item Jak vracet více hodnot?
-    \begin{itemize}
-      \item Využití globálních proměnných (většinou nevhodné)
-      \item Strukturovaný typ na výstup (ukazatel na \code{struct}, viz dále)
-      \item Modifikací vstupních parametrů (předání ukazatelem)
-    \end{itemize}
+    \begin{enumerate}
+      \item Globální proměnnou
+      \begin{itemize}
+	\item Většinou nevhodné
+      \end{itemize}
+
+      \pause
+
+      \item Změnou vstupních parametrů
+      \begin{itemize}
+	\item Nutno předat ukazatelem
+      \end{itemize}
+    \end{enumerate}
 
   \end{itemize}
 
@@ -2102,7 +2146,7 @@ int main(void) {
 \begin{onslide}<1->
 \begin{lstlisting}
 void div(int a, int b) {
-  printf("%d\n", a / b);
+  print_int(a / b);
 }
 \end{lstlisting}
 \end{onslide}
@@ -2110,7 +2154,7 @@ void div(int a, int b) {
 \onslide<2->
 \begin{lstlisting}
 int div(int a, int b) {
-  printf("%d\n", a / b);
+  print_int(a / b);
   return a / b;
 }
 \end{lstlisting}
@@ -2119,7 +2163,7 @@ int div(int a, int b) {
 \begin{lstlisting}
 int rem;
 int div(int a, int b) {
-  printf("%d\n", a / b);
+  print_int(a / b);
   rem = a % b;
   return a / b;
 }
@@ -2131,6 +2175,8 @@ int div(int a, int b) {
 \end{frame}
 
 % skipped: Hlavičkové soubory z pb071_03_funkcepole_2016.pdf
+
+\fi
 
 \section{Pointery (ukazatele)}
 \frame{\sectionpage}
@@ -3140,6 +3186,8 @@ array[1][0][15][4] = 1;
 
 \section{Řetězce}
 \frame{\sectionpage}
+
+\end{document}
 
 \begin{frame}{Pole znaků, řetězce}
 
