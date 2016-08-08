@@ -2209,7 +2209,7 @@ int div(int a, int b) {
 
     \item Adresy jsou typicky uváděny jako hexadecimální čísla
     \begin{itemize}
-      \item Adresy na \xes zabírají 4 bajty, na 64-bitu 8 bajtů
+      \item Adresy na \xesl zabírají 4 bajty, na \xesh 8 bajtů
       \item Na konkrétní délky nespoléhejte!
       \item Příklady adres: \code{0x00100000}, \code{0xffffffff81385c33}
     \end{itemize}
@@ -2221,16 +2221,17 @@ int div(int a, int b) {
 \begin{frame}{Obsah paměti}
 
   \begin{itemize}
-    \item Kód, instrukce
+    \item Instrukce (program)
     \begin{itemize}
       \item Nemění se
     \end{itemize}
 
     \pause
 
-    \item Data
+    \item Statická data (static)
     \begin{itemize}
       \item Většina se nemění, jsou přímo v binárce
+      \item Řetězce, konstanty (nemění se)
       \item Globální proměnné (mění se)
     \end{itemize}
 
@@ -2238,7 +2239,7 @@ int div(int a, int b) {
 
     \item Zásobník (stack)
     \begin{itemize}
-      \item Mění se pro každou funkci (stack-frame)
+      \item Mění se pro každý blok (a funkci)
       \item Lokální proměnné
     \end{itemize}
 
@@ -2265,7 +2266,7 @@ int div(int a, int b) {
 
     \item Pomocí názvu proměnné můžeme číst/zapisovat z/do této paměti
     \begin{itemize}
-      \item Např. \code{int cislo = 3;}
+      \item Např.\ \code{cislo = 3;}
     \end{itemize}
 
     \pause
@@ -2273,7 +2274,7 @@ int div(int a, int b) {
     \item Překladač nahrazuje jméno proměnné její adresou
     \begin{itemize}
       \item Typicky relativní k zásobníku
-      \item \code{movl \$3, -4(\%rbp)}
+      \item \code[language=Assembler]{movl \$3, -4(\%rbp)}
     \end{itemize}
   \end{itemize}
 
@@ -2289,7 +2290,7 @@ int div(int a, int b) {
 %
 %\end{frame}
 
-\begin{frame}{Operátor \code{\&}}
+\begin{frame}[fragile]{Operátor \code{\&}}
 
   \begin{itemize}
     \item Unární operátor \code{\&} vrací adresu svého argumentu
@@ -2307,7 +2308,27 @@ int div(int a, int b) {
 
   \end{itemize}
 
-  % XXX obrazek
+\begin{center}
+  \pgfdeclarelayer{background}
+  \pgfsetlayers{background,main}
+  \begin{tikzpicture}
+      \node [tl_state] (P) {\code{1000}};
+      \node (P_LAB) [above=0mm of P] {\code{p}};
+      \node [tl_state] (C) [below right=0.4cm and 0.8cm of P] {\code{3}}
+        edge[tl_edge,bend right=8] (P);
+      \node (C_LAB) [above=0mm of C] {\code{cislo}};
+      \node (C_A) [left=-1mm of C,yshift=2.5mm] {\tiny 1000};
+      \node (P_A) [left=-1mm of P,yshift=2.5mm] {\tiny 800};
+
+      \node (DUMMY) [below=of C] {};
+
+      \begin{pgfonlayer}{background}
+	\node[rectangle,fill=blue!10,draw=black,inner sep=8pt] (CONT) [fit=(P)(C)(P_LAB)(C_A)(P_A)(DUMMY)] {};
+	\node (CONT_LAB) [above=0mm of CONT] {Paměť};
+	\node (CONT_A) [above left=-2mm and -1mm of CONT] {\tiny 0};
+      \end{pgfonlayer}
+  \end{tikzpicture}
+\end{center}
 
 \end{frame}
 
@@ -2317,6 +2338,7 @@ int div(int a, int b) {
     \item Operátor \code{*} za typem T vytvoří ukazatel na proměnnou typu T
     \begin{itemize}
       \item \code{int cislo; int *p = \&cislo;}
+
 
       \pause
 
@@ -2332,16 +2354,25 @@ int div(int a, int b) {
 
     \item Proměnná \code{p} je stále jen proměnná
     \begin{itemize}
-      \item Tato proměnná je na nějaké adrese X
-      \item Na její adrese X je uložena adresa Y jiné proměnné (\code{cislo})
-      \item Odkazovaná proměnná má daný typ (\code{int})
+      \item Z příkladu: \code{p} je na adrese 800
+      \item Na adrese 800 je uložena adresa (1000) proměnné \code{cislo}
     \end{itemize}
 
     \pause
 
-    \item Pozor na \code{int *a, b;}
+    \item \code{*} je součástí typu, ne názvu proměnné!
     \begin{itemize}
-      \item \code{a} je \code{int *}, \code{b} jen \code{int}
+      \item \code{int *p;}
+      \begin{itemize}
+	\item \code{p = 1000; p += 2;}
+      \end{itemize}
+
+      \pause
+
+      \item Ale váže se k proměnné: \code{int *a, b;}
+      \begin{itemize}
+	\item \code{a} má typ \code{int *}, \code{b} jen \code{int}
+      \end{itemize}
     \end{itemize}
 
   \end{itemize}
@@ -2392,8 +2423,6 @@ int div(int a, int b) {
     \item Vypište hodnotu (\code{print_pointer})
     \begin{itemize}
       \item Lokálního ukazatele na vaši lokální proměnnou
-      \item Ukazatele na vaši lokální proměnnou (\code{\&promenna})
-      \item Ukazatele \code{NULL}
     \end{itemize}
 
     \item Přeložte a spusťte
@@ -2427,23 +2456,20 @@ int div(int a, int b) {
     \pause
 
     \item Zpřístupní hodnotu, na kterou ukazatel \emph{ukazuje}
-    \begin{itemize}
-      \item Nikoli vlastní \emph{hodnotu} ukazatele, což je adresa
-    \end{itemize}
 
-    \pause
-
-    \item Příklady dereference typu (není reálné C)
-    \begin{itemize}
-      \item \code{&int} je \code{int *}
-      \pause
-      \item \code{*(int *)} je \code{int}
-      \item \code{*(int **)} je \code{int *}
-      \item \code{**(int **)} je \code{int}
-      \pause
-      \item \code{*(\&int)} je \code{int}
-      \item \code{**(\&\&int)} je \code{int}
-    \end{itemize}
+%    \pause
+%
+%    \item Příklady dereference typu (není reálné C)
+%    \begin{itemize}
+%      \item \code{&int} je \code{int *}
+%      \pause
+%      \item \code{*(int *)} je \code{int}
+%      \item \code{*(int **)} je \code{int *}
+%      \item \code{**(int **)} je \code{int}
+%      \pause
+%      \item \code{*(\&int)} je \code{int}
+%      \item \code{**(\&\&int)} je \code{int}
+%    \end{itemize}
 
     \pause
 
@@ -2463,36 +2489,30 @@ int div(int a, int b) {
 
 \end{frame}
 
-% \begin{frame}{Proměnné a ukazatele}{Ukázka}
-%
-% int promennaX = -213;
-% (promennaX je adresa schránky 1,
-% obsahuje -213)
-% int* pX = &promennaX;
-% (pX je adresa schránky 2, obsahuje
-% adresu schránky 1)
-% obsah paměti
-% -213
-% 1
-% adresa paměti
-% 1
-% 2
-% int** ppX = &pX;
-% (ppX je adresa schránky 3,
-% obsahuje adresu schránky 2, která
-% obsahuje adresu schránky 1)
-% 2
-%  3
-%   \begin{itemize}
-% \item print(*pX); vypíše? (-213)
-% \item print(promennaX); vypíše? (-213) print(*ppX); vypíše? 1
-% \item print(pX); vypíše? 1
-%  \item print(&pX); vypíše? 2
-% \item print(ppX); vypíše? 2
-%  \item print(*(&pX)); vypíše? 1
-%   \end{itemize}
-%
-% \end{frame}
+\begin{frame}[fragile]{Úkol}{Na papír}
+
+\begin{block}{Zadání}
+\begin{lstlisting}
+int cislo = 5;     // assume cislo is at address 1000
+int *p = &cislo;   // assume p is at address 800
+int **q = &p;      // assume q is at address 600
+\end{lstlisting}
+\end{block}
+
+  \medskip
+
+  \heading{Co vypíše?}
+  \begin{itemize}
+    \item \code{print_int(*p);} %vypíše? (-213)
+    \item \code{print_int(cislo);} % vypíše? (-213)
+    \item \code{print_pointer(*q);} % vypíše? 1
+    \item \code{print_pointer(p);} % vypíše? 1
+    \item \code{print_pointer(&p);} % vypíše? 2
+    \item \code{print_pointer(q);} % vypíše? 2
+    \item \code{print_pointer(*(&p));} % vypíše? 1
+  \end{itemize}
+
+\end{frame}
 
 \begin{frame}{Úkol}
 
@@ -2500,7 +2520,7 @@ int div(int a, int b) {
   \begin{enumerate}
     \item Vypište hodnotu vaší lokální proměnné
     \item Pomocí lokálního ukazatel změňte hodnotu proměnné
-    \item Vypište znovu hodnotu
+    \item Vypište znovu hodnotu lokální proměnné
     \item Přeložte a spusťte
   \end{enumerate}
 
@@ -2952,7 +2972,7 @@ void fun(unsigned int members) {
 
 \begin{frame}[fragile]{Úkol}{Na papír}
 
-\begin{block}{Příklad}
+\begin{block}{Zadání}
 \begin{lstlisting}
 int array[10];
 for (int i = 0; i < 10; i++)
@@ -4528,8 +4548,8 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
     \item \emph{Halda (heap)}
     \begin{itemize}
-      \item Mění se při každém \code{malloc}, \code{free}
       \item Dynamicky alokované proměnné
+      \item Mění se při každém \code{malloc}, \code{free}
     \end{itemize}
 
   \end{itemize}
