@@ -12,7 +12,7 @@ $(PROJ).tex: $(PROJ).bbl
 
 %.bbl: %.bib
 	latex $(patsubst %.bib,%.tex,$<)
-	bibtex $(subst .bib$,,$<)
+	bibtex $(patsubst %.bib,%,$<)
 	latex $(patsubst %.bib,%.tex,$<)
 	latex $(patsubst %.bib,%.tex,$<)
 	@rm -f $(PROJ).{pdf,dvi,ps}
