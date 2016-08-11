@@ -1,4 +1,5 @@
-% vim: tw=78 ai spell spelllang=en sw=2
+% vim: tw=78 ai spell spelllang=en_gb sw=2
+% syntax spell toplevel
 
 \documentclass[10pt]{llncs}
 \usepackage{color}
@@ -16,6 +17,9 @@
 
 \newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
 
+\newcommand{\syz}{\textsc{SyzKaller}\xspace}
+\newcommand{\trin}{\textsc{Trinity}\xspace}
+
 \setcounter{tocdepth}{1}
 
 \begin{document}
@@ -28,14 +32,98 @@
 \maketitle
 
 \begin{abstract}
-  TBD
+  Throughout the past few years, many tools for testing the Linux kernel
+  emerged. Some of them are really successful in finding bugs in the kernel.
+  Since we use the kernel as a base in our products, we should also use the
+  tools to find potential bugs in our products. There is an upcoming release
+  of \textit{SUSE Linux Enterprise 12 Service Pack 2} (SLE12-SP2). And
+  provided SLE12-SP2 happens to be rebased on a relatively new kernel version,
+  it contains many yet uncovered bugs.
+
+  This paper deals with the tools which were used by the author of this paper
+  during the SLE12-SP2 kernel development. Apart from others, it especially
+  covers \syz and \trin. It describes requirements, installation use and some
+  of the found bugs in our kernels.
 \end{abstract}
 
 \section{Introduction} \label{sec:intro}
+At SUSE, we develop our products based on Linux upstream code. The kernel is
+no exception. Traditionally, we build our major releases of \textit{SUSE Linux
+Enterprise} (SLE) on the current kernel versions. SLE10 is based on 2.6.16,
+SLE11 on 2.6.27, SLE12 on 3.12, and so on. Sometimes we also upgrade to the
+current kernel version on \textit{Service Pack} (SP) releases. For example
+SLE11-SP1 contained 2.6.32. This happened also with SLE12-SP2. SLE12-SP2 will
+be released with kernel 4.4.
 
-\section{Conclusion}
+Over the years, it was proven, that every such rebase onto a new version
+brings regressions. Some drivers get removed over time because upstream
+developers lost interest in fixing them. Contrary to our customers, of course.
+Some functionality vanishes as it became obsolete. Not always for our
+customers. Performance drops significantly sometimes as upstream does not focus
+on performance primarily. And with new code, new bugs get introduced. While
+the former two cases are intentional and can be easily reverted in most cases,
+the latter two are not so easy to cover.
 
-\section*{Availability}
+According to the \texttt{git} history between SLE12 (3.12) and SLE12-SP2 (4.4)
+kernels, almost 40 thousand files were changed. More than seven million lines
+of code were modified in the files\footnote{Measured by \texttt{git diff -w -b
+-M -{}-shortstat -l 13000 v3.12..v4.4}.}. Therefore, with the manpower we have,
+manual inspection of the changes is out of question. We have to rely on some
+helpers to do the hard work. Performance issues are handled in most cases by
+our \textit{Performance Team} and are not covered in this paper. We focus here
+on tools aimed at finding functional bugs.
+
+The range of the tools which can be used for kernel testing is quite large.
+There are commercial ones like Coverity \textsc{Prevent} which is run on the
+latest kernel by Coverity and results provided to
+developers~\cite{coverity_scan}.  There are purely academic ones which are
+run mostly by their developers to find bugs like \textsc{Stanse}~\cite{stanse}
+or \textsc{LDV}~\cite{ldv}. Of the tools often used by kernel developers, the most popular occurs to be \textsc{Sparse}~\cite{sparse}.
+
+In this paper, we describe tools used by the author of the paper for checking
+the SLE12-SP2 kernel. He concentrated especially on tools which are not used
+in day-to-day life of developers, but still they are relatively easy-to-use
+and return good results. This includes \trin~\cite{trin} described in
+Section~\ref{sec:trin}, \syz~\cite{syz} described in Section~\ref{sec:syz}. The
+overall view, explanation of approaches and techniques, and comprehensive list
+of tools can be found in the author's thesis~\cite{slaby2013automatic}.
+
+\section{Fuzz Testing} \label{sec:fuzz}
+Nowadays, one of the common techniques for exercising code is \emph{Fuzz
+Testing}. In short, random data are generated and sent to program input.  The
+reason behind is to confuse and potentially crash the program. The idea is
+based on the assumption that programs do not handle their input correctly and
+unhandled corner cases can cause havoc when triggered in the program. The
+assumption is correct and fuzzers in this section support that.
+
+\subsection{\trin} \label{sec:trin}
+\cite{trin}
+
+\paragraph{Usage} \trin is not a part of SLE. But it can be easily obtained
+from the buildservice from project \texttt{devel:tools}. Since SLE12-SP2 is
+not released yet, there is no SLE12-SP2 repository in there. But SLE-12-SP1
+works nicely. Finally, \trin is not recommended to be run as superuser. So the
+steps to install and run \trin are as follows:
+\begin{lstlisting}[language=bash]
+zypper ar -f http://download.opensuse.org/repositories/ \
+             devel:/tools/SLE_12_SP1/devel:tools.repo
+zypper install trinity
+su some_user
+trinity
+\end{lstlisting}
+
+\trin will run until a warning appears in the kernel log.
+
+\subsection{\syz} \label{sec:syz}
+\cite{syz}
+
+\section{insmod \& rmmod} \label{sec:insmod}
+
+\section{Results} \label{sec:res}
+
+\section{Conclusion} \label{sec:concl}
+
+%\section*{Availability}
 
 \bibliographystyle{plain}
 \bibliography{paper}
