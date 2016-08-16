@@ -11,12 +11,14 @@
 \usepackage{xspace}
 \pagestyle{plain}
 
-\lstset{language=C,tabsize=2,numbers=left,showstringspaces=false,
+\lstset{language=C,tabsize=2,showstringspaces=false,
 	breaklines=true,breakatwhitespace=true,escapeinside={(*@}{@*)},
-	frame=l,captionpos=b,basicstyle=\sffamily\small}
+	captionpos=b,basicstyle=\sffamily\small}
+%numbers=left,frame=l
 
 \newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
 
+\newcommand{\gcc}{\textsc{Gcc}\xspace}
 \newcommand{\syz}{\textsc{SyzKaller}\xspace}
 \newcommand{\trin}{\textsc{Trinity}\xspace}
 
@@ -97,13 +99,46 @@ unhandled corner cases can cause havoc when triggered in the program. The
 assumption is correct and fuzzers in this section support that.
 
 \subsection{\trin} \label{sec:trin}
-\cite{trin}
+\trin~\cite{trin} is a special fuzzer aimed specifically at the Linux kernel.
+It passes data to system calls like \texttt{read}, \texttt{write},
+\texttt{ioctl}, \texttt{mmap}, \texttt{mkdir}, and many others (see
+\texttt{syscalls/} directory in \trin sources). System calls are entry points
+to the kernel and take parameters.  Therefore parameters can be used as a sort
+of input for the kernel and random data are passed exactly to them.
 
-\paragraph{Usage} \trin is not a part of SLE. But it can be easily obtained
-from the buildservice from project \texttt{devel:tools}. Since SLE12-SP2 is
-not released yet, there is no SLE12-SP2 repository in there. But SLE-12-SP1
-works nicely. Finally, \trin is not recommended to be run as superuser. So the
-steps to install and run \trin are as follows:
+The list of system calls is not the only speciality of \trin. Every system
+call has its \emph{parameters annotated}. So that \trin knows whether the
+parameter is a file descriptor, memory address, path, socket address, and so
+on. This results in much higher coverage given it tries only parameters which
+make sense. For example passing a pointer as a parameter where a file
+descriptor is expected will not even populate to the driver we want to
+actually fuzz. One can argue that we should test if
+pointer-instead-of-descriptor is handled correctly. But this is usually
+handled in higher layers which are not changed too often and are mostly bug
+free. The philosophy of the tool is to aim at the consumers of the data, not
+at the intermediate layers.
+
+The tool automatically opens few files, sockets and passes them to appropriate
+parameters whenever needed. It also passes the returned values to other system
+calls. So for example one file descriptor undergoes several distinct
+\texttt{ioctl}s in a row. All this can happen in parallel. Using the
+\texttt{-C N} parameter, \trin forks N children and runs them in parallel.
+
+\trin monitors the kernel log. Whenever a warning, a bug report or similar
+is detected there, \trin terminates execution. It is up to the user to examine
+what happened, no reports, nor reproducers are generated.
+
+\paragraph{Availability} Even though \trin is available directly in openSUSE,
+it is not part of SLE. But the \trin binary package can be downloaded and
+installed from the SUSE Build System. It is in the project
+\texttt{devel:tools}. Since SLE12-SP2 is not released yet, there is no
+SLE12-SP2 repository in the project. But the SLE-12-SP1 one works nicely too.
+Source codes can be obtained from
+\url{https://github.com/kernelslacker/trinity}.
+
+\paragraph{Usage} \trin is not recommended to be run as root. So the steps to
+install and run \trin are as follows (remove the line break including the
+backslash and spaces):
 \begin{lstlisting}[language=bash]
 zypper ar -f http://download.opensuse.org/repositories/ \
              devel:/tools/SLE_12_SP1/devel:tools.repo
@@ -112,18 +147,183 @@ su some_user
 trinity
 \end{lstlisting}
 
-\trin will run until a warning appears in the kernel log.
-
 \subsection{\syz} \label{sec:syz}
-\cite{syz}
+\syz~\cite{syz} is, similar to \trin, a system call fuzzer. It also contains
+description of system calls and their parameters. But \syz goes a bit further.
+It also watches which code was already visited and tries to change the input
+data so that the rest of the code is visited next. This increases coverage of
+the tested code significantly as was proven for example by
+\textsc{Sage}~\cite{sage} earlier.
+
+\begin{figure}[tb]
+\begin{center}
+  \begin{lstlisting}
+void fun(void) {
+  __sanitizer_cov_trace_pc();   // instrumented
+  int x = fun1();
+  if (x) {
+    __sanitizer_cov_trace_pc(); // instrumented
+    do_something();
+  }
+  __sanitizer_cov_trace_pc();   // instrumented
+}
+  \end{lstlisting}
+\end{center}
+    \caption{Instrumentation done by \gcc for \syz.}
+  \label{fig:instr}
+\end{figure}
+
+The hard part is to decide which code was visited by some input data. For that
+purpose, \syz lets the \gcc compiler insert a call to a special function
+called \code{\_\_sanitizer\_cov\_trace\_pc} into every branch. To be more
+exact, the call is inserted to every basic block. So if we look at the
+imaginary example in Figure~\ref{fig:instr}, we can see that the code contains
+one \code{if}.  This means, there are three basic blocks:
+\begin{enumerate}
+  \item the code before the \code{if} (call to \code{fun1}),
+  \item the true branch of the \code{if} (call to \code{do_something}), and
+  \item the code after the \code{if} (no statements).
+\end{enumerate}
+All of them are instrumented by \gcc to their beginning as can be seen in the
+Figure. This instrumentation is supported in \gcc since version 6.1 (commit
+d29e939c63).
+
+Since a call to the function above is instrumented all over the kernel, the
+function has to be implemented somewhere. The function is in the kernel in
+\texttt{kernel/kcov.c} since version 4.6 (commit 5c9a8750a6). Its purpose is
+to store that the basic block was visited and export this information via
+\textit{debugfs} in \texttt{/sys/kernel/debug/kcov}. The respective
+configuration option to enable support for all this is \texttt{CONFIG\_KCOV}.
+
+\paragraph{Architecture} All the fuzzing happens in a virtual machine. This
+helps isolation of kernels when they crash. \syz has three main components
+which communicate with each other:
+\begin{enumerate}
+  \item \texttt{syz-executor} -- a small, self-contained, built program
+  containing a sequence of system calls with input. This is run inside the
+  virtual machine to cause some errors at best.
+  \item \texttt{syz-fuzzer} -- builds the sequence of system calls, permutes
+  input, compiles all that into several \texttt{syz-executor}s.
+  \texttt{syz-fuzzer} then runs and terminates them. There is a single
+  instance in each virtual machine.
+  \item \texttt{syz-manager} -- runs and manages virtual machines with
+  \texttt{syz-fuzzer}s being inside them. It can also run several virtual
+  machines in parallel. Users are supposed to run this component.
+\end{enumerate}
+
+\paragraph{Configuration} The \texttt{syz-manager} expects a configuration
+file on input. There should be a path to a virtual image which will be used
+for fuzzing, a local working directory, the \texttt{vmlinux} image of kernel
+with debug information (possibly separate), a ssh key to use for logging into
+the machine as root, how many virtual machines and \texttt{syz-executor}
+inside them should be run etc. A complete list of options is in the manual, of
+course.
+
+\subsubsection{Fuzzing SLE12-SP2}
+As we could see earlier, only kernel 4.6 or newer can be fuzzed when built by
+\gcc 6.1 (or newer). But in SLE12-SP2, the kernel is 4.4 and it is built by
+\gcc 4.8.  Fortunately, the commit which adds the coverage support to the
+kernel is self-contained and can be easily backported to 4.4. Also a newer
+\gcc can be built for SLE12-SP2 rather easily.
+
+When we build the kernel, we should follow the \syz author recommendations
+too. He suggests to enable some kernel debugging options to find more bugs.
+The most important ones are:
+\begin{itemize}
+  \item \texttt{CONFIG\_KASAN} -- checks memory accesses and helps to catch
+  errors like use-after-free and out-of-bounds. \texttt{KASAN} needs
+  \texttt{SLUB} memory allocator to work correctly (the SLE12-SP2's default is
+  \texttt{SLAB}.)
+  \item \texttt{CONFIG\_LOCKDEP} -- watches locking and reports potential
+  errors like deadlocks and stalls.
+\end{itemize}
+There is some performance penalty expected from both. But when we enable them
+in the SLE12-SP2 kernel, it does not boot in reasonable time at all. All, the
+instrumentation and the two options slow down the kernel too much. Debugging
+showed that both \texttt{KASAN} and \texttt{LOCKDEP} very often store stack
+traces to remember where an actual memory or locking operation took place.
+This information is very useful when some error is reported, so this cannot be
+turned off.
+
+Further detailed investigation and measurements by \texttt{perf} nailed the
+problem down to the DWARF stack unwinder. It is too slow to be invoked so many
+times during boot. Turning the unwinder off makes the kernel boot in a virtual
+machine too.
+
+\paragraph{Availability} Similar to \trin, \syz is available in openSUSE. For
+SLE12-SP2, we can download \syz including the modified kernel from the
+Internal Build Service. There are two projects for that purpose:
+\begin{enumerate}
+  \item \texttt{home:jirislaby:syzkaller} contains \syz proper.
+  \item \texttt{home:jirislaby:syzkaller:sle12-sp2} always builds the latest
+  patched SLE12-SP2 kernel. It uses newer \gcc from the repository above to
+  build the kernel (no need to install that on the tested machine). The kernel
+  is with all \texttt{SLAB}, \texttt{KASAN}, \texttt{LOCKDEP}, and
+  \texttt{KCOV} enabled. \texttt{STACK\_UNWIND} is disabled.
+\end{enumerate}
+Source codes are at \url{https://github.com/google/syzkaller}.
+
+\paragraph{Usage} First, one needs a \textsc{Qemu} virtual machine image. It
+need not contain SLE12-SP2 system, but is preferred. In such preinstalled
+machine, the kernel shall be replaced as follows:
+\begin{lstlisting}[language=bash]
+zypper ar -f http://dist.suse.de/ibs/home:/jirislaby:/ \
+             syzkaller:/sle12-sp2/syzkaller_SLE-12-SP2/ \
+             home:jirislaby:syzkaller:sle12-sp2.repo
+zypper dup --from home_jirislaby_syzkaller_sle12-sp2
+\end{lstlisting}
+To successfully run \syz we need \texttt{vmlinux-<version>} and its
+corresponding \texttt{vmlinux-<version>-default.debug}. The former can be
+copied from the virtual machine directly (\texttt{/boot/vmlinux-*-default.gz})
+and extracted. The latter can be taken from the appropriate
+\texttt{kernel-default-debuginfo} package. Be it from the virtual machine by
+installing the package and copying the file
+(\texttt{/usr/lib/debug/boot/vmlinux-*-default.debug}) or by downloading and
+extracting from the \texttt{-debuginfo} \texttt{rpm} by \texttt{rpm2cpio} and
+\texttt{cpio}. Path to \texttt{vmlinux} is set in the configuration. The debug
+counterpart has to be in the same directory. Whether it works can be checked
+e.g.\ by \texttt{addr2line -e vmlinux schedule}.
+
+The final step is to allow root logins into the virtual machines without
+password. Generate a ssh key by \texttt{keygen}, store the public key into
+\texttt{/root/.ssh/authorized\_keys}. Set the path to private key in the
+configuration. \texttt{ssh -i <key> root@vm} shall work to log into the
+virtual machine without asking for password.
+
+If that all works, \syz can be installed as root and finally run as an
+ordinary user:
+\begin{lstlisting}[language=bash]
+zypper ar -f http://dist.suse.de/ibs/home:/jirislaby:/ \
+             syzkaller/SUSE_SLE-12-SP2_Update_standard/ \
+             home:jirislaby:syzkaller.repo
+zypper install syzkaller
+su some_user
+ssh-keygen -f my_key
+# transfer my_key.pub to /root/.ssh/authorized_keys in VM
+cp /usr/share/doc/packages/syzkaller/example.cfg .
+vim example.cfg      # edit appropriately
+syz-manager -config example.cfg
+\end{lstlisting}
+
+When the fuzzed kernel crashes or emits a warning, every such error is logged
+into a separate text-mode crash report. These reports are put into the
+\texttt{crashes/} directory located in the configured working directory. To
+guarantee progress, virtual machines are restarted after a configured period
+of time or when a virtual machine stops responding.
+
+The generated report can be investigated manually or a reproducer can be
+generated, if possible. The \texttt{syz-repro} utility serves exactly this
+purpose.  It takes a path to the report and, similar to \texttt{syz-manager},
+runs several virtual machines. First, it tries to find which
+\texttt{syz-executor} exactly caused the error. Second, it tries minimize the
+system call sequence.  If it succeeds, a reproducer written in C is generated
+to the standard output.
 
 \section{insmod \& rmmod} \label{sec:insmod}
 
 \section{Results} \label{sec:res}
 
 \section{Conclusion} \label{sec:concl}
-
-%\section*{Availability}
 
 \bibliographystyle{plain}
 \bibliography{paper}
