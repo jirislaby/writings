@@ -2,60 +2,14 @@
 
 \input{class.tex}
 
-\let\Oldemph\emph
-\renewcommand{\emph}[1]{\textcolor{blue}{\Oldemph{#1}}}
-\newcommand{\heading}[1]{\textbf{\textcolor{BurntOrange}{#1}}}
-\newcommand{\header}[1]{\textbf{\texttt{\textcolor{WildStrawberry}{#1}}}}
-\newcommand{\doc}[1]{\textbf{\texttt{\textcolor{OliveGreen}{#1}}}}
-\newcommand{\red}[1]{\textcolor{red}{#1}}
-
-\mode<presentation>
-{
-\usetheme{Madrid}
-}
-
-\setbeamertemplate{navigation symbols}{}
-%\setbeamertemplate{footline}[frame number]{}
-
-\usepackage{adjustbox}
-\usepackage[utf8x]{inputenc}
-\usepackage{helvet}
-\usepackage{mathptmx}
-\usepackage[T1]{fontenc}
-\usepackage{graphicx}
-\usepackage{hyperref}
-\usepackage[final]{listings}
-\usepackage{multirow}
-\usepackage{tikz}
-\usepackage[absolute,overlay]{textpos}
-\usepackage{xspace}
-\usetikzlibrary{arrows, positioning}
-
-\tikzset{tl_state/.style={rounded corners, thick, draw, minimum height=6mm,
-	minimum width=12mm, bottom color=black!15, top color=black!5}}
-\tikzset{tl_phase/.style={thick, draw, minimum size=8mm}}
-\tikzset{tl_edge/.style={<-, >=stealth', semithick}}
-
-\lstset{tabsize=2,numbers=none,showstringspaces=false,breaklines=true,
-	breakatwhitespace=true,escapeinside={(*@}{@*)},
-	basicstyle=\scriptsize,keywordstyle=\bfseries\color{OliveGreen},
-	commentstyle=\color{blue}, columns=flexible, language=C,
-	morekeywords={asm}}
-
-\newcommand{\cmd}[2][]{\lstinline[columns=fullflexible, language=bash,
-	basicstyle=\ttfamily, #1]$#2$}
-\newcommand{\code}[2][]{\lstinline[columns=fullflexible, basicstyle=\ttfamily,
-	#1]$#2$}
+\input{../../../templates/header_present.tex}
 
 \newcommand{\syz}{\textsc{Syzkaller}\xspace}
 \newcommand{\trin}{\textsc{Trinity}\xspace}
 
-\definecolor{mygray}{gray}{.9}
-
 \title{SLE12-SP2 Kernel Testing}
 \subtitle{Fuzzing the SUSE Kernel}
-\date[September 16\textsuperscript{th} 2016, Mikulov]{September
-16\textsuperscript{th} 2016 \\ Mikulov}
+\date[16/09/2016, Mikulov]{September 16\textsuperscript{th} 2016 \\ Mikulov}
 
 \author[Jiri~Slaby]{\textbf{Jiri~Slaby}}
 
@@ -110,9 +64,347 @@
 
 \end{frame}
 
-\section{Fuzzers}
+\section{Fuzz Testing}
 
-\begin{frame}{Fuzzers}
+\begin{frame}[fragile]{Fuzz Testing}
+
+  \begin{center}
+  \heading{Common technique nowadays}
+
+  \bigskip
+
+  \begin{tikzpicture}
+    \node [tl_phase] (INIT) { Random Data };
+
+    \begin{uncoverenv}<2->
+    \node [tl_state, right=1.5cm of INIT] (PRG) { \texttt{./program} }
+      edge[tl_edge] (INIT);
+    \end{uncoverenv}
+
+    \begin{uncoverenv}<3->
+    \node [above right=0cm and 2cm of PRG] (CRASH) { Crash? }
+      edge[tl_edge] (PRG);
+    \end{uncoverenv}
+
+    \begin{uncoverenv}<4->
+    \node [tl_phase, below=of PRG] (MOD) { Modified Data }
+      edge[tl_edge,bend right=80] node [right] {No crash?} (PRG);
+    \end{uncoverenv}
+
+    \begin{uncoverenv}<5->
+      \path [tl_edge,->,bend left=80] (MOD) edge (PRG);
+    \end{uncoverenv}
+
+  \end{tikzpicture}
+
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Fuzzing the Kernel}
+
+  \begin{itemize}
+    \item Userspace fuzzing
+    \begin{itemize}
+      \item Input from user
+      \item Files from filesystem
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item What is the input of the kernel?
+
+    \pause
+
+    \begin{itemize}
+      \item Data from drivers
+      \begin{itemize}
+	\item Network traffic, disk data, \dots
+	\item Fuzzers do not cover this
+      \end{itemize}
+
+      \pause
+
+      \item \emph{System calls}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Kernel Fuzzers}
+
+  \begin{itemize}
+    \item Two often used
+    \begin{enumerate}
+      \item \trin
+      \item \syz
+    \end{enumerate}
+
+    \pause
+
+    \item Both used in the SLE12-SP2 development cycle
+
+    \pause
+
+    \begin{itemize}
+      \item Successfully $\rightarrow$ bugs found
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\subsection{\trin}
+\frame{\subsectionpage}
+
+\begin{frame}{\trin}
+
+  \begin{itemize}
+    \item List of syscalls
+
+    \pause
+
+    \item Annotated parameters of every syscall
+    \begin{itemize}
+      \item File descriptor
+      \item Address
+      \item Path
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Principle of operation
+
+    \pause
+
+    \begin{enumerate}
+      \item Create few such resources above
+
+      \pause
+
+      \item Start invoking syscalls with appropriate parameters
+
+      \pause
+
+      \item Check dmesg for a WARNING/BUG
+      \begin{itemize}
+	\item Stop operation if there is one
+      \end{itemize}
+
+      \pause
+
+      \item Store syscall return values and \emph{reuse} them later
+    \end{enumerate}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Availability}
+
+  \begin{itemize}
+    \item Not a part of SLE
+
+    \pause
+
+    \item \texttt{devel:tools} project in OBS
+    \begin{itemize}
+      \item No SLE12-SP2 project yet
+      \item Use SLE12-SP1 instead
+    \end{itemize}
+
+    \pause
+
+    \item Run under ordinary user
+  \end{itemize}
+
+  \onslide<2->
+
+  \begin{block}{Install \& run}
+  \begin{lstlisting}[language=bash,columns=fullflexible,belowskip=0pt]
+zypper ar -f http://download.opensuse.org/repositories/devel:/tools/SLE_12_SP1 D:T
+zypper install trinity
+  \end{lstlisting}
+  \onslide<3->
+  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt]
+su some_user
+trinity
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\subsection{\syz}
+\frame{\subsectionpage}
+
+\begin{frame}{\syz}
+
+  \begin{itemize}
+    \item Similar to \trin
+    \begin{itemize}
+      \item List of syscalls
+      \item Annotated parameters of every syscall
+    \end{itemize}
+
+    \pause
+
+    \item But it tracks coverage
+    \begin{itemize}
+      \item It tries to cover all code paths
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\syz}{Tracking Coverage}
+
+  \heading{Every basic block is instrumented by \textsc{Gcc}}
+
+  \medskip
+
+  \begin{block}{Example}
+  \bigskip
+  \begin{lstlisting}[belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline]
+void syscall_158(int param) {
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline,firstnumber=last]
+  __sanitizer_cov_trace_pc();   // instrumented
+  \end{lstlisting}
+  \onslide<1->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline,firstnumber=last]
+  fun1();
+  if (param) {
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline,firstnumber=last]
+    __sanitizer_cov_trace_pc(); // instrumented
+  \end{lstlisting}
+  \onslide<1->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline,firstnumber=last]
+    fun2();
+  }
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline,firstnumber=last]
+  __sanitizer_cov_trace_pc();   // instrumented
+  \end{lstlisting}
+  \onslide<1->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
+    frame=leftline,firstnumber=last]
+  return;
+}
+  \end{lstlisting}
+  \bigskip
+  \end{block}
+
+  \begin{textblock*}{4cm}(8.3cm,3.5cm)
+  \begin{tikzpicture}
+    \node (START) { };
+
+    \node [tl_state, below=4mm of START, align=center] (PARAM) {
+        \code{fun1();} \\
+        \code{param;}
+      }
+      edge[tl_edge] (START);
+
+    \node [tl_state, below left=5mm and -8mm of PARAM] (FUN2) { \code{fun2();} }
+      edge[tl_edge] node [left,yshift=.3mm] { \code{true} } (PARAM);
+
+    \node [tl_state, below=16mm of PARAM] (RET) { \code{return;} }
+      edge[tl_edge,bend right=30] node [right] { \code{false} } (PARAM)
+      edge[tl_edge] (FUN2);
+
+    \node [below=4mm of RET] (EXIT) { }
+      edge[tl_edge] (RET);
+
+  \end{tikzpicture}
+  \end{textblock*}
+
+\end{frame}
+
+\begin{frame}{\syz}{Principle of Operation}
+
+  \begin{itemize}
+
+    \item Principle of operation
+
+    \pause
+
+    \begin{enumerate}
+      \item Create few such resources above
+
+      \pause
+
+      \item Start invoking syscalls with appropriate parameters
+
+      \pause
+
+      \item Check dmesg for a WARNING/BUG
+      \begin{itemize}
+	\item Stop operation if there is one
+      \end{itemize}
+
+      \pause
+
+      \item Store syscall return values and \emph{reuse} them later
+    \end{enumerate}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Availability}
+
+  \begin{itemize}
+    \item Not a part of SLE
+
+    \pause
+
+    \item \texttt{home:jirislaby:syzkaller} project in \emph{IBS}
+    \begin{itemize}
+      \item \syz and newer \textsc{Gcc}
+    \end{itemize}
+
+    \pause
+
+    \item \texttt{home:jirislaby:syzkaller:sle12-sp2} project in IBS
+    \begin{itemize}
+      \item Latest kernel patched
+    \end{itemize}
+  \end{itemize}
+
+  \onslide<2->
+
+  \begin{block}{Install \& run}
+  \begin{lstlisting}[language=bash,columns=fullflexible,belowskip=0pt]
+zypper ar -f http://dist.suse.de/ibs/home:/jirislaby:/syzkaller/SLE12-SP2/ syz
+zypper install syzkaller
+su some_user
+ssh-keygen -f my_key
+# now transfer my_key.pub to /root/.ssh/authorized_keys in VM
+cp /usr/share/doc/packages/syzkaller/example.cfg .
+vim example.cfg      # edit appropriately
+syz-manager -config example.cfg
+  \end{lstlisting}
+%  \onslide<3->
+%  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt]
+%  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\section{Results}
+\frame{\sectionpage}
+
+\begin{frame}{Results}
 
   \begin{itemize}
     \item XXX
@@ -121,6 +413,7 @@
 \end{frame}
 
 \section{Conclusion}
+\frame{\sectionpage}
 
 \begin{frame}{Conclusion}
 
