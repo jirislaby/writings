@@ -259,7 +259,7 @@ trinity
 
 \begin{frame}[fragile]{\syz}{Tracking Coverage}
 
-  \heading{Every basic block is instrumented by \textsc{Gcc}}
+  \heading{Every basic block is instrumented}
 
   \medskip
 
@@ -330,36 +330,140 @@ void syscall_158(int param) {
 
 \end{frame}
 
-\begin{frame}{\syz}{Principle of Operation}
+\begin{frame}{\syz}{\code{__sanitizer_cov_trace_pc}}
 
   \begin{itemize}
-
-    \item Principle of operation
+    \item What does it do?
+    \pause
+    \begin{itemize}
+      \item Stores its caller address
+      \item All exported in \textit{debugfs}
+    \end{itemize}
 
     \pause
 
-    \begin{enumerate}
-      \item Create few such resources above
+    \item Who does instrument it into the kernel?
+    \pause
+    \begin{itemize}
+      \item \textsc{Gcc} $\geq$ 6
 
       \pause
 
-      \item Start invoking syscalls with appropriate parameters
+      \item But \textsc{Gcc} in SP2 is 4.8 and 5 only
+    \end{itemize}
 
-      \pause
+    \pause
 
-      \item Check dmesg for a WARNING/BUG
-      \begin{itemize}
-	\item Stop operation if there is one
-      \end{itemize}
-
-      \pause
-
-      \item Store syscall return values and \emph{reuse} them later
-    \end{enumerate}
-
+    \item How to enable the instrumentation?
+    \pause
+    \begin{itemize}
+      \item Turn on \texttt{CONFIG\_KCOV}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
+
+\begin{frame}{\syz}{Requirements}
+
+  \begin{itemize}
+    \item \textsc{Gcc} $\geq$ 6
+    \begin{itemize}
+      \item Instrumentation support
+    \end{itemize}
+
+    \pause
+
+    \item Kernel
+    \begin{itemize}
+      \item Enable instrumentation: \texttt{KCOV}
+      \item Enable debugging (optional): \texttt{KASAN}, \texttt{KMEMLEAK},
+	\texttt{LOCKDEP}
+      \item Disable unwinder (too slow to boot): \texttt{STACK\_UNWIND}
+    \end{itemize}
+
+    \pause
+
+    \item \syz package
+
+    \pause
+
+    \item \textsc{Qemu}
+    \begin{itemize}
+      \item \syz fuzzes in isolation
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\syz}{Principle of Operation}
+
+  \begin{enumerate}
+    \item \texttt{syz-manager} starts a virtual machine
+
+    \pause
+
+    \item \texttt{syz-manager} starts \texttt{syz-fuzzer} inside the VM
+
+    \pause
+
+    \item Random data are generated
+
+    \pause
+
+    \item \label{item:invok} Syscalls sequence is invoked with appropriate
+      parameters
+
+    \pause
+
+    \item Check dmesg for a WARNING/BUG
+    \begin{itemize}
+      \item Generate a report if there is one
+    \end{itemize}
+
+    \pause
+
+    \item Look at the visited paths and permute the input accordingly
+
+    \pause
+
+    \item Check if the VM is viable
+    \begin{itemize}
+      \item Restart if needed
+    \end{itemize}
+
+    \pause
+
+    \item Repeat from \ref{item:invok}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\syz}{Reproducers}
+
+  \begin{itemize}
+    \item \syz can generate reproducers from reports
+    \begin{itemize}
+      \item A simple C code
+      \item Triggers the reported WARNING/BUG
+    \end{itemize}
+
+    \pause
+
+    \item Run \texttt{syz-repro}
+    \begin{itemize}
+      \item Give the report as a parameter
+    \end{itemize}
+
+    \pause
+
+    \item The reproducer is emitted
+    \begin{itemize}
+      \item \texttt{syz-repro} may fail for rare race conditions etc.
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
 
 \begin{frame}[fragile]{Availability}
 
@@ -368,38 +472,59 @@ void syscall_158(int param) {
 
     \pause
 
-    \item \texttt{home:jirislaby:syzkaller} project in \emph{IBS}
+    \item \texttt{home:jirislaby:syzkaller:sle12-sp2} project in \emph{IBS}
     \begin{itemize}
-      \item \syz and newer \textsc{Gcc}
+      \item Latest kernel patched for \emph{guest}
     \end{itemize}
 
     \pause
 
-    \item \texttt{home:jirislaby:syzkaller:sle12-sp2} project in IBS
+    \item \texttt{home:jirislaby:syzkaller} project in \emph{IBS}
     \begin{itemize}
-      \item Latest kernel patched
+      \item \syz (and \textsc{Gcc} 6) for \emph{host}
     \end{itemize}
   \end{itemize}
 
   \onslide<2->
 
   \begin{block}{Install \& run}
+  \begin{lstlisting}[language=bash,columns=fullflexible]
+zypper ar -f http://dist.suse.de/ibs/home:/jirislaby:/syzkaller:/sle12-sp2/syz_SLE12-SP2/ syz:k
+zypper dup --from syz:k
+  \end{lstlisting}
+  \onslide<3->
   \begin{lstlisting}[language=bash,columns=fullflexible,belowskip=0pt]
 zypper ar -f http://dist.suse.de/ibs/home:/jirislaby:/syzkaller/SLE12-SP2/ syz
 zypper install syzkaller
+  \end{lstlisting}
+  \onslide<4->
+  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt,
+    belowskip=0pt]
 su some_user
+  \end{lstlisting}
+  \onslide<5->
+  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt,
+    belowskip=0pt]
 ssh-keygen -f my_key
 # now transfer my_key.pub to /root/.ssh/authorized_keys in VM
+  \end{lstlisting}
+  \onslide<6->
+  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt,
+    belowskip=0pt]
 cp /usr/share/doc/packages/syzkaller/example.cfg .
 vim example.cfg      # edit appropriately
+  \end{lstlisting}
+  \onslide<7->
+  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt,
+    belowskip=0pt]
 syz-manager -config example.cfg
   \end{lstlisting}
-%  \onslide<3->
-%  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt]
-%  \end{lstlisting}
   \end{block}
 
 \end{frame}
+
+\section{Demo}
+\frame{\sectionpage}
 
 \section{Results}
 \frame{\sectionpage}
