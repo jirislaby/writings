@@ -305,7 +305,7 @@ void syscall_158(int param) {
   \bigskip
   \end{block}
 
-  \begin{textblock*}{4cm}(8.3cm,3.5cm)
+  \begin{textblock*}{4cm}(8.8cm,3.5cm)
   \begin{tikzpicture}
     \node (START) { };
 
@@ -324,6 +324,18 @@ void syscall_158(int param) {
 
     \node [below=4mm of RET] (EXIT) { }
       edge[tl_edge] (RET);
+
+    \node<2-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of PARAM.north west] (IL1) {};
+    \node<2-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of PARAM.north east] (IR1) {}
+      edge[thick,blue] (IL1);
+
+    \node<2-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of FUN2.north west] (IL2) {};
+    \node<2-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of FUN2.north east] (IR2) {}
+      edge[thick,blue] (IL2);
+
+    \node<2-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of RET.north west] (IL3) {};
+    \node<2-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of RET.north east] (IR3) {}
+      edge[thick,blue] (IL3);
 
   \end{tikzpicture}
   \end{textblock*}
@@ -390,6 +402,10 @@ void syscall_158(int param) {
     \item \textsc{Qemu}
     \begin{itemize}
       \item \syz fuzzes in isolation
+
+      \pause
+
+      \item Runs in \emph{snapshot} mode
     \end{itemize}
   \end{itemize}
 
@@ -517,6 +533,10 @@ vim example.cfg      # edit appropriately
   \onslide<7->
   \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt,
     belowskip=0pt]
+ln -s /usr/bin # short-term hack
+  \end{lstlisting}
+  \onslide<8->
+  \begin{lstlisting}[language=bash,columns=fullflexible,aboveskip=0pt]
 syz-manager -config example.cfg
   \end{lstlisting}
   \end{block}
@@ -532,7 +552,185 @@ syz-manager -config example.cfg
 \begin{frame}{Results}
 
   \begin{itemize}
-    \item XXX
+    \item Both tools were run since SP2 kernel fork
+    \begin{itemize}
+      \item (Since update to 4.4)
+    \end{itemize}
+
+    \pause
+
+    \item \trin
+    \begin{itemize}
+      \item One major issue
+      \item Some minor issues
+    \end{itemize}
+
+    \pause
+
+    \item \syz
+    \begin{itemize}
+      \item Bluetooth completely broken
+
+      \pause
+
+      \item Crypto, Floppy, GFX, NET, Sound, TTY, USB, \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\trin and \code{thread\_struct} Leak}
+
+  \begin{itemize}
+    \item Upstream bug
+
+    \pause
+
+    \item Fork over limits $\rightarrow$ memory leak
+
+    \pause
+
+    \item \code{task_struct} for each process
+    \begin{itemize}
+      \item PIDs, priorities, credentials, \dots
+    \end{itemize}
+
+    \pause
+
+    \item \code{thread_struct} for each process
+    \begin{itemize}
+      \item In \code{task_struct}, platform specific
+
+      \pause
+
+      \item FPU info, I/O ports info, \dots
+    \end{itemize}
+
+    \pause
+
+    \item No free of \code{thread_struct} content in fail paths of \code{fork}
+    \begin{enumerate}
+      \item Alloc \code{task_struct}
+
+      \pause
+
+      \item Alloc \code{thread_struct} content
+
+      \pause
+
+      \item Fork fails? $\Rightarrow$ free \code{task_struct}
+      \begin{itemize}
+	\item \code{thread_struct} content \emph{leaks}
+
+	\pause
+
+	\item I/O ports info on \xes in particular
+	  \tikz[remember picture] \node [coordinate,xshift=-3mm,yshift=-1cm] (EX) {};
+      \end{itemize}
+    \end{enumerate}
+
+    \pause
+
+    \item Details in bnc\#968063
+  \end{itemize}
+
+  \begin{textblock*}{5cm}(8.0cm,9mm)
+  \begin{onlyenv}<3->
+  \begin{lstlisting}[belowskip=0pt]
+struct task_struct {
+  pid_t pid;
+  int prio;
+  struct cred *cred;
+  ...
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{visibleenv}<4->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+  struct thread_struct thread;
+  \end{lstlisting}
+  \end{visibleenv}
+  \begin{onlyenv}<3->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+};
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{onlyenv}<5->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+struct thread_struct { /* x86 */
+  struct fpu fpu;
+  unsigned long *io_bitmap_ptr;
+  ...
+};
+  \end{lstlisting}
+  \end{onlyenv}
+  \tikz[remember picture]\node [coordinate,xshift=3cm,yshift=-2mm] (IO) {};
+  \end{textblock*}
+
+  \onslide<9->
+
+  \begin{tikzpicture}[overlay]
+    \path[tl_edge,->] (EX) edge [out=0,in=290] (IO);
+  \end{tikzpicture}
+
+\end{frame}
+
+\begin{frame}[fragile]{\syz and Bluetooth}
+
+  \begin{itemize}
+    \item \texttt{WARNING at kernel/workqueue.c:4042}
+    \begin{itemize}
+      \item Attempt to fix
+      \begin{itemize}
+        \item \textit{Bluetooth: fix power\_on vs close race}
+
+	\pause
+
+	\item Did not help
+      \end{itemize}
+
+      \pause
+
+      \item Unresolved yet -- upstream bug (see bnc\#984822)
+      \item Several developers involved
+      \item A freed workqueue tried to be stopped?
+    \end{itemize}
+
+    \pause
+
+    \item \texttt{KASAN: use-after-free in vhci\_send\_frame}
+    \begin{itemize}
+      \item \textit{Bluetooth: vhci: purge unhandled skbs}
+      \item \textit{Bluetooth: vhci: fix open\_timeout vs. hdev race}
+      \item \textit{Bluetooth: vhci: Fix race at creating hci device}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\syz and Others}
+
+  \begin{itemize}
+    \item Fixed
+    \begin{itemize}
+      \item \texttt{KASAN: use-after-free in snd\_timer\_interrupt} (ALSA)
+      \item \texttt{KASAN: use-after-free in hash\_sock\_destruct} (crypto)
+      \item \texttt{WARNING at drivers/block/floppy.c:975} (floppy)
+      \item \texttt{KASAN: use-after-free in irtty\_open} (IR TTY)
+      \item \texttt{WARNING at drivers/tty/n\_gsm.c:2048} (TTY)
+      \item \texttt{INFO: suspicious RCU usage at net/core/filter.c:1925} (NET)
+      \item \texttt{KASAN: slab-out-of-bounds in sctp\_add\_bind\_addr} (NET)
+      \item \texttt{WARNING at mm/page\_alloc.c:3373} (USB)
+    \end{itemize}
+
+    \item Fix known, not merged yet
+    \begin{itemize}
+      \item \texttt{KASAN: stack-out-of-bounds in iov\_iter\_advance}
+    \end{itemize}
+
+    \item Not fixed yet
+    \begin{itemize}
+      \item \texttt{WARNING at drivers/gpu/drm/ttm/ttm\_bo\_vm.c:265}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -542,9 +740,17 @@ syz-manager -config example.cfg
 
 \begin{frame}{Conclusion}
 
-  \begin{itemize}
-    \item XXX
-  \end{itemize}
+  \begin{center} \Large
+    \heading{It is worth running fuzzers on SLE kernels}
+  \end{center}
+
+  \pause
+  \bigskip
+  \medskip
+
+  \begin{center} \huge
+    \heading{Questions?}
+  \end{center}
 
 \end{frame}
 
