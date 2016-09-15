@@ -40,9 +40,13 @@
 
     \pause
 
-    \item About 40k LOCs changes between SLE12-SP1 and -SP2
+    \item We upgraded in SLE12-SP1 $\rightarrow$ -SP2
     \begin{itemize}
-      \item Manual inspection impossible
+      \item About 40k LOCs changed
+
+      \pause
+
+      \item $\Rightarrow$ Manual inspection impossible
     \end{itemize}
 
     \pause
@@ -124,7 +128,10 @@
       \item Data from drivers
       \begin{itemize}
 	\item Network traffic, disk data, \dots
-	\item Fuzzers do not cover this
+
+	\pause
+
+	\item These fuzzers do not cover this
       \end{itemize}
 
       \pause
@@ -137,23 +144,20 @@
 
 \begin{frame}{Kernel Fuzzers}
 
-  \begin{itemize}
-    \item Two often used
-    \begin{enumerate}
-      \item \trin
-      \item \syz
-    \end{enumerate}
+  \heading{Two often used}
+  \begin{enumerate}
+    \item \trin
+    \item \syz
+  \end{enumerate}
 
-    \pause
+  \pause
+  \medskip
 
-    \item Both used in the SLE12-SP2 development cycle
+  \heading{Both used in the SLE12-SP2 development cycle}\\[.9ex]
 
-    \pause
+  \pause
 
-    \begin{itemize}
-      \item Successfully $\rightarrow$ bugs found
-    \end{itemize}
-  \end{itemize}
+  \hspace{1.8em} Successfully $\rightarrow$ bugs found
 
 \end{frame}
 
@@ -164,6 +168,9 @@
 
   \begin{itemize}
     \item List of syscalls
+    \begin{itemize}
+      \item \file{syscalls/*.c}
+    \end{itemize}
 
     \pause
 
@@ -172,35 +179,45 @@
       \item File descriptor
       \item Address
       \item Path
-      \item \dots
+      \item Socket address
+      \item 14 more\dots
     \end{itemize}
 
     \pause
 
-    \item Principle of operation
+    \item Use the information
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\trin}{Principle of operation}
+
+  \begin{enumerate}
+    \item Create few resources
 
     \pause
 
-    \begin{enumerate}
-      \item Create few such resources above
+    \item \label{item:invok1} Invoke a syscall
+    \begin{itemize}
+      \item Random one
+      \item Appropriate parameters
+    \end{itemize}
 
-      \pause
+    \pause
 
-      \item Start invoking syscalls with appropriate parameters
+    \item Check tainted flag
+    \begin{itemize}
+      \item Stop operation if true
+    \end{itemize}
 
-      \pause
+    \pause
 
-      \item Check dmesg for a WARNING/BUG
-      \begin{itemize}
-	\item Stop operation if there is one
-      \end{itemize}
+    \item Store syscall return values and \emph{reuse} them later
 
-      \pause
+    \pause
 
-      \item Store syscall return values and \emph{reuse} them later
-    \end{enumerate}
-
-  \end{itemize}
+    \item Repeat from \ref{item:invok1}
+  \end{enumerate}
 
 \end{frame}
 
@@ -262,7 +279,9 @@ trinity
 
 \begin{frame}[fragile]{\syz}{Tracking Coverage}
 
-  \heading{Every basic block is instrumented}
+  \begin{uncoverenv}<3->
+    \heading{Every basic block is instrumented}
+  \end{uncoverenv}
 
   \medskip
 
@@ -272,29 +291,29 @@ trinity
     frame=leftline]
 void syscall_158(int param) {
   \end{lstlisting}
-  \onslide<2->
+  \onslide<3->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
     frame=leftline,firstnumber=last]
   __sanitizer_cov_trace_pc();   // instrumented
   \end{lstlisting}
-  \onslide<1->
+  \onslide<2->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
     frame=leftline,firstnumber=last]
   fun1();
   if (param) {
   \end{lstlisting}
-  \onslide<2->
+  \onslide<3->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
     frame=leftline,firstnumber=last]
     __sanitizer_cov_trace_pc(); // instrumented
   \end{lstlisting}
-  \onslide<1->
+  \onslide<2->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
     frame=leftline,firstnumber=last]
     fun2();
   }
   \end{lstlisting}
-  \onslide<2->
+  \onslide<3->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt,numbers=left,xleftmargin=2.5em,
     frame=leftline,firstnumber=last]
   __sanitizer_cov_trace_pc();   // instrumented
@@ -310,34 +329,34 @@ void syscall_158(int param) {
 
   \begin{textblock*}{4cm}(\paperwidth - 4.5cm,\textheight/2 - 1cm)
   \begin{tikzpicture}
-    \node (START) { };
+    \node<2-> (START) { };
 
-    \node [tl_state, below=4mm of START, align=center] (PARAM) {
+    \node<2-> [tl_state, below=4mm of START, align=center] (PARAM) {
         \code{fun1();} \\
         \code{param;}
       }
       edge[tl_edge] (START);
 
-    \node [tl_state, below left=5mm and -8mm of PARAM] (FUN2) { \code{fun2();} }
+    \node<2-> [tl_state, below left=5mm and -8mm of PARAM] (FUN2) { \code{fun2();} }
       edge[tl_edge] node [left,yshift=.3mm] { \code{true} } (PARAM);
 
-    \node [tl_state, below=16mm of PARAM] (RET) { \code{return;} }
+    \node<2-> [tl_state, below=16mm of PARAM] (RET) { \code{return;} }
       edge[tl_edge,bend right=30] node [right] { \code{false} } (PARAM)
       edge[tl_edge] (FUN2);
 
-    \node [below=4mm of RET] (EXIT) { }
+    \node<2-> [below=4mm of RET] (EXIT) { }
       edge[tl_edge] (RET);
 
-    \node<2-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of PARAM.north west] (IL1) {};
-    \node<2-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of PARAM.north east] (IR1) {}
+    \node<3-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of PARAM.north west] (IL1) {};
+    \node<3-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of PARAM.north east] (IR1) {}
       edge[thick,blue] (IL1);
 
-    \node<2-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of FUN2.north west] (IL2) {};
-    \node<2-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of FUN2.north east] (IR2) {}
+    \node<3-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of FUN2.north west] (IL2) {};
+    \node<3-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of FUN2.north east] (IR2) {}
       edge[thick,blue] (IL2);
 
-    \node<2-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of RET.north west] (IL3) {};
-    \node<2-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of RET.north east] (IR3) {}
+    \node<3-> [inner sep=0pt,minimum size=0pt,below right=0.7mm and 1.3mm of RET.north west] (IL3) {};
+    \node<3-> [inner sep=0pt,minimum size=0pt,below left=0.7mm and 1.3mm of RET.north east] (IR3) {}
       edge[thick,blue] (IL3);
 
   \end{tikzpicture}
@@ -393,6 +412,9 @@ void syscall_158(int param) {
       \item Enable instrumentation: \texttt{KCOV}
       \item Enable debugging (optional): \texttt{KASAN}, \texttt{KMEMLEAK},
 	\texttt{LOCKDEP}
+
+      \pause
+
       \item Disable unwinder (too slow to boot): \texttt{STACK\_UNWIND}
     \end{itemize}
 
@@ -425,11 +447,15 @@ void syscall_158(int param) {
 
     \pause
 
-    \item Random data are generated
+    \item \label{item:invok2} Generate a syscalls sequence --
+      \texttt{syz-executor}
+    \begin{itemize}
+      \item Incl.\ random data
+    \end{itemize}
 
     \pause
 
-    \item \label{item:invok} Syscalls sequence is invoked with appropriate
+    \item \texttt{syz-executor} is invoked with appropriate
       parameters
 
     \pause
@@ -452,7 +478,7 @@ void syscall_158(int param) {
 
     \pause
 
-    \item Repeat from \ref{item:invok}
+    \item Repeat from \ref{item:invok2}
   \end{enumerate}
 
 \end{frame}
@@ -596,6 +622,7 @@ syz-manager -config example.cfg
     \pause
 
     \item \code{task_struct} for each process
+    \pause
     \begin{itemize}
       \item PIDs, priorities, credentials, \dots
     \end{itemize}
@@ -614,6 +641,7 @@ syz-manager -config example.cfg
     \pause
 
     \item No free of \code{thread_struct} content in fail paths of \code{fork}
+    \pause
     \begin{enumerate}
       \item Alloc \code{task_struct}
 
@@ -643,13 +671,17 @@ syz-manager -config example.cfg
   \begin{onlyenv}<3->
   \begin{lstlisting}[belowskip=0pt]
 struct task_struct {
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{visibleenv}<4->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   pid_t pid;
   int prio;
   struct cred *cred;
   ...
   \end{lstlisting}
-  \end{onlyenv}
-  \begin{visibleenv}<4->
+  \end{visibleenv}
+  \begin{visibleenv}<5->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   struct thread_struct thread;
   \end{lstlisting}
@@ -659,7 +691,7 @@ struct task_struct {
 };
   \end{lstlisting}
   \end{onlyenv}
-  \begin{onlyenv}<5->
+  \begin{onlyenv}<6->
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 struct thread_struct { /* x86 */
   struct fpu fpu;
@@ -670,7 +702,7 @@ struct thread_struct { /* x86 */
   \end{onlyenv}
   \end{textblock*}
 
-  \onslide<9->
+  \onslide<11->
 
   \begin{tikzpicture}[remember picture,overlay]
     \path[tl_edge,->] (EX) edge [out=0,in=290] (IO.center);
@@ -728,12 +760,12 @@ struct thread_struct { /* x86 */
 
     \item Fix known, not merged yet
     \begin{itemize}
-      \item \texttt{KASAN: stack-out-of-bounds in iov\_iter\_advance}
+      \item \texttt{KASAN: stack-out-of-bounds in iov\_iter\_advance} (NET)
     \end{itemize}
 
     \item Not fixed yet
     \begin{itemize}
-      \item \texttt{WARNING at drivers/gpu/drm/ttm/ttm\_bo\_vm.c:265}
+      \item \texttt{WARNING at drivers/gpu/drm/ttm/ttm\_bo\_vm.c:265} (GFX)
     \end{itemize}
   \end{itemize}
 
@@ -745,7 +777,7 @@ struct thread_struct { /* x86 */
 \begin{frame}{Conclusion}
 
   \begin{center} \Large
-    \heading{It is worth running fuzzers on SLE kernels}
+    \heading{Is it worth running fuzzers on SLE kernels?}
   \end{center}
 
   \pause
