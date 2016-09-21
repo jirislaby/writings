@@ -1,0 +1,242 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{IPC}
+
+  \begin{itemize}
+    \item Plná meziprocesová komunikace
+    \begin{itemize}
+      \item Sdílená paměť
+      \item Zprávy
+      \item Semafory
+    \end{itemize}
+
+    \pause
+
+    \item Výpis: \cmd{ipcs} (\heading{Demo})
+    \item Dokumentace: \cmd{man 5 ipc}
+    \item \header{sys/ipc.h}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{IPC}{Klíče}
+
+  \begin{itemize}
+    \item IPC pracuje s klíči (\code{key_t})
+    \item Procesy komunikují pomocí klíče
+    \begin{itemize}
+      \item Jen pokud mají stejný
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření klíče: \code{ftok} (\header{sys/ipc.h})
+    \begin{itemize}
+      \item Cesta k existujícímu uzlu na disku
+      \item Nějaké 8bitové nenulové číslo
+    \end{itemize}
+
+    \pause
+
+    \item Např.\ \code{ftok(".", 'x')}
+  \end{itemize}
+
+\end{frame}
+
+\iffimuni
+\subsection{Sdílená paměť}
+\fi
+
+\begin{frame}{IPC}{Sdílená paměť}
+
+  \begin{itemize}
+    \item \header{sys/shm.h}
+    \item Vytvoření: \code{shmget}
+    \begin{itemize}
+      \item Poslední parametr \code{IPC_CREAT}
+      \item Logický OR s právy (\code{0644} apod.)
+    \end{itemize}
+
+    \pause
+
+    \item Získaní adresy (attach): \code{shmat}
+    \item Navrácení adresy (detach): \code{shmdt}
+
+    \pause
+
+    \item Další operace: \code{shmctl}
+    \begin{itemize}
+      \item Informace: \code{SHM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření sdílené paměti (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+    \item Vytvořte si sdílený segment (\code{shmget})
+    \item Získejte adresu (\code{shmat})
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V obou proveďte \code{shmdt}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\iffimuni
+\subsection{Zprávy}
+\fi
+
+\begin{frame}[fragile]{IPC}{Zprávy}
+
+  \begin{block}{Formát zprávy}
+  \begin{lstlisting}
+struct my_message {
+  long mtype;   /* set to something > 0 */
+  ...
+};
+  \end{lstlisting}
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item \header{sys/msg.h}
+    \item Vytvoření fronty zpráv: \code{msgget}
+
+    \pause
+
+    \item Odeslání zprávy: \code{msgsnd}
+    \item Přijetí zprávy: \code{msgrcv}
+
+    \pause
+
+    \item Další operace: \code{msgctl}
+    \begin{itemize}
+      \item Informace: \code{MSG_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Posílání zpráv (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+
+    \item Vytvořte si frontu zpráv (\code{msgget})
+    \item Vytvořte si strukturu zprávy
+    \begin{itemize}
+      \item Musí obsahovat \code{long mtype}
+      \item Přidejte \code{char text[10]}
+    \end{itemize}
+
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do fronty (\code{msgsnd}) řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte frontu (\code{msgrcv}) a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\iffimuni
+\subsection{Semafory}
+\fi
+
+\begin{frame}[fragile]{IPC}{Semafory}
+
+  \begin{itemize}
+    \item \header{sys/sem.h}
+    \item<+-> Meziprocesové zamykání/správa prostředků
+    \item<+-> Vytvoření semaforu: \code{semget}
+    \item<+-> Změna stavu semaforu: \code{semop}
+    \item<+-> Další operace: \code{semctl}
+    \begin{itemize}
+      \item \emph{Nastavení iniciální hodnoty}: \code{SETVAL} (spolu s
+	\code{union semun.val})
+      \item Informace: \code{SEM_STAT}
+      \item Zrušení: \code{IPC_RMID}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+  \begin{uncoverenv}<3->
+  \begin{block}{Parametr \code{semop}}
+  \begin{lstlisting}
+struct sembuf {
+  ushort  sem_num;
+  short   sem_op;  /*  -  0  +  */
+  short   sem_flg;
+};
+  \end{lstlisting}
+  \end{block}
+  \end{uncoverenv}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práce se semaforem (IPC)}
+  \begin{enumerate}
+    \item Vytvořte si klíč (\code{ftok})
+    \begin{itemize}
+      \item A vypište ho (\code{\%x})
+    \end{itemize}
+    \item Vytvořte 2 programy
+
+    \item Jeden program je tiskovým serverem
+    \begin{itemize}
+      \item Vytvořte si 1 semafor (\code{semget})
+      \item Obsluhuje 5 tiskáren (\code{semctl} a \code{SETVAL})
+      \item Tisk trvá 10 vteřin
+    \end{itemize}
+
+    \item Druhý program je klientem
+    \begin{itemize}
+      \item Chce tisknout
+    \end{itemize}
+
+    \item Spusťte jeden server a více než 5 klientů
+    \begin{itemize}
+      \item Do 10 vteřin
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
