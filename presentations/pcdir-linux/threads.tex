@@ -1,0 +1,114 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{Vlákna}
+
+  \begin{itemize}
+    \item Kontext procesoru bez samostatné VM
+    \begin{itemize}
+      \item Sdílí s rodičovským procesem a ostatními vlákny
+    \end{itemize}
+
+    \pause
+
+    \item Z pohledu jádra Linuxu
+    \begin{itemize}
+      \item Nerozlišuje
+      \item Oboje je \code{struct task_struct}
+      \item Oboje vzniká pomocí \code{clone}
+    \end{itemize}
+
+    \pause
+
+    \item Použít vlákna nebo procesy?
+    \begin{itemize}
+      \item Velmi záleží na aplikaci
+      \item Nemá jasné výhody nebo nevýhody
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Vytvoření vlákna}
+
+  \begin{itemize}
+    \item Nejčastěji používaná implementace: POSIX threads (pthreads)
+    \begin{itemize}
+      \item Knihovna \file{pthread} (\header{pthread.h}, \doc{man 7 pthreads})
+    \end{itemize}
+
+    \pause
+
+    \item Vytvoření vlákna: \code{int pthread_create(pthread_t *thread, const
+      pthread_attr_t *attr,}\\
+      \code{void *(*start_routine) (void *), void *arg)} %stopzone
+    \begin{itemize}
+      \item \code{thread}: návratová hodnota -- držátko
+      \item \code{attr}: atributy k vytvoření nebo \code{NULL}
+      \item \code{start_routine}: funkce vlákna
+      \item \code{arg}: předá se jako parametr do \code{start_routine}
+      \item Návratová hodnota: \code{0} -- v pořádku, jinak číslo chyby
+    \end{itemize}
+
+    \pause
+
+    \item Čekaní na skončení: \code{int pthread_join(pthread_t thread,
+      void **retval)}
+    \begin{itemize}
+      \item \code{thread}: držátko z \code{pthread_create}
+      \item \code{retval}: co vrátila \code{start_routine}
+      \item Návratová hodnota: \code{0} -- v pořádku, jinak číslo chyby
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Vytvoření vlákna}
+  \begin{enumerate}
+    \item Otevřete si \file{14/main.pro}
+    \item Vytvořte vlákno
+    \item Něco v něm vypište
+    \item Vraťte z vlákna \code{0x100}
+    \item V rodiči si počkejte na vlákno
+    \item Vypište návratovou hodnotu vlákna
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Ukončení vlákna}
+
+  \begin{itemize}
+    \item Vlákno lze ukončit z jiného vlákna
+    \begin{itemize}
+      \item Podmínka: vlákno občas vykoná jeden z ,,cancellation points''
+      \item \code{sleep}, \code{open}, \code{read}, \code{close}, \code{wait},
+        \dots (\doc{man pthreads})
+    \end{itemize}
+
+    \pause
+
+    \item Ukončení: \code{int pthread_cancel(pthread_t thread)}
+    \begin{itemize}
+      \item \code{thread}: držátko z \code{pthread_create}
+      \item Návratová hodnota: \code{0} -- v pořádku, jinak číslo chyby
+      \item \code{pthread_join} dostane \code{PTHREAD_CANCELED}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Ukončení vlákna}
+  \begin{enumerate}
+    \item Ve vlákně spěte v cyklu
+    \item V rodiči spěte 2 vteřiny
+    \item Potom ukončete vlákno
+    \item A počkejte si na vlákno
+    \item Vypište návratovou hodnotu vlákna
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
