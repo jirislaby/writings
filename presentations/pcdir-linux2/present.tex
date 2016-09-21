@@ -15,6 +15,8 @@
   \tableofcontents
 \end{frame}
 
+\iffalse
+
 \section{Úvodní informace}
 \frame{\sectionpage}
 
@@ -210,26 +212,24 @@
 \subsection*{Oboustranná komunikace}
 \frame{\subsectionpage}
 
-\begin{frame}{Roura}
+\input{../pb173-bin/12/roury.tex}
+
+\begin{frame}{Socketpair}
 
   \begin{itemize}
-    \item X
-  \end{itemize}
+    \item Narozdíl od rour
+    \begin{itemize}
+      \item Je obousměrný
+      \item Umí datagramy
+    \end{itemize}
 
-\end{frame}
-
-\begin{frame}{FIFO}
-
-  \begin{itemize}
-    \item X
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Socketpair – vlastnosti a použití}
-
-  \begin{itemize}
-    \item X
+    \item \small \code{int socketpair(int domain, int type, int proto,
+      int sv[2])}
+    \begin{itemize}
+      \item Doména: \code{AF_UNIX}
+      \item Typ: \code{SOCK_STREAM}, \code{SOCK_DGRAM}
+      \item Protokol: \code{0}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -240,22 +240,39 @@
 \begin{frame}{SystemV IPC}
 
   \begin{itemize}
-    \item semafory, fronty zpráv, sdílená paměť – princip, vlastnosti a použití jednotlivých mechanismů
+    \item princip, vlastnosti a použití jednotlivých mechanismů
   \end{itemize}
 
 \end{frame}
 
 \input{../pb173-bin/12/sysvipc.tex}
 
+\fi
+
 \subsection*{POSIX IPC}
 \frame{\subsectionpage}
 
-\begin{frame}{Semafory}
+\begin{frame}{Sdílená paměť}
 
   \begin{itemize}
-    \item \doc{man sem\_overview}
-    \item \code{sem\_t *sem\_open(const char *name, int oflag)}
-    \item \code{int sem_close(sem_t *sem)}
+    \item \doc{man shm\_overview}, knihovna \cmd{\-lrt}
+    \item Vytvoření: \code{int shm_open(const char *name, int oflag, mode_t
+      mode)}
+    \begin{itemize}
+      \item Parametry jako u \code{open}
+      \item Ale jméno: 1 lomítko na začátku (\file{/nazev})
+    \end{itemize}
+
+    \pause
+
+    \item Operace: \code{ftruncate}, \code{mmap}
+
+    \item Zrušení (nepovinné): \code{int shm_unlink(const char *name)}
+    \item Zavření: \code{munmap}, \code{close}
+
+    \pause
+
+    \item Pracuje nad \file{/dev/shm/}
   \end{itemize}
 
 \end{frame}
@@ -263,28 +280,82 @@
 \begin{frame}{Fronty zpráv}
 
   \begin{itemize}
-    \item X
+    \item \doc{man mq\_overview}, \header{mqueue.h}, knihovna \cmd{\-lrt}
+    \item Vytvoření: \code{mqd_t mq_open(const char *name, int oflag)}
+    \begin{itemize}
+      \item Parametry jako u \code{open}
+      \item Ale jméno: 1 lomítko na začátku (\file{/nazev})
+    \end{itemize}
+
+    \pause
+
+    \item Komunikace
+    \begin{itemize}
+      \item Prioritizovaná: vyšší priorita předbíhá
+      \item \small \code{int mq_send(mqd_t mq, const char *msg, size_t len, unsigned int prio)}
+      \item \small \code{ssize_t mq_receive(mqd_t mq, char *msg, size_t len, unsigned int *prio)}
+    \end{itemize}
+
+    \pause
+
+    \item Zrušení (nepovinné): \code{int mq_unlink(const char *name)}
+    \item Zavření: \code{int mq_close(mqd_t mq)}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Sdílená paměť – princip}
+\begin{frame}[fragile]{Fronty zpráv}{Vlastnosti}
 
   \begin{itemize}
-    \item \doc{man shm\_overview}
-    \item \code{int shm\_open(const char *name, int oflag, mode\_t mode);}
-    \item \code{int shm\_unlink(const char *name);}
+    \item \small \code{int mq_getattr(mqd_t mq, struct mq_attr *attr)}
+
+    \pause
+
+    \item \small \code{int mq_setattr(mqd_t mq, const struct mq_attr *newattr,} \\
+      \code{struct mq_attr *oldattr)}
+    \begin{itemize}
+      \item Lze změnit jen \code{O_NONBLOCK} v \code{mq_flags}
+    \end{itemize}
   \end{itemize}
+
+  \onslide<1->
+
+  \begin{block}{\code{struct mq_attr}}
+  \begin{lstlisting}
+long mq_flags;       /* Flags: 0 or O_NONBLOCK */
+long mq_maxmsg;      /* Max. # of messages on queue */
+long mq_msgsize;     /* Max. message size (bytes) */
+long mq_curmsgs;     /* # of messages currently in queue */
+  \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
-\begin{frame}{Vlastnosti a použití jednotlivých mechanismů}
+\begin{frame}{Semafory}
 
   \begin{itemize}
-    \item X
+    \item \doc{man sem\_overview}, \header{semaphore.h}, knihovna \cmd{\-pthread}
+    \item Vytvoření: \code{sem_t *sem_open(const char *name, int oflag)}
+
+    \pause
+
+    \item Odemčení: \code{int sem_post(sem_t *sem)}
+    \item Zamčení
+    \begin{itemize}
+      \item \code{int sem_wait(sem_t *sem)}
+      \item \code{int sem_trywait(sem_t *sem)}
+      \item \code{int sem_timedwait(sem_t *sem, const struct timespec *abs_timeout)}
+    \end{itemize}
+
+    \pause
+
+    \item Zrušení (nepovinné): \code{int sem_unlink(const char *name)}
+    \item Zavření: \code{int sem_close(sem_t *sem)}
   \end{itemize}
 
 \end{frame}
+
+\end{document}
 
 \subsection*{Sdílená paměť}
 \frame{\subsectionpage}
