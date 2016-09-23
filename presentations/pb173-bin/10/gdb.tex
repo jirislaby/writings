@@ -1,0 +1,343 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{Debugger \cmd{gdb}}
+
+  \begin{itemize}
+    \item Pracuje s ELFem a DWARFem
+    \begin{itemize}
+      \item DWARF není nutný, ale usnadňuje ladění
+    \end{itemize}
+
+    \pause
+
+    \item Používá systémové volání \code{ptrace}
+    \begin{itemize}
+      \item Sleduje proces
+      \item Upravuje vykonávání
+      \item Čte a mění paměť
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Podpora Python skriptů
+    \item Spuštění: \cmd{gdb --volby_gdb --args binarka --volby_binarky}
+    \item Nápověda: \cmd{help}
+    \item Manuál: \href{https://sourceware.org/gdb/current/onlinedocs/gdb/}{GDB
+      User Manual}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\cmd{gcc} a \cmd{gdb}}
+
+  \begin{itemize}
+    \item \cmd{gcc} generuje různé úrovně ladicích informací
+    \begin{itemize}
+      \item \texttt{-g1} (méně informací)
+      \item \texttt{-g2} alias \texttt{-g}
+      \item \texttt{-g3} (navíc informace o makrech)
+      \item \texttt{-ggdb} (i v kombinaci s \texttt{-g<cislo>})
+      \begin{itemize}
+	\item \cmd{gcc} použije i \cmd{gdb} rozšíření, pokud možno
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+    \medskip
+
+    \item S \emph{optimalizacemi} se ladí se obtížněji
+    \begin{itemize}
+      \item Proměnné zmizely, konstanty se propagovaly, \dots
+
+      \item Ale bez optimalizací je pomalý kód
+      \begin{itemize}
+	\item Někdy i nepřeložitelný
+      \end{itemize}
+
+      \item V \cmd{gcc} 4.8 se objevilo \texttt{-Og}
+      \begin{itemize}
+	\item Zapíná jen optimalizace, které (příliš) neztěžují ladění
+	\item Nezapíná samotnou generaci ladicích informací!
+	\item Používá se v kombinaci s \texttt{-g...}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \heading{Demo:} makra, \cmd{gdb} a \iffimuni \file{pb173-bin/10/mac.c} \else \file{pcdir-linux2/06/mac.c} \fi
+
+\end{frame}
+
+\begin{frame}{Operace s během}
+
+  \begin{itemize}
+    \item Spustit: \cmd{run}
+    \item Spustit po \code{main}: \cmd{start}
+    \item Přerušit: signálem (např.\ Ctrl-c)
+    \item Pokračovat po návrat z funkce: \file{finish}
+    \item Pokračovat: \file{continue}
+
+    \pause
+
+    \item Krokovat s vnořením: \cmd{step} (po řádcích), \cmd{stepi} (po
+      instrukcích)
+    \item Krokovat bez vnoření: \cmd{next} (po řádcích), \cmd{nexti} (po
+      instrukcích)
+
+    \item Konec: \cmd{quit}
+
+    \medskip
+    \pause
+
+    \item Opakování předchozího příkazu: ENTER
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Úkol:} spusťte si \cmd{yes} v \cmd{gdb} a přerušte. Vyzkoušejte si
+  \file{finish} a \file{continue}. Zkuste krokovat po instrukcích hlavní cyklus
+  \cmd{yes}. Poté \cmd{quit}.
+
+\end{frame}
+
+\begin{frame}{Výpisy I.}
+
+  \heading{Výpis}
+  \begin{itemize}
+    \item Zásobníku volání: \cmd{where}
+    \begin{itemize}
+      \item Pohyb po rámcích zásobníku: \cmd{up}, \cmd{down}
+    \end{itemize}
+
+    \pause
+
+    \item Zdrojového kódu: \cmd{list} (jen pokud máme DWARF)
+    \item Assembleru: \cmd{disassemble}
+    \item Ostatní: \cmd{info registers}, \file{info break}, \file{info macro},
+      \dots
+  \end{itemize}
+
+  \bigskip
+
+  Většina příkazů akceptuje parametry -- výpis lokací, funkcí, proměnných,
+  registrů atd.
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Výpisy v \cmd{gdb}}
+  \begin{enumerate}
+    \item Přeložte si \iffimuni \file{pb173-bin/10/debug.c} \else \file{pcdir-linux2/06/debug.c} \fi
+    \item Spusťte \file{debug} (mělo by dojít k pádu)
+    \item Otevřete \file{debug} v \cmd{gdb}
+    \item Spusťte (\cmd{run})
+
+    \item Prohlédněte si, kde došlo k pádu (vypište):
+    \begin{itemize}
+      \item Zásobník volání (\cmd{where})
+      \item Místo pádu (\cmd{list} s parametrem \code{soubor:radek})
+      \item Disassembly (\cmd{disassemble} s parametrem \code{adresa})
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Výpisy II.}
+
+  \begin{itemize}
+    \item Dump (\cmd{x}) a print (\cmd{p})
+    \item Lze použít s formátováním (\cmd{x/f} a \cmd{p/f}, kde \cmd{f} je
+      formát)
+
+    \pause
+
+    \item Formát jsou tři hodnoty
+    \begin{enumerate}
+      \item Počet vypisovaných hodnot
+      \item Formát vypisovaných hodnot
+      \begin{itemize}
+	\item \cmd{x}: hexa (podobně jako \code{printf})
+	\item \cmd{d}: decimálně
+	\item \cmd{u}: decimálně bez znaménka
+	\item \cmd{s}: řetězec
+	\item \cmd{a}: adresa
+	\item \cmd{i}: instrukce
+	\item Ostatní: viz \cmd{help x}
+      \end{itemize}
+
+      \item Velikost skupiny
+      \begin{itemize}
+	\item \cmd{b}: 1 bajt (\code{0x00 0x00 0x00 0x00})
+	\item \cmd{h}: 2 bajty (\code{0x0000 0x0000})
+	\item \cmd{w}: 4 bajty (\code{0x00000000})
+	\item \cmd{g}: 8 bajtů (\dots)
+      \end{itemize}
+    \end{enumerate}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Výpisy}
+  \begin{enumerate}
+    \item Otevřete si znovu program \file{debug} v \cmd{gdb}
+    \item Spusťte po pád (\cmd{run})
+    \item Vypište
+    \begin{itemize}
+      \item Adresu aktuální instrukce (\cmd{p/a \$pc})
+      \item 20 instrukcí od aktuální (\cmd{x/20i \$pc})
+      \item 32 hexa byte hodnot na zásobníku (\cmd{\$sp})
+      \item 8 hexa giant hodnot na zásobníku
+    \end{itemize}
+    \item Pokuste se najít na zásobníku adresu, kam se vrátí po \code{ret}
+    \item Proměnnou \code{b} (\cmd{print b})
+    \item Proměnnou \code{argc} v \code{main} (\cmd{up} a \cmd{print argc})
+  \end{enumerate}
+
+\end{frame}
+
+\iffimuni
+
+\else
+
+\begin{frame}{Automatické výpisy}
+
+\begin{itemize}
+  \item Lze nastavit automatický výpis zobrazený po každém příkazu
+
+  \pause
+
+  \item Přidání: \cmd{display}
+  \begin{itemize}
+    \item Parametry stejné jako pro \cmd{p} nebo \cmd{x}
+  \end{itemize}
+  \item Informace: \cmd{info display}
+\end{itemize}
+
+\pause
+\bigskip
+
+\heading{Úkol:} vypište si aktuální instrukci po každém příkazu
+
+\end{frame}
+
+\fi
+
+\begin{frame}{Breakpointy}
+
+\begin{itemize}
+  \item Zastavení vykonávání v definovaném bodě
+
+  \pause
+
+  \item Příkaz: \file{break}
+  \item Parametr
+  \begin{itemize}
+    \item Adresa
+    \item Funkce
+    \item soubor:radek
+    \item \dots
+  \end{itemize}
+\end{itemize}
+
+\pause
+\bigskip
+
+\heading{Úkol}
+\begin{enumerate}
+  \item Přidejte breakpoint na začátek \code{main} a spusťte (\cmd{run})
+  \item Krokujte až k pádu (\cmd{next})
+  \item Zopakujte pro \code{step} a také \code{stepi}
+\end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Další informace}
+
+\begin{itemize}
+  \item Spousta dalších informací v \cmd{info}
+  \item \cmd{functions}, \cmd{types}, \cmd{variables}, \cmd{locals}
+  \item \cmd{sources}, \cmd{line}, \cmd{macros}, \cmd{scope}
+  \item \cmd{symbol}
+  \item \cmd{threads}
+  \item Další viz \cmd{help info}
+\end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Demo} \iffimuni (\file{pb173-bin/10/thread.c}) \else (\file{pcdir-linux2/06/thread.c}) \fi
+
+\end{frame}
+
+\begin{frame}{Změna běhu}
+
+  \begin{itemize}
+    \item \texttt{set}, \texttt{set variable}
+    \item Registry procesoru: \cmd{\$rax}, \cmd{\$rbx}, \dots
+    \item Proměnné \cmd{gdb}: \cmd{\$pc}, \cmd{\$sp}, \dots
+    \item Vnitřní proměnné: \cmd{\$ostatni}
+    \begin{itemize}
+      \item Pro vlastní použití
+    \end{itemize}
+    \item Paměť: \cmd{\{typ\}adresa}
+  \end{itemize}
+
+\end{frame}
+
+\iffimuni
+\subsection{Obrazy paměti}
+\fi
+
+\begin{frame}{Obrazy paměti}
+
+  \begin{itemize}
+    \item Jádro může při pádu zapsat obraz paměti (,,coredump'')
+    \begin{itemize}
+      \item Výhoda: žádné zpomalení běhu
+      \item Nevýhoda: proces je mrtvý, nelze krokovat apod.
+
+      \pause
+
+      \item Nutno zvýšit limit velikosti (bývá 0): \cmd{ulimit -c}
+      \item Cíl, kam se ukládají: \cmd{sysctl kernel.core_pattern}
+    \end{itemize}
+
+    \pause
+
+    \item Potom se dá analyzovat v \cmd{gdb}
+    \begin{itemize}
+      \item \cmd{gdb binarka core_soubor}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Práce s obrazem paměti}
+  \begin{enumerate}
+    \item Nastavte limit na obrazy na \code{unlimited} (\cmd{ulimit -c})
+    \item Podívejte se, kam se obraz uloží (\cmd{sysctl kernel.core_pattern})
+    \item Spusťte program z předchozího příkladu
+    \begin{itemize}
+      \item Pád by měl vygenerovat coredump
+    \end{itemize}
+
+    \item Otevřete v \cmd{gdb} s obrazem paměti (\cmd{gdb ./debug path_to_core})
+    \item Vypište si podobné informace jako předtím
+    \begin{itemize}
+      \item \cmd{where}
+      \item \cmd{print b}
+      \item A podobně
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
