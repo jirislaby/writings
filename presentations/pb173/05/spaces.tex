@@ -1,0 +1,72 @@
+% vim: ai sw=2 spell spelllang=cs
+%
+\tikzstyle{spcwid} = [minimum width=4cm]
+\tikzstyle{spc} = [draw,thick,spcwid,minimum height=.85\textheight]
+\tikzstyle{box} = [draw,fill=white]
+\tikzstyle{empty} = [inner sep=0pt,minimum width=0pt]
+\tikzstyle{line} = [-,semithick]
+\pgfdeclarelayer{ram}
+\pgfdeclarelayer{space}
+\pgfsetlayers{ram,main,space}
+
+\begin{tikzpicture}
+  \begin{pgfonlayer}{space}
+    \node [spc] (PHYS) {};
+  \end{pgfonlayer}
+
+  \node [rotate=90,left=0mm of PHYS,anchor=south] {Physical Space};
+  \begin{pgfonlayer}{ram}
+    \node [draw,fill=blue!15,spcwid,minimum height=5.3cm,below=0mm of PHYS.north] (RAM) {RAM};
+  \end{pgfonlayer}
+
+  \node [box,below right=0mm of PHYS.north west] {BIOS};
+  \node [box,below right=2.8cm and 2mm of PHYS.north west] {ACPI};
+  \node [box,below right=3.5cm and 1.5cm of PHYS.north west] {Timer};
+  \node [box,spcwid,below=4.5cm of PHYS.north] {PCI Devices};
+
+  \path (RAM.south) -- node {Empty} (PHYS.south);
+
+  \begin{pgfonlayer}{space}
+    \node [spc,right=18mm of PHYS] (VIRT) {};
+  \end{pgfonlayer}
+  \node [rotate=270,right=0mm of VIRT,anchor=south] {Virtual Space};
+
+  \node [box,spcwid,minimum height=4.3cm,align=center,below=0mm of VIRT.north] (US)
+    {Userspace \\ (differs per process)};
+  \begin{pgfonlayer}{ram}
+    \node [box,fill=blue!15,spcwid,minimum height=1.2cm,below right=0mm of US.south west,baseline=-5ex] (PHYS2) {};
+    \node [above=0mm of PHYS2.south] {Physical memory};
+  \end{pgfonlayer}
+  \node [box,below right=0mm of US.south west] (HOLE) {Hole};
+  \node [box,spcwid,above=0mm of VIRT.south] (MODS) {Modules};
+  \node [box,spcwid,above=0mm of MODS.north] (KERN) {Kernel};
+  \node [box,above left=0pt of KERN.north east] {Hole};
+  \path (PHYS2.south) -- node {\dots} (KERN.north);
+
+  \node [empty,below=1cm of RAM.north east] (CONNL1) {};
+  \node [empty,below=2mm of CONNL1] (CONNL2) {};
+
+  \node [empty,left=1cm of CONNL1] (RECTL) {}
+    edge[line,densely dashed] (CONNL1);
+  \node [empty,below=8mm of RECTL] (RECBL) {}
+    edge[line,densely dashed] (RECTL);
+  \node [empty,right=8mm of RECBL] (RECBR) {}
+    edge[line,densely dashed] (RECBL);
+  \node [empty,left=2mm of CONNL2] (RECTR) {}
+    edge[line,densely dashed] (CONNL2)
+    edge[line,densely dashed] (RECBR);
+
+  \node [empty,below=1cm of US.north west] (CONNR1) {}
+    edge[line] (CONNL1);
+  \node [empty,below=2mm of CONNR1] (CONNR2) {}
+    edge[line] (CONNL2);
+
+  \draw (PHYS.north east) -- (HOLE.south west);
+  \draw (RAM.south east) -- (PHYS2.south west);
+
+  \node [empty,above=1cm of PHYS.south east] (ARRL) {};
+  \node [empty,above=1cm of VIRT.south west] {}
+    edge[<->,semithick,>=stealth']
+      node[above] {\footnotesize MMU}
+      node[below] {\footnotesize Mapping} (ARRL);
+\end{tikzpicture}
