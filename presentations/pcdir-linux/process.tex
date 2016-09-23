@@ -1,0 +1,204 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{Procesy}
+
+  \heading{Proces = běžící program}
+  \begin{itemize}
+    \item Kontext procesoru se samostatnou VM
+    \begin{itemize}
+      \item Vlákno nemá samostatnou VM, sdílí
+    \end{itemize}
+
+    \pause
+
+    \item OS má informace o každém procesu
+    \begin{itemize}
+      \item Stav procesu, Program counter
+      \item PID, PPID
+      \item UIDy, GIDy
+      \item Časy běhu
+      \item Reakce na signály, fronta signálů
+      \item Deskriptory otevřených souborů
+      \item Limity
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Základní informace o procesu}
+
+  \begin{itemize}
+    \item PID: \code{pid_t getpid(void)} (\header{unistd.h})
+    \item PPID: \code{pid_t getppid(void)} (\header{unistd.h})
+
+    \pause
+
+    \item ID: \code{getuid}, \code{getgid}, \code{geteuid}, \code{getegid},
+      \dots (opakování)
+
+    \pause
+
+    \item Časy běhu: \code{clock_t times(struct tms *buf)} (\header{sys/times.h})
+    \item Pracovní adresář: \code{char *getcwd(char *buf, size_t size)}
+      (\header{unistd.h})
+
+    \item \dots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Proces a paměť}
+
+  \begin{figure}
+    \input{spaces.pspdftex}
+  \end{figure}
+
+\end{frame}
+
+\begin{frame}{Vytvoření a zrušení procesu}
+
+  \begin{itemize}
+    \item \code{pid_t fork(void)} (\header{unistd.h})
+    \begin{itemize}
+      \item Vznikne nový proces (potomek)
+      \item Návratová hodnota
+      \begin{itemize}
+        \item \code{\-1} -- chyba
+        \item \code{0} -- \code{fork} se vrátil do potomka
+        \item \code{> 0} -- rodič a \code{fork} vrací PID potomka
+      \end{itemize}
+
+      \pause
+
+      \item Často následuje \code{exec} -- spuštění nové binárky
+    \end{itemize}
+
+    \pause
+
+    \item \code{void exit(int status)} (\header{stdlib.h})
+    \begin{itemize}
+      \item \code{status}: dostane rodič (v shellu \cmd{\$?})
+      \item Zánik procesu
+      \item Nikdy se nevrátí
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Vytváření procesů}
+  \begin{enumerate}
+    \item Vytvořte si 10 potomků
+    \item V každém potomkovi si vypište jeho PID a PID rodiče
+    \item Potomka ukončete
+
+    \item V rodiči spěte 10 vteřin
+    \begin{itemize}
+      \item Jaký stav mají po tuto dobu potomci?
+    \end{itemize}
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Čekání na potomky}
+
+  \begin{itemize}
+    \item Správný rodič by měl na své potomky počkat
+    \begin{itemize}
+      \item Než skončí
+      \item A pochovat je
+      \item Jinak vznikají zombie
+    \end{itemize}
+
+    \pause
+
+    \item \code{pid_t waitpid(pid_t pid, int *status, int options)}
+      (\header{sys/wait.h})
+    \begin{itemize}
+      \item \code{pid}: na koho čekat, \code{\-1} = na kohokoliv
+
+      \pause
+
+      \item \code{status}: co vrátil \code{main} nebo parametr \code{exit}
+      \begin{itemize}
+	\item Kromě návratové hodnoty i stav
+	\item Makra \code{WIFEXITED}, \code{WEXITSTATUS}, \code{WIFSIGNALED},
+	  \dots
+      \end{itemize}
+
+      \pause
+
+      \item \code{options}: blokující čekání apod.
+      \item Návratová hodnota: PID potomka
+
+      \pause
+
+      \item \code{wait(status)} je \code{waitpid(-1, status, 0)}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Čekání na potomky}
+  \begin{enumerate}
+    \item Odstraňte spaní v předchozím příkladě
+    \item Přidejte spaní 1 vteřinu v \emph{potomkovi} po výpise
+    \item V rodiči čekejte na potomky
+    \item Vypište jejich PID
+    \item Zjistěte, jak byly ukončeny
+    \item Tuto informaci vypište
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Plánování procesu}
+
+  \begin{center}
+    \tikzstyle{pre} = [<-,shorten <=1pt,>=stealth',semithick,above]
+    \tikzstyle{post} = [pre,shorten <=0pt,shorten >=1pt,->]
+    \tikzstyle{empty} = [inner sep=0pt, minimum size=0pt]
+    \begin{tikzpicture}[node distance=20mm, font=\footnotesize]
+      \node [tl_state] (KERN) {Kernel Space};
+
+      \node (PREFORK) [left=30mm of KERN] {}
+        edge [post] node {\code{fork()}} (KERN);
+
+      \onslide<2->{\node [tl_state] (USER) [above left=18mm and 10mm of KERN] {User Space}
+        edge [pre,right,in=120,out=0] node [xshift=1mm] {\code{return}} (KERN)
+        edge [post,left,out=300] node [xshift=-5mm] {\code{syscall}/interrupt} (KERN);
+      }
+
+      \onslide<3->{\node [tl_state] (ZOMB) [above right=13mm and 10mm of KERN] {Zombie}
+        edge [pre,left,bend left=20] node [xshift=-1mm] {\code{exit()}} (KERN);
+      }
+
+      \onslide<4->{\node [empty] (DEAD) [above right=5mm of ZOMB] {}
+        edge [pre,in=70,out=180] node [yshift=1mm] {\code{wait()}} (ZOMB);
+      }
+
+      \onslide<5->{\node [tl_state] (RUN) [below left=of KERN] {Runnable}
+        edge [pre,dashed,bend right=20,in=170] node {} (KERN)
+        edge [post,left,bend left=20] node [xshift=-1mm] {\code{schedule()}} (KERN);
+      }
+
+      \onslide<6->{\node [tl_state] (S) [below right=10mm and 25mm of KERN] {Sleeping}
+        edge [pre,bend right=30,in=195] node [xshift=12mm,yshift=1mm] {\code{wait_event_interruptible()}} (KERN)
+        edge [post,right,bend left=20,in=170] node [xshift=-2mm,yshift=2mm] {\code{wake_up()}} (KERN);
+      }
+
+      \onslide<7->{\node [tl_state] (D) [below=25mm of KERN] {Delayed}
+        edge [pre,right,bend right=20] node [yshift=-7mm] {\code{wait_event()}} (KERN)
+        edge [post,left,bend left=20] node [yshift=-7mm] {\code{wake_up()}} (KERN);
+      }
+    \end{tikzpicture}
+  \end{center}
+
+\end{frame}
+
