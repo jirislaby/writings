@@ -272,7 +272,7 @@
 
     \pause
 
-    \item Pracuje nad \file{/dev/shm/}
+    \item Pracuje nad \file{/dev/shm/} (tmpfs)
   \end{itemize}
 
 \end{frame}
@@ -300,6 +300,10 @@
 
     \item Zrušení (nepovinné): \code{int mq_unlink(const char *name)}
     \item Zavření: \code{int mq_close(mqd_t mq)}
+
+    \pause
+
+    \item Pracuje nad \file{/dev/mqueue/} (mqueue FS)
   \end{itemize}
 
 \end{frame}
@@ -355,18 +359,8 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \end{frame}
 
-\fi
-
 \subsection*{Sdílená paměť}
 \frame{\subsectionpage}
-
-\begin{frame}{Podložené souborem}
-
-  \begin{itemize}
-    \item X
-  \end{itemize}
-
-\end{frame}
 
 \begin{frame}{Anonymní (SVR a BSD implementace)}
 
@@ -376,10 +370,24 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \end{frame}
 
+\input{../pb173-bin/12/mmap.tex}
+
+\begin{frame}{Podložená souborem}
+
+  \begin{itemize}
+    \item \code{void *mmap(void *addr, size_t length, int prot, int flags,
+                      int fd, off_t offset)}
+    \item \code{int munmap(void *addr, size_t length)}
+    \item \code{int msync(void *addr, size_t length, int flags)}
+  \end{itemize}
+
+\end{frame}
+
 \begin{frame}{X}
 
   \begin{itemize}
     \item Využití vláknových prostředků (mutex, cond. variables) pro komunikaci mezi různými procesy
+    \item \code{PTHREAD_PROCESS_SHARED}
   \end{itemize}
 
 \end{frame}
@@ -458,8 +466,8 @@ long mq_curmsgs;     /* # of messages currently in queue */
     \item \code{int pthread_cond_init(pthread_cond_t *restrict cond,
            const pthread_condattr_t *restrict attr)}
 
-    \item \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
-    \item \code{int pthread_cond_signal(pthread_cond_t *cond)}
+    \item Všechny: \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
+    \item Alespoň 1: \code{int pthread_cond_signal(pthread_cond_t *cond)}
 
     \item \code{int pthread_cond_wait(pthread_cond_t *restrict cond,
            pthread_mutex_t *restrict mutex)}
@@ -517,10 +525,24 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \end{frame}
 
-\begin{frame}{X}
+\begin{frame}{Data lokální vláknům}
 
   \begin{itemize}
-    \item Thread specific data (POSIX a GCC implementace) – účel a použití
+    \item (POSIX a GCC implementace) – účel a použití
+    \item POSIX
+    \begin{itemize}
+      \item Omezení: \code{PTHREAD_KEYS_MAX} na proces
+      \item \code{pthread_key_t key}
+      \item \code{int pthread_key_create (pthread_key_t *key, void (*destructor)(void *))}
+      \item \code{void *pthread_getspecific (pthread_key_t key)}
+      \item \code{int pthread_setspecific (pthread_key_t key, const void *value)}
+      \item \code{int pthread_key_delete (pthread_key_t key)}
+    \end{itemize}
+
+    \item GCC
+    \begin{itemize}
+      \item \code{__thread int i;}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -579,6 +601,8 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \end{frame}
 
+\fi
+
 \section{Ladění a sledování běžících procesů}
 \frame{\sectionpage}
 
@@ -593,18 +617,16 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \end{frame}
 
-\begin{frame}{Ladění pomocí gdb}
+\subsection*{\cmd{gdb}}
+\frame{\subsectionpage}
 
-  \begin{itemize}
-    \item X
-  \end{itemize}
-
-\end{frame}
+\input{../pb173-bin/10/gdb.tex}
 
 \begin{frame}{Vzdálené ladění}
 
   \begin{itemize}
-    \item X
+    \item \cmd{gdbserver}
+    \item \cmd{target remote host:port}
   \end{itemize}
 
 \end{frame}
@@ -612,10 +634,19 @@ long mq_curmsgs;     /* # of messages currently in queue */
 \begin{frame}{Ladění programů s odstraněnými symboly}
 
   \begin{itemize}
-    \item X
+    \item Neexistuje spojení do zdrojových souborů
+    \begin{itemize}
+      \item Chybí informace o souborech a řádcích
+    \end{itemize}
+
+    \pause
+
+    \item Jsme omezeni na assembler a adresy
   \end{itemize}
 
 \end{frame}
+
+\input{../pb173-bin/09/tracers.tex}
 
 \begin{frame}{Metody sledování procesů (strace, ltrace, pstack, pmap)}
 
@@ -625,13 +656,7 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \end{frame}
 
-\begin{frame}{Profilování}
-
-  \begin{itemize}
-    \item X
-  \end{itemize}
-
-\end{frame}
+\input{../pb173-bin/10/prof.tex}
 
 \begin{frame}{Nástroje pro detekci chyb alokace a přetečení paměti}
 
@@ -640,6 +665,9 @@ long mq_curmsgs;     /* # of messages currently in queue */
   \end{itemize}
 
 \end{frame}
+
+\input{../pcdir-linux/mem_efence.tex}
+\input{../pb173-bin/09/valgrind.tex}
 
 \section*{Zdroje}
 \frame{\sectionpage}
