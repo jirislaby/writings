@@ -148,9 +148,9 @@ ssize_t (*write)(struct file *file, const char __user *buf, size_t count, loff_t
   \end{itemize}
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
+  \heading{Práce s lxr}
   \begin{enumerate}
   \item Najděte všechny možné funkce, které lze obsluhovat
   \begin{itemize}
@@ -167,20 +167,24 @@ ssize_t (*write)(struct file *file, const char __user *buf, size_t count, loff_t
   \end{enumerate}
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Příklad operací}
+\begin{frame}[fragile]{Příklad operací}
+
   \begin{lstlisting}
 struct file_operations my_fops = {
   .owner = THIS_MODULE,
   .open = my_open,
   .write = my_write,
 };
-
+  \end{lstlisting}
+  \pause
+  \begin{lstlisting}
 int my_open(struct inode *inode, struct file *filp) {
   filp->private_data = 3;
   return 0;
 }
-
+  \end{lstlisting}
+  \pause
+  \begin{lstlisting}
 ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t *offp) {
   /* filp->private_data is 3 here */
   if (count == 0)
@@ -199,21 +203,24 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
     close)}
 
   \begin{enumerate}
-  \item Definice \code{struct file_operations}
-  \item Vytvořte funkce dle prototypu z \code{file_operations} (lxr)
-  \begin{itemize}
-    \item Open a release s nějakým \code{printk} a \code{return}
-    \item Read a write prozatím jen s \code{return}
-    \item Návratové hodnoty
+    \item Definice \code{struct file_operations}
+    \item Vytvořte funkce dle prototypu z \code{file_operations} (lxr)
     \begin{itemize}
-      \item Open a release vracejí 0 (žádná chyba)
-      \item Read též (0 znamená EOF)
-      \item Write vrací \code{count} (zapsáno vše)
+      \item Open a release s nějakým \code{printk} a \code{return}
+      \item Read a write prozatím jen s \code{return}
+      \item Návratové hodnoty
+      \begin{itemize}
+	\item Open a release vracejí 0 (žádná chyba)
+	\item Read též (0 znamená EOF)
+	\item Write vrací \code{count} (zapsáno vše)
+      \end{itemize}
+
     \end{itemize}
 
-  \end{itemize}
-
-  \item Jen zkuste přeložit
+    \item Jen zkuste přeložit
+    \begin{itemize}
+      \item Nemá smysl vkládat
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -294,33 +301,33 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   \frametitle{Uživatelská paměť}
 
   \begin{itemize}
-  \item Něco, čemu nelze věřit (NULL, ukazatel do tabulek oprávnění, \dots)
-  \item \emph{POZOR}: nutnost kontroly
+    \item Něco, čemu nelze věřit (NULL, ukazatel do tabulek oprávnění, \dots)
+    \item \emph{POZOR}: nutnost kontroly
 
-  \pause
+    \pause
 
-  \item \code{copy_from_user}, \code{copy_to_user}
-  \begin{itemize}
-    \item ,,\code{memcpy}'' s kontrolou
-    \item Vracejí počet \emph{NEzkopírovaných} znaků (tj.\ 0 znamená OK)
+    \item \code{copy_from_user}, \code{copy_to_user}
+    \begin{itemize}
+      \item ,,\code{memcpy}'' s kontrolou
+      \item Vracejí počet \emph{NEzkopírovaných} znaků (tj.\ 0 znamená OK)
+    \end{itemize}
+
+    \pause
+
+    \item \code{get_user}, \code{put_user}
+    \begin{itemize}
+      \item ,,\code{var = *buf}'' a ,,\code{*buf = var}'' s kontrolou
+      \item Tzn.\ jen pro primitiva (\code{char}, \code{short}, \code{int},
+	\code{long})
+      \item Vracejí 0 nebo chybu (záporná hodnota)
+    \end{itemize}
+
+    \item Definované v \header{linux/uaccess.h}
   \end{itemize}
 
   \pause
 
-  \item \code{get_user}, \code{put_user}
-  \begin{itemize}
-    \item ,,\code{var = *buf}'' a ,,\code{*buf = var}'' s kontrolou
-    \item Tzn.\ jen pro primitiva (\code{char}, \code{short}, \code{int},
-      \code{long})
-    \item Vracejí 0 nebo chybu (záporná hodnota)
-  \end{itemize}
-
-  \item Definované v \header{linux/uaccess.h}
-  \end{itemize}
-
-  \pause
-
-  Demo: pb173/02
+  \heading{Demo:} \file{pb173/02/}
 
 \end{frame}
 
@@ -395,7 +402,7 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   \frametitle{Datové typy}
   \begin{itemize}
   \item Jádro a proces může běžet s různými bitovými šířkami (32, 64-bit)
-  \item Problém s ukazateli a long proměnnými
+  \item Problém s ukazateli a \code{long} proměnnými
   \begin{itemize}
   \item Jiná délka dat
   \item Jiné zarovnání struktur
@@ -407,14 +414,14 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   \begin{center}
   \begin{tabular}{|p{2.8cm}|c|p{2.8cm}|} \hline
   Uživatel (32-bit) & & Jádro (64-bit) \\ \hline
-  \texttt{data} ... 4 bajty na offsetu 4 &
+  \code{data} \dots\ 4 bajty na offsetu 4 &
   \begin{lstlisting}[language=C]
 struct my {
   char x;
   void *data;
 };
   \end{lstlisting} &
-  \texttt{data} ... 8 bajtů na offsetu 8 \\ \hline
+  \code{data} \dots\ 8 bajtů na offsetu 8 \\ \hline
   \end{tabular}
   \end{center}
 
