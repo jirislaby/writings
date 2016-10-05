@@ -1,5 +1,7 @@
 % vim: ai sw=2 spell spelllang=cs
 
+\shorthandoff{-} % cline fix
+
 \begin{frame}
   \frametitle{Ladění jádra}
 
@@ -9,13 +11,19 @@
 
   \heading{Jak zjistit chybu v jádře}
   \begin{itemize}
-  \item Ladicími výpisy
-  \item Výstupem přes soubor (obsah velkých bufferů apod.)
-  \item Pád $\Rightarrow$ analýza Oops
-  \item Regrese $\Rightarrow$ \cmd{git bisect}
-  \item Automatické nástroje
-  \item (Debugger -- \cmd{kgdb} a další)
-  \item \ldots
+    \item Ladicími výpisy
+    \pause
+    \item Výstupem přes soubor (obsah velkých bufferů apod.)
+    \pause
+    \item Pád $\Rightarrow$ analýza Oops
+    \pause
+    \item Regrese $\Rightarrow$ \cmd{git bisect}
+    \pause
+    \item Automatické nástroje
+    \pause
+    \item (Debugger -- \cmd{kgdb} a další)
+    \pause
+    \item \ldots
   \end{itemize}
 \end{frame}
 
@@ -27,60 +35,86 @@
 \begin{frame}
   \frametitle{Výpisy}
   \begin{itemize}
-  \item \code{printk} již známe
-  \item Před formátovací řetězec se vkládá \code{KERN_*}
+    \item \code{printk} již známe
+
+    \pause
+
+    \item Před formátovací řetězec se vkládá \code{KERN_*}
+    \begin{itemize}
+      \item Řetězec ve formě \code{<cislo>} nebo \code{\\001cislo}
+
+      \pause
+
+      \item Sděluje úroveň (důležitost) zprávy
+      \item Definované v \header{linux/kernel.h}
+
+      \pause
+
+      \item Zkratky: \code{pr_err}, \code{pr_info}, \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Nastavení výpisů}
+
+  \heading{Úroveň ovlivňuje, co se kde zobrazí}
   \begin{itemize}
-  \item Řetězec ve formě \texttt{<číslo>} nebo \texttt{\textbackslash 001číslo}
-  \item Sděluje úroveň (důležitost) zprávy
-  \item Definované v \header{linux/kernel.h}
+    \item \cmd{dmesg} nastavit nelze
+    \begin{itemize}
+      \item Obsahuje vždy všechno
+    \end{itemize}
+
+    \pause
+
+    \item Nastavení \file{/var/log/*} (syslogu) závislé na systému
   \end{itemize}
-  \end{itemize}
+
+  \onslide<1->
 
   \begin{block}{Obvyklé nastavení}
   \begin{center}
-  \begin{tabular}{|l|l|l|l|} \hline
-  Důležitost & Konzole & \file{/var/log/*}   & \cmd{dmesg} \\ \hline\hline
-  vysoká     & ANO     & ANO                 & ANO         \\ \hline
-  normální   & NE      & ANO                 & ANO         \\ \hline
-  ladicí     & NE      & NE                  & ANO         \\ \hline\hline
-  zapisuje   & jádro   & syslog*             & jádro       \\ \hline
+  \begin{tabular}{|l|c|c|c|} \hline
+  \multicolumn{1}{|c|}{\multirow{2}{*}{Důležitost}} &
+  	\multicolumn{3}{c|}{Cíl} \\ \cline{2-4}
+                    & \cmd{dmesg} & \file{/var/log/*}   & Konzole \\ \hline\hline
+  \code{KERN_EMERG} & \cmark      & \cmark              & \cmark  \\ \hline
+  \code{KERN_INFO}  & \cmark      & \cmark              & \xmark  \\ \hline
+  \code{KERN_DEBUG} & \cmark      & \xmark              & \xmark  \\ \hline\hline
+  \onslide<3->{Zapisuje:}
+	& \onslide<3->{jádro}
+	& \onslide<3->{syslog*}
+	& \onslide<3->{jádro} \\ \hline
   \end{tabular}
   \end{center}
   \end{block}
 
-  \begin{center}
-  \heading{Úroveň ovlivňuje, co se kde zobrazí}
-  \end{center}
-
 \end{frame}
 
-\begin{frame}
-  \frametitle{Nastavení výpisů}
+\begin{frame}{Nastavení konzole}
 
   \begin{itemize}
-  \item \cmd{dmesg} nastavit nelze
-  \begin{itemize}
-    \item Obsahuje vždy všechno
-  \end{itemize}
-  \item Nastavení syslogu závislé na systému
-  \end{itemize}
+    \item Příkazem: \cmd{dmesg -n cislo}
 
-  \pause
-  \medskip
+    \pause
 
-  \heading{Nastavení konzole}
-  \begin{itemize}
-  \item \texttt{dmesg -n číslo}
-  \begin{itemize}
-    \item \emph{Zprávy s vyšší úrovní se objeví na konzoli}
-    \item Hodnota 8 $\Rightarrow$ všechno dění
+    \item Zprávy s vyšší úrovní se objeví na konzoli
+    \begin{itemize}
+      \item Vyšší úroveň = nižší číslo
+    \end{itemize}
+
+    \pause
+
+    \item Hodnota 8 (debug) $\Rightarrow$ všechno dění
     \begin{itemize}
       \item Např.\ při ,,hard-locku''
     \end{itemize}
   \end{itemize}
+
+  \medskip
   \pause
-  \item Demo: \file{pb173/03} + \cmd{dmesg -n}
-  \end{itemize}
+
+  \heading{Demo:} \file{pb173/03} + \cmd{dmesg -n}
 
 \end{frame}
 
@@ -104,18 +138,20 @@
   \begin{itemize}
     \item Nechceme 10G \file{/var/log/messages}
     \begin{itemize}
-      \item Ladicí výpisy: \code{DEBUG}
+      \item Ladicí výpisy: \code{KERN_DEBUG}
     \end{itemize}
+
+    \pause
+
     \item Nechceme spoustu hlášek na konzoli
     \begin{itemize}
-      \item Obvyklé chyby: \code{WARNING}, \code{ERR}
+      \item Obvyklé chyby: \code{KERN_WARNING}, \code{KERN_ERR}
     \end{itemize}
   \end{itemize}
 
   \pause
-  \bigskip
 
-  \heading{Příklady}
+  \begin{block}{Příklady}
   \begin{lstlisting}
 printk(KERN_EMERG "Thread overran stack, or stack corrupted\n");
 printk(KERN_ALERT "Unhandled fault: %s (0x%03x) at 0x%08lx\n", ...
@@ -126,6 +162,7 @@ printk(KERN_NOTICE "PCI: Starting initialization.\n");
 printk(KERN_INFO "SMP mode deactivated.\n");
 printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \end{lstlisting} %stopzone
+  \end{block}
 
 \end{frame}
 
@@ -135,6 +172,9 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
   \heading{Co vše může být konzole pro výpisy}
   \begin{itemize}
     \item \file{tty0-tty*} (co když stroj umře?)
+
+    \pause
+
     \item Sériová konzole (\file{ttyS*})
     \item Síťová konzole (\texttt{netconsole})
 
@@ -148,9 +188,9 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
 
   Nastavení pomocí parametru jádra (modulu)
   \begin{itemize}
-  \item \texttt{console=tty1}
-  \item \texttt{console=ttyS0}
-  \item \texttt{netconsole=...}
+    \item \texttt{console=tty1}
+    \item \texttt{console=ttyS0}
+    \item \texttt{netconsole=...}
   \end{itemize}
 
   \medskip
@@ -172,6 +212,8 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
     \item Např.\ \cmd{echo h >/proc/sysrq-trigger}
   \end{enumerate}
 
+  \smallskip
+
   Více informací v \doc{Documentation/networking/netconsole.txt}
 
 \end{frame}
@@ -184,6 +226,9 @@ printk(KERN_DEBUG "cosa%d: microcode started\n", ...
     \begin{itemize}
       \item Znepřehlednění (typické pro ACPI, iwlwifi)
       \item Nestíhá se posílat na konzoli (ztráta informací)
+
+      \pause
+
       \item \emph{Částečné řešení} (\header{linux/printk.h}):
       \begin{lstlisting}
 if (printk_ratelimit())
@@ -196,6 +241,9 @@ if (printk_ratelimit())
     \item Binární data
     \begin{itemize}
       \item \cmd{dmesg} zobrazuje jen textová data
+
+      \pause
+
       \item \emph{Částečné řešení} (\header{linux/kernel.h}):
       \begin{lstlisting}
 print_hex_dump_bytes(...) // Vyzaduje DEBUG
@@ -207,7 +255,7 @@ print_hex_dump(...)
   \pause
 
   \begin{center}
-  \heading{Mnoho binárních dat se předává pomocí speciálních souborů}
+    \heading{Mnoho binárních dat se předává pomocí speciálních souborů}
   \end{center}
 
 \end{frame}
@@ -282,17 +330,21 @@ print_hex_dump(...)
   \frametitle{SysRq}
 
   \begin{itemize}
-  \item System-request (\doc{Documentation/sysrq.txt})
-  \begin{itemize}
-    \item Klávesnicí: Alt-PrintScreen
-    \item Vzdáleně: \file{/proc/sysrq-trigger}
-  \end{itemize}
-  \item Funguje (většinou) i po pádu systému
-  \item Zapnutí: \cmd{sysctl kernel.sysrq=1}
+    \item System-request (\doc{Documentation/sysrq.txt})
+    \begin{itemize}
+      \item Klávesnicí: Alt-PrintScreen
+      \item Vzdáleně: \file{/proc/sysrq-trigger}
+    \end{itemize}
+
+    \pause
+
+    \item Funguje (většinou) i po pádu systému
+    \item Zapnutí: \cmd{sysctl kernel.sysrq=1}
   \end{itemize}
 
   \pause
 
+  \begin{block}{Příklady SysRq}
   \begin{center}
   \small
   \begin{tabular}{|l|l|} \hline
@@ -303,8 +355,8 @@ print_hex_dump(...)
   w & výpis blokujících procesů \\ \hline
   s-u-s-b & sync + unmount + reboot \\ \hline
   \end{tabular} \\[2mm]
-  \emph{Příklady SysRq}
   \end{center}
+  \end{block}
 
 \end{frame}
 
@@ -335,25 +387,22 @@ print_hex_dump(...)
   \item Dekóduje a vypisuje jejich parametry na STDOUT
   \end{itemize}
 
-  Demo: \texttt{strace -e open,read cat \ldots/debug/\ldots}
+  \heading{Demo:} \cmd{strace -e open,read cat .../debug/...}
 
 \end{frame}
 
 \iffimuni
-\begin{frame}[fragile]
-  \frametitle{Analýza Oops}
+\begin{frame}[fragile]{Analýza Oops}
 
   \footnotesize
-  \begin{lstlisting}{language=C}
+  \begin{lstlisting}
 my_init(void) { char *ptr = (void *)5; *ptr = 5; }
   \end{lstlisting}
   \begin{lstlisting}{language=XML}
 BUG: unable to handle kernel NULL pointer dereference at 00000000000005
 IP: [<ffffffffa0039042>] my_init+0x12/0x30 [pb173]
 PGD 3daff067 PUD 3c713067 PMD 0 
-Oops: 0002 [#1] SMP 
-last sysfs file: /sys/devices/system/...
-CPU 0 
+...
 Modules linked in: pb173(+) mperf fuse ...
 Pid: 2506, comm: insmod Not tainted 2.6.36-rc4-16-default #1 /Bochs
 RIP: 0010:[<ffffffffa0039042>]  [<ffffffffa0039042>] my_init+0x12/0x30 [pb173]
