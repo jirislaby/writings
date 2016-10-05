@@ -17,7 +17,7 @@
   \tableofcontents
 \end{frame}
 
-\iftrue
+\iffalse
 
 \section{Úvodní informace}
 \frame{\sectionpage}
@@ -95,44 +95,203 @@
 
 \end{frame}
 
+\fi
+
 \section{Procesy}
 \frame{\sectionpage}
 
 \input{../pcdir-linux/process.tex}
 
-\begin{frame}{Vytvoření procesů}
+\begin{frame}{\code{exec}}
+
+  {\footnotesize
+  \code{int execve(const char *file, char *const argv[], char *const envp[]);} }
+
+  \bigskip
 
   \begin{itemize}
-    \item X
+    \item Zamění běžící proces za jiný
+
+    \pause
+
+    \item Nový proces je načten z \code{file}
+    \item Jsou mu předány parametry \code{argv}
+    \item Běží v prostředí \code{envp}
+
+    \pause
+
+    \item Nadstavby: \code{execl}, \code{execlp}, \code{execle}, \code{execv},
+      \code{execvp}, \code{execvpe}
+    \begin{itemize}
+      \item \code{l/v}: proměnný počet parametrů vs.\ pole
+      \item \code{p}: hledá v \cmd{PATH}
+      \item \code{e}: prostředí
+    \end{itemize}
+
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Návaznosti procesů (process groups, sessions)}
+\begin{frame}{Skupiny procesů a sezení}
 
   \begin{itemize}
-    \item X
+    \item Skupina procesů
+    \begin{itemize}
+      \item Zejm.\ pro adresování signálů (viz dále)
+    \end{itemize}
+
+    \pause
+
+    \item Sezení
+    \begin{itemize}
+      \item Sdílí terminál
+      \item Obsahuje skupiny procesů
+    \end{itemize}
+
+    \pause
+
+    \item Oboje se dědí a přežívá \code{exec}
+  \end{itemize}
+
+  \onslide<1->
+
+  \begin{center}
+  \tikzstyle{proc} = [circle,fill=black,inner sep=0pt,minimum size=4pt]
+  \pgfdeclarelayer{background}
+  \pgfdeclarelayer{background2}
+  \pgfsetlayers{background2,background,main}
+  \begin{tikzpicture}[font=\tiny]
+    % pgrp1
+    \node[proc,fill=red,label=below:100] (PROC100) {};
+    \node[proc,above right=1mm and 12mm of PROC100,label=below:101] (PROC101) {};
+    \node[proc,below right=5mm and 8mm of PROC100,label=below:102] (PROC102) {};
+    \begin{pgfonlayer}{background}
+      \node [fill=blue!15,inner sep=10pt,draw,ellipse,semithick,fit=(PROC100)(PROC101)(PROC102)] (PGRP100) {};
+    \end{pgfonlayer}
+    \node[below=.8ex of PGRP100.north,align=center] {Process Group \\ 100};
+
+    % pgrp2
+    \node[proc,below right=2mm and 3.7cm of PROC100, label=below:200] (PROC200) {};
+    \node[proc,fill=red,above right=1mm and 12mm of PROC200,label=below:201] (PROC201) {};
+    \begin{pgfonlayer}{background}
+      \node [color=red,fill=blue!15,inner sep=10pt,draw,ellipse,semithick,fit=(PROC200)(PROC201)] (PGRP200) {};
+    \end{pgfonlayer}
+    \node[below=.8ex of PGRP200.north,align=center] {Process Group \\ 201};
+
+    % session
+    \begin{pgfonlayer}{background2}
+      \node [fill=red!15,inner sep=2pt,draw,ellipse,thick,fit=(PGRP100)(PGRP200)] (SESSION) {};
+    \end{pgfonlayer}
+    \node[below=.8ex of SESSION.north,align=center] {Session \\ 201};
+
+    % TTY
+    \node [right=8mm of SESSION,font=\small] {TTY}
+      edge[<-,semithick,>=stealth'] (SESSION);
+  \end{tikzpicture}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Skupina procesů}
+
+  \begin{itemize}
+    \item Má vedoucího
+    \begin{itemize}
+      \item Proces, který ji vytvořil
+    \end{itemize}
+
+    \pause
+
+    \item Jsou očíslované
+    \begin{itemize}
+      \item Číslo vedoucího procesu
+    \end{itemize}
+
+    \pause
+
+    \item Zjištění čísla: \code{pid_t getpgrp(void)}
+    \item Vytvoření: \code{int setpgid(pid_t pid, pid_t pgid)}
+    \begin{itemize}
+      \item \code{pid} -- koho (0 = aktuální proces)
+      \item \code{pgid} -- kam
+      \begin{itemize}
+	\item 0 = aktuální proces
+	\item Jinak ID skupiny -- ze stejného sezení
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Další rozhraní: \code{getpgid}, \code{setpgrp} (zastaralé)
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Obsluha ukončení potomků procesu (problematika zombie)}
+\begin{frame}{Úkol}
+
+  \heading{Skupiny procesů}
+  \begin{enumerate}
+    \item Upravujte předchozí příklad
+    \item Navíc vypište ID skupiny
+    \item 3.\ potomka umístěte do nové skupiny
+    \begin{itemize}
+      \item Vypište znovu ID skupiny
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Sezení}
 
   \begin{itemize}
-    \item X
+    \item Má vedoucího
+    \begin{itemize}
+      \item Proces/skupinu, která ji vytvořila
+    \end{itemize}
+
+    \pause
+
+    \item Jsou očíslované
+    \begin{itemize}
+      \item Číslo vedoucího procesu/skupiny
+    \end{itemize}
+
+    \pause
+
+    \item Zjištění čísla: \code{pid_t getsid(pid_t pid)}
+    \item Vytvoření: \code{pid_t setsid(void)}
+    \begin{itemize}
+      \item Vedoucí skupiny nesmí -- vedl by skupinu v jiném sezení
+    \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Sezení}
+  \begin{enumerate}
+    \item Upravujte předchozí příklad
+    \item Navíc vypište ID sezení
+    \item 7.\ potomka umístěte do nového sezení
+    \begin{itemize}
+      \item Vypište ID skupiny i sezení
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
 \begin{frame}{Vlastnosti procesů}
 
   \begin{itemize}
-    \item X
+    \item \code{getpriority} \code{setpriority}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{X}
+\input{../pcdir-linux/uid.tex}
+
+\begin{frame}{Démon}
 
   \begin{itemize}
     \item Postup vytvoření démona
@@ -142,6 +301,8 @@
 
 \section{IPC komunikace}
 \frame{\sectionpage}
+
+\end{document}
 
 \begin{frame}{IPC komunikace}
 
@@ -527,8 +688,6 @@ long mq_curmsgs;     /* # of messages currently in queue */
   \end{itemize}
 
 \end{frame}
-
-\fi
 
 \section{Síťová komunikace s využitím socketů}
 \frame{\sectionpage}
