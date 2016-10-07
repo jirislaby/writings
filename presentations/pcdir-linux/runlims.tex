@@ -1,0 +1,191 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{Limity za běhu}
+
+  \begin{enumerate}
+    \item Nevázané k souborovému systému
+    \begin{itemize}
+      \item Obecné limity systému
+
+      \pause
+
+      \item \code{long sysconf(int name)} (\header{unistd.h})
+      \begin{itemize}
+	\item \code{name}: jméno limitu -- \code{_SC_ARG_MAX},
+	  \code{_SC_OPEN_MAX}, \code{_SC_PAGESIZE}, \dots
+	\item Návratová hodnota: limit
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Vázané k souborovému systému
+    \begin{itemize}
+      \item Často limity daného souborového systému pro danou položku
+      \begin{itemize}
+	\item Pro adresář (d)
+	\item Pro soubor (f)
+      \end{itemize}
+
+      \pause
+
+      \item \code{long pathconf(const char *path, int name)}
+	(\header{unistd.h})
+      \begin{itemize}
+	\item \code{path}: pro který soubor
+	\item \code{name}: jméno limitu -- \code{_PC_LINK_MAX} (f),
+	  \code{_PC_NAME_MAX} (d), \code{_PC_PATH_MAX} (d), \dots
+	\item Návratová hodnota: limit
+      \end{itemize}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Limity za běhu}
+  \begin{enumerate}
+    \item Zjistěte velikost stránky v systému
+    \item Vypište
+    \item Zjistěte maximální délku jména souboru a cesty
+    \item Vypište
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Limity procesu}
+
+  \begin{itemize}
+    \item Každý proces má limity, co smí
+    \begin{itemize}
+      \item Počet otevřených souborů
+      \item Velikost paměti, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Dva druhy limitů
+    \begin{itemize}
+      \item Hard: jen root může zvyšovat
+      \item Soft: uživatel může měnit až do výše hard
+    \end{itemize}
+
+    \pause
+
+    \item V shellu: \cmd{ulimit} (Demo)
+
+    \pause
+
+    \item \code{int getrlimit(int resource, struct rlimit *rlim)} a
+      \code{int setrlimit(int resource, const struct rlimit *rlim)}
+    \begin{itemize}
+      \item \code{resource}: který limit -- \code{RLIMIT_CPU},
+	\code{RLIMIT_STACK}, \dots
+      \item \code{rlim}: na co nastavit/návratová hodnota
+      \item Návratová hodnota: \code{0} -- OK, jinak chyba
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{\code{struct rlimit}}
+  \begin{lstlisting}
+rlim_t rlim_cur;  /* Soft limit */
+rlim_t rlim_max;  /* Hard limit (ceiling for rlim_cur) */
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Limity za běhu}
+  \begin{enumerate}
+    \item Vypište si do dvou sloupců všechny limity
+    \begin{itemize}
+      \item \code{Soft0  Hard0}
+      \item \code{Soft1  Hard1}
+      \item \dots
+    \end{itemize}
+
+    \item Iterujte přes limity od limitu číslo \code{0}
+    \item Využijte \code{RLIM_NLIMITS} jako strop
+    \item Vyzkoušejte
+    \item Porovnejte výstup s \cmd{ulimit -a} a \cmd{ulimit -aH}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Priorita procesu}
+
+  \begin{itemize}
+    \item Některé procesy jsou výpočetně náročné
+
+    \pause
+
+    \item Ale nevadí jim, když je někdo upozadí
+
+    \pause
+
+    \item Každý proces má prioritu
+    \begin{itemize}
+      \item Priorita = 20 + nice (z pohledu jádra, demo)
+
+      \pause
+
+      \item Nice: iniciálně \code{0}, \code{< 0} zvyšuje prioritu, \code{> 0}
+	snižuje
+    \end{itemize}
+
+    \pause
+
+    \item Změna nice: \code{int nice(int inc)} (\header{unistd.h})
+    \begin{itemize}
+      \item \code{inc}: o kolik
+    \end{itemize}
+
+    \pause
+
+    \item Zjištění/nastavení: (\header{unistd.h}) \\
+      \code{int getpriority(int which, id_t who)} a
+      \code{int setpriority(int which, id_t who, int prio)}
+    \begin{itemize}
+      \item \pozor: pracují také s nice!
+      \item \code{which}: čeho -- \code{PRIO_PROCESS}, \code{PRIO_PGRP},
+	\code{PRIO_USER}
+      \item \code{who}: kterého (procesu, skupiny procesů, uživatele)
+      \item \code{prio}: hodnota nice
+    \end{itemize}
+
+    \pause
+
+    \item Další speciální nastavení plánovače: \doc{man 7 sched}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Priorita procesu}
+  \begin{enumerate}
+    \item Vytvořte si program, který cyklí
+    \item Každou miliontou iteraci něco vypište
+    \begin{itemize}
+      \item Popř.\ číslo upravte podle rychlosti stroje
+    \end{itemize}
+
+    \item Před cyklem programu zvyšte nice (\code{nice( > 0)})
+    \begin{itemize}
+      \item Poběží s nižší prioritou
+    \end{itemize}
+
+    \item Program přeložte a spusťte čtyřikrát
+
+    \item Nyní spustťe 4 instance \cmd{cat /dev/zero >/dev/null}
+    \item Změnilo se chování vašeho programu?
+    \item Co se stane, když nice měnit nebudete?
+  \end{enumerate}
+
+\end{frame}
+
