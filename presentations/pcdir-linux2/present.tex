@@ -95,8 +95,6 @@
 
 \end{frame}
 
-\fi
-
 \section{Procesy}
 \frame{\sectionpage}
 
@@ -314,22 +312,125 @@
 \begin{frame}{Démon}
 
   \begin{itemize}
-    \item Postup vytvoření démona
+    \item Proces běžící na pozadí (\doc{man 7 daemon})
+    \item Obsluhuje požadavky
+
+    \pause
+
+    \item Těžký démon
+    \begin{itemize}
+      \item Sám program vytvoří démon
+      \item Spoustu kroků (viz dále)
+    \end{itemize}
+
+    \pause
+
+    \item Lehký démon
+    \begin{itemize}
+      \item \cmd{systemd} a podobní dělají těžkou práci
+      \item Program obsluhuje signály
+      \item Program vystaví rozhraní
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
+\begin{frame}{Vytvoření démona}
+
+  \heading{Obvyklé kroky pro vytvoření (těžkého) démona}
+  \begin{itemize}
+    \item Spuštění na pozadí
+    \begin{itemize}
+      \item \code{fork} a \code{exit} rodiče, dvakrát
+    \end{itemize}
+
+    \pause
+
+    \item \code{setsid}
+    \begin{itemize}
+      \item Odpojení od terminálu
+      \item Proces je vedoucí sezení
+      \item Proces je vedoucí skupiny procesů
+    \end{itemize}
+
+    \pause
+
+    \item Nastavení lokální cesty na \file{/}
+
+    \pause
+
+    \item Reset signálů
+
+    \pause
+
+    \item Nastavení umasky na 0
+    \begin{itemize}
+      \item Bez omezení masky u \code{open} a dalších
+    \end{itemize}
+
+    \pause
+
+    \item Zavření všech souborů
+
+    \pause
+
+    \item Otevření standardních souborů
+    \begin{itemize}
+      \item Do logu, na konzoli, do \file{/dev/null}
+    \end{itemize}
+
+    \pause
+
+    \item Většinu z toho dělá: \code{int daemon(int nochdir, int noclose)}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Démon}
+  \begin{enumerate}
+    \item Napište démon
+    \item Použijte \code{daemon} (\header{unistd.h})
+    \item Otevřete \file{/tmp/log} jako stdout
+    \begin{itemize}
+      \item Vypište pomocí \code{printf} informaci o startu
+    \end{itemize}
+
+    \item V cyklu ověřujte, zda existuje \file{/tmp/kick}
+    \begin{itemize}
+      \item Vždy chvíli spěte
+    \end{itemize}
+
+    \item Pokud existuje, něco vypište
+    \begin{itemize}
+      \item \code{printf}
+    \end{itemize}
+
+    \item Soubor smažte
+    \begin{itemize}
+      \item \code{unlink} nebo \code{remove}
+    \end{itemize}
+
+    \item Zkuste \cmd{touch /tmp/kick}
+  \end{enumerate}
+
+\end{frame}
+
+\fi
+
 \section{IPC komunikace}
 \frame{\sectionpage}
-
-\end{document}
 
 \begin{frame}{IPC komunikace}
 
   \begin{itemize}
-  \item XXX
+  \item Komunikace mezi procesy
   \begin{itemize}
-    \item YYY
+    \item Signály
+    \item Roury, sokety
+    \item IPC
+    \item \code{mmap}
   \end{itemize}
  \end{itemize}
 
@@ -561,6 +662,8 @@ long mq_curmsgs;     /* # of messages currently in queue */
   \end{itemize}
 
 \end{frame}
+
+\end{document}
 
 \section{Vícevláknové aplikace dle POSIX}
 \frame{\sectionpage}
