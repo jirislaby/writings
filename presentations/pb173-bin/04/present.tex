@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{IV. ELF I.}
-\date{15. 10. \the\year}
+\date{11. 10. \the\year}
 
 \begin{document}
 
@@ -28,7 +28,7 @@
 
     \item Podpora pro ladicí informace
     \begin{itemize}
-      \item Příště
+      \item Přespříště
     \end{itemize}
 
     \pause
@@ -96,7 +96,7 @@
     \item Knihovny při překladu: \cmd{gcc ... -lelf}
     \item První je třeba volat \code{elf_version(EV_CURRENT)}
     \begin{itemize}
-      \item Nesmí být \code{EV_NONE}
+      \item Nesmí vrátit \code{EV_NONE}
     \end{itemize}
   \end{itemize}
 
@@ -111,17 +111,17 @@
     \item Poslední chyba: \code{int elf_errno()}
     \item Převod na text: \code{const char *elf_errmsg(int error)}
     \begin{itemize}
-      \item \lstinline@-1@ jako \code{error} je zkratka pro \code{elf_errno()}
+      \item \code{\-1} jako \code{error} je zkratka pro \code{elf_errno()}
     \end{itemize}
   \end{itemize}
 
-  \bigskip
-
-  Typicky:
+  \begin{block}{Typicky}
   \begin{lstlisting}
 if (!elf_function(...))
   errx(1, "elf_function: %s", elf_errmsg(-1));
   \end{lstlisting} %stopzone
+  \end{block}
+
 \end{frame}
 
 \begin{frame}
@@ -135,7 +135,7 @@ if (!elf_function(...))
     \item Zkontrolujte návratovou hodnotu
     \begin{itemize}
       \item Nesmí být \code{EV_NONE}
-      \item V případě chyby ji vypište (\code{elf_errmsg(-1)})
+      \item V případě chyby chybu vypište (\code{elf_errmsg(-1)})
     \end{itemize}
 
     \item Pomocí standardního \code{open} otevřete soubor z příkazové řádky
@@ -148,9 +148,7 @@ if (!elf_function(...))
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{\file{libelf}}
-  \framesubtitle{Soubory}
+\begin{frame}[fragile]{\file{libelf}}{Soubory}
 
   \begin{itemize}
     \item \file{libelf} pracuje s \emph{file deskriptory}
@@ -162,12 +160,16 @@ if (!elf_function(...))
       \item \code{ref} je \code{NULL}
     \end{itemize}
 
-    \item Ověření typu sobouru
+    \pause
+
+    \item Zjištění typu sobouru
     \begin{itemize}
       \item \code{Elf_Kind elf_kind(Elf *elf)}
       \item Návratová hodnota je jedno z \code{ELF_K_NONE}, \code{ELF_K_AR},
               \emph{\code{ELF_K_ELF}}
     \end{itemize}
+
+    \pause
 
     \item Konec práce
     \begin{itemize}
@@ -178,7 +180,7 @@ if (!elf_function(...))
   \pause
 
   \begin{block}{Příklad (bez ověření chyb)}
-  \begin{lstlisting}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 int fd = open(file, O_RDONLY);
 Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
 elf_end(elf);
@@ -188,8 +190,7 @@ close(fd);
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
   \heading{Doplňte načtení souboru zadaného jako parametr}
   \begin{enumerate}
@@ -233,11 +234,8 @@ close(fd);
     \end{itemize}
   \end{itemize}
 
-  \begin{textblock*}{4.7cm}(8cm,1.9cm)
-    \includegraphics[width=4.7cm]{Elf-layout--en}
-    \begin{center}
-      \tiny{Zdroj: wikipedia}
-    \end{center}
+  \begin{textblock*}{5cm}(\textwidth-6cm,.5\textheight-2.3cm)
+    \input{ELF_layout.tex}
   \end{textblock*}
 
 \end{frame}
@@ -247,13 +245,25 @@ close(fd);
 
   \begin{itemize}
     \item \cmd{readelf -h}
+
+    \pause
+
     \item Magické číslo (\code{0x7f 'E' 'L' 'F'})
+
+    \pause
+
     \item Typ, cílová architektura, stroj, systém, \dots
+
+    \pause
+
     \item Metadata popisující hlavičky
+
+    \pause
+
     \item V \file{libelf} (\header{gelf.h})
     \begin{itemize}
       \item Struktura \code{GElf_Ehdr}
-      \item \code{gelf_getehdr}
+      \item \code{GElf_Ehdr *gelf_getehdr(Elf *elf, GElf_Ehdr *dest)}
     \end{itemize}
   \end{itemize}
 
@@ -284,6 +294,9 @@ close(fd);
   \begin{itemize}
     \item \cmd{readelf -S} (obsah sekce: \cmd{readelf -x},
       popř.\ text \cmd{readelf -p})
+
+    \pause
+
     \item Vytvářené překladačem/linkerem
     \item Čtené překladačem/linkerem/interpretrem
 
@@ -309,9 +322,9 @@ close(fd);
 
   \heading{Práce se sekcemi}
   \begin{enumerate}
-    \item Vytvořte si soubor s \code{puts("hello")} a \code{puts("world")}
+    \item Vytvořte si soubor s kódem \code{puts("hello")} a \code{puts("world")}
     \item Vytvořte si vlastní sekci s daty
-    \begin{lstlisting}
+    \begin{lstlisting}[belowskip=0pt]
 int __attribute__((section(".data.my_section"))) x = 3;
     \end{lstlisting}
     \item Vytvořte si vlastní sekci s funkcí (\code{.text.my_section})
@@ -321,7 +334,7 @@ int __attribute__((section(".data.my_section"))) x = 3;
     \end{itemize}
 
     \item Vypište si seznam sekcí v obou souborech (\cmd{readelf -S})
-    \item Vypište si obsah sekcí (\cmd{readelf -x})
+    \item Vypište si obsah sekcí (\cmd{readelf -x}):
     \begin{itemize}
       \item \code{.rodata} (zkuste i \cmd{readelf -p})
       \item V \file{.o}: \code{.data.my_section}
@@ -335,19 +348,23 @@ int __attribute__((section(".data.my_section"))) x = 3;
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{\file{libelf}}
-  \framesubtitle{Sekce}
+\begin{frame}{\file{libelf}}{Sekce}
 
   \begin{itemize}
-    \item Držátko: \code{Elf_Scn}
+    \item Držátko: struktura \code{Elf_Scn}
+    \begin{itemize}
+      \item Obsah nedefinovaný
+    \end{itemize}
 
     \pause
 
-    \item Hlavička: \code{GElf_Shdr} (\header{gelf.h})
+    \item Hlavička: struktura \code{GElf_Shdr} (\header{gelf.h})
     \begin{itemize}
       \item Získání hlavičky:
 	\code{GElf_Shdr *gelf_getshdr(Elf_Scn *scn, GElf_Shdr *dst)}
+
+      \pause
+
       \item \code{sh_name}: offset do dat sekce \code{.shstrtab}
       \item \code{sh_type}: \code{SHT_NULL}, \code{SHT_PROGBITS},
 	\code{SHT_SYMTAB}, \code{SHT_STRTAB}, \dots
@@ -358,10 +375,13 @@ int __attribute__((section(".data.my_section"))) x = 3;
 
     \pause
 
-    \item Data: \code{Elf_Data}
+    \item Data: struktura \code{Elf_Data}
     \begin{itemize}
       \item Iterace přes obsah:
 	\code{Elf_Data *elf_getdata(Elf_Scn *scn, Elf_Data *data)}
+
+      \pause
+
       \item \code{d_buf}: data
       \item \code{d_type}: \code{ELF_T_BYTE}, \code{ELF_T_ADDR}, \dots
       \item \code{d_size}: velikost dat
@@ -370,9 +390,7 @@ int __attribute__((section(".data.my_section"))) x = 3;
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{\file{libelf}}
-  \framesubtitle{Vyhledání sekcí}
+\begin{frame}[fragile]{\file{libelf}}{Vyhledání sekcí}
 
   \begin{itemize}
     \item x-tá sekce: \code{Elf_Scn *elf_getscn(Elf *elf, size_t index)}
@@ -384,11 +402,10 @@ int __attribute__((section(".data.my_section"))) x = 3;
       \code{int elf_getshdrstrndx(Elf *elf, size_t *dst)}
   \end{itemize}
 
-  \pause
-  \smallskip
+  \onslide<2->
 
   \begin{block}{Příklad}
-  \begin{lstlisting}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 Elf_Scn *scn = NULL;
 while ((scn = elf_nextscn(elf, scn))) {
   GElf_Shdr shdr;
@@ -421,7 +438,7 @@ while ((scn = elf_nextscn(elf, scn))) {
 
     \item Vypište data každé sekce (\code{elf_getdata})
     \begin{itemize}
-      \item Uvažte jen první \code{elf_getdata} (neiterujte přes data)
+      \item Uvažte jen první \code{elf_getdata} (tj.\ neiterujte přes data)
       \item Hexdump prvních 16 bytů obsahu
     \end{itemize}
 
@@ -431,18 +448,22 @@ while ((scn = elf_nextscn(elf, scn))) {
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{\file{libelf}}
-  \framesubtitle{Úpravy ELFu}
+\begin{frame}[fragile]{\file{libelf}}{Úpravy ELFu}
 
   \begin{itemize}
     \item Otevření s \code{ELF_C_WRITE}/\code{ELF_C_RDWR}
+
+    \pause
+
     \item Nová sekce: \code{Elf_Scn *elf_newscn(Elf *elf)}
     \begin{itemize}
       \item \code{gelf_getshdr} jako předtím a naplnění
       \item Po naplnění: \code{int gelf_update_shdr(Elf_Scn *scn, GElf_Shdr *src)}
       \item Vytvoření dat: \code{Elf_Data *elf_newdata(Elf_Scn *scn)}
     \end{itemize}
+
+    \pause
+
     \item Zápis do souboru
     \begin{itemize}
       \item \code{loff_t elf_update(Elf *elf, Elf_Cmd cmd)}
@@ -452,8 +473,7 @@ while ((scn = elf_nextscn(elf, scn))) {
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
   \heading{Přidání sekce do ELFu/ověření (ne)funkčnosti \file{libelf}}
   \begin{enumerate}

@@ -35,7 +35,7 @@ store(a, addr);
 
   \begin{center}
   \begin{tabular}{c}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 int a = load(addr);
 a = a + 1;
 store(a, addr);
@@ -49,112 +49,119 @@ store(a, addr);
   \bigskip
   \pause
 
-  \begin{tabular}{c|c|c}
-  \code{*addr} & Vlákno A & Vlákno B \\ \hline
-  \begin{lstlisting}[language=C]
+  \begin{tabular}{c|l|l}
+  \code{*addr} & \multicolumn{1}{c|}{Vlákno A} & \multicolumn{1}{c}{Vlákno B}
+    \\ \hline
+  \begin{lstlisting}
 0
 0
 0
   \end{lstlisting} &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 int a = load(addr);
 a = a + 1;
 <schedule>
   \end{lstlisting} &
   \begin{lstlisting}[showlines]
-<waiting>         ~
+<waiting>
 
 
   \end{lstlisting} \\
-  \end{tabular}
-  \end{center}
 
+  \multicolumn{3}{l}{} \\
   \pause
 
-  \begin{center}
-  \begin{tabular}{c|c|c}
-  \code{*addr} & Vlákno A & Vlákno B \\ \hline
-  \begin{lstlisting}[language=C]
+  \code{*addr} & \multicolumn{1}{c|}{Vlákno A} & \multicolumn{1}{c}{Vlákno B}
+    \\ \hline
+  \begin{lstlisting}
 0
 0
 1
   \end{lstlisting} &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 int a = load(addr);
 a = a + 1;
 <waiting>
   \end{lstlisting} &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 int a = load(addr);
 a = a + 1;
 store(a, addr);
-  \end{lstlisting}
-  \end{tabular}
-  \end{center}
+  \end{lstlisting} \\
 
+  \multicolumn{3}{l}{} \\
   \pause
 
-  \begin{center}
-  \begin{tabular}{c|c|c}
-  \code{*addr} & Vlákno A & Vlákno B \\ \hline
-  \begin{lstlisting}[language=C]
-   0
-   0
-/*>1<*/
-  \end{lstlisting} &
-  \begin{lstlisting}[language=C]
+  \code{*addr} & \multicolumn{1}{c|}{Vlákno A} & \multicolumn{1}{c}{Vlákno B}
+    \\ \hline
+  \begin{tabular}{c}
+  \begin{lstlisting}[belowskip=0pt]
+0
+0
+  \end{lstlisting}\\
+  \begin{lstlisting}[aboveskip=0pt]
+>1<
+  \end{lstlisting}
+  \end{tabular} &
+  \begin{lstlisting}
 int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} &
-  \begin{lstlisting}[language=C,showlines]
-<exited>          ~
+  \begin{lstlisting}[showlines]
+<exited>
 
 
   \end{lstlisting}
+
   \end{tabular}
   \end{center}
+
 \end{frame}
 
-\begin{frame}
-  \frametitle{Řešení chyb souběhu}
+\begin{frame}{Řešení chyb souběhu}
 
   \begin{itemize}
-  \item Atomickou operací ve stylu \code{load_inc_store}
-  \begin{itemize}
-  \item Nutná podpora CPU
-  \item Ne na všechno jsou operace (vesměs jen +, -, load, store)
-  \end{itemize}
+    \item Atomickou operací ve stylu \code{load_inc_store}
+    \begin{itemize}
+      \item Nutná podpora CPU
+      \item Ne na všechno jsou operace (vesměs jen +, -, load, store)
+    \end{itemize}
 
-  \pause
+    \pause
 
-  \item Kritickou sekcí
-  \begin{itemize}
-  \item Kus kódu vykonávaný max.\ jedním procesem
-  \item Zámky
-  \end{itemize}
+    \item Kritickou sekcí
+    \begin{itemize}
+      \item Kus kódu vykonávaný max.\ jedním procesem
+      \item Zámky
+    \end{itemize}
 
-  \pause
+    \pause
 
-  \item Read-copy-update (RCU)
-  \begin{itemize}
-  \item Podrobnosti v LDD
-  \end{itemize}
+    \item Read-copy-update (RCU)
+    \begin{itemize}
+      \item Podrobnosti v LDD
+    \end{itemize}
   \end{itemize}
 \end{frame}
 
 \mysection{Atomické operace, bitmapy}
 
-\begin{frame}[fragile]
-  \frametitle{Atomické operace}
+\begin{frame}[fragile]{Atomické operace}
 
   \begin{itemize}
-  \item \header{linux/atomic.h}, \doc{Documentation/atomic\_ops.txt}
-  \item \code{atomic_t a = ATOMIC_INIT(5)}
-  \item Pojme 32 bitů se znaménkem (\code{int}) (historicky jen 24)
-  \item \code{atomic_read}, \code{atomic_set}
-  \item \code{atomic_add}, \code{atomic_inc}, \code{atomic_sub},
-    \code{atomic_dec}, \code{atomic_*_return} a další (LXR)
+    \item \header{linux/atomic.h}, \doc{Documentation/atomic\_ops.txt}
+    \item \code{atomic_t a = ATOMIC_INIT(5)}
+
+    \pause
+
+    \item Pojme 32 bitů se znaménkem (\code{int}) (historicky jen 24)
+    \item \code{atomic_read}, \code{atomic_set}
+
+    \pause
+
+    \item \code{atomic_add}, \code{atomic_inc}, \code{atomic_sub},
+      \code{atomic_dec}, \code{atomic_*_return} a další (LXR)
   \end{itemize}
 
   \pause
@@ -182,7 +189,7 @@ atomic_inc(&a);
   \pause
 
   \begin{itemize}
-  \item \code{atomic64_t} (drahý na 32-bitu)
+    \item \code{atomic64_t} (drahý na 32-bitu)
   \end{itemize}
 
 \end{frame}
@@ -211,11 +218,21 @@ atomic_inc(&a);
   \frametitle{Atomické bitové operace}
 
   \begin{itemize}
-  \item Stačí-li 1 bit namísto celého čísla (např.\ \code{int})
-  \item \header{linux/bitops.h}, \doc{Documentation/atomic\_ops.txt}
-  \item \code{DECLARE_BITMAP(a, 1000)}
-  \item \code{set_bit}, \code{clear_bit}, \code{test_bit}
-  \item \code{test_and_set_bit}, \code{test_and_clear_bit}
+    \item Stačí-li 1 bit namísto celého čísla (např.\ \code{int})
+    \item \header{linux/bitops.h}, \doc{Documentation/atomic\_ops.txt}
+
+    \pause
+
+    \item \code{DECLARE_BITMAP(a, 1000)}
+    \begin{itemize}
+      \item Pole \code{a} typu \code{long} o velikosti
+        \code{1000/BITS_PER_LONG}
+    \end{itemize}
+    \item \code{set_bit}, \code{clear_bit}, \code{test_bit}
+
+    \pause
+
+    \item \code{test_and_set_bit}, \code{test_and_clear_bit}
   \end{itemize}
 
   \pause
@@ -223,13 +240,13 @@ atomic_inc(&a);
 
   \heading{Bitmapy lze použít i NEATOMICKY (např.\ v kritických sekcích)}
   \begin{itemize}
-  \item \header{linux/bitmap.h}
-  \item \code{__set_bit}, \code{__clear_bit}
-  \item \code{bitmap_zero}, \code{bitmap_fill}, \code{bitmap_copy}
-  \item \code{bitmap_OP}, kde $\text{\code{OP}} \in \left\{\text{\code{and}},
-    \text{\code{or}}, \text{\code{xor}}, \text{\code{andnot}},
-    \text{\code{complement}}\right\}$
-  \item \code{bitmap_empty}, \code{bitmap_full}, \dots
+    \item \header{linux/bitmap.h}
+    \item \code{__set_bit}, \code{__clear_bit}
+    \item \code{bitmap_zero}, \code{bitmap_fill}, \code{bitmap_copy}
+    \item \code{bitmap_OP}, kde $\text{\code{OP}} \in \left\{\text{\code{and}},
+      \text{\code{or}}, \text{\code{xor}}, \text{\code{andnot}},
+      \text{\code{complement}}\right\}$
+    \item \code{bitmap_empty}, \code{bitmap_full}, \dots
   \end{itemize}
 
 \end{frame}
@@ -303,8 +320,8 @@ atomic_inc(&a);
   \pause
 
   \begin{center}
-  \heading{\pozor \\ Zámky lze držet jen v jádře (po dobu vykonávání
-  syscallu)}
+    \heading{\pozor \\ Zámky lze držet jen v jádře (po dobu vykonávání 1
+      syscallu)}
   \end{center}
 \end{frame}
 
@@ -312,13 +329,15 @@ atomic_inc(&a);
 \subsection{Spinlocky}
 \fi
 
-\begin{frame}[fragile]
-  \frametitle{Zámky v jádře -- spinlocky}
+\begin{frame}[fragile]{Spinlocky}
 
   \begin{itemize}
     \item Čekání ve smyčce
     \item \header{linux/spinlock.h}, \doc{Documentation/spinlocks.txt}
     \item \code{DEFINE_SPINLOCK(lock)}, \code{spinlock_t lock}
+
+    \pause
+
     \item \code{spin_lock}, \code{spin_unlock}
     \item Podobné \code{pthread} spinlockům
   \end{itemize}
@@ -328,14 +347,14 @@ atomic_inc(&a);
   \begin{block}{Řešení pomocí spinlocků}
   \begin{center}
   \begin{tabular}{ccc}
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 int *addr = &some_int;
 ...
 int a = load(addr);
 a = a + 1;
 store(a, addr);
   \end{lstlisting} & $\Rightarrow$ &
-  \begin{lstlisting}[language=C]
+  \begin{lstlisting}
 DEFINE_SPINLOCK(addr_lock);
 int *addr = &some_int;
 ...
@@ -368,14 +387,16 @@ spin_unlock(&addr_lock);
 \subsection{Mutexy}
 \fi
 
-\begin{frame}[fragile]
-  \frametitle{Zámky v jádře -- mutexy}
+\begin{frame}[fragile]{Mutexy}
 
   \heading{Mutexy}
   \begin{itemize}
     \item Spící, fronta čekatelů
     \item \header{linux/mutex.h}
     \item \code{DEFINE_MUTEX(name)}
+
+    \pause
+
     \item \code{mutex_lock}, \code{mutex_unlock}
     \item Podobné \code{pthread} mutexům
   \end{itemize}
@@ -413,10 +434,10 @@ mutex_unlock(&addr_lock);
 
   \heading{Semafory}
   \begin{itemize}
-  \item \header{linux/semaphore.h}
-  \item Víceméně nepoužívat
-  \item \code{DEFINE\_SEMAPHORE(lock)}
-  \item \code{down}, \code{up}
+    \item \header{linux/semaphore.h}
+    \item Víceméně nepoužívat
+    \item \code{DEFINE\_SEMAPHORE(lock)}
+    \item \code{down}, \code{up}
   \end{itemize}
 
   \pause
@@ -434,6 +455,33 @@ mutex_unlock(&addr_lock);
     \item Pochází z dob počátku Linuxu
     \item \code{lock_kernel}, \code{unlock_kernel}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Deadlock}
+
+  \begin{itemize}
+    \item 4 podmínky uváznutí
+    \item Jádro spoléhá na programátora, že k němu nikdy nedojde
+
+    \pause
+
+    \item \textsc{LockDep}
+
+    \pause
+
+    \begin{itemize}
+      \item Dynamický mechanismus hledání chyb v zámcích
+    \end{itemize}
+    \item Obvyklé typy chyb: ABBA, AA
+    \item Obvyklé chyby: \code{lock} + \code{if} + \code{return} (\pozor)
+  \end{itemize}
+
+  \onslide<1->
+
+  \begin{figure}
+    \includegraphics[width=9em]{deadlock}
+  \end{figure}
 
 \end{frame}
 
@@ -469,26 +517,6 @@ mutex_unlock(&addr_lock);
   \medskip
 
   Pozn.: inspirace v pb173/04\\
-
-\end{frame}
-
-\begin{frame}[fragile]
-  \frametitle{Deadlock}
-
-  \begin{itemize}
-    \item 4 podmínky uváznutí
-    \item Jádro spoléhá na programátora, že k němu nikdy nedojde
-    \item \textsc{LockDep}
-    \begin{itemize}
-      \item Dynamický mechanismus hledání chyb v zámcích
-    \end{itemize}
-    \item Obvyklé typy chyb: ABBA, AA
-    \item Obvyklé chyby: \code{lock} + \code{if} + \code{return} (\pozor)
-  \end{itemize}
-
-  \begin{figure}
-  \includegraphics[width=9em]{deadlock}
-  \end{figure}
 
 \end{frame}
 
