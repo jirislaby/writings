@@ -1,43 +1,132 @@
 % vim: ai sw=2 spell spelllang=cs
 
-\begin{frame}[fragile]{Signály}
+\begin{frame}{Signály}{Účel a použití}
 
   \begin{itemize}
-    \item Signály předávané mezi procesy (\doc{man 7 signal}, \header{signal.h})
+    \item Podobné přerušením procesoru
+    \begin{enumerate}
+      \item Jádro doručí signál procesu
+      \item Proces přestává vykonávat kód
+      \item Obsluží signál
+      \item Pokračuje, kde skončil
+    \end{enumerate}
+
+    \pause
+
+    \item Signál lze
     \begin{itemize}
-      \item Čísla: \code{SIGHUP}, \code{SIGINT}, \code{SIGKILL},
-	\code{SIGTERM}, \dots
+      \item Ignorovat (až na výjimky)
 
       \pause
 
-      \item Některé lze ignorovat, popř.\ jim nastavit akci
+      \item Dočasně blokovat
+
+      \pause
+
+      \item Poslat (sobě, ostatním procesům)
+
+      \pause
+
+      \item Na něj čekat
     \end{itemize}
 
     \pause
 
-    \item Rozesílání: \code{int kill(pid_t pid, int sig)}
+    \item Signály jsou čísla
     \begin{itemize}
-      \item \code{pid}: koho zabít, \code{\-1} znamená všechny
+      \item \code{SIGHUP} (1), \code{SIGINT} (2), \code{SIGKILL} (9),
+        \code{SIGTERM} (15), \dots
+    \end{itemize}
+
+    \pause
+
+    \item \doc{man 7 signal}, \header{signal.h}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Rozesílání}
+
+  \begin{itemize}
+    \item \code{int kill(pid_t pid, int sig)}
+    \begin{itemize}
+      \item \code{pid}: koho zabít
+      \ifpcdirlinuxb
+      \begin{itemize}
+	\item \code{0} -- všechny ve svojí skupině
+	\item \code{\-1} -- všechny
+	\item \code{\-pid} -- skupinu \code{pid}
+      \end{itemize}
+      \fi
+
+      \pause
+
       \item \code{sig}: číslo signálu
     \end{itemize}
 
     \pause
 
-    \item Obsluha: \code{sighandler_t signal(int signum, sighandler_t handler)}
+    \item \code{int raise(int sig)}
     \begin{itemize}
-      \item \code{typedef void (*sighandler_t)(int)}
-      \item \pozor: některé funkce nejsou dostupné v obsluze!
+      \item Alias pro \code{kill(getpid(), sig)}
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+int main(void) {
+  raise(SIGINT);
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Obsluha}
+
+  \begin{itemize}
+    \item \pozor: některé funkce nejsou dostupné v obsluze -- \doc{man}!
+
+    \pause
+
+    \item \code{sighandler_t signal(int sig, sighandler_t handler)}
+    \begin{itemize}
+      \item Nepřenositelný!
+    \end{itemize}
+
+    \pause
+
+    \item \code{int sigaction(int sig, const struct sigaction *act,} \\
+      \code{struct sigaction *oldact)}
+    \begin{itemize}
+      \item \code{sig}: číslo signálu
+      \item \code{act}/\code{oldact}: akce nová/stará
     \end{itemize}
   \end{itemize}
 
-  \begin{block}{Příklad (bez ošetření návratových hodnot)}
+  \pause
+
+  \begin{block}{\code{struct sigaction} a příklad}
+  \begin{tabular}{ll}
   \begin{lstlisting}
-static void my_sig(int sig) { printf("Signal %d raised\n", sig); }
+struct sigaction {
+  void (*sa_handler)(int);
+  void (*sa_sigaction)(int, siginfo_t *, void *);
+  sigset_t sa_mask; /* sigemptyset(sa_mask) */
+  int sa_flags; /* SA_SIGINFO => sa_sigaction */
+};
+  \end{lstlisting}~
+  & \pause
+  \begin{lstlisting}
+static void my_sig(int sig) {
+  printf("Signal %d raised\n", sig);
+}
 int main(void) {
   signal(SIGINT, my_sig);
-  raise(SIGINT); /* alias pro kill(getpid(), SIGINT); */
 }
   \end{lstlisting}
+  \end{tabular}
   \end{block}
 
 \end{frame}
@@ -46,7 +135,7 @@ int main(void) {
 
   \heading{Signály}
   \begin{enumerate}
-    \item Upravujte předchozí příklad
+    \item Upravujte předchozí příklad \ifpcdirlinuxb XXX \fi
     \item Přidejte obsluhu pro signál TERM
     \begin{itemize}
       \item Vypište v ní PID
