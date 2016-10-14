@@ -45,6 +45,52 @@
 
 \end{frame}
 
+\ifpcdirlinuxb
+
+\begin{frame}[fragile]{Masky signálů}
+
+  \begin{itemize}
+    \item Některé signálové funkce pracují s maskami
+    \begin{itemize}
+      \item Typ \code{sigset_t}
+    \end{itemize}
+
+    \pause
+
+    \item Inicializace
+    \begin{itemize}
+      \item Na 0: \code{int sigemptyset(sigset_t *set)}
+      \item Na 1: \code{int sigfillset(sigset_t *set)}
+    \end{itemize}
+
+    \pause
+
+    \item Operace
+    \begin{itemize}
+      \item Přidat: \code{int sigaddset(sigset_t *set, int sig)}
+      \item Odebrat: \code{int sigdelset(sigset_t *set, int sig)}
+    \end{itemize}
+
+    \pause
+
+    \item Je nastaven?
+    \begin{itemize}
+      \item \code{int sigismember(const sigset_t *set, int sig)}
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+sigset_t mask;
+sigfillset(&mask);
+sigdelset(&mask, SIGINT);
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\fi
+
 \begin{frame}[fragile]{Rozesílání}
 
   \begin{itemize}
@@ -83,7 +129,44 @@ int main(void) {
 
 \end{frame}
 
-\begin{frame}[fragile]{Obsluha}
+\ifpcdirlinuxb
+
+\begin{frame}[fragile]{Čekání na signál}
+
+  \begin{itemize}
+    \item Lze čekat na signál a pokračovat až po jeho obsluze
+
+    \pause
+
+    \item \code{int pause(void)}
+
+    \pause
+
+    \item \code{int sigsuspend(const sigset_t *mask)}
+    \begin{itemize}
+      \item Blokuje signály specifikované v \code{mask}
+      \item Čeká na ostatní
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+int main(void) {
+  sigset_t s;
+  sigfillset(&s);
+  sigdelset(&s, SIGTERM);
+  sigsuspend(&s);
+  return 0;
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\fi
+
+\begin{frame}[fragile]{\ifpcdirlinux Obsluha \else Asynchronní obsluha \fi}
 
   \begin{itemize}
     \item \pozor: některé funkce nejsou dostupné v obsluze -- \doc{man}!
@@ -135,18 +218,36 @@ int main(void) {
 
   \heading{Signály}
   \begin{enumerate}
-    \item Upravujte předchozí příklad \ifpcdirlinuxb XXX \fi
+    \ifpcdirlinux
+      \item Upravujte předchozí příklad
+    \else
+      \item Vytvořte si nový \code{main}
+    \fi
+
     \item Přidejte obsluhu pro signál TERM
     \begin{itemize}
       \item Vypište v ní PID
     \end{itemize}
+
+    \ifpcdirlinuxb {
+      \item Vytvořte si opět 10 potomků
+      \begin{itemize}
+	\item Budou spát 5 vteřin
+      \end{itemize}
+    } \fi
 
     \item Prvním 5 potomkům pošlete signál TERM
     \begin{itemize}
       \item Zatímco spí
     \end{itemize}
 
-    \item Důvod ukončení (výpis) by se pro těch 5 měl změnit
+    \ifpcdirlinux
+      \item Důvod ukončení (výpis) by se pro těch 5 měl změnit
+    \else
+      \item V rodiči si na potomky počkejte (\code{wait})
+      \item Vypište, zda byl potomek zabit (\code{WIFSIGNALED(status)})
+    \fi
+
     \item Vyzkoušejte
   \end{enumerate}
 
