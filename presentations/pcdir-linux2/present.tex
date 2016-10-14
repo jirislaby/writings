@@ -491,27 +491,85 @@
 
 \input{../pcdir-linux/signals.tex}
 
+\begin{frame}[fragile]{Blokování signálů}
+
+  { \small
+    \code{int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)}
+  }
+  \begin{itemize}
+    \item \code{how} -- co s množinou \code{set}
+    \begin{itemize}
+      \item Přidat: \code{SIG_BLOCK}
+      \item Odebrat: \code{SIG_UNBLOCK}
+      \item Nastavit: \code{SIG_SETMASK}
+    \end{itemize}
+    \item \code{set} -- které signály
+    \item \code{oldset} -- původní blokované signály
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+sigset_t s;
+sigfillset(&s);
+sigdelset(&s, SIGTERM);
+sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
 \begin{frame}{Synchronní obsluha}
 
   \begin{itemize}
-    \item Synchronní: \code{sigwaitinfo}, \code{sigtimedwait}
-    \item Synchronní: \code{sigwait} (jen sig no)
+    \item Čeká se na specifikovaný signál
+
+    \pause
+
+    \item Ten se odebere z fronty
+    \begin{itemize}
+      \item Rozdíl od \code{pause}/\code{sigsuspend}
+    \end{itemize}
+
+    \pause
+
+    \item \pozor: je nutno signály nejprve maskovat!
+    \begin{itemize}
+      \item Aby nebyly doručovány
+    \end{itemize}
+
+    \pause
+
+    \item \code{int sigwait(const sigset_t *set, int *sig)}
+    \begin{itemize}
+      \item \code{set} -- na co čekat
+      \item \code{sig} -- co skutečně přišlo
+    \end{itemize}
+
+    \pause
+
+    \item \code{sigwaitinfo}, \code{sigtimedwait}
+    \begin{itemize}
+      \item Navíc \code{siginfo_t}, popř.\ timeout
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Blokování}
+\begin{frame}{Signály a deadlocky}
 
   \begin{itemize}
-    \item X
-  \end{itemize}
+    \item \pozor\ na zámky
 
-\end{frame}
+    \pause
 
-\begin{frame}{Doporučená metodika obsluhy signálů pro zabránění deadlocků}
+    \item Ne všechny funkce jsou dostupné v obsluze
+    \begin{itemize}
+      \item Vždy konzultujte \doc{man}!
+    \end{itemize}
 
-  \begin{itemize}
-    \item X
+    \pause
+
+    \item Je-li třeba kód nepřerušit, signál v okolí blokujte
   \end{itemize}
 
 \end{frame}
@@ -527,7 +585,7 @@
     \item Narozdíl od rour
     \begin{itemize}
       \item Je obousměrný
-      \item Umí datagramy
+      \item Umí datagramy (viz sítě dále)
     \end{itemize}
 
     \item \small \code{int socketpair(int domain, int type, int proto,
@@ -543,14 +601,6 @@
 
 \subsection*{SystemV IPC}
 \frame{\subsectionpage}
-
-\begin{frame}{SystemV IPC}
-
-  \begin{itemize}
-    \item princip, vlastnosti a použití jednotlivých mechanismů
-  \end{itemize}
-
-\end{frame}
 
 \input{../pb173-bin/12/sysvipc.tex}
 
@@ -570,10 +620,10 @@
 
     \pause
 
-    \item Operace: \code{ftruncate}, \code{mmap}
+    \item Operace: \code{ftruncate}, poté \code{mmap}
 
     \item Zrušení (nepovinné): \code{int shm_unlink(const char *name)}
-    \item Zavření: \code{munmap}, \code{close}
+    \item Zavření: \code{munmap}, poté \code{close}
 
     \pause
 
@@ -667,13 +717,17 @@ long mq_curmsgs;     /* # of messages currently in queue */
 \subsection*{Sdílená paměť}
 \frame{\subsectionpage}
 
+\iffalse
+
 \begin{frame}{Anonymní (SVR a BSD implementace)}
 
   \begin{itemize}
-    \item X
+    \item XXX
   \end{itemize}
 
 \end{frame}
+
+\fi
 
 \input{../pb173-bin/12/mmap.tex}
 
