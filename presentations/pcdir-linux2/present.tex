@@ -464,8 +464,6 @@
 
 \end{frame}
 
-\fi
-
 \section{IPC komunikace}
 \frame{\sectionpage}
 
@@ -926,26 +924,77 @@ msync(m, stat.st_size, M_SYNC);
 
 \end{frame}
 
-\end{document}
+\fi
 
 \section{Vícevláknové aplikace dle POSIX}
 \frame{\sectionpage}
 
-\begin{frame}{Vícevláknové aplikace dle POSIX}
+\begin{frame}{Vlákna a POSIX}
 
   \begin{itemize}
-  \item XXX
-  \begin{itemize}
-    \item YYY
-  \end{itemize}
+    \item POSIX standard definuje vlákna
+    \begin{itemize}
+      \item POSIX.1
+    \end{itemize}
+
+    \pause
+
+    \item Knihovna \file{pthread} (\header{pthread.h}, \doc{man 7 pthreads})
+    \begin{itemize}
+      \item \cmd{gcc -pthread} (není tam \cmd{\-l})
+    \end{itemize}
+
+    \pause
+
+    \item Několik implementací na Linuxu
+    \begin{itemize}
+      \item Historicky: LinuxThreads (nesplňuje POSIX)
+      \item Dnes používaná: NPTL (\doc{man 7 nptl})
+    \end{itemize}
+
+    \pause
+
+    \item Implementace na ostatních platformách
+    \begin{itemize}
+      \item FreeBSD, NetBSD, OpenBSD, Mac OS X, Solaris, \dots
+      \item Omezeně na Windows
+    \end{itemize}
  \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Principy implementace vláken a z toho plynoucí vlastnosti}
+\begin{frame}{Principy implementace vláken}
 
+  \heading{Modely vláken}
   \begin{itemize}
-    \item X
+    \item 1:1 -- na úrovni jádra
+    \begin{itemize}
+      \item 1 vlákno = 1 proces
+      \item Jednoduchá implementace
+      \item Linux i většina ostatních
+    \end{itemize}
+
+    \pause
+
+    \item N:1 -- na úrovni procesu
+    \begin{itemize}
+      \item N vláken = 1 proces
+      \item Jádro neví o vláknech (nebo je neumí)
+      \begin{itemize}
+	\item Vlastní scheduler
+      \end{itemize}
+      \item Rychlé přepnutí ,,kontextu''
+      \item Nelze rozprostřít zátěž na více CPU
+      \item GNU Portable Threads
+    \end{itemize}
+
+    \pause
+
+    \item M:N -- hybridní model
+    \begin{itemize}
+      \item M vláken = N procesů
+      \item Kombinace 1:1 a N:1
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -954,12 +1003,27 @@ msync(m, stat.st_size, M_SYNC);
 
 \begin{frame}{Nastavení vlastností}
 
+  \heading{Lze ovlivnit chování vlákna}
   \begin{itemize}
-    \item \code{pthread_attr_init}
-    \item \code{pthread_attr_setschedparam}
-    \item \code{pthread_attr_setstack}
-    \item \code{pthread_attr_setaffinity_np} (GNU)
-    \item \code{pthread_attr_destroy}
+    \item Parametr \code{attr} při vytváření vlákna
+
+    \pause
+
+    \item Inicializace a deinicializace \code{pthread_attr_t}
+    \begin{itemize}
+      \item \code{int pthread_attr_init(pthread_attr_t *attr)}
+      \item \code{int pthread_attr_destroy(pthread_attr_t *attr)}
+    \end{itemize}
+
+    \pause
+
+    \item Nastavení
+    \begin{itemize}
+      \item Priority: \code{pthread_attr_setschedparam}
+      \item Zásobníku: \code{pthread_attr_setstack}
+      \item Afinity CPU: \code{pthread_attr_setaffinity_np} (GNU)
+      \item \dots
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -967,15 +1031,23 @@ msync(m, stat.st_size, M_SYNC);
 \subsection*{Synchronizace}
 \frame{\subsectionpage}
 
-\begin{frame}{X}
+\begin{frame}{Základní synchronizační mechanismy}
 
   \begin{itemize}
-    \item Základní synchronizační mechanismy – mutex, conditional variables, R/W lock, barriers, spinlocks
+    \item Zámky
+    \begin{itemize}
+      \item Mutexy
+      \item Spinlocky
+      \item R/W zámky
+    \end{itemize}
+
+    \item Podmíněné proměnné
+    \item Bariéry
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{Mutex}
+\begin{frame}{Mutexy}
 
   \begin{itemize}
     \item \code{int pthread_mutex_init(pthread_mutex_t *restrict mutex,
@@ -984,50 +1056,6 @@ msync(m, stat.st_size, M_SYNC);
     \item \code{int pthread_mutex_trylock(pthread_mutex_t *mutex)}
     \item \code{int pthread_mutex_unlock(pthread_mutex_t *mutex)}
     \item \code{int pthread_mutex_destroy(pthread_mutex_t *mutex)}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Conditional variables}
-
-  \begin{itemize}
-    \item \code{int pthread_cond_init(pthread_cond_t *restrict cond,
-           const pthread_condattr_t *restrict attr)}
-
-    \item Všechny: \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
-    \item Alespoň 1: \code{int pthread_cond_signal(pthread_cond_t *cond)}
-
-    \item \code{int pthread_cond_wait(pthread_cond_t *restrict cond,
-           pthread_mutex_t *restrict mutex)}
-
-    \item \code{int pthread_cond_destroy(pthread_cond_t *cond)}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{R/W lock}
-
-  \begin{itemize}
-    \item \code{int pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)}
-
-    \item \code{int  pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)}
-    \item \code{int  pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)}
-    \item \code{int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)}
-
-    \item \code{int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Barriers}
-
-  \begin{itemize}
-    \item \code{int pthread_barrier_init(pthread_barrier_t *restrict barrier,
-    const pthread_barrierattr_t *restrict attr, unsigned count)}
-
-    \item \code{int pthread_barrier_wait(pthread_barrier_t *barrier)}
-
-    \item \code{int pthread_barrier_destroy(pthread_barrier_t *barrier)}
   \end{itemize}
 
 \end{frame}
@@ -1045,11 +1073,65 @@ msync(m, stat.st_size, M_SYNC);
 
 \end{frame}
 
-\begin{frame}{X}
+\begin{frame}{R/W zámky}
 
   \begin{itemize}
-    \item Strategie předcházení deadlockům a chybám vícecláknových aplikací
+    \item Mutex
+    \item \code{int pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)}
+
+    \item \code{int  pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)}
+    \item \code{int  pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)}
+    \item \code{int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)}
+
+    \item \code{int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Podmíněné proměnné}
+
+  \begin{itemize}
+    \item \code{int pthread_cond_init(pthread_cond_t *restrict cond,
+           const pthread_condattr_t *restrict attr)}
+
+    \item Všechny: \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
+    \item Alespoň 1: \code{int pthread_cond_signal(pthread_cond_t *cond)}
+
+    \item \code{int pthread_cond_wait(pthread_cond_t *restrict cond,
+           pthread_mutex_t *restrict mutex)}
+
+    \item \code{int pthread_cond_destroy(pthread_cond_t *cond)}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Bariéry}
+
+  \begin{itemize}
+    \item \code{int pthread_barrier_init(pthread_barrier_t *restrict barrier,
+    const pthread_barrierattr_t *restrict attr, unsigned count)}
+
+    \item \code{int pthread_barrier_wait(pthread_barrier_t *barrier)}
+
+    \item \code{int pthread_barrier_destroy(pthread_barrier_t *barrier)}
+  \end{itemize}
+
+The  count  argument  specifies  the  number  of threads that must call
+\code{pthread_barrier_wait}() before any of them successfully return from  the
+call. The value specified by count must be greater than zero.
+
+\end{frame}
+
+\begin{frame}{Uváznutí}
+
+  \begin{itemize}
+    \item Strategie předcházení deadlockům a chybám vícevláknových aplikací
+  \end{itemize}
+
+  \begin{figure}
+    \includegraphics[width=9em]{../pb173/04/deadlock}
+  \end{figure}
+
 
 \end{frame}
 
@@ -1077,6 +1159,8 @@ msync(m, stat.st_size, M_SYNC);
 
 \section{Síťová komunikace s využitím socketů}
 \frame{\sectionpage}
+
+\end{document}
 
 \input{../pcdir-linux/net.tex}
 
