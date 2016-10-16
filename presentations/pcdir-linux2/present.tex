@@ -731,31 +731,198 @@ long mq_curmsgs;     /* # of messages currently in queue */
 
 \input{../pb173-bin/12/mmap.tex}
 
-\begin{frame}{Podložená souborem}
+\begin{frame}[fragile]{Mapování podložené souborem}
 
   \begin{itemize}
-    \item \code{void *mmap(void *addr, size_t length, int prot, int flags,
-                      int fd, off_t offset)}
-    \item \code{int munmap(void *addr, size_t length)}
-    \item \code{int msync(void *addr, size_t length, int flags)}
+    \item Data jsou ukládána do souboru
+    \begin{itemize}
+      \item Novému souboru nutno nastavit délku pomocí \code{ftruncate}
+    \end{itemize}
+
+    \pause
+
+    \item Opět pomocí \code{mmap}
+    \begin{itemize}
+      \item \code{fd} (5.\ parametr) je otevřený soubor
+    \end{itemize}
+
+    \pause
+
+    \item Zápisy do souboru lze synchronizovat na disk
+    \begin{itemize}
+      \item \code{munmap} nezaručuje data na disku
+
+      \pause
+
+      \item \code{int msync(void *addr, size_t length, int flags)}
+      \begin{itemize}
+	\item \code{addr} a \code{length} -- oblast
+	\item \code{flags} -- \code{MS_ASYNC}, \code{MS_SYNC},
+	  \code{MS_INVALIDATE}
+      \end{itemize}
+    \end{itemize}
+  \end{itemize}
+
+  \onslide<2->
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[belowskip=0pt]
+struct stat stat;
+int fd = open("soubor.txt", O_RDWR);
+fstat(fd, &stat);
+char *m = mmap(NULL, stat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  \end{lstlisting}
+  \onslide<3->
+  \begin{lstlisting}[aboveskip=0pt]
+m[100] = 'X';
+msync(m, stat.st_size, M_SYNC);
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\subsection*{IPC závěr}
+\frame{\subsectionpage}
+
+\begin{frame}{Vláknové prostředky}
+
+  \heading{Vláknové prostředky lze používat i mezi procesy}
+  \begin{itemize}
+    \item Zámky, podmíněné proměnné apod.\ (viz vlákna dále)
+    \begin{itemize}
+      \item Např.\ alokované uvnitř \code{mmap} paměti
+
+      \pause
+
+      \item Předpokládají použití jen uvnitř jedné VM
+      \begin{itemize}
+	\item Nutno jim nastavit \code{PTHREAD_PROCESS_SHARED}
+      \end{itemize}
+
+      \pause
+
+      \item \code{pthread_mutexattr_setpshared} \\
+        \code{pthread_condattr_setpshared}, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Signály
+    \begin{itemize}
+      \item Vláknové ovládání funguje i pro proces
+      \begin{itemize}
+	\item \pozor: ne naopak!
+      \end{itemize}
+
+      \pause
+
+      \item Např.\ \code{pthread_sigmask} funguje jako \code{sigprocmask}
+
+      \pause
+
+      \begin{itemize}
+	\item Ale \code{sigprocmask} ve vlákně nemá definováno chování
+      \end{itemize}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{X}
+\begin{frame}{Producent/konzument}
 
   \begin{itemize}
-    \item Využití vláknových prostředků (mutex, cond. variables) pro komunikaci mezi různými procesy
-    \item \code{PTHREAD_PROCESS_SHARED}
+    \item Sdílená paměť
+    \begin{itemize}
+      \item Typicky kruhový buffer
+
+      \pause
+
+      \item SysV \code{shmget}, POSIX \code{shm_open}, BSD \code{mmap}
+    \end{itemize}
+
+    \pause
+
+    \item Producent
+    \begin{enumerate}
+      \item Má data
+
+      \pause
+
+      \item Čeká na místo v bufferu
+      \begin{itemize}
+	\item Na semafor \code{space}
+      \end{itemize}
+
+      \pause
+
+      \item Zapíše data
+      \begin{itemize}
+	\item A zvýší semafor \code{data}
+      \end{itemize}
+    \end{enumerate}
+
+    \pause
+
+    \item Konzument
+    \begin{enumerate}
+      \item Čeká na data v bufferu
+      \begin{itemize}
+	\item Na semafor \code{data}
+      \end{itemize}
+
+      \pause
+
+      \item Přečte a zpracuje data
+
+      \pause
+
+      \item Uvolní místo
+      \begin{itemize}
+	\item Zvýší semafor \code{space}
+      \end{itemize}
+    \end{enumerate}
+
+    \item Na počátku
+    \begin{itemize}
+      \item \code{space} je velikost bufferu
+      \item \code{data} je \code{0}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{X}
+\begin{frame}{Úkol}
 
-  \begin{itemize}
-    \item Řešení klasické úlohy producer/consumer pomocí jednotlivých prostředků
-  \end{itemize}
+  \heading{Producent/konzument}
+  \begin{enumerate}
+    \item Napište si producenta a konzumenta
+    \begin{itemize}
+      \item Proces, který se rozdvojí
+      \item Potomek a rodič si budou jednosměrně předávat bajty
+    \end{itemize}
+
+    \item Alokujte kruhový buffer 1\,KiB
+    \item Mějte 2 společné semafory
+    \begin{itemize}
+      \item \code{space} a \code{data}
+    \end{itemize}
+
+    \item V jednom procesu plňte buffer ze standardního vstupu
+    \begin{itemize}
+      \item Počkejte na \code{space}, zapište bajt a inkrementujte \code{data}
+    \end{itemize}
+
+    \item V druhém čtěte z bufferu a vypisujte na standardní výstup
+    \begin{itemize}
+      \item Počkejte na \code{data}, přečtěte bajt a inkrementujte \code{space}
+    \end{itemize}
+
+    \item Oba musí mít vlastní ukazovátka na buffer
+    \begin{itemize}
+      \item \code{buf[off] = 'X';} \\
+	\code{off = (off + 1) \% 1024;}
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
