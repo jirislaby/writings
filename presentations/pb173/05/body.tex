@@ -1,7 +1,8 @@
 % vim: ai sw=2 spell spelllang=cs
 
-\begin{frame}
-  \frametitle{Práce s pamětí}
+\iffimuni\else
+
+\begin{frame}{Práce s pamětí}
 
   \heading{LDD3 kap. 8} (zastaralá část o bootmem)\\
   \heading{Understanding the Linux Virtual Memory Manager} (zastaralá)
@@ -15,6 +16,8 @@
   \end{itemize}
 
 \end{frame}
+
+\fi
 
 \iffimuni
 \section{Organizace paměti}
@@ -74,31 +77,40 @@
   \frametitle{Fyzický prostor}
 
   \begin{itemize}
-  \item To, co je za MMU
-  \item RAM, časovače, řadiče přerušení, ACPI tabulky, zařízení
-  \item Co kde je $\Rightarrow$ otázka na BIOS/(U)EFI/\dots
-  \item Jak který prostor vypadá $\Rightarrow$ specifikace bridge, ACPI, PCI,
-    \ldots
-  \item I hierarchický prostor
-  \begin{itemize}
-  \item Např. rozsah \code{100}--\code{1ff} $\rightarrow$ ChipXY
+    \item To, co je za MMU
+    \item RAM, časovače, řadiče přerušení, ACPI tabulky, zařízení
+
+    \pause
+
+    \item Co kde je $\rightarrow$ otázka na BIOS/(U)EFI/\dots
+
+    \pause
+
+    \item Jak který prostor vypadá $\rightarrow$ specifikace bridge, ACPI, PCI,
+      \ldots
+
+    \pause
+
+    \item I hierarchický prostor
     \begin{itemize}
-    \item ChipXY směruje dále:
-    \item Adresa \code{100}--\code{18f} $\rightarrow$ řadič klávesnice
-    \item Adresa \code{190}--\code{1ff} $\rightarrow$ časovač
+    \item Např.\ rozsah \code{100}--\code{1ff} $\rightarrow$ ChipXY
+      \begin{itemize}
+      \item ChipXY směruje dále:
+      \item Adresa \code{100}--\code{18f} $\rightarrow$ řadič klávesnice
+      \item Adresa \code{190}--\code{1ff} $\rightarrow$ časovač
+      \end{itemize}
     \end{itemize}
-  \end{itemize}
   \end{itemize}
 
   \pause
 
   \heading{RAM}
   \begin{itemize}
-  \item Reprezentována rozsahy lineárních (fyzických) adres
-  \begin{itemize}
-  \item Rozsahy kvůli vloženým prostorům zařízení (e820)
-  \end{itemize}
-  \item Cache (některá zařízení také)
+    \item Reprezentována rozsahy lineárních (fyzických) adres
+    \begin{itemize}
+      \item Rozsahy kvůli vloženým prostorům zařízení (e820)
+    \end{itemize}
+    \item Cache (některá zařízení také)
   \end{itemize}
 
 \end{frame}
@@ -106,7 +118,7 @@
 \begin{frame}
   \frametitle{Úkol}
   
-  \heading{Práce s fyzickou adresou -- přečtení signatury a délky nějaké ACPI
+  \heading{Práce s fyzickou adresou -- čtení signatury a délky ACPI
     tabulky z fyzické adresy}
   \begin{enumerate}
     \item Najděte fyzickou adresu nějaké ACPI tabulky v \cmd{dmesg}
@@ -117,9 +129,9 @@
     \end{itemize}
 
     \item Získejte virtuální adresu (\code{u32 *virt = ioremap_cache(phys, 8)})
-    \item Vypište virtuální adresu (\code{\%p} a porovnat hodnotu s fyzickou)
-    \item Vypište signaturu (4\,B textu -- \code{virt[0]})
-    \item Vypište délku tabulky (4\,B -- \code{virt[1]})
+    \item Vypište virtuální adresu (\code{\%p} a porovnejte hodnotu s fyzickou)
+    \item Vypište signaturu (4\,B textu -- \code{virt[0]} a \code{\%.4s})
+    \item Vypište délku tabulky (4\,B -- \code{virt[1]} a \code{\%u})
     \item Odmapujte (\code{iounmap(virt)})
     \item Porovnejte délku s výpisem (tj. \code{0x00064} nahoře)
     \item Můžete si přemapovat a vypsat celou tabulku a porovnat položky se
@@ -128,7 +140,7 @@
 
   \bigskip
 
-  Pozn.: na starších jádrech se výpis v dmesg liší
+  Pozn.: na starších jádrech se výpis v \cmd{dmesg} liší
 
 \end{frame}
 
@@ -140,36 +152,36 @@
   \frametitle{Virtuální prostor}
 
   \begin{itemize}
-  \item To, co vidí CPU (a překládá MMU)
-  \begin{itemize}
-  \item I 1:1 -- start systému, noMMU, \ldots
-  \end{itemize}
-  \end{itemize}
-
-  \pause
-
-  \begin{itemize}
-  \item OS ,,rozdělí'' FP na stránky
-  \begin{itemize}
-  \item Index stránky je tzv. \emph{page frame number} (pfn)
-  \end{itemize}
-  \item OS namapuje stránky do VP
-  \begin{itemize}
-  \item A může přidat ,,imaginarní'' stránky např. na disku (swap)
+    \item To, co vidí CPU (a překládá MMU)
     \begin{itemize}
-    \item Programy vidí více ,,paměti''
+      \item I 1:1 -- start systému, noMMU, \ldots
     \end{itemize}
-  \item Toto mapování čte MMU (ví odkud)
-  \end{itemize}
-  \end{itemize}
 
-  \pause
+    \pause
 
-  \begin{itemize}
+    \item OS ,,rozdělí'' FP na stránky
+    \begin{itemize}
+      \item Index stránky je tzv. \emph{page frame number} (pfn)
+    \end{itemize}
+
+    \pause
+
+    \item OS namapuje stránky do VP
+    \begin{itemize}
+      \item A může přidat ,,imaginarní'' stránky např.\ na disku (swap)
+      \begin{itemize}
+	\item Programy vidí více ,,paměti''
+      \end{itemize}
+
+      \item Toto mapování čte MMU (ví odkud)
+    \end{itemize}
+
+    \pause
+
     \item Každá stránka má svoji \code{struct page}
-  \begin{itemize}
-  \item Informace o stránce (nikdy nevyswapovat, špinavá, počet uživatelů)
-  \end{itemize}
+    \begin{itemize}
+      \item Informace o stránce (nikdy nevyswapovat, špinavá, počet uživatelů)
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -298,9 +310,9 @@
 
   \heading{Základní typy alokací}
   \begin{itemize}[<+->]
-  \item Malé bloky až souvisle po stránkách (\code{kmalloc})
-  \item Souvisle po stránkách (\code{__get_free_pages})
-  \item Nesouvisle po stránkách a namapovat (\code{vmalloc})
+    \item Malé bloky až souvisle po stránkách (\code{kmalloc})
+    \item Souvisle po stránkách (\code{__get_free_pages})
+    \item Nesouvisle po stránkách a namapovat (\code{vmalloc})
   \end{itemize}
 
   \pause
@@ -308,11 +320,11 @@
 
   \heading{GFP\_*}
   \begin{itemize}
-  \item Parametr pro alokátory
-  \item \code{GFP_ATOMIC} -- nespi (např. uvnitř spinlocků)
-  \item \code{GFP_TEMPORARY} -- uvolním během pár příštích instrukcí
-  \item \code{GFP_KERNEL} -- obyčejné alokace všude jinde
-  \item a další: \code{GFP_NOFS}, \code{GFP_NOIO}, \dots
+    \item Parametr pro alokátory
+    \item \code{GFP_ATOMIC} -- nespi (např.\ uvnitř spinlocků)
+    \item \code{GFP_TEMPORARY} -- uvolním během pár příštích instrukcí
+    \item \code{GFP_KERNEL} -- obyčejné alokace všude jinde
+    \item a další: \code{GFP_NOFS}, \code{GFP_NOIO}, \dots
   \end{itemize}
 
 \end{frame}
