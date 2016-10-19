@@ -1031,15 +1031,19 @@ msync(m, stat.st_size, M_SYNC);
 \subsection*{Synchronizace}
 \frame{\subsectionpage}
 
+\input{../pb173/04/race.tex}
+
 \begin{frame}{Základní synchronizační mechanismy}
 
   \begin{itemize}
-    \item Zámky
+    \item Kritické sekce -- zámky
     \begin{itemize}
-      \item Mutexy
       \item Spinlocky
+      \item Mutexy
       \item R/W zámky
     \end{itemize}
+
+    \pause
 
     \item Podmíněné proměnné
     \item Bariéry
@@ -1047,78 +1051,248 @@ msync(m, stat.st_size, M_SYNC);
 
 \end{frame}
 
-\begin{frame}{Mutexy}
+\begin{frame}[fragile]{Spinlocky}
 
   \begin{itemize}
-    \item \code{int pthread_mutex_init(pthread_mutex_t *restrict mutex,
-           const pthread_mutexattr_t *restrict attr)}
-    \item \code{int pthread_mutex_lock(pthread_mutex_t *mutex)}
-    \item \code{int pthread_mutex_trylock(pthread_mutex_t *mutex)}
-    \item \code{int pthread_mutex_unlock(pthread_mutex_t *mutex)}
-    \item \code{int pthread_mutex_destroy(pthread_mutex_t *mutex)}
+    \item Čekání ve smyčce
+
+    \pause
+
+    \item Inicializace a deinicializace \code{pthread_spinlock_t}
+    \begin{itemize}
+      \item { \footnotesize \code{int pthread_spin_init(pthread_spinlock_t *lock, int pshared)}}
+      \item { \footnotesize \code{int pthread_spin_destroy(pthread_spinlock_t *lock)}}
+    \end{itemize}
+
+    \pause
+
+    \item Operace
+    \begin{itemize}
+      \item { \footnotesize \code{int pthread_spin_lock(pthread_spinlock_t *lock)}}
+      \item { \footnotesize \code{int pthread_spin_trylock(pthread_spinlock_t *lock)}}
+      \item { \footnotesize \code{int pthread_spin_unlock(pthread_spinlock_t *lock)}}
+    \end{itemize}
   \end{itemize}
+
+  \pause
+
+  \begin{block}{Řešení pomocí spinlocků}
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}
+int *addr = &some_int;
+...
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}
+pthread_spinlock_t spin;
+int *addr = &some_int;
+...
+pthread_spin_lock(&spin);
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+pthread_spin_unlock(&spin);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+  \end{block}
 
 \end{frame}
 
-\begin{frame}{Spinlocks}
+\begin{frame}[fragile]{Mutexy}
 
   \begin{itemize}
-    \item \code{int pthread_spin_init(pthread_spinlock_t *lock, int pshared)}
+    \item Spící, fronta čekatelů
 
-    \item \code{int pthread_spin_lock(pthread_spinlock_t *lock)}
-    \item \code{int pthread_spin_unlock(pthread_spinlock_t *lock)}
+    \pause
 
-    \item \code{int pthread_spin_destroy(pthread_spinlock_t *lock)}
+    \item Inicializace a deinicializace \code{pthread_mutex_t}
+    \begin{itemize}
+      \item { \code{int pthread_mutex_init(pthread_mutex_t *mutex,
+	}} \\
+	{ \code{const pthread_mutexattr_t *attr)} }
+      \item \code{int pthread_mutex_destroy(pthread_mutex_t *mutex)}
+    \end{itemize}
+
+    \pause
+
+    \item Operace
+    \begin{itemize}
+      \item \code{int pthread_mutex_lock(pthread_mutex_t *mutex)}
+      \item \code{int pthread_mutex_trylock(pthread_mutex_t *mutex)}
+      \item \code{int pthread_mutex_unlock(pthread_mutex_t *mutex)}
+    \end{itemize}
+
   \end{itemize}
+
+  \pause
+
+  \begin{block}{Řešení pomocí mutexů}
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}
+int *addr = &some_int;
+...
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}
+pthread_mutex_t mutex;
+int *addr = &some_int;
+...
+pthread_mutex_lock(&mutex);
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+pthread_mutex_unlock(&mutex);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+  \end{block}
 
 \end{frame}
 
-\begin{frame}{R/W zámky}
+\begin{frame}[fragile]{R/W zámky}
 
   \begin{itemize}
-    \item Mutex
-    \item \code{int pthread_rwlock_init(pthread_rwlock_t *rwlock, const pthread_rwlockattr_t *attr)}
+    \item Spící, podobné mutexům
 
-    \item \code{int  pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)}
-    \item \code{int  pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)}
-    \item \code{int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)}
+    \pause
 
-    \item \code{int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)}
+    \item Inicializace a deinicializace \code{pthread_rwlock_t}
+    \begin{itemize}
+      \item \code{int pthread_rwlock_init(pthread_rwlock_t *rwlock,
+	const pthread_rwlockattr_t *attr)}
+      \item \code{int pthread_rwlock_destroy(pthread_rwlock_t *rwlock)}
+    \end{itemize}
+
+    \pause
+
+    \item Operace
+    \begin{itemize}
+      \item \code{int  pthread_rwlock_rdlock(pthread_rwlock_t *rwlock)}
+      \item \code{int  pthread_rwlock_wrlock(pthread_rwlock_t *rwlock)}
+      \item \code{int pthread_rwlock_unlock(pthread_rwlock_t *rwlock)}
+    \end{itemize}
+
   \end{itemize}
+
+  \pause
+
+  \begin{block}{Řešení pomocí R/W zámků}
+  \begin{center}
+  \begin{tabular}{ccc}
+  \begin{lstlisting}
+int *addr = &some_int;
+...
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} & $\Rightarrow$ &
+  \begin{lstlisting}
+pthread_rwlock_t rwlock;
+int *addr = &some_int;
+...
+pthread_rwlock_wrlock(&rwlock);
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+pthread_rwlock_unlock(&rwlock);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
+  \end{block}
+
 
 \end{frame}
 
 \begin{frame}{Podmíněné proměnné}
 
   \begin{itemize}
-    \item \code{int pthread_cond_init(pthread_cond_t *restrict cond,
-           const pthread_condattr_t *restrict attr)}
+    \item Čekání na událost
+    \begin{enumerate}
+      \item Konzument: mám co dělat?
+      \item Ne? $\Rightarrow$ počkám, na producenta
+      \item Producent naplní data a probudí konzumenta
+    \end{enumerate}
 
-    \item Všechny: \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
-    \item Alespoň 1: \code{int pthread_cond_signal(pthread_cond_t *cond)}
+    \pause
 
-    \item \code{int pthread_cond_wait(pthread_cond_t *restrict cond,
-           pthread_mutex_t *restrict mutex)}
+    \item Inicializace a deinicializace \code{pthread_cond_t}
+    \begin{itemize}
+      \item \code{int pthread_cond_init(pthread_cond_t *cond,}\\
+	\code{const pthread_condattr_t *attr)}
+      \item \code{int pthread_cond_destroy(pthread_cond_t *cond)}
+    \end{itemize}
 
-    \item \code{int pthread_cond_destroy(pthread_cond_t *cond)}
+    \pause
+
+    \item Čekání
+    \begin{itemize}
+      \item \code{int pthread_cond_wait(pthread_cond_t *cond,
+	pthread_mutex_t *mutex)}
+      \item \code{mutex} je odemčen, potom se čeká na \code{cond} a uzamčen
+    \end{itemize}
+
+    \pause
+
+    \item Probouzení
+    \begin{itemize}
+      \item Všech: \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
+      \item Alespoň 1: \code{int pthread_cond_signal(pthread_cond_t *cond)}
+    \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Mutexy a podmíněné proměnné}
+  \begin{enumerate}
+    \item Upravujte předchozí příklad
+    \item V rodiči plňte a buďte
+    \item Ve vlákně spěte a čtěte
+
+    \item Jako parametr předejte \code{ahoj} XXX
+    \begin{itemize}
+      \item \cmd{echo ahoj}
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
 \begin{frame}{Bariéry}
 
   \begin{itemize}
-    \item \code{int pthread_barrier_init(pthread_barrier_t *restrict barrier,
-    const pthread_barrierattr_t *restrict attr, unsigned count)}
+    \item Synchronizace v bodě programu
+    \begin{itemize}
+      \item Teď musí x vláken projít daným bodem
+    \end{itemize}
 
-    \item \code{int pthread_barrier_wait(pthread_barrier_t *barrier)}
+    \pause
 
-    \item \code{int pthread_barrier_destroy(pthread_barrier_t *barrier)}
+    \item Inicializace a deinicializace \code{pthread_cond_t}
+    \begin{itemize}
+      \item \code{int pthread_barrier_init(pthread_barrier_t *barrier,} \\
+	\code{const pthread_barrierattr_t *attr, unsigned count)}
+      \begin{itemize}
+	\item \code{count} -- počet vláken, které musí projít daným bodem
+      \end{itemize}
+      \item \code{int pthread_barrier_destroy(pthread_barrier_t *barrier)}
+    \end{itemize}
+
+    \pause
+
+    \item Čekání -- daný bod
+    \begin{itemize}
+      \item \code{int pthread_barrier_wait(pthread_barrier_t *barrier)}
+    \end{itemize}
+
   \end{itemize}
-
-The  count  argument  specifies  the  number  of threads that must call
-\code{pthread_barrier_wait}() before any of them successfully return from  the
-call. The value specified by count must be greater than zero.
 
 \end{frame}
 
