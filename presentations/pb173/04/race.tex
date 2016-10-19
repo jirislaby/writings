@@ -1,0 +1,91 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}[fragile]
+  \frametitle{Příklad chyby souběhu}
+
+  \begin{center}
+  \begin{tabular}{c}
+  \begin{lstlisting}
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting}
+  \end{tabular}
+
+  \smallskip
+
+  Uvažujme při startu \code{*addr == 0}
+
+  \bigskip
+  \pause
+
+  \begin{tabular}{c|l|l}
+  \code{*addr} & \multicolumn{1}{c|}{Vlákno A} & \multicolumn{1}{c}{Vlákno B}
+    \\ \hline
+  \begin{lstlisting}
+0
+0
+0
+  \end{lstlisting} &
+  \begin{lstlisting}
+int a = load(addr);
+a = a + 1;
+<schedule>
+  \end{lstlisting} &
+  \begin{lstlisting}[showlines]
+<waiting>
+
+
+  \end{lstlisting} \\
+
+  \multicolumn{3}{l}{} \\
+  \pause
+
+  \code{*addr} & \multicolumn{1}{c|}{Vlákno A} & \multicolumn{1}{c}{Vlákno B}
+    \\ \hline
+  \begin{lstlisting}
+0
+0
+1
+  \end{lstlisting} &
+  \begin{lstlisting}
+int a = load(addr);
+a = a + 1;
+<waiting>
+  \end{lstlisting} &
+  \begin{lstlisting}
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} \\
+
+  \multicolumn{3}{l}{} \\
+  \pause
+
+  \code{*addr} & \multicolumn{1}{c|}{Vlákno A} & \multicolumn{1}{c}{Vlákno B}
+    \\ \hline
+  \begin{tabular}{c}
+  \begin{lstlisting}[belowskip=0pt]
+0
+0
+  \end{lstlisting}\\
+  \begin{lstlisting}[aboveskip=0pt]
+>1<
+  \end{lstlisting}
+  \end{tabular} &
+  \begin{lstlisting}
+int a = load(addr);
+a = a + 1;
+store(a, addr);
+  \end{lstlisting} &
+  \begin{lstlisting}[showlines]
+<exited>
+
+
+  \end{lstlisting}
+
+  \end{tabular}
+  \end{center}
+
+\end{frame}
+
