@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{V. ELF II.}
-\date{29. 10. \the\year}
+\date{18. 10. \the\year}
 
 \begin{document}
 
@@ -24,38 +24,7 @@
 
 \end{frame}
 
-\begin{frame}{Struktura ELFu}
-
-  \begin{itemize}
-    \item ELF hlavička
-
-    \pause
-
-    \item Hlavičky sekcí
-    \begin{itemize}
-      \item Popis dat pro linkování, ladění apod.
-      \item Pro překladač, debugger, \dots
-    \end{itemize}
-
-    \item Hlavičky programové
-    \begin{itemize}
-      \item Pohled na data pro spuštění
-      \item Pro interpretr
-    \end{itemize}
-
-    \pause
-
-    \item Data
-    \begin{itemize}
-      \item Odkazovány z obou typů hlaviček
-    \end{itemize}
-  \end{itemize}
-
-  \begin{textblock*}{5cm}(\textwidth-6cm,.5\textheight-2.3cm)
-    \input{ELF_layout.tex}
-  \end{textblock*}
-
-\end{frame}
+\input{../04/elf_struct.tex}
 
 \section{Obsah sekcí}
 \frame{\sectionpage}
@@ -65,11 +34,15 @@
 
   \begin{itemize}
     \item Závislý na typu sekce (\code{Shdr->sh_type})
-    \item Nic, řetězce, kód
 
     \pause
 
-    \item Tabulky
+    \item Nic (\code{SHT_NULL})
+    \item Pro spuštění (\code{SHT_PROGBITS})
+
+    \pause
+
+    \item Tabulky (\code{SHT_*TAB})
     \begin{itemize}
       \item Počet položek: \code{Shdr->sh_size / Shdr->sh_entsize}
 
@@ -113,7 +86,7 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
   \medskip
   \pause
 
-  Demo: \cmd{readelf -x .strtab -p .strtab}
+  \heading{Demo:} \cmd{readelf -x .strtab -p .strtab}
 
 \end{frame}
 
@@ -121,14 +94,14 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
 
   \begin{itemize}
     \item Typ sekce: \code{Shdr->sh_type == SHT_SYMTAB} nebo \code{SHT_DYNSYM}
-    \item Jména pro symboly jsou v sekci \code{Shdr->sh_link}
-    \item Tabulka o různých ,,symbolech''
+    \item Dump: \cmd{readelf --syms}
+    \item Tabulka s různými ,,symboly''
 
     \pause
 
     \item Symbol -- \code{GElf_Sym}
     \begin{itemize}[<+->]
-      \item \code{st_name} -- jméno symbolu (index do \code{Shdr->sh_link})
+      \item \code{st_name} -- jméno symbolu (offset do \code{Shdr->sh_link})
       \item \code{st_value} -- hodnota symbolu
       \item \code{GELF_ST_TYPE(st_info)} -- k čemu se symbol váže
 	(\code{STT_OBJECT}, \code{STT_FUNC}, \code{STT_SECTION},
@@ -136,6 +109,8 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
       \item \code{st_shndx} (pro \code{STT_SECTION}) -- které sekce se symbol
 	týká (může být i \code{SHN_UNDEF}, \code{SHN_ABS}, \dots)
     \end{itemize}
+
+    \pause
 
     \item \code{gelf_getsym(Elf_Data *data, int idx, GElf_Sym *dst)}
     \begin{itemize}
@@ -154,10 +129,25 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
   \begin{enumerate}
     \item Pro všechny sekce typu \code{SHT_SYMTAB} nebo \code{SHT_DYNSYM}
     \item Iterujte přes všechny symboly
-    \item U všech vypište jméno symbolu
-    \item Pro \code{STT_FUNC} vypište navíc hodnotu a index sekce
-    \item Pro \code{STT_OBJECT} vypište navíc hodnotu a velikost
-    \item Pro \code{STT_SECTION} vypište navíc index sekce a hodnotu
+    \begin{itemize}
+      \item \code{0 .. Shdr->sh_size / Shdr->sh_entsize}
+    \end{itemize}
+    \item U všech vypište jméno symbolu (\code{elf_strptr})
+    \item Pro typ \code{STT_FUNC} vypište navíc
+    \begin{itemize}
+      \item Adresu (\code{st_value}) a index sekce, ve které je
+	(\code{st_shndx})
+    \end{itemize}
+
+    \item Pro typ \code{STT_OBJECT} vypište navíc
+    \begin{itemize}
+      \item Hodnotu (\code{st_value}) a velikost (\code{st_size})
+    \end{itemize}
+
+    \item Pro typ \code{STT_SECTION} vypište navíc
+    \begin{itemize}
+      \item Hodnotu (\code{st_value}) a index sekce (\code{st_shndx})
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -166,7 +156,7 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
 
   \begin{itemize}
     \item Typ sekce: \code{Shdr->sh_type == SHT_DYNAMIC}
-    \item Jména pro symboly jsou v sekci \code{Shdr->sh_link}
+    \item Dump: \cmd{readelf --dynamic}
     \item Tabulka pro spuštění
 
     \pause
@@ -177,7 +167,12 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
         \dots)
       \item \code{d_u.d_ptr} -- hodnota symbolu (ukazatel)
       \item \code{d_u.d_val} -- hodnota symbolu (ostatní)
+      \begin{itemize}
+	\item Pro jména: offset do sekce \code{Shdr->sh_link}
+      \end{itemize}
     \end{itemize}
+
+    \pause
 
     \item \code{gelf_getdyn(Elf_Data *data, int idx, GElf_Dyn *dst)}
     \begin{itemize}
@@ -196,7 +191,8 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
   \begin{enumerate}
     \item Pro všechny sekce typu \code{SHT_DYNAMIC}
     \item Iterujte přes všechny dynamické symboly
-    \item Pro \code{DT_NEEDED} vypište jméno knihovny (\code{d_val})
+    \item Pro \code{DT_NEEDED} vypište jméno knihovny (\code{elf_strptr} a
+      \code{d_val})
     \item Pro \code{DT_INIT} vypište, kde se má začít (\code{d_ptr})
     \begin{itemize}
       \item Podívejte se do kódu, kde to je (\cmd{objdump -d})
@@ -210,6 +206,7 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
 
   \begin{itemize}
     \item Typ sekce: \code{Shdr->sh_type == SHT_REL} a \code{SHT_RELA}
+    \item Dump: \cmd{readelf -r}
     \item Tabulka pro linkování -- kde se má co a čím nahradit
 
     \pause
@@ -224,6 +221,8 @@ Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
         \code{Shdr->sh_link})
       \item \code{r_addend} (jen \code{RELA}) -- kolik přičíst k symbolu
     \end{itemize}
+
+    \pause
 
     \item \code{gelf_getrel(Elf_Data *data, int idx, GElf_Rel *dst)} a \\
       \code{gelf_getrela(Elf_Data *data, int idx, GElf_Rela *dst)}
