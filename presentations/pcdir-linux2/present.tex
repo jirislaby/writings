@@ -300,7 +300,7 @@
 \begin{frame}{Vlastnosti procesů}
 
   \begin{itemize}
-    \item X
+    \item XXX
   \end{itemize}
 
 \end{frame}
@@ -924,8 +924,6 @@ msync(m, stat.st_size, M_SYNC);
 
 \end{frame}
 
-\fi
-
 \section{Vícevláknové aplikace dle POSIX}
 \frame{\sectionpage}
 
@@ -1240,7 +1238,7 @@ pthread_rwlock_unlock(&rwlock);
 
     \pause
 
-    \item Probouzení
+    \item Probouzení (\code{mutex} lze držet)
     \begin{itemize}
       \item Všech: \code{int pthread_cond_broadcast(pthread_cond_t *cond)}
       \item Alespoň 1: \code{int pthread_cond_signal(pthread_cond_t *cond)}
@@ -1254,23 +1252,40 @@ pthread_rwlock_unlock(&rwlock);
   \heading{Mutexy a podmíněné proměnné}
   \begin{enumerate}
     \item Upravujte předchozí příklad
-    \item V rodiči plňte a buďte
-    \item Ve vlákně spěte a čtěte
-
-    \item Jako parametr předejte \code{ahoj} XXX
+    \item Dopište předávání znaku přes globální proměnnou
     \begin{itemize}
-      \item \cmd{echo ahoj}
+      \item Přístup zamčete mutexem
+    \end{itemize}
+
+    \item V rodiči zapisujte a buďte
+    \begin{itemize}
+      \item Načtěte znak ze vstupu (\code{getchar})
+      \item Zapište znak do globální proměnné (držte mutex)
+      \item Proveďte \code{pthread_cond_broadcast}
+    \end{itemize}
+
+    \item Ve vlákně čekejte a čtěte
+    \begin{itemize}
+      \item Držte celou dobu mutex
+      \item Proveďte \code{pthread_cond_wait}
+      \item Vypište znak z globální proměnné
+      \item Nějakou krátkou dobu spěte (\code{usleep})
+    \end{itemize}
+
+    \item Ztrácí se znaky?
+    \begin{itemize}
+      \item Pokud ano, jak to vyřešit?
     \end{itemize}
   \end{enumerate}
 
 \end{frame}
 
-\begin{frame}{Bariéry}
+\begin{frame}[fragile]{Bariéry}
 
   \begin{itemize}
     \item Synchronizace v bodě programu
     \begin{itemize}
-      \item Teď musí x vláken projít daným bodem
+      \item Teď musí $x$ vláken projít daným bodem
     \end{itemize}
 
     \pause
@@ -1294,47 +1309,240 @@ pthread_rwlock_unlock(&rwlock);
 
   \end{itemize}
 
+  \onslide<1->
+
+  \begin{block}{Příklad}
+  \begin{center}
+  \tikzstyle{dummy} = [inner sep=0pt,minimum size=0pt]
+  \tikzstyle{code} = [draw,thick,fill=blue!15]
+  \tikzstyle{line} = [line width=2pt]
+  \pgfdeclarelayer{background}
+  \pgfsetlayers{background,main}
+  \begin{tikzpicture}%[font=\small]
+    % T1
+    \node [dummy] (T1lab) {Vlákno 1};
+    \node [dummy,above=1mm of T1lab] {};
+
+    \node [dummy,below=1.2ex of T1lab.south west] (T1L1a) {};
+    \node [dummy,right=of T1L1a] (T1L1b) {}
+      edge [line] (T1L1a);
+
+    \node [dummy,below=1.2ex of T1L1a] (T1L2a) {};
+    \node [dummy,right=8mm of T1L2a] (T1L2b) {}
+      edge [line] (T1L2a);
+
+    \node [dummy,below=1.2ex of T1L2a] (T1L3a) {};
+    \node [dummy,right=12mm of T1L3a] (T1L3b) {}
+      edge [line,color=red] (T1L3a);
+
+    \node [dummy,below=1.2ex of T1L3a] (T1L4a) {};
+    \node [dummy,right=4mm of T1L4a] (T1L4b) {}
+      edge [line] (T1L4a);
+    \node [dummy,below=1mm of T1L4a] {};
+
+    % T2
+    \node [dummy, right=8mm of T1lab] (T2lab) {Vlákno 2};
+
+    \node [dummy,below=1.2ex of T2lab.south west] (T2L1a) {};
+    \node [dummy,right=4mm of T2L1a] (T2L1b) {}
+      edge [line] (T2L1a);
+
+    \node [dummy,below=1.2ex of T2L1a] (T2L2a) {};
+    \node [dummy,right=12mm of T2L2a] (T2L2b) {}
+      edge [line,color=red] (T2L2a);
+
+    \node [dummy,below=1.2ex of T2L2a] (T2L3a) {};
+    \node [dummy,right=13mm of T2L3a] (T2L3b) {}
+      edge [line] (T2L3a);
+
+    % T3
+    \node [dummy,right=8mm of T2lab] (T3lab) {Vlákno 3};
+    \node [dummy,above=1mm of T3lab] {};
+
+    \node [dummy,below=1.2ex of T3lab.south west] (T3L1a) {};
+    \node [dummy,right=9mm of T3L1a] (T3L1b) {}
+      edge [line] (T3L1a);
+
+    \node [dummy,below=1.2ex of T3L1a] (T3L2a) {};
+    \node [dummy,right=6mm of T3L2a] (T3L2b) {}
+      edge [line] (T3L2a);
+
+    \node [dummy,below=1.2ex of T3L2a] (T3L3a) {};
+    \node [dummy,right=10mm of T3L3a] (T3L3b) {}
+      edge [line] (T3L3a);
+
+    \node [dummy,below=1.2ex of T3L3a] (T3L4a) {};
+    \node [dummy,right=12mm of T3L4a] (T3L4b) {}
+      edge [line,color=red] (T3L4a);
+    \node [dummy,below=1.5mm of T3L4a] {};
+
+    \begin{pgfonlayer}{background}
+      \node [code,fit=(T1lab)(T1L1a)(T1L1b)(T1L2a)(T1L2b)(T1L3a)(T1L3b)(T1L4a)(T1L4b)] {};
+      \node [code,fit=(T2lab)(T2L1a)(T2L1b)(T2L2a)(T2L2b)(T2L3a)(T2L3b)] {};
+      \node [code,fit=(T3lab)(T3L1a)(T3L1b)(T3L2a)(T3L2b)(T3L3a)(T3L3b)(T3L4a)(T3L4b)] {};
+    \end{pgfonlayer}{background}
+
+  \end{tikzpicture}
+  \end{center}
+  \end{block}
+
 \end{frame}
 
 \begin{frame}{Uváznutí}
 
-  \begin{itemize}
-    \item Strategie předcházení deadlockům a chybám vícevláknových aplikací
-  \end{itemize}
+  \heading{4 podmínky}
+  \begin{enumerate}
+    \item Vzájemné vyloučení -- použití zámků apod.
+
+    \pause
+
+    \begin{itemize}
+      \item Řešení: nepoužít zámykání (fronty, RCU, \dots)
+    \end{itemize}
+
+    \pause
+
+    \item Drž a čekej -- proces má 1 zámek, chce další
+
+    \pause
+
+    \begin{itemize}
+      \item Řešení: zamknout všechny potřebné zámky nebo žádný; mít jen 1
+    \end{itemize}
+
+    \pause
+
+    \item Neodnímatelnost -- nelze odemčít držené zámky
+
+    \pause
+
+    \begin{itemize}
+      \item Řešení: ?
+    \end{itemize}
+
+    \pause
+
+    \item Kruhové čekání -- procesy čekají na sebe
+
+    \pause
+
+    \begin{itemize}
+      \item Řešení: zamykat v daném pořadí
+    \end{itemize}
+
+  \end{enumerate}
+
+  \onslide<1->
 
   \begin{figure}
-    \includegraphics[width=9em]{../pb173/04/deadlock}
+    \includegraphics[width=8em]{../pb173/04/deadlock}
   \end{figure}
-
 
 \end{frame}
 
-\begin{frame}{Data lokální vláknům}
+\begin{frame}[fragile]{Data lokální vláknům}
 
   \begin{itemize}
-    \item (POSIX a GCC implementace) – účel a použití
-    \item POSIX
+    \item Stavová funkce volaná z více vláken
     \begin{itemize}
-      \item Omezení: \code{PTHREAD_KEYS_MAX} na proces
-      \item \code{pthread_key_t key}
-      \item \code{int pthread_key_create (pthread_key_t *key, void (*destructor)(void *))}
-      \item \code{void *pthread_getspecific (pthread_key_t key)}
-      \item \code{int pthread_setspecific (pthread_key_t key, const void *value)}
-      \item \code{int pthread_key_delete (pthread_key_t key)}
+      \item Kam si uloží stav?
     \end{itemize}
+
+    \pause
+
+    \item POSIX (\code{pthread_key_t key})
+    \begin{itemize}
+      \item Omezení: \code{PTHREAD_KEYS_MAX} (\textasciitilde 1024) na proces
+
+      \pause
+
+      \item Vytvoření a zrušení
+      \begin{itemize}
+	\item \code{int pthread_key_create(pthread_key_t *key,} \\
+	  \code{void (*destructor)(void *))}
+	\item \code{int pthread_key_delete(pthread_key_t key)}
+      \end{itemize}
+
+      \pause
+
+      \item Operace
+      \begin{itemize}
+	\item \code{void *pthread_getspecific(pthread_key_t key)}
+	\item \code{int pthread_setspecific(pthread_key_t key,} \\
+	  \code{const void *value)}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
 
     \item GCC
     \begin{itemize}
-      \item \code{__thread int i;}
+      \item \code{static __thread int i;}
     \end{itemize}
   \end{itemize}
 
+  \onslide<4->
+
+  \begin{block}{Příklad}
+  \begin{tabular}{lp{3em}l}
+  \begin{lstlisting}
+char *ptr = malloc(100);
+pthread_setspecific(key, ptr);
+  \end{lstlisting} & &
+  \begin{lstlisting}[showlines]
+char *ptr = pthread_getspecific(key);
+
+  \end{lstlisting}
+  \end{tabular}
+  \end{block}
+
 \end{frame}
+
+\begin{frame}[fragile]{Inicializace z vlákna}
+
+  \begin{itemize}
+    \item Inicializace sdílené proměnné
+    \begin{itemize}
+      \item Právě jednou!
+    \end{itemize}
+
+    \pause
+
+    \item Typ: \code{pthread_once_t}
+    \begin{itemize}
+      \item Proměnná se nastaví na \code{PTHREAD_ONCE_INIT}
+    \end{itemize}
+
+    \pause
+
+    \item Zavolání inicializace
+    \begin{itemize}
+      \item \code{int pthread_once(pthread_once_t *once,} \\
+	\code{void (*init_routine)(void))}
+      \item \code{once} -- kontrolní proměnná
+      \item \code{init_routine} -- funkce, která se právě jednou zavolá
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+static void called_once() { /* invoked only once */
+  puts("Byl jsem zde!");
+}
+
+void thread_fun() { /* invoked from many threads, many times */
+  static pthread_once_t once = PTHREAD_ONCE_INIT;
+  pthread_once(&once, called_once);
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\fi
 
 \section{Síťová komunikace s využitím socketů}
 \frame{\sectionpage}
-
-\end{document}
 
 \input{../pcdir-linux/net.tex}
 
@@ -1392,6 +1600,8 @@ pthread_rwlock_unlock(&rwlock);
 \section{Ladění a sledování běžících procesů}
 \frame{\sectionpage}
 
+\end{document}
+
 \begin{frame}{Ladění a sledování běžících procesů}
 
   \begin{itemize}
@@ -1434,7 +1644,7 @@ pthread_rwlock_unlock(&rwlock);
 
 \input{../pb173-bin/09/tracers.tex}
 
-\begin{frame}{Metody sledování procesů (strace, ltrace, pstack, pmap)}
+\begin{frame}{Metody sledování procesů (pstack, pmap)}
 
   \begin{itemize}
     \item X
