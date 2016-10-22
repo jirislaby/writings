@@ -41,76 +41,157 @@
 
 \ifpcdirlinuxb
 
+\begin{frame}{Vlastnosti}
+
+  \begin{itemize}
+    \item X
+  \end{itemize}
+
+\end{frame}
+
+\input{unixsocket.tex}
+
+\begin{frame}{Operace nad sockety}
+
+  \begin{itemize}
+    \item Komunikace
+    \begin{itemize}
+      \item Standardně (\code{read}, \code{write}, \code{readv},
+	\code{writev}, \code{sendfile})
+      \item Síťovými prostředky (\code{recv}, \code{send}, \dots)
+    \end{itemize}
+
+    \pause
+
+    \item Multiplexing
+    \begin{itemize}
+      \item Standardně (\code{select}, \code{poll})
+    \end{itemize}
+
+    \pause
+
+    \item Parametry
+    \begin{itemize}
+      \item \code{ioctl}, \code{fcntl} (\code{O_NONBLOCK})
+      \item \code{getsockopt}, \code{setsockopt}
+    \end{itemize}
+
+    \pause
+
+    \item Spojování
+    \begin{itemize}
+      \item Klient: \code{connect}
+      \item Server: \code{bind}, \code{listen}, \code{accept}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Síťové prostředky komunikace}
+
+  \begin{block}{Prototypy}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=3pt]
+ssize_t recv(int sock, void *buf, size_t len, int flags)
+ssize_t send(int sock, const void *buf, size_t len, int flags)
+  \end{lstlisting}
+
+  \begin{onslide}<2->
+    \begin{lstlisting}[aboveskip=3pt,belowskip=2pt]
+ssize_t recvfrom(int sock, void *buf, size_t len, int flags,
+      struct sockaddr *src_addr, socklen_t *addrlen)
+ssize_t sendto(int sock, const void *buf, size_t len, int flags,
+      const struct sockaddr *dest_addr, socklen_t addrlen)
+  \end{lstlisting}
+  \end{onslide}
+  \end{block}
+
+  \begin{itemize}
+    \item Lze kontrolovat odeslání a příjem
+    \begin{itemize}
+      \item \code{flags} -- \code{MSG_DONTWAIT}, \code{MSG_OOB},
+	\code{MSG_PEEK}, \code{MSG_DONTROUTE}
+    \end{itemize}
+
+    \pause
+
+    \item Lze adresovat
+    \begin{itemize}
+      \item Jen pro nespojované sockety (dále)
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad (bez ošetření chyb)}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+int sock = socket(AF_INET, SOCK_DGRAM, 0);
+sendto(sock, "ahoj", 4, addr, sizeof(addr));
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+
 \subsection*{Unix sockety}
 \frame{\subsectionpage}
 
-\begin{frame}{Unix sockety}
+\begin{frame}[fragile]{Unix sockety}
 
   \begin{itemize}
-    \item \code{AF_UNIX} (\doc{man 7 unix})
+    \item Adresace cestou v souborovém systému
+    \begin{itemize}
+      \item Nebo bezejmenný
+    \end{itemize}
+
+    \pause
+
+    \item Jen lokální komunikace
+
+    \pause
+
+    \item Protokol: \code{AF_UNIX} (\doc{man 7 unix})
+
+    \pause
+
     \item Vytvoření
     \begin{itemize}
       \item \code{socketpair} (už známe)
       \item \code{socket} (viz dále)
     \end{itemize}
-
-    \pause
-
-    \begin{itemize}
-      \item XXX
-      \begin{itemize}
-	\item X
-	\item Y
-      \end{itemize}
-    \end{itemize}
   \end{itemize}
+
+  \onslide<4->
+
+  \begin{block}{Příklad (bez ošetření chyb)}
+  \begin{lstlisting}
+socketpair(AF_UNIX, SOCK_STREAM, 0, sock);
+write(sock[0], "ahoj", 4);
+read(sock[1], buf, 4);
+  \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
-\newcommand{\unixsocket}{
-\begin{frame}{UNIX a síť}
+\begin{frame}{Úkol}
 
-  \begin{itemize}
-    \item Na UNIXu býval všechno soubor
-
-    \pause
-
-    \item Na soubor existuje souborový deskriptor
-
-    \pause
-
-    \item I na síťové spojení se vytváří souborový deskriptor
+  \heading{Komunikace přes unixový socket}
+  \begin{enumerate}
+    \item Otevřete si pár socketů (\code{socketpair})
+    \item Zapište do 1 socketu postupně 2 řetězce
     \begin{itemize}
-      \item Tzv.\ socket (\doc{man 7 socket})
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{\code{socket}}
-
-  \begin{itemize}
-    \item Otevření: \code{int socket(int domain, int type, int protocol)}
-    \begin{itemize}
-      \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h}
-      \item \code{domain}: protokol -- \code{AF_INET}, \code{AF_INET6}, \dots
-      \item \code{type}: \code{SOCK_STREAM} (TCP), \code{SOCK_DGRAM} (UDP), \dots
-      \item \code{protocol}: pokud je na výběr (NETLINK), jinak 0 (pro UDP i TCP)
-      \item Návratová hodnota: souborový deskriptor nebo \code{\-1} při chybě
+      \item 2 $\times$ \code{write} se stejným socketem
     \end{itemize}
 
-    \pause
+    \item Přečtěte z 2.\ socketu data
+    \item Přeložte, vyzkoušejte
 
-    \item Zavření: klasicky \code{close}
-  \end{itemize}
+    \item Kolikrát je třeba číst na přečtení 2 zápisů?
+    \begin{itemize}
+      \item Vysvětlete
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
-
-}
-
-\ifpcdirlinuxb
-\unixsocket
-\fi
 
 \subsection*{Protokol IP}
 \frame{\subsectionpage}
@@ -168,14 +249,14 @@
       \item Patří do sítě \cmd{10.0.0.255}
       \begin{itemize}
 	\item Všichni v okolí mají adresu \cmd{10.0.0.X}
-	\item Nemůže přímo komunikovat s nikým jiným
+	\item Nemůže přímo komunikovat s nikým mimo svoji síť
       \end{itemize}
     \end{itemize}
   \end{itemize}
 
   \heading{IPv6}
   \begin{itemize}
-    \item 128bitová, udává se jako několik dvojic šestnáctkových čísel
+    \item 128bitová, udává se jako dvojice šestnáctkových čísel
       oddělených dvojtečkou
     \begin{itemize}
       \item Nuly lze vynechat
@@ -200,9 +281,14 @@
 
   \heading{Nad IP nejčastěji}
   \begin{itemize}
-    \item UDP -- nespojovaná
+    \item UDP -- nespojované
     \begin{itemize}
-      \item Málo garancí -- nespolehlivá, ale bez latencí
+      \item Málo garancí -- nespolehlivá
+      \item Bez latencí
+
+      \pause
+
+      \item Výměna jednotlivých datagramů
 
       \pause
 
@@ -211,14 +297,26 @@
 
     \pause
 
-    \item TCP -- spojovaná
+    \item TCP -- spojované
     \begin{itemize}
-      \item Garantuje pořadí paketů, ověřuje doručení -- spolehlivá, ale
-	vyšší latence
+      \item Garantuje pořadí paketů, ověřuje doručení -- spolehlivá
+      \item Ale vyšší latence
 
-	\pause
+      \pause
+
+      \item Výměna proudu bajtů
+
+      \pause
 
       \item Vhodná na data
+    \end{itemize}
+
+    \pause
+
+    \item Jedna IP může obsluhovat více UDP i TCP služeb
+    \begin{itemize}
+      \item Obě podporují tzv.\ porty
+      \item 16bitové číslo -- 64k služeb
     \end{itemize}
   \end{itemize}
 
@@ -231,37 +329,68 @@
 
 \begin{frame}{Protokol UDP/IP}
 
+  \heading{UDP komunikace}
   \begin{itemize}
-    \item Jedna IP chce obsluhovat více služeb $\rightarrow$ UDP port
+    \item Server poslouchá
     \begin{itemize}
-      \item 16bitové číslo -- 64k služeb
+      \item Předem daný UDP port (\code{bind} dále)
+      \item Nebo náhodný, volný
+
+      \pause
+
+      \item Provede se \code{read}, \code{recvfrom}, \dots
     \end{itemize}
 
     \pause
 
-    \item UDP komunikace
+    \item Klient pošle datagram
     \begin{itemize}
-      \item Server poslouchá
-      \begin{itemize}
-	\item Předem daný UDP port
-	\item Nebo náhodný, volný
-      \end{itemize}
+      \item Musí vědět/umět zjistit IP adresu i UDP port
 
       \pause
 
-      \item Klient pošle datagram
-      \begin{itemize}
-	\item Musí vědět/umět zjistit IP adresu i UDP port
-      \end{itemize}
+      \item Provede se \code{write}, \code{sendto}, \dots
+    \end{itemize}
 
-      \pause
+    \pause
 
-      \item Samostatný datagram ne/proletí sítí
-      \begin{itemize}
-	\item Další může ne/projít jinudy, pomaleji apod.
-      \end{itemize}
+    \item Samostatný datagram ne/proletí sítí
+    \begin{itemize}
+      \item Další může ne/projít jinudy, rychleji, před prvním apod.
     \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{UDP komunikace}
+  \begin{enumerate}
+    \item Otevřete UDP socket na IPv4
+    \begin{itemize}
+      \item \code{socket}, \code{AF_INET} a \code{SOCK_DGRAM}
+    \end{itemize}
+
+    \item Proveďte do něj \code{write} prázdného řetězce a délky 0
+    \begin{itemize}
+      \item Selže, ale socketu přidělí UDP port
+    \end{itemize}
+
+    \item Udělejte \code{recv} do bufferu
+    \item Buffer vypište
+    \item Zavřete socket
+    \item Přeložte a spusťte
+
+    \item Zjistěte port
+    \begin{itemize}
+      \item Pomocí \cmd{ss -ulpn}
+    \end{itemize}
+
+    \item Pošlete něco na UDP port
+    \begin{itemize}
+      \item Pomocí \cmd{netcat -u 127.0.0.1 port}
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
@@ -272,60 +401,66 @@
 
 \begin{frame}{Protokol TCP/IP}
 
+  \heading{TCP spojení}
   \begin{itemize}
-    \item Jedna IP chce obsluhovat více služeb $\rightarrow$ TCP port
+    \item Server poslouchá
     \begin{itemize}
-      \item 16bitové číslo -- 64k služeb
+      \item Předem daný TCP port
+      \item Nebo náhodný, volný
     \end{itemize}
 
     \pause
 
-    \item TCP spojení
+    \item Klient se připojí
     \begin{itemize}
-      \item Server poslouchá
+      \item Musí vědět/umět zjistit IP adresu i TCP port
+    \end{itemize}
+
+    \pause
+
+    \item Vznikne čtveřice a trvá po celé spojení
+    \begin{itemize}
+      \item Zdrojová IP a TCP port
+      \item Cílová IP a TCP port
+    \end{itemize}
+
+    \pause
+
+    \item Proud dat
+
+    \pause
+
+    \begin{itemize}
+      \item Pakety IP se mohou zpozdit, nedoručit, předběhnout
+      \item TCP korektně doručí všechny a ve správném pořadí
       \begin{itemize}
-	\item Předem daný TCP port
-	\item Nebo náhodný, volný
+	\item Může trvat dlouho
       \end{itemize}
-
-      \pause
-
-      \item Klient se připojí
-      \begin{itemize}
-	\item Musí vědět/umět zjistit IP adresu i TCP port
-      \end{itemize}
-
-      \pause
-
-      \item Vznikne čtveřice
-      \begin{itemize}
-	\item Zdrojová IP
-	\item Zdrojový TCP port
-	\item Cílová IP
-	\item Cílový TCP port
-      \end{itemize}
-
-      \pause
-
-      \item Proud dat
     \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \ifpcdirlinux
-\unixsocket
+\input{unixsocket.tex}
 \fi
 
 \begin{frame}{Úkol}
 
-  \heading{Otevření socketu}
+  \heading{Otevření TCP socketu}
   \begin{enumerate}
     \item Otevřete TCP socket na IPv4
+    \begin{itemize}
+      \item \code{socket}, \code{AF_INET} a \code{SOCK_STREAM}
+    \end{itemize}
     \item Zavřete
     \item Přeložte, vyzkoušejte
     \item Zkopírujte si do dvou zdrojových souborů
     \begin{itemize}
+      \item Nebo rozdělte kód v závislosti na příkazové řádce
+      \begin{itemize}
+	\item \code{if (argc > 1) server(); else client();}
+      \end{itemize}
       \item Zárodek klienta a serveru
     \end{itemize}
   \end{enumerate}
@@ -354,15 +489,15 @@ Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
   \begin{itemize}
     \item Interpretace dat z/do sítě
     \begin{itemize}
-      \item Např.\ porty jsou 16bitové
+      \item Např.\ UDP i TCP porty jsou 16bitové
     \end{itemize}
 
     \pause
 
     \item Funkce (\header{arpa/inet.h})
     \begin{itemize}
-      \item \code{ntohs}, \code{ntohl} -- ze sítě
-      \item \code{htons}, \code{htonl} -- do sítě
+      \item \code{ntohs}, \code{ntohl} -- ze sítě (\textit{Net TO Host})
+      \item \code{htons}, \code{htonl} -- do sítě (\textit{Host TO Net})
       \item \code{*s} -- \code{short} (16 bitů), \code{*l} -- \code{long}
         (32 bitů)
     \end{itemize}
@@ -370,17 +505,65 @@ Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
 
 \end{frame}
 
-\begin{frame}[fragile]{Adresování v Linuxu}
+\begin{frame}{Adresování v Linuxu}
+
+  \begin{block}{Příklady adres}
+  \begin{center}
+  \begin{tabular}{|l|l|l|l|} \hline
+    \textbf{Protokol} & \textbf{Vel.} &
+      \textbf{Struktura} & \textbf{Příklad adresy} \\ \hline
+    Unix (\code{AF_UNIX})  & 108 & \code{sockaddr_un} & \code{/tmp/socket_xy} \\ \hline
+    IPv4 (\code{AF_INET})  & 4   & \code{sockaddr_in} & \code{127.0.0.1} \\ \hline
+    IPv6 (\code{AF_INET6}) & 16  & \code{sockaddr_in6} & \code{2a01:4240:2e27::1} \\ \hline
+    IPX  (\code{AF_IPX})   & 4+6 & \code{sockaddr_ipx} & \code{fedcba98 1a2b3c5d7e9f} \\ \hline
+  \end{tabular}
+  \end{center}
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item Každý protokol má svou strukturu pro adresu
+    \begin{itemize}
+      \item Dostatečně velká, aby uchovala adresu (a další)
+    \end{itemize}
+
+    \pause
+
+    \item Funkce pracují s obecnou \code{struct sockaddr}
+    \begin{itemize}
+      \item Každá \code{sockaddr_*} má položku \code{family}
+      \begin{itemize}
+	\item Např.\ \code{sockaddr_in.sin_family = AF_INET} \\
+	  \code{sockaddr_in6.sin6_family = AF_INET6}
+      \end{itemize}
+
+      \pause
+
+      \item Funkce mají parametr velikost
+      \begin{itemize}
+	\item Např.\ \code{sizeof(struct sockaddr_in)}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Pojme jakoukoliv: \code{struct sockaddr_storage}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Adresování v Linuxu -- shrnutí}
 
   \begin{center}
   \begin{tabular}{|l|l|} \hline
-  \textbf{Typ adresy} & \multicolumn{1}{|c|}{\textbf{Adresa v Linuxu}} \\ \hline
+  \textbf{Typ adresy} & \multicolumn{1}{c|}{\textbf{Adresa v Linuxu}} \\ \hline
   Obecná & \begin{lstlisting}
 struct sockaddr {
   sa_family_t sa_family; /* AF_INET, AF_INET6, ... */
   char sa_data[14];
 };
-struct sockaddr_storage; // large enough
+struct sockaddr_storage; // large enough for any address
   \end{lstlisting}
   \\ \hline
 
@@ -424,8 +607,8 @@ struct in6_addr {
 \begin{frame}[fragile]{Získání adresy}
 
   \begin{itemize}
-    \item \code{int getaddrinfo(const char *node, const char *service, const
-      struct addrinfo *hints, struct addrinfo **res)}
+    \item \code{int getaddrinfo(const char *node, const char *service,} \\
+      \code{const struct addrinfo *hints, struct addrinfo **res)}
     \begin{itemize}
       \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h},
         \header{netdb.h}
@@ -461,8 +644,64 @@ int  ai_protocol;           struct addrinfo *ai_next;
   \begin{enumerate}
     \item Doplňte do klienta z předchozího příkladu za vytvoření socketu
     \item Použijte \code{getaddrinfo}
+
     \item Zjistěte, kolik je k dispozici adres pro server \cmd{google.com}
+    \begin{itemize}
+      \item Parametr \code{node}
+    \end{itemize}
+
     \item Omezte se jen na TCP a port HTTP
+    \begin{itemize}
+      \item \code{hints.ai_socktype} bude \code{SOCK_STREAM}
+      \item \code{hints.ai_protocol} bude \code{IPPROTO_TCP}
+      \item \code{service} bude \code{\"http\"}
+    \end{itemize}
+
+    \item Přeložte, vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Převod adresy na řetězec}
+
+  \begin{block}{Prototyp}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=3pt]
+int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host,
+  socklen_t hostlen, char *serv, socklen_t servlen, int flags)
+  \end{lstlisting}
+  \end{block}
+
+  \begin{itemize}
+    \item Hlavičky: \header{sys/socket.h}, \header{netdb.h}
+    \item \code{addr}: adresa (např.\ \code{ai.ai_addr})
+    \item \code{addrlen}: velikost adresy (např.\ \code{ai.ai_addrlen})
+    \item \code{host}: buffer pro jméno/adresu (vel.\ \code{NI_MAXHOST})
+    \item \code{serv}: buffer pro službu (vel.\ \code{NI_MAXSERV})
+    \item \code{hostlen}/\code{servlen}: velikost bufferu \code{host} a
+      \code{serv}
+    \item \code{flags}: \code{NI_NUMERICHOST}, \code{NI_NUMERICSERV}, \dots
+
+    \item Návratová hodnota: 0 je OK, jinak číslo chyby
+    \begin{itemize}
+      \item \code{const char *gai_strerror(int errcode)}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Výpis adres}
+  \begin{enumerate}
+    \item Doplňujte do předchozího příkladu
+    \item Použijte \code{getnameinfo}
+
+    \item Vypište i adresy
+    \begin{itemize}
+      \item \code{serv} může být NULL
+      \item Nastavte \code{flags} na \code{NI_NUMERICHOST}
+    \end{itemize}
+
     \item Přeložte, vyzkoušejte
   \end{enumerate}
 
@@ -471,14 +710,17 @@ int  ai_protocol;           struct addrinfo *ai_next;
 \begin{frame}[fragile]{Klient}
 
   \begin{itemize}
-    \item Připojení: \code{int connect(int sockfd,} \\
-      \code{const struct sockaddr *addr, socklen_t addrlen)} %stopzone
+    \item Připojení: { \footnotesize
+      \code{int connect(int sockfd, const struct sockaddr *addr,} \\
+      \code{socklen_t addrlen)}
+      }
     \begin{itemize}
       \item \code{sockfd}: návratová hodnota funkce \code{socket}
       \item \code{addr}: adresa, kam se připojit
       \item \code{addrlen}: velikost struktury adresy
     \end{itemize}
 
+\ifpcdirlinux
     \pause
 
     \item Příjem: \code{read} nebo \code{ssize_t recv(int sockfd, void *buf,
@@ -486,6 +728,7 @@ int  ai_protocol;           struct addrinfo *ai_next;
 
     \item Vysílání: \code{write} nebo \code{ssize_t send(int sockfd, const void
       *buf, size_t len, int flags)}
+\fi
   \end{itemize}
 
   \pause
@@ -504,7 +747,7 @@ write(fd, "ahoj", 4);
 
   \heading{Klient}
   \begin{enumerate}
-    \item Připojte se na localhost na port ssh
+    \item Připojte se na \code{localhost} na port \code{ssh}
     \item Přečtěte ze socketu 20 znaků
     \item Vypište je na standardní výstup
     \item Vyzkoušejte
@@ -580,7 +823,7 @@ write(fd, "ahoj", 4);
 
 \begin{frame}{Multiplexing}
 
-  \heading{Jak přepínat mezi \code{read} a \code{write}}
+  \heading{Jak přepínat mezi čtením, zápisem a různými deskriptory}
   \begin{itemize}
     \item \code{int poll(struct pollfd *fds, nfds_t nfds, int timeout)} (\header{poll.h})
     \begin{itemize}
@@ -606,6 +849,19 @@ write(fd, "ahoj", 4);
     \end{itemize}
 
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Multiplexing}
+  \begin{enumerate}
+    \item Upravte klienta
+    \item Bude číst zároveň ze spojení a standardního vstupu
+    \item Data ze spojení opět vypište
+    \item Data ze standardního vstupu pošlete serveru
+    \item Vyzkoušejte
+  \end{enumerate}
 
 \end{frame}
 
