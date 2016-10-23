@@ -1561,8 +1561,6 @@ void thread_fun() { /* invoked from many threads, many times */
 
 \end{frame}
 
-\fi
-
 \section{Síťová komunikace s využitím socketů}
 \frame{\sectionpage}
 
@@ -1570,17 +1568,24 @@ void thread_fun() { /* invoked from many threads, many times */
 
 \begin{frame}[fragile]{Parametry socketu}
 
-  \begin{block}{Prototypy}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=3pt]
+  \begin{block}{Prototypy a příklad}
+  \begin{lstlisting}[aboveskip=2pt]
 int getsockopt(int sock, int level, int optname, void *optval, socklen_t *optlen)
 int setsockopt(int sock, int level, int optname, const void *optval, socklen_t optlen)
   \end{lstlisting}
+  \onslide<4->
+  \begin{lstlisting}[belowskip=2pt]
+struct ip_mreqn mreq = { ... };
+setsockopt(sock, SOL_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
+  \end{lstlisting}
   \end{block}
+
+  \onslide<1->
 
   \begin{itemize}
     \item \code{level} == \code{SOL_SOCKET}
     \begin{itemize}
-      \item \code{optname} -- \code{SO_BINDTODEVICE}, \dots
+      \item \code{optname} -- \code{SO_BINDTODEVICE}, \code{SO_BROADCAST}, \dots
     \end{itemize}
 
     \pause
@@ -1603,27 +1608,181 @@ int setsockopt(int sock, int level, int optname, const void *optval, socklen_t o
 
   \end{itemize}
 
-  \begin{block}{Příklad}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=3pt]
-struct ip_mreqn mreq = { ... };
-setsockopt(sock, SOL_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq));
-  \end{lstlisting}
-  \end{block}
-
 \end{frame}
 
-\begin{frame}{Multicasting a broadcasting}
+\begin{frame}{Broadcasting}
 
+  \heading{Hromadné rozesílání paketů \emph{všem}}
   \begin{itemize}
-    \item X
+    \item Paket se rozešle všem v podsíti
+    \begin{itemize}
+      \item Nešíří se dál směrovači (až na výjimky)
+    \end{itemize}
+
+    \pause
+
+    \item Broadcast je podporován jen nad datagramy (UDP)
+    \begin{itemize}
+      \item Je třeba nastavit \code{SO_BROADCAST} pomocí \code{setsockopt}
+    \end{itemize}
+
+    \pause
+
+    \item U některých protokolů speciální adresy
+
+    \pause
+
+    \item U IPv4 všechny bity v podsíti 1
+    \begin{itemize}
+      \item 192.168.0.100/24 $\rightarrow$ 192.168.0.255
+      \item A speciální: 255.255.255.255 (\code{INADDR_BROADCAST})
+    \end{itemize}
+
+    \pause
+
+    \item IPv6 broadcast nepodporuje
   \end{itemize}
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Broadcast}
+  \begin{enumerate}
+    \item Vytvořte si UDP socket
+    \item Nastavte socket na broadcast
+    \begin{itemize}
+      \item \code{setsockopt}, \code{SOL_SOCKET} a \code{SO_BROADCAST}
+    \end{itemize}
+
+    \item Pošlete něco všem na port 10000
+    \begin{itemize}
+      \item Např.\ 255.255.255.255 (\code{INADDR_BROADCAST})
+    \end{itemize}
+
+    \item Spusťte si \cmd{nc} a něco mu programem pošlete
+    \begin{itemize}
+      \item \cmd{nc -ul 0.0.0.0 10000}
+      \item \cmd{nc} ale zobrazí jen první datagram
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{Multicasting}
+
+  \heading{Hromadné rozesílání paketů \emph{zaregistrovaným}}
+  \begin{itemize}
+    \item Paket se rozešle všem, kteří o to stojí
+    \begin{itemize}
+      \item Šíří se dál směrovači (pokud to umí)
+    \end{itemize}
+
+    \pause
+
+    \item Multicast je podporován jen nad datagramy (UDP)
+
+    \pause
+
+    \item U některých protokolů speciální adresy
+
+    \pause
+
+    \item IPv4 i IPv6 mají rezervován blok adres
+    \begin{itemize}
+      \item 224.0.0.0/4 tj.\ 224.0.0.0--239.255.255.255
+      \item ff00::/8, tj.\ ff00::--ffff:ffff:...:ffff:ffff
+    \end{itemize}
+
+    \pause
+
+    \item Každý se musí přihlásit do skupiny
+    \begin{itemize}
+      \item \code{setsockopt}
+      \begin{itemize}
+	\item IPv4: \code{SOL_IP}, \code{IP_ADD_MEMBERSHIP} a \code{struct
+	  ip_mreqn}
+	\item IPv6: \code{IPPROTO_IPV6}, \code{IPV6_ADD_MEMBERSHIP} a
+	  \code{struct ipv6_mreq}
+      \end{itemize}
+
+      \pause
+
+      \item \cmd{netstat -g} nebo \file{/proc/net/igmp} a \file{igmp6}
+    \end{itemize}
+  \end{itemize}
+
+  \onslide<5->
+
+  \begin{block}{\code{struct ip_mreqn} a \code{struct ipv6_mreq}}
+  \begin{tabular}{lp{2em}l}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+struct in_addr imr_multiaddr;
+struct in_addr imr_address;
+int            imr_ifindex;
+  \end{lstlisting} & &
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt,showlines]
+struct in6_addr ipv6mr_multiaddr;
+
+unsigned int ipv6mr_interface;
+  \end{lstlisting}
+  \end{tabular}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Adresy multicastu}
+
+  \begin{block}{Speciální adresy}
+    \begin{center}
+      \begin{tabular}{|l|l|l|} \hline
+    \textbf{Cíl} & \textbf{IPv4} & \textbf{IPv6} \\ \hline
+    Rezervováno	   & 224.0.0.0 & ff00::/16 \\
+		   & 	       & ff0f::/16 \\ \hline
+    Všichni	   & 224.0.0.1 & ff02::1 \\ \hline
+    Routery	   & 224.0.0.2 & ff02::2 \\ \hline
+    Nesměrované	   & 224.0.0.x & ffx2::/16 \\ \hline
+    Směrované	   & 224.0.1.x & ffxe::/16 \\ \hline
+    Pro organizace & 239.0.0.0/8 & ffx8::/16 \\ \hline
+    K dispozici    & 224.0.2.0--224.0.255.255 & ffxe::/16 \\
+		   & 224.3.0.0--224.4.255.255 & \\
+		   & 233.252.0.0--233.255.255.255 & \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Multicast}
+  \begin{enumerate}
+    \item Přepište broadcasting na multicasting
+    \item Odstraňte nastavení broadcastu
+    \item Přihlašte stroj do multicastové skupiny
+    \begin{itemize}
+      \item \code{setsockopt}, \code{SOL_IP} a \code{IP_ADD_MEMBERSHIP}
+      \item Např.\ do adresy 224.0.2.100
+    \end{itemize}
+
+    \item Pošlete něco všem na port 10000
+    \begin{itemize}
+      \item Do stejné adresy, jako jste přihlásili stroj
+    \end{itemize}
+
+    \item Spusťte si \cmd{nc} a něco mu programem pošlete
+    \begin{itemize}
+      \item \cmd{nc -ul 0.0.0.0 10000}
+      \item \cmd{nc} ale zobrazí jen první datagram
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\fi
+
 \section{Ladění a sledování běžících procesů}
 \frame{\sectionpage}
-
-\end{document}
 
 \begin{frame}{Ladění a sledování běžících procesů}
 

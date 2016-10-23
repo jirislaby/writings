@@ -601,40 +601,95 @@ struct in6_addr {
 
 \end{frame}
 
-\subsection*{Klient}
-\frame{\subsectionpage}
+\ifpcdirlinuxb
+
+\begin{frame}[fragile]{Speciální adresy}
+
+  \begin{block}{Speciální adresy a použití}
+    \begin{center}
+      \begin{tabular}{|l|l|l|} \hline
+    \textbf{Adresa} & \textbf{IPv4} & \textbf{IPv6} \\ \hline
+    Loopback  & \code{INADDR_LOOPBACK}  & \code{in6addr_loopback} \\
+	      &				& \code{IN6ADDR_LOOPBACK_INIT} \\ \hline
+    Jakákoliv & \code{INADDR_ANY}       & \code{in6addr_any} \\
+	      &				& \code{IN6ADDR_ANY_INIT} \\ \hline
+    Broadcast & \code{INADDR_BROADCAST} & Nemá \\ \hline
+      \end{tabular}
+    \end{center}
+
+    \pause
+
+    \begin{lstlisting}
+struct sockaddr_in sin = {
+  .sin_addr.s_addr = INADDR_BROADCAST,
+};
+struct sockaddr_in6 sin6;
+memcpy(&sin6.sin6_addr, &in6addr_any, sizeof(in6addr_any));
+    \end{lstlisting}
+  \end{block}
+
+%  \begin{itemize}
+%    \item Proměnné a konstanty pro speciální adresy
+%  \end{itemize}
+
+\end{frame}
+
+\fi
 
 \begin{frame}[fragile]{Získání adresy}
 
-  \begin{itemize}
-    \item \code{int getaddrinfo(const char *node, const char *service,} \\
-      \code{const struct addrinfo *hints, struct addrinfo **res)}
-    \begin{itemize}
-      \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h},
-        \header{netdb.h}
-      \item \code{node}: cílový stroj (adresa/jméno)
-      \item \code{service}: cílový port (číslo/jméno)
-      \item \code{hints}: omezení, co hledat (IPv4, IPv6 apod.), nebo NULL
-      \item \code{res}: návratová hodnota
-      \item Návratová hodnota: 0 je OK, jinak číslo chyby
-      \begin{itemize}
-	\item \code{const char *gai_strerror(int errcode)}
-      \end{itemize}
-    \end{itemize}
-
-    \item<2-> Uvolnění: \code{void freeaddrinfo(struct addrinfo *res)}
-  \end{itemize}
-
-  \begin{uncoverenv}<1->
-  \begin{block}{\code{struct addrinfo}}
-  \begin{lstlisting}
-int  ai_flags;              socklen_t        ai_addrlen;
-int  ai_family;             struct sockaddr *ai_addr;
-int  ai_socktype;           char            *ai_canonname;
-int  ai_protocol;           struct addrinfo *ai_next;
+  \begin{block}{Prototyp}
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
   \end{lstlisting}
   \end{block}
-  \end{uncoverenv}
+
+  \begin{itemize}
+    \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h},
+      \header{netdb.h}
+
+    \pause
+
+    \item \code{node}: cílový stroj -- adresa nebo jméno
+    \item \code{service}: cílový port -- číslo nebo jméno
+
+    \pause
+
+    \item \code{hints}: omezení, co hledat (IPv4, IPv6 apod.), nebo NULL
+
+    \pause
+
+    \item \code{res}: zřetězený seznam získaných adres
+    \begin{itemize}
+      \item Nutno uvolnit: \code{void freeaddrinfo(struct addrinfo *res)}
+    \end{itemize}
+
+    \pause
+
+    \item Návratová hodnota: 0 je OK, jinak číslo chyby
+    \begin{itemize}
+      \item \code{const char *gai_strerror(int errcode)}
+    \end{itemize}
+  \end{itemize}
+
+  \onslide<3->
+
+  \begin{block}{\code{struct addrinfo}}
+    \begin{tabular}{ll}
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int  ai_flags;
+int  ai_family;   // AF_INET, ...
+int  ai_socktype; // SOCK_STREAM, ...
+int  ai_protocol; // IPPROTO_TCP, ...
+  \end{lstlisting} &
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+struct sockaddr *ai_addr;    // address
+socklen_t        ai_addrlen; // sizeof address
+char            *ai_canonname;
+struct addrinfo *ai_next;    // link to next ai
+  \end{lstlisting}
+    \end{tabular}
+  \end{block}
 
 \end{frame}
 
@@ -653,11 +708,22 @@ int  ai_protocol;           struct addrinfo *ai_next;
     \item Omezte se jen na TCP a port HTTP
     \begin{itemize}
       \item \code{hints.ai_socktype} bude \code{SOCK_STREAM}
-      \item \code{hints.ai_protocol} bude \code{IPPROTO_TCP}
-      \item \code{service} bude \code{\"http\"}
+      \item \code{hints.ai_protocol} může být \code{IPPROTO_TCP}
+      \item \code{service} bude \code{\"http\"} nebo \code{\"80\"}
     \end{itemize}
 
+    \item Projděte seznam
+    \begin{itemize}
+      \item \code{for (struct addrinfo *i = ai; i; i = i->ai_next)}
+      \item Pro každou položku vypište \code{ai_family} a \code{ai_socktype}
+    \end{itemize}
+
+    \item Vypište počet iterací
+
     \item Přeložte, vyzkoušejte
+    \begin{itemize}
+      \item Kolik je adres?
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -665,7 +731,7 @@ int  ai_protocol;           struct addrinfo *ai_next;
 \begin{frame}[fragile]{Převod adresy na řetězec}
 
   \begin{block}{Prototyp}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=3pt]
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host,
   socklen_t hostlen, char *serv, socklen_t servlen, int flags)
   \end{lstlisting}
@@ -675,15 +741,25 @@ int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host,
     \item Hlavičky: \header{sys/socket.h}, \header{netdb.h}
     \item \code{addr}: adresa (např.\ \code{ai.ai_addr})
     \item \code{addrlen}: velikost adresy (např.\ \code{ai.ai_addrlen})
-    \item \code{host}: buffer pro jméno/adresu (vel.\ \code{NI_MAXHOST})
-    \item \code{serv}: buffer pro službu (vel.\ \code{NI_MAXSERV})
+
+    \pause
+
+    \item \code{host}: buffer pro jméno/adresu (vel.\ \code{NI_MAXHOST}), nebo
+      \code{NULL}
+    \item \code{serv}: buffer pro službu (vel.\ \code{NI_MAXSERV}), nebo
+      \code{NULL}
     \item \code{hostlen}/\code{servlen}: velikost bufferu \code{host} a
       \code{serv}
+
+    \pause
+
     \item \code{flags}: \code{NI_NUMERICHOST}, \code{NI_NUMERICSERV}, \dots
+
+    \pause
 
     \item Návratová hodnota: 0 je OK, jinak číslo chyby
     \begin{itemize}
-      \item \code{const char *gai_strerror(int errcode)}
+      \item Opět \code{gai_strerror}
     \end{itemize}
   \end{itemize}
 
@@ -693,10 +769,10 @@ int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host,
 
   \heading{Výpis adres}
   \begin{enumerate}
-    \item Doplňujte do předchozího příkladu
+    \item Doplňujte předchozí příklad
     \item Použijte \code{getnameinfo}
 
-    \item Vypište i adresy
+    \item Vypište v každé iteraci i adresy
     \begin{itemize}
       \item \code{serv} může být NULL
       \item Nastavte \code{flags} na \code{NI_NUMERICHOST}
@@ -706,6 +782,9 @@ int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host,
   \end{enumerate}
 
 \end{frame}
+
+\subsection*{Klient}
+\frame{\subsectionpage}
 
 \begin{frame}[fragile]{Klient}
 
@@ -735,7 +814,7 @@ int getnameinfo(const struct sockaddr *addr, socklen_t addrlen, char *host,
 
   \begin{block}{Příklad (bez ošetření chyb)}
   \begin{lstlisting}
-getaddrinfo("nekde", "neco", &hint, &ai);
+getaddrinfo("ferda", "telnet", &hint, &ai);
 fd = connect(sockfd, ai->ai_addr, ai->ai_addrlen);
 write(fd, "ahoj", 4);
   \end{lstlisting}
@@ -747,7 +826,11 @@ write(fd, "ahoj", 4);
 
   \heading{Klient}
   \begin{enumerate}
-    \item Připojte se na \code{localhost} na port \code{ssh}
+    \item Připojte se na \code{localhost} na TCP port \code{ssh}
+    \begin{itemize}
+      \item Pouze \code{hints.ai_socktype} bude pouze \code{SOCK_STREAM}
+    \end{itemize}
+
     \item Přečtěte ze socketu 20 znaků
     \item Vypište je na standardní výstup
     \item Vyzkoušejte
@@ -759,44 +842,55 @@ write(fd, "ahoj", 4);
 \subsection*{Server}
 \frame{\subsectionpage}
 
-\begin{frame}{Server}
+\begin{frame}[fragile]{Server}
+
+  \begin{block}{Prototypy}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int listen(int sockfd, int backlog)
+  \end{lstlisting}
+  \onslide<4->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+  \end{lstlisting}
+  \end{block}
+
+  \onslide<1->
 
   \heading{Tři kroky}
   \begin{enumerate}
-    \item Nastavení adresy a portu
+    \item Nastavení adresy a portu, kde poslouchat (\code{bind})
     \begin{itemize}
-      \item \code{int bind(int sockfd, const struct sockaddr *addr,}\\
-        \code{socklen_t addrlen)}
-      \begin{itemize}
-	\item \code{addr}: IP adresa se nastavuje často na \code{INADDR_ANY}
-	  (IPv4, host) nebo \code{in6addr_any}/\code{IN6ADDR_ANY_INIT} (IPv6,
-	  net)
-      \end{itemize}
+      \item \code{addr}: IP adresa se nastavuje často na \code{INADDR_ANY}
+	(IPv4) nebo \code{in6addr_any} (IPv6), port je
+	\code{sin_port}/\code{sin6_port} (ale \code{htons}!)
     \end{itemize}
 
     \pause
 
-    \item Nastavení socketu jako pasivního (bude čekat na spojení)
+    \item Nastavení socketu jako pasivního (\code{listen})
     \begin{itemize}
-      \item \code{int listen(int sockfd, int backlog)}
-      \begin{itemize}
-	\item \code{backlog}: kolik spojení může čekat na obsluhu
-      \end{itemize}
+      \item \code{backlog}: kolik spojení může čekat na obsluhu
 
+      \pause
+
+      \item Socket bude čekat na spojení
       \item Od tohoto okamžiku bude fungovat \code{connect} na tento port
     \end{itemize}
 
     \pause
 
-    \item Čekání na příchozí spojení
+    \item Čekání na příchozí spojení (\code{accept})
     \begin{itemize}
-      \item \code{int accept(int sockfd, struct sockaddr *addr, } \\
-        \code{socklen_t *addrlen)}
-      \begin{itemize}
-	\item \code{addr}: návratová hodnota -- adresa toho, kdo se připojil
-      \end{itemize}
+      \item \code{addr}: návratová hodnota -- adresa toho, kdo se připojil
+      \item Vrací socket, nad kterým se provádějí operace
 
-      \item Volá se opakovaně pro obsluhu dalších spojení
+      \pause
+
+      \item Volá se opakovaně v cyklu pro obsluhu dalších spojení
     \end{itemize}
 
   \end{enumerate}
@@ -809,11 +903,19 @@ write(fd, "ahoj", 4);
   \begin{enumerate}
     \item Vytvořte server
     \item Pro každé příchozí spojení vytvořte potomka
+    \begin{itemize}
+      \item \code{bind}, \code{listen}, opakuj (\code{accept}, \code{fork})
+    \end{itemize}
+
     \item Rodič bude čekat na další spojení
     \item Potomek obslouží spojení
     \item Přečte ze socketu až 100 znaků
     \item Pošle je zpět
     \item Upravte klienta, aby po připojení něco poslal
+    \begin{itemize}
+      \item A to na váš port z \code{bind}
+    \end{itemize}
+
     \item Potom přečte ze socketu až 100 znaků
     \item Vypíše je
     \item Vyzkoušejte
@@ -825,29 +927,132 @@ write(fd, "ahoj", 4);
 
   \heading{Jak přepínat mezi čtením, zápisem a různými deskriptory}
   \begin{itemize}
-    \item \code{int poll(struct pollfd *fds, nfds_t nfds, int timeout)} (\header{poll.h})
+    \item Mám standardní vstup, socket, rouru
+    \item Jsou v nich občas data
+    \item V jakém pořadí z nich číst?
+
+    \pause
+
+    \item Nutno číst zároveň ze všech
     \begin{itemize}
-      \item \code{fds}: pole popisující, na které \code{fd} čekat (a jaké
-        události)
-      \item \code{nfds}: velikost pole \code{fds}
-      \item \code{timeout}: \code{NULL} nebo timeout
-      \item \code{fds} je po návratu patřičně upraveno
+      \item Multiplexovat
     \end{itemize}
 
     \pause
 
-    \item \code{int select(int nfds, fd_set *readfds, fd_set *writefds,
-      fd_set *exceptfds, struct timeval *timeout)} (\header{sys/select.h})
-    \begin{itemize}
-      \item \code{nfds}: nejvyšší číslo \code{fd} v množinách + 1
-      \item \code{readfds}: čekat, až je bude možno číst, nebo \code{NULL}
-      \item \code{writefds}: čekat, až do nich bude možno zapisovat, nebo
-	\code{NULL}
-      \item \code{exceptfds}: čekat, až nastane chyba, nebo \code{NULL}
-      \item Návratová hodnota: počet nastavených bitů v \code{readfds},
-	\code{writefds} a \code{exceptfds}
-    \end{itemize}
+    \item Podobně pro výstup a chyby
 
+    \pause
+
+    \item Funkce \code{poll} a \code{select}
+  \end{itemize}
+
+  \medskip
+  \onslide<1->
+
+  \begin{center}
+  \tikzstyle{fdline} = [->,thick, >=stealth', shorten > = 1pt]
+  \begin{tikzpicture}
+    \node[ellipse,draw,thick] (PROC) {Proces};
+    \node[above right=1mm and 15mm of PROC] { Uživatel }
+      edge[fdline] node[above] {\code{fd0}} (PROC);
+    \node[below right=1mm and 15mm of PROC] { Soubor }
+      edge[fdline] node[below] {\code{fd4}} (PROC);
+    \node[above left=1mm and 15mm of PROC] (NET1) { Síť };
+    \draw<1-2>[fdline] (NET1) -- node[above,xshift=2pt,yshift=1pt] {\code{fd12}} (PROC);
+    \draw<3-|handout:0>[fdline,color=red,<->] (NET1) -- node[above,xshift=2pt,yshift=1pt,color=black] {\code{fd12}} (PROC);
+
+    \node[below left=1mm and 15mm of PROC] (NET2) { Síť };
+    \draw<1-2>[fdline] (NET2) -- node[below,xshift=2pt,yshift=-1pt] {\code{fd12}} (PROC);
+    \path<3-|handout:0> (NET2) -- (PROC) node[midway] {\color{red}{Error}};
+
+    \node[below=8mm of PROC] { Roura }
+      edge[fdline] node[right] {\code{fd5}} (PROC);
+  \end{tikzpicture}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{poll}}
+
+  \begin{block}{Prototyp a příklad}
+  \begin{lstlisting}[aboveskip=2pt]
+#include <poll.h>
+struct pollfd {  // from poll.h
+  int   fd;      // file descriptor
+  short events;  // requested events: POLLIN, POLLOUT, ...
+  short revents; // returned events: POLLIN, POLLOUT, POLLERR, POLLHUP, ...
+};
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+  \end{lstlisting}
+  \onslide<4->
+  \begin{lstlisting}[belowskip=2pt]
+struct pollfd pfd[] = { { 0, POLLIN }, { 2, POLLIN }, { fd, POLLIN | POLLOUT } };
+if (poll(pfd, 3, -1) > 0)
+  puts("some event!");
+  \end{lstlisting}
+  \end{block}
+
+  \onslide<1->
+
+  \begin{itemize}
+    \item \code{fds}: pole popisující, na které \code{fd} čekat (a jaké
+      události)
+    \item \code{nfds}: velikost pole \code{fds}
+
+    \pause
+
+    \item \code{timeout}: timeout v ms, nebo \code{\-1}
+
+    \pause
+
+    \item \code{fds} je po návratu patřičně \emph{upraveno}
+    \begin{itemize}
+      \item Nový \code{poll} $\Rightarrow$ nová inicializace pole
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{select}}
+
+  \begin{block}{Prototypy}
+  \begin{lstlisting}[aboveskip=2pt]
+#include <sys/select.h>
+int select(int nfds, fd_set *rdfds, fd_set *wrfds, fd_set *exceptfds, struct timeval *timeout)
+void FD_ZERO(fd_set *set);                void FD_CLR(int fd, fd_set *set);
+void FD_SET(int fd, fd_set *set);         int  FD_ISSET(int fd, fd_set *set);
+  \end{lstlisting}
+  \onslide<5->
+  \begin{lstlisting}[belowskip=2pt]
+fd_set rd, wr;
+FD_ZERO(&rd);        FD_ZERO(&wr);
+FD_SET(0, &rd);      FD_SET(2, &rd);      FD_SET(fd, &rd);      FD_SET(fd, &wr);
+if (select(fd + 1, &rd, &wr, NULL, NULL) > 0)
+  puts("some event!");
+  \end{lstlisting}
+  \end{block}
+
+  \onslide<1->
+
+  \begin{itemize}
+    \item \code{nfds}: nejvyšší číslo \code{fd} v množinách + 1
+
+    \pause
+
+    \item \code{rdfds}: čekat, až je bude možno číst, nebo \code{NULL}
+    \item \code{wrfds}: čekat, až do nich bude možno zapisovat, nebo
+      \code{NULL}
+    \item \code{exceptfds}: čekat, až nastane chyba, nebo \code{NULL}
+
+    \pause
+
+    \item \code{timeout}: timeout v \code{timeval}, nebo \code{NULL}
+
+    \pause
+
+    \item Návratová hodnota: počet bitů 1 v \code{rdfds}, \code{wrfds} a
+      \code{exceptfds}
   \end{itemize}
 
 \end{frame}
@@ -858,6 +1063,10 @@ write(fd, "ahoj", 4);
   \begin{enumerate}
     \item Upravte klienta
     \item Bude číst zároveň ze spojení a standardního vstupu
+    \begin{itemize}
+      \item Použijte \code{poll}, nebo \code{select}
+    \end{itemize}
+
     \item Data ze spojení opět vypište
     \item Data ze standardního vstupu pošlete serveru
     \item Vyzkoušejte
