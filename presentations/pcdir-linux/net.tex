@@ -65,7 +65,7 @@
 
     \item Multiplexing
     \begin{itemize}
-      \item Standardně (\code{select}, \code{poll})
+      \item Standardně (\code{select}, \code{poll}, \code{epoll})
     \end{itemize}
 
     \pause
@@ -944,7 +944,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
     \pause
 
-    \item Funkce \code{poll} a \code{select}
+    \item Funkce \code{select}, \code{poll} a \code{epoll}
   \end{itemize}
 
   \medskip
@@ -973,46 +973,7 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 \end{frame}
 
-\begin{frame}[fragile]{\code{poll}}
-
-  \begin{block}{Prototyp a příklad}
-  \begin{lstlisting}[aboveskip=2pt]
-#include <poll.h>
-struct pollfd {  // from poll.h
-  int   fd;      // file descriptor
-  short events;  // requested events: POLLIN, POLLOUT, ...
-  short revents; // returned events: POLLIN, POLLOUT, POLLERR, POLLHUP, ...
-};
-int poll(struct pollfd *fds, nfds_t nfds, int timeout)
-  \end{lstlisting}
-  \onslide<4->
-  \begin{lstlisting}[belowskip=2pt]
-struct pollfd pfd[] = { { 0, POLLIN }, { 2, POLLIN }, { fd, POLLIN | POLLOUT } };
-if (poll(pfd, 3, -1) > 0)
-  puts("some event!");
-  \end{lstlisting}
-  \end{block}
-
-  \onslide<1->
-
-  \begin{itemize}
-    \item \code{fds}: pole popisující, na které \code{fd} čekat (a jaké
-      události)
-    \item \code{nfds}: velikost pole \code{fds}
-
-    \pause
-
-    \item \code{timeout}: timeout v ms, nebo \code{\-1}
-
-    \pause
-
-    \item \code{fds} je po návratu patřičně \emph{upraveno}
-    \begin{itemize}
-      \item Nový \code{poll} $\Rightarrow$ nová inicializace pole
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
+% http://www.ulduzsoft.com/2014/01/select-poll-epoll-practical-difference-for-system-architects/
 
 \begin{frame}[fragile]{\code{select}}
 
@@ -1056,6 +1017,216 @@ if (select(fd + 1, &rd, &wr, NULL, NULL) > 0)
   \end{itemize}
 
 \end{frame}
+
+\begin{frame}{Výhody a nevýhody \code{select}}
+
+  \heading{Nevýhody}
+  \begin{itemize}
+    \item Modifikuje bitové masky
+    \begin{itemize}
+      \item Nutno nastavit pokaždé znovu
+    \end{itemize}
+
+    \pause
+
+    \item Nutnost projít všechny bitové masky
+    \begin{itemize}
+      \item A na každý bit se dotázat \code{FD_ISSET}
+    \end{itemize}
+
+    \pause
+
+    \item Omezení na počet deksriptorů
+    \begin{itemize}
+      \item Na linuxu 1024 (\code{FD_SETSIZE})
+    \end{itemize}
+
+    \pause
+
+    \item Nelze zavřít ani přidat deskriptor, na který se čeká
+    \begin{itemize}
+      \item Např.\ z jiného vlákna
+    \end{itemize}
+
+    \pause
+
+    \item Nutno spočítat nejvyšší deskriptor
+  \end{itemize}
+
+  \pause
+
+  \heading{Výhody}
+  \begin{itemize}
+    \item Přenositelný
+
+    \pause
+
+    \item Timeout je v $\mu$s
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{poll}}
+
+  \begin{block}{Prototyp a příklad}
+  \begin{lstlisting}[aboveskip=2pt]
+#include <poll.h>
+struct pollfd {  // from poll.h
+  int   fd;      // file descriptor
+  short events;  // requested events: POLLIN, POLLOUT, ...
+  short revents; // returned events: POLLIN, POLLOUT, POLLERR, POLLHUP, ...
+};
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+  \end{lstlisting}
+  \onslide<4->
+  \begin{lstlisting}[belowskip=2pt]
+struct pollfd pfd[] = { { 0, POLLIN }, { 2, POLLIN }, { fd, POLLIN | POLLOUT } };
+if (poll(pfd, 3, -1) > 0)
+  puts("some event!");
+  \end{lstlisting}
+  \end{block}
+
+  \onslide<1->
+
+  \begin{itemize}
+    \item \code{fds}: pole popisující, na které \code{fd} čekat (a jaké
+      události)
+    \item \code{nfds}: velikost pole \code{fds}
+
+    \pause
+
+    \item \code{timeout}: timeout v ms, nebo \code{\-1}
+
+    \pause
+
+  \item \code{revents} ve \code{fds} jsou po návratu patřičně upraveny
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Výhody a nevýhody \code{poll}}
+
+  \heading{Narozdíl od \code{select}}
+  \begin{itemize}
+    \item Nemodifikuje vstupní data
+    \begin{itemize}
+      \item Deskriptory a \code{event} se nemění
+      \item Ale je třeba pokaždé nastavit \code{revents} na 0
+    \end{itemize}
+
+    \pause
+
+    \item Stále nutnost projít všechny struktury \code{fds}
+    \begin{itemize}
+      \item A ne jednodušší bitová pole
+      \item Jádro také teď musí procházet struktury
+    \end{itemize}
+
+    \pause
+
+    \item Stále nelze zavřít ani přidat deskriptor, na který se čeká
+
+    \pause
+
+    \item Timeout je v ms
+  \end{itemize}
+
+  \pause
+
+  \heading{Výhody}
+  \begin{itemize}
+    \item Stále přenositelný
+  \end{itemize}
+
+\end{frame}
+
+\ifpcdirlinuxb
+
+\begin{frame}[fragile]{\code{epoll}}
+
+  \begin{block}{Prototypy}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+#include <sys/epoll.h>
+struct epoll_event {
+  uint32_t     events; // EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLHUP, ...
+  epoll_data_t data;   // user data (union: ptr, fd, u32, u64)
+};
+int epoll_create1(int flags); // Linux 2.6.27+
+int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
+  \end{lstlisting}
+  \end{block}
+
+  \begin{enumerate}
+    \item Vytvoření: \code{epoll_create1}
+
+    \pause
+
+    \item Úprava seznamu fd: \code{epoll_ctl}
+    \begin{itemize}
+      \item \code{op}: \code{EPOLL_CTL_ADD}, \code{EPOLL_CTL_MOD},
+	\code{EPOLL_CTL_DEL}
+      \item \code{fd}: deskriptor, který se má sledovat
+      \item \code{event}: co se má sledovat + data
+    \end{itemize}
+
+    \pause
+
+    \item Čekání: \code{epoll_wait}
+    \begin{itemize}
+      \item \code{events}: pole, které se plní daty
+      \item \code{maxevents}: velikost pole
+      \item Návratová hodnota: počet naplněných prvků do pole
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]{\code{epoll} příklad}
+
+  \begin{lstlisting}
+struct epoll_event epe[] = {
+  { .events = EPOLLIN, .data.fd = 0 },
+  { .events = EPOLLIN, .data.fd = 2 },
+  { .events = EPOLLIN | EPOLLOUT, .data.fd = fd },
+};
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}
+int ep = epoll_create1(0);
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}
+for (int a = 0; a < 3; a++)
+  epoll_ctl(ep, EPOLL_CTL_ADD, epe[a].data.fd, &epe[a]);
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}
+if (epoll_wait(ep, epe, 3, -1) > 0)
+  puts("some event!");
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}
+close(ep);
+  \end{lstlisting}
+
+  \pause
+
+  \begin{center}
+    \heading{\code{epoll} existuje jen na Linuxu!}
+  \end{center}
+
+\end{frame}
+
+\fi
 
 \begin{frame}{Úkol}
 
