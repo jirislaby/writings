@@ -119,7 +119,7 @@ Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
   \end{block}
 
   \pause
-  \bigskip
+  \medskip
 
   \heading{Pro typy o velikosti větší než 1 je nutné znát pořadí}
   \begin{itemize}
@@ -144,12 +144,12 @@ Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
   \begin{itemize}
     \item \header{asm/byteorder.h}
     \item \code{__leXX}, \code{__beXX}
+    \item $\text{\code{XX}}\in\left\{\text{\code{16}},\text{\code{32}},\text{\code{64}}\right\}$
 
     \pause
 
     \item \code{cpu_to_leXX}, \code{cpu_to_beXX}
     \item \code{leXX_to_cpu}, \code{beXX_to_cpu}
-    \item $\text{\code{XX}}\in\left\{\text{\code{16}},\text{\code{32}},\text{\code{64}}\right\}$
 
     \pause
 
@@ -185,7 +185,7 @@ Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
     \item Díra na konci adresového prostoru
     \begin{itemize}
       \item Tj.\ nevalidní ukazatel (dereference by způsobila pád)
-      \item Např.\ na x86\_64: \code{0xfffffffffff00000-0xffffffffffffffff}
+      \item Např.\ na \xesh: \code{0xfffffffffff00000-0xffffffffffffffff}
       \item Lze použít k zakódování chyby
     \end{itemize}
 
@@ -228,33 +228,30 @@ Mixed-endian  & \texttt{PDP-11}             & 0x34 & 0x12 & 0x78 & 0x56 \\
 
     \pause
 
-    \item \code{list_add(co, kam)}, \code{list_add_tail},
-      \code{list_del}
-    \item \code{list_move}, \code{list_move_tail}
+    \item \code{list_add(co, kam)}, \code{list_add_tail(co, kam)},
+      \code{list_del(co)}
+    \item \code{list_move(co, kam)}, \code{list_move_tail(co, kam)}
   \end{itemize}
 
   \pause
 
   \begin{block}{Příklad}
-  \begin{center}
-  \begin{tabular}{l|l}
+  \begin{tabular}{lp{3em}l}
   \begin{lstlisting}[language=C]
 struct my_struct {
   int a;
   struct list_head list;
 };
 LIST_HEAD(my_list);
-  \end{lstlisting} &
+  \end{lstlisting} & &
   \begin{lstlisting}
 struct my_struct *s;
 s = kmalloc(sizeof(*s), GFP_KERNEL);
 if (!s) { ... }
 s->a = 10;
-list_add(&s->list, &my_list);
-/* list_add_tail(&s->list, &my_list); */
+list_add(&s->list, &my_list); /* or list_add_tail(&s->list, &my_list); */
   \end{lstlisting}
   \end{tabular}
-  \end{center}
   \end{block}
 
   \pause
@@ -264,16 +261,18 @@ list_add(&s->list, &my_list);
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Seznam II.}
+\begin{frame}[fragile]{Seznam II.}
 
   \begin{itemize}
     \item \header{linux/list.h}
-    \item \code{list_empty}
+    \item \code{list_empty(list)}
 
     \pause
 
     \item Jedna položka: \code{list_entry}, \code{list_first_entry}
+
+    \pause
+
     \item Iterace:
       \code{list_for_each_entry(...) \{ ... \}} (jako \code{for}), \\
       \code{list_for_each_entry_reverse(...) \{ ... \}}
@@ -283,17 +282,22 @@ list_add(&s->list, &my_list);
     \item \code{*_safe} varianty -- pokud měním aktuální člen seznamu
   \end{itemize}
 
-  \pause
+  \onslide<2->
 
   \begin{block}{Příklad}
-  \begin{lstlisting}
+    \begin{lstlisting}[aboveskip=2pt]
 struct my_struct *s, *s1;
 s = list_first_entry(&my_list, struct my_struct, list);
 s = list_entry(s->list.next, struct my_struct, list);
-/* or */
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[belowskip=0pt]
 list_for_each_entry(s, &my_list, list) { s->a; }
+    \end{lstlisting}
+    \onslide<4->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
 list_for_each_entry_safe(s, s1, &my_list, list) { list_del(&s->list); }
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
 
   \pause
@@ -307,45 +311,49 @@ list_for_each_entry_safe(s, s1, &my_list, list) { list_del(&s->list); }
 \subsection{FIFO}
 \fi
 
-\begin{frame}
-  \frametitle{FIFO}
+\begin{frame}{FIFO}
 
   \begin{itemize}
-  \item \header{linux/kfifo.h}, \doc{samples/kfifo/*}
-  \item \code{struct kfifo}
-  \begin{itemize}
-  \item Statické: \code{DECLARE_KFIFO} + \code{INIT_KFIFO}
-  \item Dynamické: \code{kfifo_alloc(\&fifo, size, GFP_*)},
-    \code{kfifo_free}
-  \end{itemize}
-  \item Zápis: \code{kfifo_in(\&fifo, buf, count)}
-  \item Čtení: \code{kfifo_out(\&fifo, buf, count)}
-  \item Obsazeno: \code{kfifo_len(\&fifo)}
-  \item Volno: \code{kfifo_avail(\&fifo)}
+    \item \header{linux/kfifo.h}, \doc{samples/kfifo/*}
+    \item \code{struct kfifo}
+    \begin{itemize}
+      \item Statické: \code{DECLARE_KFIFO} + \code{INIT_KFIFO}
+      \item Dynamické: \code{kfifo_alloc(\&fifo, size, GFP_*)},
+	\code{kfifo_free(&fifo)}
+    \end{itemize}
+
+    \pause
+
+    \item Zápis: \code{kfifo_in(\&fifo, buf, count)}
+    \item Čtení: \code{kfifo_out(\&fifo, buf, count)}
+
+    \pause
+
+    \item Obsazeno: \code{kfifo_len(\&fifo)}
+    \item Volno: \code{kfifo_avail(\&fifo)}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
   \heading{Práce s FIFO} (\header{linux/kfifo.h})
   \begin{enumerate}
-  \item Globální FIFO 8 intů (\code{DECLARE_KFIFO})
-  \item \code{INIT_KFIFO}
-  \item Zapisovat čísla (\code{kfifo_in}) dokud je místo
-  \item Vypsat všechna čísla (\code{kfifo_out} + \code{kfifo_len})
+    \item Globální FIFO 8 intů (\code{DECLARE_KFIFO})
+    \item \code{INIT_KFIFO}
+    \item Zapisovat čísla (\code{kfifo_in}) dokud je místo
+    \item Vypsat všechna čísla (\code{kfifo_out} + \code{kfifo_len})
   \end{enumerate}
 
   \bigskip
 
-  Pozn.: ve starších jádrech je jiné rozhraní:
+  Pozn.: ve starších jádrech ($<$ 2.6.33) je jiné rozhraní:
   \begin{itemize}
-  \item jen dynamicky: \code{my_fifo=kfifo_alloc}
-  \item \code{__kfifo_put}=\code{kfifo_in}
-  \item \code{__kfifo_get}=\code{kfifo_out}
-  \item \code{__kfifo_len}=\code{kfifo_len}
-  \item \code{avail} není
+    \item jen dynamicky: \code{my_fifo = kfifo_alloc}
+    \item \code{__kfifo_put} je \code{kfifo_in}
+    \item \code{__kfifo_get} je \code{kfifo_out}
+    \item \code{__kfifo_len} je \code{kfifo_len}
+    \item \code{avail} není
   \end{itemize}
 
 \end{frame}

@@ -3,7 +3,7 @@
 \input{../header.tex}
 
 \subtitle{VI. DWARF}
-\date{5. 11. \the\year}
+\date{25. 10. \the\year}
 
 \begin{document}
 
@@ -20,6 +20,13 @@
     \item Strukturované ladicí informace
     \begin{itemize}
       \item Zápis komplikovaných výrazů
+      \begin{itemize}
+	\item \code{void klist_init(struct klist *k, void (*get)(struct
+	  klist_node *), void (*put)(struct klist_node *));}
+      \end{itemize}
+
+      \pause
+
       \item Vytvářené překladačem
     \end{itemize}
 
@@ -29,8 +36,8 @@
 
     \item Dokumentace
     \begin{itemize}
-      \item \href{http://www.dwarfstd.org/doc/Debugging\%20using\%20DWARF.pdf}{Introduction to the DWARF Debugging Format}
-      \item \href{http://www.dwarfstd.org/doc/DWARF4.pdf}{DWARF Debugging Information Format (Version 4)}
+      \item \href{http://www.dwarfstd.org/doc/Debugging\%20using\%20DWARF.pdf}{Introduction to the DWARF Debugging Format} (10 stran, obrázky)
+      \item \href{http://www.dwarfstd.org/doc/DWARF4.pdf}{DWARF Debugging Information Format (Version 4)} ($>$ 300 stran)
     \end{itemize}
 
   \end{itemize}
@@ -46,14 +53,20 @@
       \item Pro každý zdrojový soubor jeden skoro-strom
     \end{itemize}
 
-    \item Uzly stromů jsou \emph{Debugging Information Entry} (DIE)
-    \item Jeden DIE může odkazovat na kterýkoliv jiný
+    \pause
 
+    \item Uzly stromů jsou \emph{Debugging Information Entry} (DIE)
+
+    \pause
+
+    \item Jeden DIE může odkazovat na kterýkoliv jiný
   \end{itemize}
+
+  \onslide<1->
 
   \begin{center}
   \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
-  \tikzstyle{diee} = [<-, thick, >=stealth']
+  \tikzstyle{diee} = [<-, thick, >=stealth', shorten < =1pt]
   \begin{tikzpicture}
     \node [die] (CU) {
       \textbf{DIE} \\
@@ -86,36 +99,36 @@
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{DWARF a ELF}
+\begin{frame}{DWARF a ELF}
 
-  \begin{enumerate}
-    \item DWARF je v ELFu uložený v \code{.debug_*} sekcích
+  \heading{DWARF je v ELFu uložený v \code{.debug_*} sekcích}
+  \begin{itemize}
+    \item \code{.debug_info}: všechny DIE z lesa stromů
+    \item \code{.debug_abbrev}
     \begin{itemize}
-      \item \code{.debug_info}: všechny DIE z lesa stromů
-      \item \code{.debug_abbrev}: formát \code{.debug_info} (Figure 48 v DWARF4)
-
-      \pause
-
-      \item \code{.debug_line}: překlad instrukce $\leftrightarrow$ řádek kódu
-      \item \code{.debug_loc}: popis maker
-      \item \code{.debug_str}: řetězce odkazované z \code{.debug_info}
+      \item Typ položek v \code{.debug_info}
+      \item Figure 48 v DWARF4
     \end{itemize}
 
     \pause
 
-    \item Výpis DWARFu v ELFu
+    \item \code{.debug_line}: překlad instrukce $\leftrightarrow$ řádek kódu
+    \item \code{.debug_loc}: popis maker
+    \item \code{.debug_str}: řetězce odkazované z \code{.debug_info}
+
+    \pause
+
+    \item Výpis
     \begin{itemize}
       \item \cmd{readelf --debug-dump}
       \item \cmd{objdump --dwarf}
       \item \cmd{dwarfdump} (z \file{libdwarf})
     \end{itemize}
-  \end{enumerate}
+  \end{itemize}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Knihovny na práci s DWARF}
+\begin{frame}{Knihovny pro práci s DWARFem}
 
   \heading{Dvě různé implementace knihoven}
   \begin{enumerate}
@@ -147,8 +160,8 @@
   \frametitle{\file{libdw} a \file{libdwfl}}
 
   \begin{itemize}
-    \item Knihovny jsou součástí elfutils
-    \item Lze je používat střídavě (jako \code{elf} a \code{gelf})
+    \item Knihovny jsou součástí \file{elfutils}
+    \item Lze je používat střídavě (podobně jako \code{elf} a \code{gelf})
 
     \pause
 
@@ -161,7 +174,13 @@
     \pause
 
     \item Ukončení: \code{void dwfl_end(Dwfl *dwfl)}
-    \item Poslední chyba: \code{dwfl_errmsg(-1)}
+
+    \pause
+
+    \item Chyba na řetězec: \code{const char *dwfl_errmsg(int err)}
+    \begin{itemize}
+      \item \code{err}: \code{\-1} pro poslední
+    \end{itemize}
 
     \pause
 
@@ -182,9 +201,9 @@
   \begin{enumerate}
     \item Nainstalujte si \file{libdw} (a \file{libdwfl})
     \item Vytvořte si \code{main}
-    \item Definujte si statické háčky
+    \item Definujte si háčky
     \begin{itemize}
-      \item Struktura \code{const Dwfl_Callbacks}
+      \item Statická struktura \code{const Dwfl_Callbacks}
       \item \code{.section_address = dwfl_offline_section_address}
       \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
@@ -208,7 +227,7 @@
       \item \code{const char *name}: pojmenování modulu (např.\ 
         \code{file_name})
       \item \code{const char *file_name}: jméno souboru
-      \item \code{int fd}: \lstinline|-1| (nebo souborový deskriptor, pak
+      \item \code{int fd}: \code{\-1} (nebo souborový deskriptor, pak
 	\code{file_name == ""})
     \end{itemize}
 
@@ -229,9 +248,14 @@
 
   \end{itemize}
 
+  \onslide<1->
+
   \begin{block}{Příklad}
-    \begin{lstlisting}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
 Dwfl_Module *mod = dwfl_report_offline(dwfl, argv[1], argv[1], -1);
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
 while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
     \end{lstlisting}
   \end{block}
@@ -262,12 +286,13 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{DIE}
+\begin{frame}[fragile]{Debugging Information Entry}
 
-  \heading{Debugging Information Entry}
   \begin{itemize}
-    \item Typ celého DIE: \code{DW_TAG_*}
+    \item Typ celého DIE: \code{DW_TAG_*} \tikz[remember picture,baseline=-.5ex] \node [coordinate] (TYPE1) {};
+
+    \pause
+
     \item Z DIE: \code{int dwarf_tag(Dwarf_Die *die)}
     \begin{itemize}
       \item \code{DW_TAG_compile_unit}: DIE o souboru
@@ -280,7 +305,7 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
 
     \item Seznam atributů = trojic
     \begin{itemize}
-      \item O co jde: \code{DW_AT_*}
+      \item O co jde: \code{DW_AT_*} \tikz[remember picture,baseline=-.5ex] \node [coordinate] (AT1) {};
       \begin{itemize}
 	\item \code{DW_AT_comp_dir}: adresář, kde se překládalo
 	\item \code{DW_AT_name}: jméno (proměnné, souboru, \dots)
@@ -288,28 +313,44 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
 	\item \code{DW_AT_type}: typ proměnné
 	\item \dots
       \end{itemize}
-      \item Typ/forma hodnoty (\code{DW_FORM_*})
+
+      \pause
+
+      \item Typ/forma hodnoty (\code{DW_FORM_*}) \tikz[remember picture,baseline=-.5ex] \node [coordinate] (FORM1) {};
       \begin{itemize}
 	\item \code{DW_FORM_addr}
 	\item \code{DW_FORM_string}
 	\item \dots
       \end{itemize}
-      \item Hodnota
+
+      \pause
+
+      \item Hodnota \tikz[remember picture,baseline=-.5ex] \node [coordinate] (HODN1) {};
     \end{itemize}
   \end{itemize}
 
-  \begin{textblock*}{5cm}(8.8cm,1.2cm)
+  \begin{textblock*}{3cm}(\textwidth-3.5cm,1.2cm)
   \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
-  \begin{tikzpicture}
-    \node [die] (CU) {
-      \textbf{DIE} \\
-      type = compile\_unit \\
-      {\uncover<2->{comp\_dir (str) = /tmp/test}} \\
-      {\uncover<2->{name (str) = test.c}} \\
-      {\uncover<2->{producer (str) = GCC}}
+    \begin{tikzpicture}
+      \node [die] (CU) {
+	\textbf{DIE} \\
+	\tikz[remember picture,baseline=-.5ex,xshift=-2pt] \node [coordinate] (TYPE2) {};type = compile\_unit \\
+      {\uncover<3->{\tikz[remember picture,baseline=1pt,xshift=0pt] \node [coordinate] (AT2) {};comp\_dir (str) = /tmp/test}} \\
+      {\uncover<3->{name (str) = test.c}} \\
+      {\uncover<3->{producer \tikz[remember picture,baseline=2pt] \node [coordinate] (FORM2) {};(str) = \tikz[remember picture,baseline=2pt] \node [coordinate] (HODN2) {};GCC}}
     };
-  \end{tikzpicture}
+    \end{tikzpicture}
   \end{textblock*}
+
+  \onslide<1->
+
+  \tikzstyle{mem} = [->,semithick,>=stealth']
+  \begin{tikzpicture}[remember picture,overlay]
+    \path[mem] (TYPE1) edge[out=0,in=170] (TYPE2);
+    \path<3->[mem] (AT1) edge[out=5,in=230] (AT2);
+    \path<4->[mem] (FORM1) edge[out=5,in=250] (FORM2);
+    \path<5->[mem] (HODN1) edge[out=5,in=250] (HODN2);
+  \end{tikzpicture}
 
 \end{frame}
 
@@ -345,9 +386,8 @@ DW_TAG_subprogram
 \begin{frame}[fragile]
   \frametitle{Atributy DIE}
 
-  \heading{Iterace přes všechny atributy v jednom DIE}
-  \begin{itemize}
-    \item \code{ptrdiff_t dwarf_getattrs(...)}
+  \heading{Iterace přes všechny atributy v jednom DIE}\\
+    \code{ptrdiff_t dwarf_getattrs(...)}
     \begin{itemize}
       \item \code{Dwarf_Die *die}: z \code{dwfl_nextcu}
       \item \code{int (*callback)(Dwarf_Attribute *, void *)}: vaše funkce,
@@ -356,8 +396,6 @@ DW_TAG_subprogram
         parametr
       \item \code{ptrdiff_t offset}: \code{0}
     \end{itemize}
-
-  \end{itemize}
 
   \pause
   \medskip
@@ -433,7 +471,7 @@ static void dump_dwfl(Dwfl *dwfl)
   \begin{itemize}
     \item \code{int dwarf_child(Dwarf_Die *die, Dwarf_Die *result)}
     \begin{itemize}
-      \item Do \code{result} vloží potomka \code{die}
+      \item Do \code{result} vloží 1.\ potomka \code{die}
       \item Vrací 0 (OK), 1 (žádný potomek), -1 (chyba)
       \item \code{result} musí být ukazatel na lokální proměnnou
     \end{itemize}
