@@ -1,0 +1,174 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{\code{ptrace}}
+
+  \begin{itemize}
+    \item \header{sys/ptrace.h}
+    \item Systémové volání ke sledování procesů
+    \begin{itemize}
+      \item Naváže se na proces
+      \item Ovládá ho
+    \end{itemize}
+
+    \pause
+
+    \item \code{ptrace(enum __ptrace_request r, pid_t p, void *addr,
+      void *data)}
+    \begin{itemize}
+      \item \code{r} -- co chceme
+      \item \code{p} -- na kom to chceme provést
+      \item \code{addr} a \code{data} -- význam závisí na hodnotě \code{request}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\code{ptrace}}{Navázání}
+
+  \heading{Dvě možnosti}
+  \begin{enumerate}
+    \item Svého potomka
+    \begin{itemize}
+      \item Potomek: \code{ptrace(PTRACE_TRACEME)} a \code{raise(SIGSTOP)}
+
+      \pause
+
+      \item Rodič: \code{waitpid} a \code{ptrace(neco)},
+        např.\ \code{PTRACE_CONT}
+
+      \pause
+
+      \item \code{waitpid} počká na \code{raise} potomka, který už je
+	p-trasovatelný
+    \end{itemize}
+
+    \pause
+
+    \item Cizí proces
+    \begin{itemize}
+      \item Trasovač: \code{ptrace(PTRACE_ATTACH, pid)} a \code{waitpid}
+
+      \pause
+
+      \item Nastaví \code{pid} p-trasovatelný, pošle \code{SIGSTOP},
+	\code{waitpid} na signál počká
+    \end{itemize}
+  \end{enumerate}
+
+  \pause
+  \medskip
+
+  \heading{Odpojení \emph{zastaveného} trasovaného} \\
+  \code{ptrace(PTRACE_DETACH, pid)}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Trasování potomka}
+  \begin{enumerate}
+    \item Proveďte \code{fork}
+    \item Potomek
+    \begin{itemize}
+      \item Nastavte jej p-trasovatelného
+      \item Něco vypište
+      \item Pošlete mu signál
+      \item Něco vypište
+    \end{itemize}
+
+    \item Rodič
+    \begin{itemize}
+      \item Počkejte na zastaveného potomka
+      \item Čekejte na standardní vstup
+      \item Něco vypište
+      \item Odpojte potomka
+      \item Něco vypište
+    \end{itemize}
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\code{ptrace}}{Krokování}
+
+  \begin{itemize}
+    \item \code{ptrace(PTRACE_CONT)} -- pokračuj ve vykonávání
+    \item Přerušení klasickým \code{kill}
+
+    \pause
+
+    \item \code{ptrace(PTRACE_SYSCALL)} -- do příštího systémového volání
+    \item \code{ptrace(PTRACE_SINGLESTEP)} -- jedna instrukce
+
+    \pause
+
+    \item Vždy je třeba počkat na signál od potomka
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Krokování potomka}
+  \begin{enumerate}
+    \item V rodiči v cyklu:
+    \begin{itemize}
+      \item Čekejte na standardní vstup
+      \item Krokujte potomka po instrukci
+    \end{itemize}
+
+    \item Nezapomeňte ošetřit stav, kdy potomek skončil
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\code{ptrace}}{Manipulace s procesem}
+
+  \heading{}
+  \begin{itemize}
+    \item \code{ptrace(PTRACE_PEEKTEXT)} -- přečti kód
+    \item \code{ptrace(PTRACE_PEEKDATA)} -- přečti data
+
+    \pause
+
+    \item \code{ptrace(PTRACE_PEEKUSER)} -- přečti registr, \dots
+
+    \pause
+
+    \item \code{ptrace(PTRACE_GETREGS)} -- přečti registry
+    \begin{itemize}
+      \item \code{struct user_regs_struct}
+    \end{itemize}
+
+    \pause
+
+    \item \code{ptrace(PTRACE_GETFPREGS)} -- přečti plovoucí desetinné registry
+    \begin{itemize}
+      \item \code{struct user_fpregs_struct}
+    \end{itemize}
+
+    \pause
+
+    \item \code{SET*} a \code{POKE*} varianty
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Manipulace s procesem}
+  \begin{enumerate}
+    \item V rodiči v cyklu navíc:
+    \begin{itemize}
+      \item Vypište adresu aktuálně zastavené instrukce
+      \item První byte instrukce
+    \end{itemize}
+    \item Vyzkoušejte
+  \end{enumerate}
+
+\end{frame}
+
