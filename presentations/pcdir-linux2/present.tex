@@ -1834,9 +1834,67 @@ unsigned int ipv6mr_interface;
 \begin{frame}{Vzdálené ladění}
 
   \begin{itemize}
-    \item \cmd{gdbserver}
-    \item \cmd{target remote host:port}
+    \item \cmd{gdb} nefunguje všude
+    \begin{itemize}
+      \item Malá zařízení, kde se \cmd{gdb} nevejde apod.
+      \item Virtuální stroje
+    \end{itemize}
+
+    \pause
+
+    \item Stále existuje možnost, jak \cmd{gdb} spustit
+
+    \pause
+
+    \item \cmd{gdb} se spustí nadvakrát
+    \begin{itemize}
+      \item \cmd{gdbserver} spolu s tím, co chceme ladit
+      \item \cmd{gdb} na vzdáleném stroji
+    \end{itemize}
+
+    \pause
+
+    \item Oba spolu komunikují a přes médium přenáší data
+    \begin{itemize}
+      \item Sériová linka, UDP, TCP, jakýkoliv příkaz (např.\ \cmd{ssh})
+    \end{itemize}
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\cmd{gdbserver} a \cmd{gdb}}
+
+  \begin{itemize}
+    \item \cmd{gdbserver} se spouští podobně jako \code{gdb}
+    \begin{itemize}
+      \item \cmd{gdbserver --volby_gdbs COMM binarka --volby_binarky}
+      \item \cmd{COMM}: přes co se \cmd{gdb} chystá připojit
+      \item \cmd{gdbserver} čeká na spojení
+    \end{itemize}
+
+    \pause
+
+    \item \cmd{gdb} se spustí s cestou k binárce
+    \begin{itemize}
+      \item \cmd{target remote /dev/ttyS0}
+      \item \cmd{target remote host:port}
+      \item \cmd{target remote udp:host:port}
+      \item \cmd{target remote | command}
+    \end{itemize}
+
+    \pause
+
+    \item Můžou být nutná další nastavení
+    \begin{itemize}
+      \item \cmd{set architecture i386:x86-64:intel}
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Demo} \cmd{qemu -s} a \cmd{gdb} remote
 
 \end{frame}
 
@@ -1846,21 +1904,51 @@ unsigned int ipv6mr_interface;
     \item Neexistuje spojení do zdrojových souborů
     \begin{itemize}
       \item Chybí informace o souborech a řádcích
+
+      \pause
+
+      \item $\Rightarrow$ jsme omezeni na assembler a adresy
     \end{itemize}
 
     \pause
 
-    \item Jsme omezeni na assembler a adresy
+    \item Neexistuje rozdělení na bloky, funkce
+    \begin{itemize}
+      \item Chybí informace symbolech
+      \begin{itemize}
+	\item Ale často máme alespoň dynamické symboly
+      \end{itemize}
+
+      \pause
+
+      \item $\Rightarrow$ jsme velmi omezeni -- tužka, papír a \cmd{vim}
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \input{../pb173-bin/09/tracers.tex}
 
-\begin{frame}{Metody sledování procesů (pstack, pmap)}
+\begin{frame}{Ladění na ostatních platformách}
 
   \begin{itemize}
-    \item X
+    \item NetBSD, FreeBSD
+    \begin{itemize}
+      \item Tracer: \cmd{ktrace}/\cmd{ktruss}
+      \item Analýza VM: \cmd{pmap}
+    \end{itemize}
+
+    \pause
+
+    \item Solaris
+    \begin{itemize}
+      \item Tracer: \cmd{truss}
+      \item Analýza VM: \cmd{pstack}, \cmd{pmap}
+    \end{itemize}
+
+    \pause
+
+    \item Všichni umí \cmd{gdb}
   \end{itemize}
 
 \end{frame}
