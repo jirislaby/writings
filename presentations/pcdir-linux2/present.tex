@@ -505,28 +505,34 @@ personality(ADDR_LIMIT_32BIT | UNAME26);
 
 \begin{frame}[fragile]{Blokování signálů}
 
-  { \small
-    \code{int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)}
-  }
+  \onslide<2->
+  \begin{block}{Prototyp a příklad}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt,columns=fullflexible]
+int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+
+sigset_t s;
+sigfillset(&s);
+sigdelset(&s, SIGTERM);
+sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
+    \end{lstlisting}
+  \end{block}
+  \onslide<1->
+
   \begin{itemize}
+    \item Blokované signály jsou ve frontě do odblokování
+
+    \pause
+
     \item \code{how} -- co s množinou \code{set}
     \begin{itemize}
       \item Přidat: \code{SIG_BLOCK}
       \item Odebrat: \code{SIG_UNBLOCK}
       \item Nastavit: \code{SIG_SETMASK}
     \end{itemize}
+
     \item \code{set} -- které signály
     \item \code{oldset} -- původní blokované signály (jádro naplní)
   \end{itemize}
-
-  \begin{block}{Příklad}
-  \begin{lstlisting}
-sigset_t s;
-sigfillset(&s);
-sigdelset(&s, SIGTERM);
-sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
-  \end{lstlisting}
-  \end{block}
 
 \end{frame}
 
@@ -567,6 +573,39 @@ sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Synchronní signály}
+  \begin{enumerate}
+    \item Vytvořte si nový \code{main}
+
+    \item Maskujte všechny signály kromě \code{SIGTERM}
+    \begin{itemize}
+      \item \code{sigprocmask}
+    \end{itemize}
+
+    \item V cyklu synchronně obsluhujte signály
+    \begin{itemize}
+      \item \code{sigwait}
+    \end{itemize}
+
+    \item Vypisujte si vždy číslo signálu
+
+    \item Spusťte
+
+    \item Posílejte si z příkazové signály
+    \begin{itemize}
+      \item \cmd{killall -2 main}
+    \end{itemize}
+
+    \item Pošlete nakonec i \code{SIGTERM}
+    \begin{itemize}
+      \item \cmd{killall -TERM main}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
 \begin{frame}{Signály a deadlocky}
 
   \begin{itemize}
@@ -594,15 +633,25 @@ sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
 \begin{frame}{Socketpair}
 
   \begin{itemize}
+    \item Vytvoří pár socketů
+    \begin{itemize}
+      \item Probereme v sítích dále
+    \end{itemize}
+
+    \pause
+
     \item Narozdíl od rour
     \begin{itemize}
       \item Je obousměrný
-      \item Umí datagramy (viz sítě dále)
+      \item Umí datagramy
     \end{itemize}
+
+    \pause
 
     \item \small \code{int socketpair(int domain, int type, int proto,
       int sv[2])}
     \begin{itemize}
+      \item \header{sys/types.h}, \header{sys/socket.h}
       \item Doména: \code{AF_UNIX}
       \item Typ: \code{SOCK_STREAM}, \code{SOCK_DGRAM}
       \item Protokol: \code{0}
@@ -628,7 +677,7 @@ sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
       mode)}
     \begin{itemize}
       \item Parametry jako u \code{open}
-      \item Ale jméno: 1 lomítko na začátku (\file{/nazev})
+      \item Ale jméno: právě 1 lomítko, a to na začátku (\file{/nazev})
     \end{itemize}
 
     \pause
@@ -642,6 +691,33 @@ sigprocmask(SIG_SETMASK, &s, NULL); /* block all except TERM */
 
     \item Pracuje nad \file{/dev/shm/} (tmpfs)
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Vytvoření sdílené paměti (POSIX)}
+  \begin{enumerate}
+    \item Upravte příklad ze SysV sdílené paměti
+    \item Vytvořte si sdílený segment (\code{shm_open})
+    \item Nastavte mu velikost (\code{ftruncate})
+    \item Získejte adresu (\code{mmap})
+    \item Nyní si zkopírujte tento \code{main} do dvou souborů
+    \item V jednom souboru v cyklu o několika iteracích:
+    \begin{itemize}
+      \item Zapisujte do paměti proměnný řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V druhém souboru:
+    \begin{itemize}
+      \item Čtěte a vypište řetězec
+      \item Čekejte 100 ms
+    \end{itemize}
+
+    \item V obou proveďte \code{shmdt}
+    \item Spusťte
+  \end{enumerate}
 
 \end{frame}
 
@@ -730,14 +806,6 @@ long mq_curmsgs;     /* # of messages currently in queue */
 \subsection*{Sdílená paměť}
 \frame{\subsectionpage}
 
-\begin{frame}{Anonymní (SVR a BSD implementace)}
-
-  \begin{itemize}
-    \item XXX
-  \end{itemize}
-
-\end{frame}
-
 \input{../pb173-bin/12/mmap.tex}
 
 \begin{frame}[fragile]{Mapování podložené souborem}
@@ -787,6 +855,18 @@ m[100] = 'X';
 msync(m, stat.st_size, M_SYNC);
   \end{lstlisting}
   \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Mapování souboru}
+  \begin{enumerate}
+    \item Namapujte si libovolný soubor do paměti
+    \item Proveďte změnu v souboru
+    \item Vyzkoušejte
+    \item Jak se liší mapování \code{MAP_PRIVATE} a \code{MAP_SHARED}?
+  \end{enumerate}
 
 \end{frame}
 
@@ -1037,6 +1117,23 @@ msync(m, stat.st_size, M_SYNC);
 
 \end{frame}
 
+\begin{frame}{Úkol}
+
+  \heading{Vlastnosti vláken}
+  \begin{enumerate}
+    \item Vytvořte cyklící vlákno
+
+    \item Navažte jej na jeden konkrétní procesor
+    \begin{itemize}
+      \item \code{pthread_attr_setaffinity_np}
+      \item \code{CPU_SET} (\doc{man})
+    \end{itemize}
+
+    \item Vyzkoušejte a pozorujte \cmd{top}/\cmd{htop}
+  \end{enumerate}
+
+\end{frame}
+
 \subsection*{Synchronizace}
 \frame{\subsectionpage}
 
@@ -1215,7 +1312,6 @@ pthread_rwlock_unlock(&rwlock);
   \end{tabular}
   \end{center}
   \end{block}
-
 
 \end{frame}
 

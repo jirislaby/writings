@@ -30,10 +30,10 @@
 
     \pause
 
-    \item Vytvoření klíče: \code{ftok} (\header{sys/ipc.h})
+    \item Vytvoření klíče: \code{key_t ftok(const char *path, int id)}
     \begin{itemize}
-      \item Cesta k existujícímu uzlu na disku
-      \item Nějaké 8bitové nenulové číslo
+      \item \code{path}: Cesta k existujícímu uzlu na disku
+      \item \code{id}: Nějaké 8bitové nenulové číslo
     \end{itemize}
 
     \pause
@@ -47,10 +47,27 @@
 \subsection{Sdílená paměť}
 \fi
 
-\begin{frame}{Sdílená paměť}
+\begin{frame}[fragile]{Sdílená paměť}
+
+  \begin{block}{Prototypy}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
+#include <sys/shm.h>
+int shmget(key_t key, size_t size, int shmflg);
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+int shmdt(const void *shmaddr);
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+    \end{lstlisting}
+  \end{block}
+
+  \onslide<1->
 
   \begin{itemize}
-    \item \header{sys/shm.h}
     \item Vytvoření: \code{shmget}
     \begin{itemize}
       \item Poslední parametr \code{IPC_CREAT}
@@ -74,8 +91,7 @@
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
   \heading{Vytvoření sdílené paměti (IPC)}
   \begin{enumerate}
@@ -102,6 +118,8 @@
     \item Spusťte
   \end{enumerate}
 
+  Pozn.: tento úkol nezahazujte
+
 \end{frame}
 
 \iffimuni
@@ -110,25 +128,41 @@
 
 \begin{frame}[fragile]{Zprávy}
 
-  \begin{block}{Formát zprávy}
-  \begin{lstlisting}
+  \begin{block}{Prototypy a formát zprávy}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
+#include <sys/msg.h>
+int msgget(key_t key, int msgflg);
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
 struct my_message {
   long mtype;   /* set to something > 0 */
   ...
 };
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
 
-  \pause
+  \onslide<1->
 
   \begin{itemize}
-    \item \header{sys/msg.h}
     \item Vytvoření fronty zpráv: \code{msgget}
 
     \pause
 
-    \item Odeslání zprávy: \code{msgsnd}
-    \item Přijetí zprávy: \code{msgrcv}
+    \item Operace
+    \begin{itemize}
+      \item \code{msgsnd}, \code{msgrcv}
+      \item Do velikosti se nepočítá \code{mtype}
+    \end{itemize}
 
     \pause
 
@@ -182,8 +216,33 @@ struct my_message {
 
 \begin{frame}[fragile]{Semafory}
 
+  \begin{block}{Prototypy a parametr \code{semop}}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
+#include <sys/shm.h>
+int semget(key_t key, int nsems, int semflg);
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int semop(int semid, struct sembuf *sops, size_t nsops);
+    \end{lstlisting}
+    \onslide<4->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+int semctl(int semid, int semnum, int cmd, ...);
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
+struct sembuf {
+  ushort  sem_num;
+  short   sem_op;  /*  -  0  +  */
+  short   sem_flg;
+};
+    \end{lstlisting}
+  \end{block}
+
+  \onslide<1->
+
   \begin{itemize}
-    \item \header{sys/sem.h}
     \item<+-> Meziprocesové zamykání/správa prostředků
     \item<+-> Vytvoření semaforu: \code{semget}
     \item<+-> Změna stavu semaforu: \code{semop}
@@ -196,18 +255,6 @@ struct my_message {
       \item \dots
     \end{itemize}
   \end{itemize}
-
-  \begin{uncoverenv}<3->
-  \begin{block}{Parametr \code{semop}}
-  \begin{lstlisting}
-struct sembuf {
-  ushort  sem_num;
-  short   sem_op;  /*  -  0  +  */
-  short   sem_flg;
-};
-  \end{lstlisting}
-  \end{block}
-  \end{uncoverenv}
 
 \end{frame}
 
