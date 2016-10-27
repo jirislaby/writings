@@ -43,7 +43,8 @@
 
   \heading{Práce s ID}
   \begin{enumerate}
-    \item Prostudujte \code{print_uids} v \file{06/main.c}
+    \item Prostudujte \code{print_uids} v \ifpcdirlinux \file{06/main.c} \else
+      \file{02/uids.c} \fi
     \item Přeložte
     \item Spusťte jako uživatel i jako root
 
@@ -96,6 +97,54 @@
     \end{itemize}
 
   \end{itemize}
+
+\end{frame}
+
+\begin{frame}{ID procesu}{Graficky}
+
+  \begin{center}
+    \tikzstyle{ids} = [draw,very thick,align=center, inner sep=8pt]
+    \tikzstyle{arr} = [->, semithick, > = stealth']
+    \tikzstyle{arrs} = [arr,shorten > = 5pt]
+    \tikzstyle{arrp} = [arr,<-]
+    \begin{tikzpicture}[node distance=2.5cm]
+      \node [ids] (RID) {Réalné \\ ID};
+      \node [ids,right=of RID] (EID) {Efektivní \\ ID}
+        edge[arrp,out=265,in=275]
+	  node[below,align=center] {\small user \\ \code{setuid}/\code{seteuid}} (RID)
+	edge[arrp,bend right=20] (RID)
+	edge[arr,bend left=20] (RID);
+
+      \path (RID) -- (EID) node[midway,align=center] {\small user \\
+        \code{setreuid}};
+
+      \node [ids,right=of EID] (SID) {Uložené \\ ID}
+	edge[arr,out=265,in=275]
+	node[below,align=center] {\small user \\ \code{setuid}/\code{seteuid}} (EID)
+	edge[arr,bend right=20] (EID);
+%	edge[arr,bend left=20] (EID);
+
+      \path (EID) -- (SID) node[midway,align=center] (ESID) {\small user \\
+	\code{setreuid}};
+
+      \node [below=3mm of ESID,align=center,inner sep=1pt] {\small \code{exec} SUID \\ programu}
+	edge[arr] (EID)
+	edge[arr] (SID);
+
+      \node [align=center, above=1.5cm of RID] {\small root \\ \code{setreuid(rid, eid)}}
+	edge[arrs] node[above left,yshift=1.7ex] {\small \code{rid}} (RID)
+	edge[arrs] node[above left,yshift=1.7ex,xshift=-4em] {\small \code{eid}}(EID.north);
+
+      \node [align=center, above=1.5cm of EID] {\small root \\ \code{setuid(uid)}}
+	edge[arrs] node[above left,yshift=2.5ex,xshift=3.5em] {\small \code{uid}} (RID.north)
+	edge[arrs] node[above right,yshift=1.7ex] {\small \code{uid}} (EID.north)
+	edge[arrs] node[above right,yshift=2.5ex,xshift=-3.5em] {\small \code{uid}}(SID.north);
+
+      \node [align=center, above=1.5cm of SID] {\small root \\ \code{seteuid(uid)}}
+	edge[arrs] node[above right,yshift=1.7ex,xshift=4em] {\small \code{uid}} (EID.north);
+
+    \end{tikzpicture}
+  \end{center}
 
 \end{frame}
 
