@@ -41,14 +41,6 @@
 
 \ifpcdirlinuxb
 
-\begin{frame}{Vlastnosti}
-
-  \begin{itemize}
-    \item X
-  \end{itemize}
-
-\end{frame}
-
 \input{unixsocket.tex}
 
 \begin{frame}{Operace nad sockety}
@@ -89,21 +81,29 @@
 
 \begin{frame}[fragile]{Síťové prostředky komunikace}
 
-  \begin{block}{Prototypy}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=3pt]
+  \begin{block}{Prototypy a příklad}
+    \begin{lstlisting}[aboveskip=2pt]
 ssize_t recv(int sock, void *buf, size_t len, int flags)
 ssize_t send(int sock, const void *buf, size_t len, int flags)
-  \end{lstlisting}
+    \end{lstlisting}
 
-  \begin{onslide}<2->
-    \begin{lstlisting}[aboveskip=3pt,belowskip=2pt]
+    \onslide<2->
+    \begin{lstlisting}
 ssize_t recvfrom(int sock, void *buf, size_t len, int flags,
       struct sockaddr *src_addr, socklen_t *addrlen)
 ssize_t sendto(int sock, const void *buf, size_t len, int flags,
       const struct sockaddr *dest_addr, socklen_t addrlen)
-  \end{lstlisting}
-  \end{onslide}
+    \end{lstlisting}
+
+    \onslide<3->
+
+    \begin{lstlisting}[belowskip=2pt]
+int sock = socket(AF_INET, SOCK_DGRAM, 0);
+sendto(sock, "ahoj", 4, addr, sizeof(addr));
+    \end{lstlisting}
   \end{block}
+
+  \onslide<1->
 
   \begin{itemize}
     \item Lze kontrolovat odeslání a příjem
@@ -119,15 +119,6 @@ ssize_t sendto(int sock, const void *buf, size_t len, int flags,
       \item Jen pro nespojované sockety (dále)
     \end{itemize}
   \end{itemize}
-
-  \pause
-
-  \begin{block}{Příklad (bez ošetření chyb)}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
-int sock = socket(AF_INET, SOCK_DGRAM, 0);
-sendto(sock, "ahoj", 4, addr, sizeof(addr));
-  \end{lstlisting}
-  \end{block}
 
 \end{frame}
 
@@ -177,17 +168,26 @@ read(sock[1], buf, 4);
   \heading{Komunikace přes unixový socket}
   \begin{enumerate}
     \item Otevřete si pár socketů (\code{socketpair})
+    \begin{itemize}
+      \item \code{SOCK_STREAM}
+    \end{itemize}
+
     \item Zapište do 1 socketu postupně 2 řetězce
     \begin{itemize}
       \item 2 $\times$ \code{write} se stejným socketem
     \end{itemize}
 
     \item Přečtěte z 2.\ socketu data
+    \begin{itemize}
+      \item S větším bufferem, např.\ 128 B
+    \end{itemize}
+
     \item Přeložte, vyzkoušejte
 
     \item Kolikrát je třeba číst na přečtení 2 zápisů?
     \begin{itemize}
       \item Vysvětlete
+      \item Bude se lišit \code{SOCK_DGRAM}?
     \end{itemize}
   \end{enumerate}
 
@@ -638,11 +638,45 @@ memcpy(&sin6.sin6_addr, &in6addr_any, sizeof(in6addr_any));
 
 \begin{frame}[fragile]{Získání adresy}
 
-  \begin{block}{Prototyp}
+  \begin{block}{Prototypy}
+
+    \onslide<3->
+
+    \begin{lstlisting}[aboveskip=3pt,belowskip=0pt]
+struct addrinfo {
+    \end{lstlisting}
+    \begin{tabular}{ll}
   \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
-int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
+int  ai_flags;
+int  ai_family;   // AF_INET, ...
+int  ai_socktype; // SOCK_STREAM, ...
+int  ai_protocol; // IPPROTO_TCP, ...
+  \end{lstlisting} &
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+struct sockaddr *ai_addr;    // address
+socklen_t        ai_addrlen; // sizeof address
+char            *ai_canonname;
+struct addrinfo *ai_next;    // link to next ai
   \end{lstlisting}
+    \end{tabular}
+    \begin{lstlisting}[aboveskip=0pt,belowskip=3pt]
+};
+    \end{lstlisting}
+
+    \onslide<1->
+
+    \begin{lstlisting}[aboveskip=3pt,belowskip=0pt]
+int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res)
+    \end{lstlisting}
+
+    \onslide<5->
+
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
+const char *gai_strerror(int errcode);
+    \end{lstlisting}
   \end{block}
+
+  \onslide<1->
 
   \begin{itemize}
     \item Hlavičky: \header{sys/types.h}, \header{sys/socket.h},
@@ -666,30 +700,8 @@ int getaddrinfo(const char *node, const char *service, const struct addrinfo *hi
 
     \pause
 
-    \item Návratová hodnota: 0 je OK, jinak číslo chyby
-    \begin{itemize}
-      \item \code{const char *gai_strerror(int errcode)}
-    \end{itemize}
+    \item Návratová hodnota: 0 je OK, jinak číslo chyby (\code{gai_strerror})
   \end{itemize}
-
-  \onslide<3->
-
-  \begin{block}{\code{struct addrinfo}}
-    \begin{tabular}{ll}
-  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
-int  ai_flags;
-int  ai_family;   // AF_INET, ...
-int  ai_socktype; // SOCK_STREAM, ...
-int  ai_protocol; // IPPROTO_TCP, ...
-  \end{lstlisting} &
-  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
-struct sockaddr *ai_addr;    // address
-socklen_t        ai_addrlen; // sizeof address
-char            *ai_canonname;
-struct addrinfo *ai_next;    // link to next ai
-  \end{lstlisting}
-    \end{tabular}
-  \end{block}
 
 \end{frame}
 
@@ -845,16 +857,16 @@ write(fd, "ahoj", 4);
 \begin{frame}[fragile]{Server}
 
   \begin{block}{Prototypy}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
-int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+  \begin{lstlisting}[columns=fullflexible,aboveskip=2pt,belowskip=0pt]
+int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
   \end{lstlisting}
   \onslide<2->
-  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
-int listen(int sockfd, int backlog)
+  \begin{lstlisting}[columns=fullflexible,aboveskip=0pt,belowskip=0pt]
+int listen(int sockfd, int backlog);
   \end{lstlisting}
   \onslide<4->
-  \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
-int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+  \begin{lstlisting}[columns=fullflexible,aboveskip=0pt,belowskip=2pt]
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
   \end{lstlisting}
   \end{block}
 
@@ -977,15 +989,18 @@ int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 \begin{frame}[fragile]{\code{select}}
 
-  \begin{block}{Prototypy}
-  \begin{lstlisting}[aboveskip=2pt]
+  \begin{block}{Prototypy a příklad}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
 #include <sys/select.h>
 int select(int nfds, fd_set *rdfds, fd_set *wrfds, fd_set *exceptfds, struct timeval *timeout)
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt]
 void FD_ZERO(fd_set *set);                void FD_CLR(int fd, fd_set *set);
 void FD_SET(int fd, fd_set *set);         int  FD_ISSET(int fd, fd_set *set);
-  \end{lstlisting}
-  \onslide<5->
-  \begin{lstlisting}[belowskip=2pt]
+    \end{lstlisting}
+    \onslide<5->
+    \begin{lstlisting}[belowskip=2pt]
 fd_set rd, wr;
 FD_ZERO(&rd);        FD_ZERO(&wr);
 FD_SET(0, &rd);      FD_SET(2, &rd);      FD_SET(fd, &rd);      FD_SET(fd, &wr);
@@ -1022,7 +1037,7 @@ if (select(fd + 1, &rd, &wr, NULL, NULL) > 0)
 
   \heading{Nevýhody}
   \begin{itemize}
-    \item Modifikuje bitové masky
+    \item Jádro modifikuje bitové masky
     \begin{itemize}
       \item Nutno nastavit pokaždé znovu
     \end{itemize}
@@ -1036,7 +1051,7 @@ if (select(fd + 1, &rd, &wr, NULL, NULL) > 0)
 
     \pause
 
-    \item Omezení na počet deksriptorů
+    \item Omezení na počet deskriptorů
     \begin{itemize}
       \item Na linuxu 1024 (\code{FD_SETSIZE})
     \end{itemize}
@@ -1110,7 +1125,7 @@ if (poll(pfd, 3, -1) > 0)
   \begin{itemize}
     \item Nemodifikuje vstupní data
     \begin{itemize}
-      \item Deskriptory a \code{event} se nemění
+      \item Deskriptory a \code{events} se nemění
       \item Ale je třeba pokaždé nastavit \code{revents} na 0
     \end{itemize}
 
@@ -1145,17 +1160,31 @@ if (poll(pfd, 3, -1) > 0)
 \begin{frame}[fragile]{\code{epoll}}
 
   \begin{block}{Prototypy}
-  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
 #include <sys/epoll.h>
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 struct epoll_event {
   uint32_t     events; // EPOLLIN, EPOLLOUT, EPOLLERR, EPOLLHUP, ...
   epoll_data_t data;   // user data (union: ptr, fd, u32, u64)
 };
+    \end{lstlisting}
+    \onslide<1->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 int epoll_create1(int flags); // Linux 2.6.27+
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event);
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
 int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout);
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
+
+  \onslide<1->
 
   \begin{enumerate}
     \item Vytvoření: \code{epoll_create1}
@@ -1235,7 +1264,7 @@ close(ep);
     \item Upravte klienta
     \item Bude číst zároveň ze spojení a standardního vstupu
     \begin{itemize}
-      \item Použijte \code{poll}, nebo \code{select}
+      \item Použijte \code{select}, nebo \code{poll}
     \end{itemize}
 
     \item Data ze spojení opět vypište
