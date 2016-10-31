@@ -1,327 +1,451 @@
 % vim: ai sw=2 spell spelllang=cs
 
 \begin{frame}
-  \frametitle{Paměť jinak I.}
+  \frametitle{Přerušení}
 
-  \heading{LDD3 kap. 15 (zastaralá)}
+  \heading{LDD3 kap. 7 a 10}
 
-  \iffimuni {
+  \iffimuni
     \bigskip
 
     \tableofcontents
-
-    \heading{Příště}
-    \begin{itemize}
-      \item Přímý přístup do paměti (DMA)
-    \end{itemize}
-  } \fi
+  \fi
 
 \end{frame}
 
-\mysection{Mapování paměti jádra (\code{mmap})}
+\mysection{,,Měkká'' přerušení}
 
 \iffimuni
-\subsection{\code{mmap} v uživatelském prostoru}
+\subsection{Časovače}
 \fi
 
-\begin{frame}[fragile]
-  \frametitle{Mapování paměti jádra}
+\begin{frame}
+  \frametitle{Časovače}
 
-  \heading{Předání dat do/z procesu}
+  \begin{itemize}
+  \item \doc{Documentation/timers/*}
+  \item Činnost v nastavených časech (i periodicky)
+  \item Kód je volán v kontextu přerušení (nelze spát)
+  \item \file{/proc/timer_list} (jen nová jádra)
+  \end{itemize}
+
+  \pause
+
+  \heading{Obyčejné časovače}
+  \begin{itemize}
+    \item Fungují na každé architektuře
+    \item Založené na \code{jiffies}
     \begin{itemize}
-      \item Známe: \code{read}, \code{write}, \code{ioctl}, \dots
+      \item Proměnná zvyšující se o 1 s frekvencí \code{HZ}
+    \end{itemize}
+    \item Rozlišení: 1--10 ms (pro \code{HZ}: 1000--100)
+  \end{itemize}
 
-      \item U všeho nutné kopírování dat
-      \begin{itemize}
-	\item \code{copy_\{from,to\}_user} apod.
-      \end{itemize}
+  \pause
+
+  \heading{High-res časovače}
+  \begin{itemize}
+    \item \header{linux/hrtimer.h}
+    \item \code{usleep_range}
+    \item Rozlišení: $\sim \mu$s
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Obyčejné časovače}
+
+  \heading{API}
+  \begin{itemize}
+  \item \header{linux/timer.h}, \code{struct timer_list}
+  \item \code{DEFINE_TIMER}$_S$, \code{setup_timer}$_D$
+  \item \code{mod_timer} (=\code{del_timer}+\code{add_timer})
+  \item \code{del_timer_sync} (\emph{POZOR})
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+static void my_fun(unsigned long data);
+static DEFINE_TIMER(my_timer, my_fun, 0, 30);
+static void my_fun(unsigned long data)
+{
+  my_timer.data *= 2;
+  mod_timer(&my_timer, jiffies + msecs_to_jiffies(data));
+}
+...
+  mod_timer(&my_timer, jiffies + msecs_to_jiffies(100));
+...
+  del_timer_sync(&my_timer);
+  \end{lstlisting}
+  \end{block}
+
+  \begin{textblock*}{4.1cm}(8.2cm,6.5cm)
+    \begin{onlyenv}<2->
+      \heading{Úkol:} Každou vteřinu, kdy je modul v systému, vypište \code{HZ}
+      (\code{\%u}) a \code{jiffies} (\code{\%lu})
+    \end{onlyenv}
+  \end{textblock*}
+
+\end{frame}
+
+\iffimuni
+\subsection{Pozdržení vykonávání kódu (spánek)}
+\fi
+
+\begin{frame}
+  \frametitle{Pozdržení vykonávání kódu}
+
+  \heading{Čekání na událost trvající pevně danou dobu} (\header{linux/delay.h})
+  \begin{enumerate}
+    \item Spánek
+    \begin{itemize}
+      \item Zapojení časovače (tikni za \dots) a plánovače (\dots a vzbuď mě)
+      \item Rozlišení: $\sim 10\,\,\mu$s až 10 ms (HW-závislé)
+      \item \code{ssleep}, \code{msleep}, \code{usleep_range}
+    \end{itemize}
+
+    \pause
+
+    \item Busy-waiting
+    \begin{itemize}
+      \item Smyčka -- spotřeba času CPU a energie!
+      \item Rozlišení: ns
+      \item \code{mdelay}, \code{udelay}, \code{ndelay}
+    \end{itemize}
+  \end{enumerate}
+
+  \pause
+  \medskip
+
+  \begin{center}
+  \heading{V jádře lze pobývat (čekat) jen omezenou dobu} \\
+  v řádu jednotek až desítek vteřin
+  \end{center}
+
+  \pause
+  \medskip
+
+  \heading{Úkol:} spěte 3 vteřiny v \code{module_init} a vyzkoušejte vložením
+    modulu
+
+\end{frame}
+
+\iffimuni
+\subsection{Odložené vykonání kódu}
+\fi
+
+\begin{frame}
+  \frametitle{Odložené vykonání kódu}
+
+  \heading{Při potřebě vykonat kód, který nelze vykonat teď}
+  \begin{itemize}
+    \item Držím zámek, jsem v přerušení, \dots
+
+    \pause
+
+    \item Není nutno specifikovat pevně daný moment
+    \begin{itemize}
+      \item (Narozdíl od časovačů)
+      \item Ale je to možné
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \heading{2 druhy}
+  \begin{enumerate}
+    \item Workqueue
+    \item Tasklet
+  \end{enumerate}
+
+  \heading{Rozdíly}
+  \begin{itemize}
+    \item Rychlost zavolání (tasklet dřív)
+    \item Kontext zavolání (tasklet z přerušení, workqueue z procesu)
+    \item Množství kódu (tj.\ rychlost vykonání)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Workqueue}
+
+  \begin{itemize}
+    \item \doc{Documentation/workqueue.txt}
+
+    \item Speciální \emph{proces} volající funkce řazené do fronty
+    \begin{itemize}
+      \item Globální, společný pro všechny -- většinou stačí
+
+      \pause
+
+      \item Vlastní -- pro speciální případy
+    \end{itemize}
+
+    \pause
+
+    \item Lze v něm spát
+
+    \item Spustí se, až se plánovač rozhodne
+    \begin{itemize}
+      \item Lze specifikovat minimální prodlevu
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Workqueue}{API}
+
+  \begin{itemize}
+    \item \header{linux/workqueue.h}, \code{struct work_struct}
+    \item Definice práce: \code{DECLARE_WORK}$_S$, \code{INIT_WORK}$_D$
+
+    \pause
+
+    \item Globální proces:
+    \begin{itemize}
+      \item Zařazení do fronty: \code{schedule_work}
+      \item Vyřazení z fronty (předčasně): \code{cancel_work_sync}
+    \end{itemize}
+
+    \pause
+
+    \item Vlastní proces:
+    \begin{itemize}
+      \item Vytvoření procesu: \code{create_workqueue},
+	\code{destroy_workqueue}
+      \item Zařazení do fronty: \code{queue_work}
+      \item Vyřazení z fronty: \code{cancel_work_sync} (tj.\ stejně)
+    \end{itemize}
+
+    \pause
+
+    \item Delayed (s garantovanou prodlevou): \code{*_delayed_work}
+  \end{itemize}
+
+  \pause
+  \medskip
+
+  \heading{Úkol:} v \code{module_init} nahrájte modul \code{ieee80211} nebo
+    \code{mac80211} (\code{request_module}). \code{request_module} nelze volat
+    přímo v \code{module_init} a je nutný i vlastní workqueue proces.
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Tasklet}
+
+  \begin{itemize}
+    \item Běží v kontextu přerušení (jako časovače)
+    \item Nelze spát
+    \item Musí být rychlý
+    \item Spustí se \emph{po} příštím přerušení
+  \end{itemize}
+
+  \pause
+  \smallskip
+
+  \heading{API}
+  \begin{itemize}
+    \item \header{linux/interrupt.h}, \code{struct tasklet_struct}
+    \item Definice taskletu: \code{DECLARE_TASKLET}$_S$,
+      \code{tasklet_init}$_D$
+
+    \pause
+
+    \item Zařazení do fronty: \code{tasklet_schedule}
+    \item Vyřazení z fronty: \code{tasklet_kill}
   \end{itemize}
 
   \pause
   \bigskip
 
-  \heading{Mapování paměti}
-  \begin{itemize}
-    \item Namapování stránek do procesu
-    \item Proces používá kus stejné paměti jako jádro
-  \end{itemize}
-
-  \pause
-
-  \begin{block}{Systémové volání \code{mmap} (uživatelský prostor)}
-  \begin{lstlisting}
-void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off);
-  \end{lstlisting}
-  \end{block}
+  \heading{Úkol:} vytvořit tasklet, spustit a vypsat posloupnost volání pomocí
+    \code{dump_stack}
 
 \end{frame}
+
+\mysection{,,Tvrdá'' přerušení (z HW)}
 
 \begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Alokace pomocí \code{mmap} (uživatelský prostor)}
-  \begin{enumerate}
-    \item Anonymní paměť
-    \begin{itemize}
-      \item \footnotesize{\code{void *mmap(void *addr, size_t len,
-	int prot, int flags, int fd, off_t off)}}
-      \item \code{len} \dots\ 20M
-      \item \code{prot} \dots\ \code{PROT_READ | PROT_WRITE}
-      \item \code{flags} \dots\ \code{MAP_PRIVATE | MAP_ANONYMOUS}
-      \item \code{fd} \dots\ -1
-    \end{itemize}
-
-    \pause
-
-    \item Mapování /dev/zero
-    \begin{itemize}
-      \item \code{len} a \code{prot} stejné
-      \item \code{flags} \dots\ \code{MAP_PRIVATE}
-      \item \code{fd} \dots\ deskriptor otevřeného /dev/zero
-    \end{itemize}
-  \end{enumerate}
-\end{frame}
-
-\iffimuni
-\subsection{\code{mmap} v jádře}
-\fi
-
-\begin{frame}[fragile]
-  \frametitle{Parametry \code{mmap} v jádře}
+  \frametitle{Přerušení HW}
 
   \begin{itemize}
-    \item V uživatelském prostoru
+    \item HW informuje o změně stavu
     \begin{itemize}
-      \item \footnotesize{\code{void *mmap(void *addr, size_t len,
-	int prot, int flags, int fd, off_t off)}}
+      \item Časovač tiknul, přišel paket, přečten blok z disku, \dots
     \end{itemize}
 
     \pause
 
-    \item V jádře (opět) jedna položka v \code{struct file_operations}
+    \item CPU přeruší chod programu/jádra a zavolá jádro
     \begin{itemize}
-      \item \footnotesize{\code{int mmap(struct file *filp,
-	struct vm_area_struct *vma)}}
+      \item Ví, koho volat, má tabulku (IDT)
+      \item Cyklus? Priority přerušení!
+    \end{itemize}
 
-      \pause
+    \pause
 
-      \item Parametry jsou předány přes \code{struct vm_area_struct}
+    \item OS musí obsloužit přerušení
+    \begin{itemize}
+      \item Zjistí zdroj a zavolá odpovídající ovladač (jeho obsluhu přerušení)
+      \begin{itemize}
+	\item Přerušení je identifikováno číslem (IRQ)
+      \end{itemize}
+
+      \item Vynuluje přerušení na řadiči přerušení
     \end{itemize}
   \end{itemize}
 
   \pause
+  \bigskip
 
-  \begin{block}{\code{struct vm_area_struct}}
-  \begin{lstlisting}
-  unsigned long vm_start; /* addr or random when addr is NULL */
-  unsigned long vm_end;   /* vm_end = vm_start+len */
-  unsigned long vm_pgoff; /* vm_pgoff = off/PAGE_SIZE */
-  unsigned long vm_flags; /* vm_flags = encoded(flags|prot), see VM_READ etc. */
-  pgprot_t vm_page_prot;  /* only for remap_* functions */
-  ...
-  const struct vm_operations_struct *vm_ops; /* later ... */
-  void *vm_private_data;
-  \end{lstlisting}
-  \end{block}
-
-  \pause
-
-  Ovladač musí mapovat stránky mezi \code{vm_start} a \code{vm_end}. \\
-  Ale \emph{POZOR}, také ověřit privilegia (čtení, zápis, spuštění).
+  \heading{Nutná podpora HW (CPU, řadiče, sběrnice, zařízení)}
 
 \end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Základní \code{mmap} funkce}
+  \frametitle{Přerušení v Linuxu}
 
-  \heading{API}
   \begin{itemize}
-  \item \header{linux/mm.h}, \code{struct vm_area_struct}
-  \item \code{__get_free_page/pages} $\Rightarrow$
-  \code{remap_pfn_range}
-  \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
+  \item \header{linux/interrupt.h}
+  \item \code{request_irq}, \code{free_irq}
+  \item Flags: hlavně \code{IRQF_SHARED}
+  \item Návratová hodnota z obsluhy: \code{IRQ_NONE}, \code{IRQ_HANDLED}
+  \item \file{/proc/interrupts}
   \end{itemize}
 
   \begin{block}{Příklad}
   \begin{lstlisting}
-int my_init(void)
-{
-  mem = __get_free_pages(GFP_KERNEL, 2);
-  /* mem = vmalloc_user(PAGE_SIZE); */
+static irqreturn_t my_handler(int irq, void *data)
+{ /* data == my_data */
+  return my_device_raised_interrupt ? IRQ_HANDLED : IRQ_NONE;
 }
-...
-int my_mmap(struct file *filp, struct vm_area_struct *vma)
+static int my_probe(struct pci_dev *pdev, ...)
 {
-  if ((vma->vm_flags & (VM_WRITE | VM_READ)) != VM_READ)
-    return -EINVAL;
-  return remap_pfn_range(vma, vma->vm_start, page_to_pfn(virt_to_page(mem)),
-      4 * PAGE_SIZE, vma->vm_page_prot);
-  /* return remap_vmalloc_range(vma, mem, 0); */
+  /* here: enable device etc. */
+  my_data = kmalloc(...);
+  ret = request_irq(pdev->irq, my_handler, IRQF_SHARED, "my", my_data);
 }
   \end{lstlisting}
   \end{block}
 
-\end{frame}
+  \pause
 
-\begin{frame}{Úkol}
-
-  \heading{Přemapování 2 prostorů}
-  \begin{enumerate}
-    \item Alokujte 2+2 stránky
-    \begin{itemize}
-      \item Dvoustránku pomocí \code{vmalloc_user}
-      \item Dvoustránku pomocí stránkového alokátoru
-    \end{itemize}
-
-    \item Zapište na všechny 4 stránky libovolný, ale různý řetězec
-
-    \item Vystavte (mapujte) stránky v \code{mmap}
-    \begin{itemize}
-      \item První dvojice RO, druhá R/W (ověřte
-        \code{prot}, tj.\ \code{vma->vm_flags})
-      \item $0 \leq \text{\code{vma->vm_pgoff}} < 2$ $\Rightarrow$ jedno
-        mapování
-      \item $3 \leq \text{\code{vma->vm_pgoff}} < 4$ $\Rightarrow$ druhé
-        mapování
-    \end{itemize}
-
-    \item Z userspace 2$\times$ \code{mmap} s \code{off} \code{0} a
-      \code{2*4096}
-    \begin{itemize}
-      \item Již hotovo v \file{pb173/09/pb173.c}
-    \end{itemize}
-  \end{enumerate}
-
-  \medskip
-
-  \heading{API (opakování)}
-  \begin{itemize}
-  \item \header{linux/mm.h}, \code{struct vm_area_struct}
-  \item \footnotesize{\code{int mmap(struct file *filp,
-    struct vm_area_struct *vma)}}
-  \item \code{__get_free_page*} $\Rightarrow$ \code{remap_pfn_range}
-  \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
-  \end{itemize}
+  \heading{Úkol:} vytvořte obsluhu pro EDU (zatím vracejte \code{IRQ_HANDLED})
 
 \end{frame}
+
+\mysection{Změny v kontextu přerušení}
 
 \iffimuni
-\subsection{\code{mmap} po stránkách}
+\subsection{Zámky}
 \fi
 
 \begin{frame}[fragile]
-  \frametitle{\code{mmap} po stránkách}
+  \frametitle{Přerušení a spinlocky}
 
-  \begin{block}{\code{struct vm_operations_struct}}
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno & Přerušení \\ \hline
+  \begin{lstlisting}[showlines]
+spin_lock(&addr_lock);
+<interrupt>
+spin_unlock(&addr_lock);
+
+  \end{lstlisting} &
   \begin{lstlisting}
-  void (*open)(struct vm_area_struct *vma);
-  void (*close)(struct vm_area_struct *vma);
-  int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
+
+spin_lock(&addr_lock);
+// ^^^ deadlock ^^^
+spin_unlock(&addr_lock);
   \end{lstlisting}
-  \end{block}
+  \end{tabular}
+  \end{center}
 
-  \heading{Přemapování roztroušených stránek}
-  \begin{itemize}
-    \item Přes \code{remap_pfn_range} obtížně
-    \item Při výpadcích stránek se mapují takové stránky jednotlivě
-    \begin{itemize}
-      \item Každý ovladač má ,,page fault handler''
-      \item Háčky \code{struct vm_operations_struct} a v ní \code{fault}
-    \end{itemize}
+  \pause
+  \bigskip
 
-    \pause
+  \heading{\code{\_irq*} varianty} \\
+  ~~~~Zákaz přerušení, poté spinlock
 
-    \item V \code{mmap}/\code{fault} je třeba zkontrolovat rozsahy a velikosti
-    \begin{itemize}
-      \item Předtím to dělaly \code{remap_*_range} funkce
-    \end{itemize}
+  \begin{center}
+  \begin{tabular}{c|c}
+  Vlákno & Přerušení \\ \hline
+  \begin{lstlisting}[showlines]
+spin_lock_irq(&addr_lock);
+// interrupt cannot trigger
+spin_unlock_irq(&addr_lock);
 
-    \pause
 
-    \item \code{vma->vm_ops} se nastaví v \code{mmap}
-    \begin{itemize}
-      \item Na strukturu s háčky (zejm.\ \code{fault})
-    \end{itemize}
+  \end{lstlisting} &
+  \begin{lstlisting}
 
-    \pause
 
-    \item \code{vma->vm_private_data}
-    \begin{itemize}
-      \item Pro naše potřeby
-      \item K předání informací z \code{file_operations->mmap} do
-        \code{vm_ops->*}
-    \end{itemize}
-  \end{itemize}
-
+spin_lock(&addr_lock);
+...
+spin_unlock(&addr_lock);
+  \end{lstlisting}
+  \end{tabular}
+  \end{center}
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{\code{mmap} po stránkách -- příklad}
+\iffimuni
+\subsection{Alokace, apod.}
+\fi
 
-  \begin{lstlisting}
-int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
-{ /* my_data == vma->vm_private_data; */
-  \end{lstlisting}
-  \begin{uncoverenv}<2->
-  \begin{lstlisting}
-  unsigned long offset = vmf->pgoff << PAGE_SHIFT;
-  struct page *page;
+\begin{frame}
+  \frametitle{Kontext přerušení}
 
-  page = my_find_page(offset);
-  if (!page)
-    return VM_FAULT_SIGBUS;
-  get_page(page);
-  vmf->page = page;
-  return 0;
-  \end{lstlisting}
-  \end{uncoverenv}
-  \begin{lstlisting}
-}
+  \heading{Další změny}
+  \begin{itemize}
+    \item Alokace
+    \begin{itemize}
+      \item \code{GFP_ATOMIC}
+      \item A tedy nevelké alokace
+    \end{itemize}
 
-struct vm_operations_struct my_vm_ops = {
-  .fault = my_fault,
-};
-
-int my_mmap(struct file *filp, struct vm_area_struct *vma)
-{ /* don't forget to check ranges */
-  vma->vm_ops = &my_vm_ops;
-  vma->vm_private_data = my_data;
-  return 0;
-}
-  \end{lstlisting}
+    \item Kód
+    \begin{itemize}
+      \item Rychlý, krátký
+      \item (Víc kódu později v taskletu, ještě víc třeba ve workqueue)
+    \end{itemize}
+  \end{itemize}
 
 \end{frame}
 
 \begin{frame}{Úkol}
 
-  \heading{Mapování roztroušených stránek} \iffimuni (součást domácího) \fi
+  \heading{Práce s přerušením} \iffimuni (součást domácího) \fi
   \begin{enumerate}
-    \item Předchozí příklad rozšiřte
-    \item Místo alokací dvoustránek alokujte 4 samostatné stránky
+    \item Vytvořte pojmenování (makra) pro registry (viz tabulku dole)
+
+    \item Spusťte 100ms periodický časovač (pro každé EDU zařízení)
     \begin{itemize}
-      \item 2$\times$ \code{vmalloc_user(PAGE_SIZE)} a 2$\times$ \code{__get_free_page}
+      \item Nechte počítat faktoriál a po výpočtu generovat přerušení (r.\ 0x20)
+      \item Můžete občas nechat EDU vyvolat i jiné přerušení (r.\ 0x60)
     \end{itemize}
 
-    \item Přemapujte stránky v \code{mmap}
-    \begin{itemize}
-      \item Změna \code{remap_pfn_range} na \code{vma->vm_ops->fault}
-    \end{itemize}
+    \item Navažte se v probe na přerušení (\code{request_irq})
 
-    \item Userspace program stejný
+    \item Implementujte obsluhu
     \begin{itemize}
-      \item Funkčnost navenek musí být zachovaná
+      \item Přečtěte stav (r.\ 0x24), vypište stav -- limitovaně
+      \item Nenula: odsouhlaste přerušení (r.\ 0x64), vraťte \code{IRQ_HANDLED}
+      \item Jinak: vráťte \code{IRQ_NONE}
     \end{itemize}
   \end{enumerate}
 
-  \medskip
-
-  \heading{Potřebné podkroky}
-  \begin{itemize}
-    \item Definice \footnotesize{\code{int fault(struct vm_area_struct *vma,
-      struct vm_fault *vmf);}}
-    \item Kontrola rozsahů v \code{mmap} (\code{end-start < 2*PAGE_SIZE}
-      apod.)
-    \item Definice \code{vm_ops} a přiřazení do \code{vma->vm_ops}
-  \end{itemize}
+\begin{block}{Specifikace baru 0 (pokračování z minula)}
+\footnotesize
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents   & Meaning \\ \hline\hline
+0x0024 & 4B  & R   & bitmap & Raised interrupts \\ \hline
+0x0060 & 4B  & W   & bitmap & Raise interrupts \\ \hline
+0x0064 & 4B  & W   & bitmap & Acknowledge interrupts \\ \hline
+\end{tabular}
+\end{center}
+\end{block}
 
 \end{frame}

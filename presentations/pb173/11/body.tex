@@ -1,302 +1,283 @@
 % vim: ai sw=2 spell spelllang=cs
 
 \begin{frame}
-  \frametitle{Komunikace mezi procesy}
+  \frametitle{Paměť jinak II.}
 
-  \heading{LDD3 část kap. 6 (zastaralá)}
+  \heading{LDD3 kap. 15 (zastaralá)}
 
-  \iffimuni
+  \iffimuni {
     \bigskip
 
+    \heading{Minule}
+    \begin{itemize}
+      \item Mapování paměti jádra (\code{mmap})
+    \end{itemize}
+
     \tableofcontents
-  \fi
+  } \fi
 
 \end{frame}
 
-\mysection{Čekání na událost}
+\mysection{Přímý přístup do paměti (DMA)}
 
-\iffimuni
-\subsection{Completion}
-\fi
+\begin{frame}
+  \frametitle{DMA}
 
-\begin{frame}[fragile]
-  \frametitle{Jednoduchá komunikace}
-
+  \heading{Přímý přístup do paměti}
   \begin{itemize}
-    \item 2 procesy (producent-konzument)
+    \item Prozatím jsme ze/do zařízení četli/zapisovali přes CPU
     \begin{itemize}
-      \item A: čeká na nějakou hotovou práci
-      \item B: udělá nějakou práci a oznámí A dokončení
-      \item A: pokračuje
+      \item Tj.\ standardními operacemi s (přemapovanou) pamětí
+    \end{itemize}
+
+    \pause
+
+    \item Velké přenosy = velká zátěž CPU
+    \begin{itemize}
+      \item Cykly, čekání na pomalou sběrnici atd.
+    \end{itemize}
+
+    \pause
+
+    \item Místo toho naprogramujeme HW, aby přenášel data sám
+    \begin{itemize}
+      \item Nutná podpora HW (sběrnice -- arbitrace, zařízení -- přenosy)
     \end{itemize}
   \end{itemize}
-
-  \pause
-
-  \heading{API}
-  \begin{itemize}
-    \item \header{linux/completion.h}, \code{struct completion}
-    \item \code{DECLARE_COMPLETION}$_S$, \code{init_completion}$_D$
-    \item Čekání: \code{wait_for_completion},
-      \code{wait_for_completion_interruptible} (retval)
-    \item Dokončení: \code{complete}, \code{complete_all}
-  \end{itemize}
-
-  \pause
-
-  \begin{block}{Příklad}
-  \begin{lstlisting}
-static DECLARE_COMPLETION(my_comp);
-static char str[32];
-A                                        B
-wait_for_completion(&my_comp);           strcpy(str, "Ahoj");
-pr_info("%s\n", str);                    complete(&my_comp);
-  \end{lstlisting} %stop_zone
-  \end{block}
 
 \end{frame}
 
 \begin{frame}
-  \frametitle{Úkol}
+  \frametitle{Princip DMA}
 
-  \heading{Použití \code{completion}}
+  \heading{Princip\only<1>{ odesílání}\only<2>{ příjmu}}
   \begin{enumerate}
-    \item Do \file{pb173/11/events} doplňte \code{completion}
-    \item Číst se bude, až někdo dokončí zápis
-    \begin{itemize}
-      \item Čekání v \code{read} bude možné přerušit signálem
-	(\code{wait_for_completion_interruptible})
-      \item V případě signálu vraťte \code{\-ERESTARTSYS}
-    \end{itemize}
-
-    \item Spusťte 2 instance \cmd{cat /dev/my_name}
-    \item Spusťte několikrát \cmd{echo XXX > /dev/my_name}
-
-    \item Pozorujte, co se děje, když použijete
-    \begin{itemize}
-      \item \code{complete} a potom:
-      \item \code{complete_all}
-    \end{itemize}
+  \item Alokace (speciální) paměti
+  \item<1> Vyplnění daty (paket, zvuk, data na disk, \dots)
+  \item Předání ukazatele do zařízení
+  \item Odstartování přenosu v zařízení
+  \item Přerušení či jiná signalizace konce přenosu od zařízení
+  \item<2> Práce s příchozími daty (paket, data z disku, \dots)
+  \item Uvolnění (speciální) paměti
   \end{enumerate}
 
 \end{frame}
 
-\iffimuni
-\subsection{Wait event a ostatní}
-\fi
+\begin{frame}{DMA v Linuxu}{Alokace}
 
-\begin{frame}
-  \frametitle{Složitější komunikace}
-
+  \heading{API alokace}
   \begin{itemize}
-    \item Čekání na více místech na jinou událost
-    \item 3 procesy
-    \begin{itemize}
-      \item A: plní buffer
-      \item B: čeká na 100\,B
-      \item C: čeká na 200\,B
-    \end{itemize}
-  \end{itemize}
-
-  \pause
-
-  \heading{API}
-  \begin{itemize}
-    \item \header{linux/wait.h}, \code{wait_queue_head_t}
-    \item \code{DECLARE_WAIT_QUEUE_HEAD}$_S$,
-      \code{init_waitqueue_head}$_D$
-    \item Čekání: \code{wait_event}, \code{wait_event_interruptible}
-    \item Dokončení: \code{wake_up}, \code{wake_up_all}
+  \item \header{linux/dma-mapping.h}, \doc{Documentation/DMA-*}
+  \item \code{dma_alloc_coherent}, \code{dma_free_coherent}
   \end{itemize}
 
   \pause
   \bigskip
 
-  Pozn.: \code{completion} je jen \code{wait_queue} + počítadlo
-
-\end{frame}
-
-\begin{frame}[fragile]{Složitější komunikace}{Příklad}
-
-  \begin{lstlisting}
-static DECLARE_WAIT_QUEUE_HEAD(my_wait);
-static atomic_t my_cnt = ATOMIC_INIT(0);
-static char str[512];
-...
-A
-  for (a = 0; a < sizeof(str); a++) {
-    str[atomic_inc_return(&my_cnt) - 1] = 'A';
-    wake_up_all(&my_wait);
-    msleep(50);
-  }
-  \end{lstlisting}
-
-  \pause
-
-  \begin{lstlisting}
-B
-  wait_event(my_wait, atomic_read(&my_cnt) > 100);
-  pr_info("%s\n", str);
-  \end{lstlisting} %stop_zone
-
-  \pause
-
-  \begin{lstlisting}
-C
-  if (wait_event_interruptible(my_wait, atomic_read(&my_cnt) > 200)) {
-    pr_info("interrupted\n");
-    return;
-  }
-  pr_info("%s\n", str);
-  \end{lstlisting} %stop_zone
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{Úkol}
-
-  \heading{Použití \code{wait_queue}}
-  \begin{enumerate}
-    \item V \file{pb173/11/events} použijte namísto \code{completion}
-      \code{wait_queue}
-    \item Číst se bude, až bude v bufferu zapsáno alespoň 5 znaků
-  \end{enumerate}
-
-\end{frame}
-
-\iffimuni
-\subsection{Scheduler a probouzení procesů}
-\fi
-
-\begin{frame}
-  \frametitle{Scheduler}
-
+  \footnotesize{\code{void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp)}}\\[-0.3em]
   \begin{itemize}
-    \item Celé je to instruování plánovače (\header{linux/sched.h})
-
-    \item Ve skutečnosti je \code{wait_event}:
-    \begin{itemize}
-      \item Nastavení typu spícího stavu procesu: \code{set_current_state}
-      \begin{itemize}
-	\item D stav: \code{TASK_UNINTERRUPTIBLE}
-	\item S stav: \code{TASK_INTERRUPTIBLE}
-      \end{itemize}
-
-      \pause
-
-      \item Uspání procesu bez/s timeoutem:
-        \code{schedule}/\code{schedule_timeout}
-    \end{itemize}
-
-    \pause
-    
-    \item A \code{wake_up}:
-    \begin{itemize}
-      \item Probuzení procesu: \code{wake_up_process}
-      \item Popř.\ s obsluhou signálů: \code{signal_pending}
-    \end{itemize}
-
-    \pause
-
-    \item \code{completion} a \code{wait_queue} ulehčuje práci
-    \begin{itemize}
-      \item Pamatováním si, koho vzbudit
-      \item Případnou kontrolou signálů
-      \item Případnou kontrolou vypršení timeoutu
-      \item \code{completion} má navíc čítač, kolik procesů vzbudit
-    \end{itemize}
+  \item \code{dev} -- zařízení, které bude k paměti přistupovat
+    (\code{NULL} pokud neznáme)
+  \item \code{size} -- velikost, jakou požadujeme
+  \item \code{dma_handle} -- DMA adresa (návratová hodnota) -- \emph{pro zařízení}
+  \item návratová hodnota -- virtuální adresa -- \emph{pro nás}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}[fragile]{DMA v Linuxu}{Příklad}
 
-  \heading{Explicitní čekání}
-  \begin{enumerate}
-    \item Místo \code{wait_event}, použijte funkce z předchozího slidu
-    \item Jako vzor prostudujte kód ve funkci \code{afu_read}
-
-    \item Zkopírujte jej a použijte
-    \begin{itemize}
-      \item Odstraňte zámek a ostatní irelevantní kód
-    \end{itemize}
-
-    \item Pozměňte čekací podmínku
-    \begin{itemize}
-      \item Bude se čekat alespoň na 2~,,\code{a}'' a 1~,,\code{b}'' v poli
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-\mysection{Vlákna}
-
-\begin{frame}[fragile]
-  \frametitle{\code{kthread}}
-
-  \begin{itemize}
-    \item Vytvoření vlákna (procesu) pro výpočty
-    \begin{itemize}
-      \item Běží v jádře
-      \item Chování jako uživatelský proces
-    \end{itemize}
-
-    \pause
-
-    \item \header{linux/kthread.h}
-    \item Vytvoření, zrušení: \code{kthread_run}, \code{kthread_stop}
-    \item Test na skončení ve vlákně: \code{kthread_should_stop}
-  \end{itemize}
-
-  \pause
-
-  \begin{block}{Příklad}
-  \begin{center}
-  \begin{tabular}{c|c}
   \begin{lstlisting}
-static int my_fun(void *data)
-{ /* data = my_data */
-  while (1) {
-    wait_event_interruptible(...);
-    if (kthread_should_stop())
-      break;
-    do_some_work();
-  }
+int my_do_DMA(struct device *dev)
+{
+  dma_addr_t dma;
+  char *virt;
+
+  virt = dma_alloc_coherent(dev, 100, &dma, GFP_KERNEL);
+  if (!virt)
+    return -ENOMEM;
+  memset(virt, 0, 100);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  my_HW_set_addr(dev, dma);
+  my_HW_start_transfer(dev);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  while (my_HW_working(dev)) /* polling */
+    msleep(100);
+  \end{lstlisting} %stop_zone
+  \pause
+  \begin{lstlisting}
+  pr_info("%s\n", virt);
+  dma_free_coherent(dev, 100, virt, dma);
   return 0;
 }
-  \end{lstlisting}~ &
-  \begin{uncoverenv}<4->
-  ~\begin{lstlisting}
-struct task_struct *my_t;
-static int my_init(void)
-{
-  my_t = kthread_run(my_fun, my_data, "my_fun");
-  return IS_ERR(my_t) ? PTR_ERR(my_t) : 0;
-}
-static void my_exit(void)
-{
-  kthread_stop(my_t);
-}
+  \end{lstlisting} %stop_zone
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Alokace DMA paměti}
+  \begin{enumerate}
+    \item Otevřete si ovladač EDU z předminula
+    \item V \code{probe} alokujte 1 stránku DMA paměti
+    \item Použijte PCI zařízení jako první parametr alokace
+    \item Vypište si virtuální, fyzickou a DMA adresu
+    \item V \code{remove} ji uvolněte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{DMA pro PCI}
+
+  \heading{Navíc}
+  \begin{itemize}
+    \item Nastavení masky adres
+    \begin{itemize}
+      \item Ne všechna zařízení zvládnou adresovat celý fyzický prostor
+      \item \code{pci_set_dma_mask(pdev, DMA_BIT_MASK(27))}
+      \item \code{pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(27))}
+    \end{itemize}
+
+    \pause
+
+    \item Zapnutí ,,spravování sběrnice''
+    \begin{itemize}
+      \item Tj.\ zařízení umí samo iniciovat přenosy apod.
+      \item \code{pci_set_master(pdev)}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad z \code{probe}}
+  \begin{lstlisting}
+  ... /* pci_enable etc. here */
+  ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(27));
+
+  pci_set_master(pdev);
+
+  virt = dma_alloc_coherent(&pdev->dev, 100, &phys, GFP_KERNEL);
   \end{lstlisting}
-  \end{uncoverenv}
-  \end{tabular}
-  \end{center}
   \end{block}
 
 \end{frame}
 
 \begin{frame}
+  \frametitle{EDU a DMA}
+
+  \begin{itemize}
+    \item Zvládá 28bitové adresy
+    \item DMA řadič napojený na PCI sběrnici a lokální paměť v EDU
+    \begin{itemize}
+      \item Lokální paměť na adrese 0x40000
+      \item Velikost 4096~B
+    \end{itemize}
+
+    \item Generuje přerušení 8 (\code{0x100}) na kartě
+    \begin{itemize}
+      \item Po dokončení přenosu
+      \item (Jen je-li vyžádáno před přenosem)
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+  \bigskip
+
+  \heading{Úkol:} doplňte předešlou alokaci o nastavení masek na správnou
+    hodnotu a zapnutí spravování sběrnice
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{EDU DMA registry}
+
+\begin{block}{Specifikace baru 0 (pokračování z předminula)}
+\begin{center}
+\begin{table}
+\footnotesize
+\begin{tabular}{|l|l|l|l|l|} \hline
+Offset & Len & R/W & Contents & Meaning \\ \hline\hline
+0x0080 & 4B  & R/W & src      & Source address \\ \hline
+0x0088 & 4B  & R/W & dst      & Destination address \\ \hline
+0x0090 & 4B  & R/W & count    & Transfer count \\ \hline
+0x0098 & 4B  & R/W & cmd      & Command register \\ \hline
+\end{tabular}
+\end{table}
+\end{center}
+\end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item \code{cmd} registr
+    \begin{itemize}
+      \item Zapisuje se po nastavení ostatních registrů
+      \item Zapisuje se \emph{jednou}, a to kombinací bitů
+      \item Bit 0: \code{RUN} (start transfer now)
+      \item Bit 1: \code{DIRECTION} (0: from RAM to EDU, 1: from EDU to RAM)
+      \item Bit 2: \code{RQINT} (generate an interrupt after the transaction)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
   \frametitle{Úkol}
 
-  \heading{Vytvoření vlákna}
+  \heading{Práce s DMA na EDU}
   \begin{enumerate}
-    \item Vytvořte vlákno
-    \item Vlákno počká na \code{write} až někdo něco zapíše
-    \item Přepíše všechny znaky ,,\code{a}'' na ,,\code{b}''
-    \item Vzbudí všechny v \code{read}, kteří čekají na data
-    \item Opakujte v cyklu dokud někdo neodebere modulu
-    \item Vyzkoušejte zápisem a čtením do/z \file{/dev/}
+    \item 10~B DMA paměti inicializujte textovým řetězcem
+    \item Přeneste 10~B do lokální paměti EDU na adresu 0x40000
+    \begin{itemize}
+      \item Nastavte všechny 4 registry
+      \item Bez přerušení (bez \code{RQINT})
+      \item Počkejte na nulovou hodnotu bitu \code{RUN} (na dokončení přenosu)
+    \end{itemize}
+
+    \item Přeneste 10~B z EDU na DMA stránku + 10
+    \begin{itemize}
+      \item Vznikne za sebou 2$\times$ stejný řetězec
+    \end{itemize}
+
+    \item Vypište DMA stránku + 10
   \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{DMA s přerušením} \iffimuni (část domácího) \fi
+  \begin{enumerate}
+    \item Rozšiřte předchozí o přerušení
+    \begin{itemize}
+      \item Přidejte ještě jeden přenos z EDU na DMA + 20
+      \item Přenos bude s \code{RQINT}
+    \end{itemize}
+
+    \item Obslužte přerušení
+    \begin{itemize}
+      \item ACK přerušení
+      \item Iniciujte tasklet
+    \end{itemize}
+
+    \item V taskletu vypište obsah DMA paměti + 20
+    \item DMA stránku vystavte přes \code{mmap}
+  \end{enumerate}
+
+  \bigskip
+
+  \emph{POZOR}
+  \begin{itemize}
+    \item Na prezenci a správnou posloupnost zabíjení taskletu, zákazu
+      přerušení, dealokace atd.
+    \item Na použití správné funkce pro převod na \code{struct page}/\code{pfn}
+      pro \code{mmap}
+  \end{itemize}
 
 \end{frame}

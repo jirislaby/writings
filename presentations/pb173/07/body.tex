@@ -1,9 +1,9 @@
 % vim: ai sw=2 spell spelllang=cs
 
 \begin{frame}
-  \frametitle{Komunikace s HW}
+  \frametitle{Komunikace mezi procesy}
 
-  \heading{LDD3 kap. 9 a 12}
+  \heading{LDD3 část kap. 6 (zastaralá)}
 
   \iffimuni
     \bigskip
@@ -13,241 +13,45 @@
 
 \end{frame}
 
-\mysection{I/O}
+\mysection{Čekání na událost}
 
-\begin{frame}
-  \frametitle{I/O}
-  \heading{Na x86: 2 přístupy}
-  \begin{itemize}
-  \item Porty
-  \item Memory Mapped I/O
-  \end{itemize}
-
-\end{frame}
-
-\iffalse
-\subsection{I/O -- porty}
+\iffimuni
+\subsection{Completion}
 \fi
-
-\begin{frame}{I/O}{Porty}
-
-  \heading{Porty}
-  \begin{itemize}
-    \item Speciální adresový prostor
-    \begin{itemize}
-      \item Závislé na architektuře
-      \item Speciální instrukce (\code{in}, \code{out} na x86)
-    \end{itemize}
-
-    \pause
-
-    \item Samostatná (malá) sběrnice
-    \begin{itemize}
-      \item Na x86: řadič klávesnice, PC spkr, staré časovače a ovladače
-      přerušení, ladicí port (\code{0x80} $\Rightarrow$ segmentový displej
-      na desce), \dots
-    \end{itemize}
-  \end{itemize}
-
-  \pause
-
-  \heading{API}
-  \begin{itemize}
-  \item \header{linux/io.h}, \header{linux/ioport.h}
-  \item Požadavek: \code{request_region}, \code{release_region}
-  \item R/W: \code{inX(port)}, \code{outX(co, port)}, kde
-    $\text{\code{X}}\in\left\{\text{\code{b}},\text{\code{w}},\text{\code{l}}\right\}$
-  \end{itemize}
-
-  \medskip
-  \pause
-
-  \heading{Demo:} pb173/07 \\
-  \heading{Úkol:} Přečíst port 0x80, zapsat do něj 1B a znovu přečíst
-
-\end{frame}
-
-\iffalse
-\subsection{I/O -- MMIO}
-\fi
-
-\begin{frame}{I/O}{MMIO}
-
-  \heading{Memory Mapped I/O}
-  \begin{itemize}
-    \item Součástí fyzického adresového prostoru
-    \item Přístup standardním čtením/zápisem
-    \begin{itemize}
-      \item Nutnost přemapovat na virtuální adresy
-    \end{itemize}
-  \end{itemize}
-
-  \pause
-
-  \heading{API}
-  \begin{itemize}
-    \item \header{linux/io.h}, \header{linux/ioport.h}
-
-    \item Požadavek: \code{request_mem_region}, \code{release_mem_region}
-    \begin{itemize}
-      \item \file{/proc/iomem}
-    \end{itemize}
-
-    \pause
-
-    \item Mapování: \code{virt = ioremap(phys)}, \code{iounmap(virt)}
-    \begin{itemize}
-      \item \code{/proc/vmallocinfo} (novější jádra)
-    \end{itemize}
-
-    \pause
-
-    \item R/W: \code{readX(odkud)}, \code{writeX(co, kam)}, kde
-      $\text{\code{X}}\in\left\{\text{\code{b}},\text{\code{w}},\text{\code{l}},\text{\code{q}}\right\}$
-    \begin{itemize}
-      \item \pozor: nelze číst jako z paměti (optimalizace, pořadí bytů, \dots)
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\mysection{PCI zařízení}
-
-\begin{frame}
-  \frametitle{PCI zařízení}
-
-  \begin{itemize}
-    \item PCI, PCI-X, PCIe
-
-    \pause
-
-    \item Hierarchická sběrnice
-    \begin{itemize}
-      \item Identifikace doména:bus:slot:funkce
-      \item Bridge (=routery)
-    \end{itemize}
-
-    \pause
-
-    \item Konfigurační prostor
-    \begin{itemize}
-      \item Automatická konfigurace
-
-      \item ID zařízení (vendor, device), I/O prostory, IRQ
-      \begin{itemize}
-	\item \emph{Obsah} I/O prostorů -- specifikace zařízení (výrobce)
-      \end{itemize}
-
-      \item \cmd{lspci}
-    \end{itemize}
-
-    \pause
-
-    \item Podrobnosti v PCI specifikaci
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}
-  \frametitle{PCI zařízení v jádře}
-
-  \begin{itemize}
-    \item \header{linux/pci.h}, \doc{Documentation/pci/*}
-    \item \code{struct pci_dev}, \code{struct pci_bus}
-
-    \pause
-
-    \item \code{pci_\{set,get\}_drvdata}
-    \begin{itemize}
-      \item Uloží/načte programátorova data do/z \code{struct pci_dev}
-    \end{itemize}
-
-    \pause
-
-    \item Referenční počet
-    \begin{itemize}
-      \item PCI zařízení může být (fyzicky) odebráno ze systému
-      \item Ale \code{struct pci_dev} zůstává, pokud reference $> 0$
-
-      \pause
-
-      \item Zvýšení: \code{pci_dev_get}
-      \item Snížení: \code{pci_dev_put}
-    \end{itemize}
-
-    \pause
-
-    \item Identifikace (ID) zařízení
-    \begin{itemize}
-      \item \code{pci_dev->vendor}, \code{pci_dev->device}, \dots
-      \item \code{PCI_ANY_ID} značí jakékoliv ID (při hledání)
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
 
 \begin{frame}[fragile]
-  \frametitle{Hledání zařízení}
-  \framesubtitle{Iterátory (starší)}
+  \frametitle{Jednoduchá komunikace}
 
   \begin{itemize}
-    \item Dovoluje přístup k zařízení více ovladači
-    \item Nepodporuje hotplug
-    \item \code{pci_get_device} (vendor, device)
+    \item 2 procesy (producent-konzument)
+    \begin{itemize}
+      \item A: čeká na nějakou hotovou práci
+      \item B: udělá nějakou práci a oznámí A dokončení
+      \item A: pokračuje
+    \end{itemize}
   \end{itemize}
 
   \pause
 
-  \begin{block}{Iterace přes zařízení}
+  \heading{API}
+  \begin{itemize}
+    \item \header{linux/completion.h}, \code{struct completion}
+    \item \code{DECLARE_COMPLETION}$_S$, \code{init_completion}$_D$
+    \item Čekání: \code{wait_for_completion},
+      \code{wait_for_completion_interruptible} (retval)
+    \item Dokončení: \code{complete}, \code{complete_all}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
   \begin{lstlisting}
-struct pci_dev *pdev = NULL;
-
-while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
-  pr_info("%.2x:%.2x.%.2x\n",
-          pdev->bus->number,
-          PCI_SLOT(pdev->devfn),
-          PCI_FUNC(pdev->devfn));
-}
-  \end{lstlisting} %stopzone
-  \end{block}
-
-  \pause
-  \medskip
-
-  \heading{Úkol:} vypsat všechna zařízení v systému (jejich
-  \emph{vendor+device} ID)
-
-\end{frame}
-
-\begin{frame}[fragile]
-  \frametitle{Hledání zařízení}
-  \framesubtitle{Událostmi}
-
-  \begin{itemize}
-    \item Registrace háčků a seznamu chtěných zařízení
-    \begin{itemize}
-      \item Seznam: \code{struct pci_device_id} (vendor, device, atd.)
-      \item Háčky: \code{struct pci_driver} (probe, remove, suspend, atd.)
-    \end{itemize}
-    \item \code{pci_register_driver}, \code{pci_unregister_driver}
-  \end{itemize}
-
-  \begin{block}{\footnotesize Události a PCI zařízení}
-  \begin{lstlisting}[language=C]
-static struct pci_device_id my_table[] = {
-  { PCI_DEVICE(VENDOR1, DEVICE1) }, { PCI_DEVICE(VENDOR1, DEVICE2) },
-  { PCI_DEVICE(0x8086, PCI_ANY_ID), .driver_data = 1 },
-  { 0, }
-};
-MODULE_DEVICE_TABLE(pci, my_table);
-static struct pci_driver my_pci_driver = {
-  .name = "my_driver",   .id_table = my_table,   .probe = my_probe,
-};
-int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
-  pr_info("%2.x %lu\n", pdev->bus->number, id->driver_data);
-  return 0;
-}
-  \end{lstlisting} %stopzone
+static DECLARE_COMPLETION(my_comp);
+static char str[32];
+A                                        B
+wait_for_completion(&my_comp);           strcpy(str, "Ahoj");
+pr_info("%s\n", str);                    complete(&my_comp);
+  \end{lstlisting} %stop_zone
   \end{block}
 
 \end{frame}
@@ -255,121 +59,151 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Navázání PCI zařízení}
+  \heading{Použití \code{completion}}
   \begin{enumerate}
-    \item \header{linux/pci.h}
-
-    \item Definice \code{struct pci_device_id}
+    \item Do \file{pb173/11/events} doplňte \code{completion}
+    \item Číst se bude, až někdo dokončí zápis
     \begin{itemize}
-      \item \cmd{lspci -nn} a najít EDU a jeho vendor+device ID
+      \item Čekání v \code{read} bude možné přerušit signálem
+	(\code{wait_for_completion_interruptible})
+      \item V případě signálu vraťte \code{\-ERESTARTSYS}
     \end{itemize}
 
-    \item Definice \code{struct pci_driver}
-    \begin{itemize}
-      \item \code{probe}, \code{remove}, \code{name}, \code{id_table}
-    \end{itemize}
+    \item Spusťte 2 instance \cmd{cat /dev/my_name}
+    \item Spusťte několikrát \cmd{echo XXX > /dev/my_name}
 
-    \item Definice háčků (viz definici \code{struct pci_driver})
+    \item Pozorujte, co se děje, když použijete
     \begin{itemize}
-      \item \scriptsize{\code{int (*probe)(struct pci_dev *, const struct pci_device_id *)}}
-      \item \scriptsize{\code{void (*remove)(struct pci_dev *)}}
+      \item \code{complete} a potom:
+      \item \code{complete_all}
     \end{itemize}
-
-    \item V probe a remove vypsat
-    \begin{itemize}
-      \item \code{pdev->bus->number}
-      \item \code{PCI_SLOT(pdev->devfn)}
-      \item \code{PCI_FUNC(pdev->devfn)}
-    \end{itemize}
-
-    \item Zavolat \code{pci_register_driver} a \code{pci_unregister_driver}
-    \item Vložit a odebrat modul (a zkontrolovat \cmd{dmesg})
   \end{enumerate}
 
 \end{frame}
 
-\begin{frame}{Práce s PCI}
+\iffimuni
+\subsection{Wait event a ostatní}
+\fi
 
-  \heading{Probe}
+\begin{frame}
+  \frametitle{Složitější komunikace}
+
   \begin{itemize}
-    \item Inicializace PCI zařízení
+    \item Čekání na více místech na jinou událost
+    \item 3 procesy
     \begin{itemize}
-      \item \code{pci_enable_device}
-      \item Do té doby nelze některé vlastnosti \code{struct pdev} používat
-        (irq)
+      \item A: plní buffer
+      \item B: čeká na 100\,B
+      \item C: čeká na 200\,B
     \end{itemize}
-
-    \pause
-
-    \item Rezervace a mapování I/O (jako v první části \iffimuni cvičení \else
-      sekce \fi)
-    \begin{itemize}
-      \item Požadavek: \code{pci_request_region}, \code{pci_request_regions}
-      \item Mapování: \code{pci_ioremap_bar} -- alias pro
-	\code{ioremap(pci_resource_start(), pci_resource_len())}
-    \end{itemize}
-
-    \pause
-
-    \item Nastavení/detekce zařízení
-      \begin{itemize}
-	\item Závisí na zařízení
-      \end{itemize}
   \end{itemize}
 
   \pause
-  \medskip
 
-  \heading{Remove}
+  \heading{API}
   \begin{itemize}
-    \item Opak Probe
-    \item \code{iounmap}, \code{pci_release_region}(\code{s}),
-      \code{pci_disable_device}
+    \item \header{linux/wait.h}, \code{wait_queue_head_t}
+    \item \code{DECLARE_WAIT_QUEUE_HEAD}$_S$,
+      \code{init_waitqueue_head}$_D$
+    \item Čekání: \code{wait_event}, \code{wait_event_interruptible}
+    \item Dokončení: \code{wake_up}, \code{wake_up_all}
   \end{itemize}
+
+  \pause
+  \bigskip
+
+  Pozn.: \code{completion} je jen \code{wait_queue} + počítadlo
 
 \end{frame}
 
-\mysection{Zobecnění na jiné sběrnice}
+\begin{frame}[fragile]{Složitější komunikace}{Příklad}
 
-\begin{frame}
-  \frametitle{Zobecnění}
+  \begin{lstlisting}
+static DECLARE_WAIT_QUEUE_HEAD(my_wait);
+static atomic_t my_cnt = ATOMIC_INIT(0);
+static char str[512];
+...
+A
+  for (a = 0; a < sizeof(str); a++) {
+    str[atomic_inc_return(&my_cnt) - 1] = 'A';
+    wake_up_all(&my_wait);
+    msleep(50);
+  }
+  \end{lstlisting}
 
-  \heading{Většina ostatních sběrnic funguje stejně}
-  \begin{itemize}
-  \item USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \dots
-  \item Nějaké probe/remove
-  \item Seznam ID
-  \item Registrace ,,ovladače''
-  \end{itemize}
+  \pause
+
+  \begin{lstlisting}
+B
+  wait_event(my_wait, atomic_read(&my_cnt) > 100);
+  pr_info("%s\n", str);
+  \end{lstlisting} %stop_zone
+
+  \pause
+
+  \begin{lstlisting}
+C
+  if (wait_event_interruptible(my_wait, atomic_read(&my_cnt) > 200)) {
+    pr_info("interrupted\n");
+    return;
+  }
+  pr_info("%s\n", str);
+  \end{lstlisting} %stop_zone
 
 \end{frame}
 
-\mysection{EDU karta}
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Použití \code{wait_queue}}
+  \begin{enumerate}
+    \item V \file{pb173/11/events} použijte namísto \code{completion}
+      \code{wait_queue}
+    \item Číst se bude, až bude v bufferu zapsáno alespoň 5 znaků
+  \end{enumerate}
+
+\end{frame}
+
+\iffimuni
+\subsection{Scheduler a probouzení procesů}
+\fi
 
 \begin{frame}
-  \frametitle{Specifikace baru 0 karty EDU}
-
-\begin{block}{Specifikace baru 0 karty EDU}
-%\footnotesize
-\begin{center}
-\begin{tabular}{|l|l|l|l|} \hline
-Offset & Len & R/W & Meaning \\ \hline\hline
-0x0000 & 4B  & R   & ID \& Revision \\ \hline
-0x0004 & 4B  & R/W & Inverted value \\ \hline
-0x0008 & 4B  & R/W & Factorial \\ \hline
-0x0020 & 4B  & R/W & Status    \\ \hline
-\end{tabular}
-\end{center}
-\end{block}
+  \frametitle{Scheduler}
 
   \begin{itemize}
-    \item ID \& Revision: \code{0xRRrr00edu}, RR -- major, rr -- minor
-    \item Inverted value: zapsané číslo se obrátí (C operátor \code{\~})
-    \item Faktoriál: vypočte se faktoriál (je nutné počkat na status bit 0)
-    \item Status:
+    \item Celé je to instruování plánovače (\header{linux/sched.h})
+
+    \item Ve skutečnosti je \code{wait_event}:
     \begin{itemize}
-      \item Bit 0 -- probíhá výpočet faktoriálu
-      \item Bit 7 -- má faktoriál generovat přerušení?
+      \item Nastavení typu spícího stavu procesu: \code{set_current_state}
+      \begin{itemize}
+	\item D stav: \code{TASK_UNINTERRUPTIBLE}
+	\item S stav: \code{TASK_INTERRUPTIBLE}
+      \end{itemize}
+
+      \pause
+
+      \item Uspání procesu bez/s timeoutem:
+        \code{schedule}/\code{schedule_timeout}
+    \end{itemize}
+
+    \pause
+    
+    \item A \code{wake_up}:
+    \begin{itemize}
+      \item Probuzení procesu: \code{wake_up_process}
+      \item Popř.\ s obsluhou signálů: \code{signal_pending}
+    \end{itemize}
+
+    \pause
+
+    \item \code{completion} a \code{wait_queue} ulehčuje práci
+    \begin{itemize}
+      \item Pamatováním si, koho vzbudit
+      \item Případnou kontrolou signálů
+      \item Případnou kontrolou vypršení timeoutu
+      \item \code{completion} má navíc čítač, kolik procesů vzbudit
     \end{itemize}
   \end{itemize}
 
@@ -378,20 +212,91 @@ Offset & Len & R/W & Meaning \\ \hline\hline
 \begin{frame}
   \frametitle{Úkol}
 
-  \heading{Vyčtení identifikace karty EDU a práce s ní}
+  \heading{Explicitní čekání}
   \begin{enumerate}
-    \item Povolte zařízení (\code{pci_enable_device})
-    \item Rezervujte bar 0 (\code{pci_request_region})
-    \item Vypište fyzickou adresu baru 0 a porovnejte s výstupem \cmd{lspci}
-    \item Přemapujte bar 0 (\code{ioremap})
-    \item Přečtěte a \emph{rozkódujte} identifikaci a revizi (\code{readX})
-    \item Ověřte živost karty pomocí invertovacího registru
+    \item Místo \code{wait_event}, použijte funkce z předchozího slidu
+    \item Jako vzor prostudujte kód ve funkci \code{afu_read}
 
-    \iffimuni\else
-    \item Vypočtěte kartou faktoriál 3, 4 a 5 a vypište
-    \fi
+    \item Zkopírujte jej a použijte
+    \begin{itemize}
+      \item Odstraňte zámek a ostatní irelevantní kód
+    \end{itemize}
 
-    \item Ukliďte v remove (unmap, release, disable)
+    \item Pozměňte čekací podmínku
+    \begin{itemize}
+      \item Bude se čekat alespoň na 2~,,\code{a}'' a 1~,,\code{b}'' v poli
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\mysection{Vlákna}
+
+\begin{frame}[fragile]
+  \frametitle{\code{kthread}}
+
+  \begin{itemize}
+    \item Vytvoření vlákna (procesu) pro výpočty
+    \begin{itemize}
+      \item Běží v jádře
+      \item Chování jako uživatelský proces
+    \end{itemize}
+
+    \pause
+
+    \item \header{linux/kthread.h}
+    \item Vytvoření, zrušení: \code{kthread_run}, \code{kthread_stop}
+    \item Test na skončení ve vlákně: \code{kthread_should_stop}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+  \begin{center}
+  \begin{tabular}{c|c}
+  \begin{lstlisting}
+static int my_fun(void *data)
+{ /* data = my_data */
+  while (1) {
+    wait_event_interruptible(...);
+    if (kthread_should_stop())
+      break;
+    do_some_work();
+  }
+  return 0;
+}
+  \end{lstlisting}~ &
+  \begin{uncoverenv}<4->
+  ~\begin{lstlisting}
+struct task_struct *my_t;
+static int my_init(void)
+{
+  my_t = kthread_run(my_fun, my_data, "my_fun");
+  return IS_ERR(my_t) ? PTR_ERR(my_t) : 0;
+}
+static void my_exit(void)
+{
+  kthread_stop(my_t);
+}
+  \end{lstlisting}
+  \end{uncoverenv}
+  \end{tabular}
+  \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Vytvoření vlákna}
+  \begin{enumerate}
+    \item Vytvořte vlákno
+    \item Vlákno počká na \code{write} až někdo něco zapíše
+    \item Přepíše všechny znaky ,,\code{a}'' na ,,\code{b}''
+    \item Vzbudí všechny v \code{read}, kteří čekají na data
+    \item Opakujte v cyklu dokud někdo neodebere modulu
+    \item Vyzkoušejte zápisem a čtením do/z \file{/dev/}
   \end{enumerate}
 
 \end{frame}
