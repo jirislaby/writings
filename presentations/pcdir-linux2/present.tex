@@ -362,6 +362,9 @@ personality(ADDR_LIMIT_32BIT | UNAME26);
     \end{itemize}
 
     \item Co se stane?
+    \begin{itemize}
+      \item Může interferovat se SELINUX/AppArmor, \dots
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -443,6 +446,9 @@ personality(ADDR_LIMIT_32BIT | UNAME26);
     \pause
 
     \item Většinu z toho dělá: \code{int daemon(int nochdir, int noclose)}
+    \begin{itemize}
+      \item Chybí např.\ reset signálů
+    \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -503,6 +509,44 @@ personality(ADDR_LIMIT_32BIT | UNAME26);
 \frame{\subsectionpage}
 
 \input{../pcdir-linux/signals.tex}
+
+\begin{frame}[fragile]{Předávání parametru se signálem}
+
+  \begin{itemize}
+    \item 3.\ parametr funkce \code{sigqueue}
+    \begin{itemize}
+      \item \code{const union sigval val}
+      \item Obsahuje \code{int} a \code{void *}
+    \end{itemize}
+
+    \pause
+
+    \item Signál se doručí i s předaným parametrem
+
+    \pause
+
+    \item 2.\ parametr funkce \code{sa_sigaction}
+    \begin{itemize}
+      \item \code{siginfo_t}
+      \item Položka \code{si_value}
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt,columns=fullflexible]
+static void handler(int sig, siginfo_t *si, void *ctx) {
+  printf("value=%d\n", si->si_value.sival_int); // prints 10
+}
+
+int main() {
+...
+  sigqueue(getpid(), SIGINT, (union sigval){10});
+}
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
 
 \begin{frame}[fragile]{Blokování signálů}
 
@@ -785,7 +829,12 @@ long mq_curmsgs;     /* # of messages currently in queue */
   \begin{itemize}
     \item \doc{man sem\_overview}, \header{semaphore.h}, knihovna \cmd{\-pthread}
     \item Vytvoření: \code{sem_t *sem_open(const char *name, int oflag,
-      mode_t mode, unsigned int value)}
+      mode_t mode,} \\ \code{unsigned int value)}
+    \begin{itemize}
+      \item Parametry jako u \code{open}
+      \item Ale jméno: 1 lomítko na začátku (\file{/nazev})
+      \item \code{value}: iniciální hodnota semaforu
+    \end{itemize}
 
     \pause
 
