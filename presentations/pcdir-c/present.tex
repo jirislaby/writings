@@ -2,7 +2,7 @@
 
 \input{header.tex}
 
-\date{26.--28. 7. \the\year}
+\date{7.--9. 12. \the\year}
 
 \pcdirctrue
 
@@ -3200,910 +3200,16 @@ array[1][0][15][4] = 1;
 
 \end{frame}
 
-\fi
-
-% XXX TODO continue reviewing here
-
-\section{Řetězce}
-\frame{\sectionpage}
-
-\begin{frame}{Pole znaků, řetězce}
-
-  \begin{itemize}
-    \item Jak uchovat jeden znak?
-    \begin{itemize}
-      \item Umíme: \code{char}
-
-      \pause
-
-      \item Jak uchovat celé slovo, popř.\ větu?
-    \end{itemize}
-
-    \pause
-
-    \item Nepraktická možnost -- nezávislé proměnné
-    \begin{itemize}
-      \item \code{char first = 'E'; char second = 'T';}
-      \item \code{printf("\%c\%c", first, second);}
-    \end{itemize}
-
-    \pause
-
-    \item Praktičtější možnost -- pole znaků
-    \begin{itemize}
-      \item \code{char sentence[10];}
-      \item \code{for (int i = 0; i < sizeof(sentence); i++)} \\
-        ~~\code{printf("\%c", sentence[i]);}
-    \end{itemize}
-
-    \pause
-
-    \item Jak se pozná konec slova/věty?
-    \begin{itemize}
-      \item Speciální znak: \code{\\0} (binární nula)
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Řetězce v C}
-
-  \begin{itemize}
-    \item Řetězce v C jsou pole znaků ukončené binární nulou
-
-    \pause
-
-    \item \code{\"Hello"}
-    \begin{itemize}
-      \item \code{\{ 'H', 'e', 'l', 'l', 'o', 0 \}}
-    \end{itemize}
-
-    \pause
-
-    \item Díky ukončovací nule nemusíme udržovat délku pole
-    \begin{itemize}
-      \item Pole znaků procházíme do výskytu koncové nuly
-      \item Řetězec lze ,,zkrátit'' zapsáním nuly dříve
-%      \item Vzniká riziko jejího přepsání (viz dále)
-    \end{itemize}
-
-    \pause
-
-    \item Deklarace řetězců
-    \begin{itemize}
-      \item \code{char str1[100]; // max. 99 znaku + koncova nula}
-      \item \code{char str2[] = "Hello"; // delka dle konstanty, viz dale}
-    \end{itemize}
-
-    \pause
-
-    \item Od C99 lze i široké (wide) znaky/řetězce
-    \begin{itemize}
-      \item \code{wchar_t wide_str[100]; // max. 99 unicode znaku + koncova
-        nula}
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Řetězcová konstanta v C}
-
-  \begin{itemize}
-    \item Je uzavřená v uvozovkách \code{\""}
-
-    \pause
-
-    \item Je uložena v datové sekci programu
-
-    \pause
-
-    \item Obsahuje koncovou nulu (binární 0, zápis 0 nebo \code{\\0})
-    \begin{itemize}
-      \item \pozor: \code{'0'} NENÍ binární nula (je to ASCII znak s hodnotou
-	48)
-      \pause
-      \item Co se zobrazí při výpisu \code{\"ahoj0svet\\0e"}?
-    \end{itemize}
-
-    \onslide<6->
-
-    \item Konstanty pro široké (unicode) řetězce mají předřazené \code{L}
-    \begin{itemize}
-      \item \code{L"}\texttt{Děsně šťavňaťoučké}\code{\"}
-      \item \code{sizeof(L"Hello") == sizeof("Hello") * sizeof(wchar_t)}
-    \end{itemize}
-
-  \end{itemize}
-
-  \onslide<5->
-
-  \begin{block}{Příklady}
-  \begin{center}
-    \begin{tabular}{|l|l|l|l|} \hline
-      Řetězec		& Délka & Místo v paměti & Poznámka \\ \hline
-      \code{\""}	& 0 & 1 & Pouze koncová 0 \\ \hline
-      \code{\"Hello"}	& 5 & 6 & \\ \hline
-      \code{\"Hello world"} & 11 & 12 & \\ \hline
-      \code{\"Hello \\t wor\\0ld"} & 11 & 15 & \\ \hline
-    \end{tabular}
-  \end{center}
-  \end{block}
-
-\end{frame}
-
-\begin{frame}{Inicializace řetězců}
-
-  \begin{itemize}
-    \item Řetězec je pole znaků ukončené nulou, jak inicializovat?
-    \begin{itemize}
-      \item Jako pole: \code{char str1[] = \{ 'W', 'o', 'r' , 'l' , 'd',
-        0 \};}
-
-      \pause
-
-      \begin{itemize}
-	\item \pozor: \code{char str_bad[] = \{ 'W', 'o', 'r' , 'l' , 'd' \};}
-	\item \code{str_bad} \emph{neobsahuje} koncovou nulu, \code{str1} ano
-      \end{itemize}
-
-      \pause
-
-      \item Pomocí konstanty: \code{char str2[] = "World";}
-
-      \pause
-
-      \item \footnotesize \code{sizeof(str1) == sizeof(str2) == sizeof("World") == 6 * sizeof(char)}
-    \end{itemize}
-
-    \pause
-
-    \item Pozor na rozdíl ukazatel a pole
-    \begin{itemize}
-      \item \code{char str[50] = "Hello";}
-      \begin{itemize}
-	\item Pole, na začátku inicializované na \code{\"Hello"}
-      \end{itemize}
-
-      \pause
-
-      \item \code{char *str = "Hello";}
-      \begin{itemize}
-	\item Ukazatel na řetězcovou konstantu
-
-	\pause
-
-	\item Řetězcové konstanty nelze měnit
-
-	\item \code{str[5] = 'y'; // spatne}
-
-	\pause
-
-	\item Vhodné použít \code{const char *str = "Hello";}
-      \end{itemize}
-
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Manipulace řetězci}
-
-  \begin{enumerate}
-    \item Jako s ukazatelem
-    \begin{itemize}
-      \item Využití ukazatelové aritmetiky, operátory \code{+}, \code{\-}, \dots
-    \end{itemize}
-
-    \pause
-
-    \item Jako s polem
-    \begin{itemize}
-      \item Využití operátoru \code{[]}
-    \end{itemize}
-
-    \pause
-
-    \item Pomocí knihovních funkcí
-    \begin{itemize}
-      \item Hlavičkový soubor \header{string.h}
-      \item \code{strcpy}, \code{strcmp}, \code{strcat}, \dots
-    \end{itemize}
-
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}{Ukazatelová aritmetika s řetězci}
-
-  \begin{itemize}
-    \item Řetězec $\sim$ pole znaků $\sim$ ukazatel
-    \begin{itemize}
-      \item \code{char str1[] = "Hello world";}
-      \item \code{str1[4]; *(str1 + 4)}
-      \item \code{str1 + 6} je \code{\"world"}
-    \end{itemize}
-
-    \pause
-
-    \item Můžeme uchovávat ukazatel doprostřed jiného řetězce
-    \begin{itemize}
-      \item \code{char *str2 = str1 + 6; // str2 is "world"}
-    \end{itemize}
-
-    \pause
-
-    \item Můžeme řetězec ukončit vložením nuly
-    \begin{itemize}
-      \item \code{str1[5] = 0; // str1 is "Hello"}
-    \end{itemize}
-
-    \pause
-
-    \item \pozor: řetězce v C nemění automaticky svou velikost
-    \begin{itemize}
-      \item Nedochází k automatickému zvětšení řetězce na potřebnou délku
-      \item Nekorektní použití může vést k zápisu za konec pole
-      \begin{itemize}
-	\item A pádu!
-      \end{itemize}
-    \end{itemize}
-
-    \pause
-
-    \item \code{str1 + str2} je sčítání \emph{ukazatelů} na řetězce
-    \begin{itemize}
-      \item Nikoli jejich řetězení (jak je např.\ v C++ nebo Javě pro typ
-	\code[language=C++]{string})
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Úkol}
-
-  \heading{Řeťezec a jeho průchod}
-  \begin{enumerate}
-    \item Otevřete si čistý projekt \file{07/main.pro}
-    \item Deklarujte si proměnnou typu \code{char []} (řetězec)
-    \item Inicializujte libovolným řetězcem
-
-    \item Vypište řetězec
-    \begin{itemize}
-      \item \code{print_string}
-    \end{itemize}
-
-    \item Projděte řetězec cyklem jako pole a vypište jednotlivé znaky
-    \begin{itemize}
-      \item \code{print_char}
-      \item Než narazíte na koncovou \code{0}
-    \end{itemize}
-
-    \item Vypište hodnotu iterátoru = délku řetězce
-
-    \item Vypište si hodnotu ukazatele na 1. (v C nultý) a poslední znak
-    \begin{itemize}
-      \item \code{print_pointer}
-    \end{itemize}
-
-    \item Přeložte a spusťte
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}{Knihovní funkce pro práci s řetězci}
-
-  \begin{itemize}
-    \item Hlavičkový soubor \header{string.h}
-    \begin{itemize}
-      \item \code{\#include <string.h>}
-    \end{itemize}
-
-    \pause
-
-    \item Nejdůležitější funkce
-    \begin{itemize}
-      \item \code{strcpy}, \code{strcat}, \code{strlen}, \code{strcmp},
-        \code{strchr}, \code{strstr}, \dots
-      \item Výpis řetězce: \code{puts(str)}, \code{printf("\%s", str);
-        // stdio.h}
-    \end{itemize}
-
-    \pause
-
-    \item Obecná pravidla
-    \begin{itemize}
-      \item Funkce předpokládají korektní C řetězec ukončený nulou
-
-      \pause
-
-      \item Funkce modifikující řetězce (\code{strcpy}, \code{strcat}, \dots)
-        očekávají dostatečný paměťový prostor v cílovém řetězci
-      \begin{itemize}
-	\item Jinak zápis za koncem alokovaného místa a poškození
-      \end{itemize}
-
-      \pause
-
-      \item Při modifikaci většinou dochází ke korektnímu umístění koncové
-        \code{0}
-      \begin{itemize}
-	\item Pozor na výjimky
-      \end{itemize}
-
-    \end{itemize}
-
-    \pause
-
-    \item Dokumentace
-    \begin{itemize}
-      \item V terminálu: \cmd{man strcpy}
-      \item \url{http://www.cplusplus.com/reference/clibrary/cstring/}
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{Jak číst dokumentaci?}
-
-\begin{lstlisting}[language=XML]
-NAME
-       strcpy, strncpy - copy a string
-
-SYNOPSIS
-       #include <string.h>
-
-       char *strcpy(char *dest, const char *src);
-       char *strncpy(char *dest, const char *src, size_t n);
-
-DESCRIPTION
-       The strcpy() function copies the string pointed to by src, including the terminating
-       null byte ('\0'), to the buffer pointed to by dest.  The strings  may  not  overlap,
-       and the destination string dest must be large enough to receive the copy.  Beware of
-       buffer overruns!  (See BUGS.)
-...
-
-RETURN VALUE
-       The  strcpy()  and  strncpy()  functions  return a pointer to the destination string
-       dest.
-
-SEE ALSO
-       bcopy(3),  memccpy(3),  memcpy(3),  memmove(3),  stpcpy(3),  stpncpy(3),  strdup(3),
-       string(3), wcscpy(3), wcsncpy(3)
-\end{lstlisting}
-
-\end{frame}
-
-\begin{frame}[fragile]{Nejdůležitější funkce pro řetězce}
-
-  \begin{itemize}
-    \item \code{strlen(a)} -- délka řetězce \code{a} bez koncové nuly
-
-    \pause
-
-    \item \code{strcpy(a, b)} -- kopíruje obsah řetězce \code{b} do \code{a}
-    \begin{itemize}
-      \item \code{a} musí být dostatečně dlouhý pro \code{b}
-    \end{itemize}
-
-    \pause
-
-    \item \code{strcat(a, b)} -- připojí řetězec \code{b} za \code{a}
-    \begin{itemize}
-      \item Nutná délka pro \code{a}: \code{strlen(a) + strlen(b) + 1} (koncová
-        nula)
-    \end{itemize}
-
-    \pause
-
-    \item \code{strcmp(a, b)} -- porovná shodu \code{a} s \code{b}
-    \begin{itemize}
-      \item Vrací $0$, pokud jsou \code{a} a \code{b} shodné (znaky i délka)
-      \item Vrací $>0$ pokud je \code{a} ,,větší'' než \code{b}
-      \item Vrací $<0$ pokud je \code{a} ,,menší'' než \code{b}
-    \end{itemize}
-
-  \end{itemize}
-
-  \onslide<1->
-
-  \begin{block}{Příklady}
-\begin{lstlisting}[belowskip=0pt]
-void fun(const char *str1, const char *str2) {
-  int copy[strlen(str1) + strlen(str2) + 1]; // copy is now garbage
-\end{lstlisting}
-  \onslide<2->
-\begin{lstlisting}[belowskip=0pt,aboveskip=0pt]
-  strcpy(copy, str1); // copy is now str1
-\end{lstlisting}
-  \onslide<3->
-\begin{lstlisting}[belowskip=0pt,aboveskip=0pt]
-  strcat(copy, str2); // copy is now str1str2 (joined with no space)
-\end{lstlisting}
-  \onslide<4->
-\begin{lstlisting}[belowskip=0pt,aboveskip=0pt]
-  if (strcmp(str1, str2))
-    printf("%s and %s differ\n", str1, str2);
-\end{lstlisting}
-  \onslide<1->
-\begin{lstlisting}[aboveskip=0pt]
-}
-\end{lstlisting}
-  \end{block}
-
-\end{frame}
-
-\begin{frame}[fragile]{Nejdůležitější funkce pro řetězce}
-
-  \begin{itemize}
-    \item \code{strchr(a, c)} -- hledá výskyt \emph{znaku} \code{c} v řetězci
-      \code{a}
-    \begin{itemize}
-      \item Vrací ukazatel na první výskyt \code{c}, nebo \code{NULL}
-    \end{itemize}
-
-    \pause
-
-    \item \code{strstr(a, b)} -- hledá výskyt \emph{řetězce} \code{b} v řetězci
-      \code{a}
-    \begin{itemize}
-      \item Vrací ukazatel na první výskyt \code{b}, nebo \code{NULL}
-    \end{itemize}
-
-    \pause
-
-    \item Analogické funkce pro \emph{široké} znaky
-    \begin{itemize}
-      \item V hlavičkovém souboru \header{wchar.h}
-      \item Název funkce obsahuje \code{wcs} namísto \code{str}
-
-      \pause
-
-      \item Např.\ \code{wchar_t *wcscpy(wchar_t *, const wchar_t *)}
-    \end{itemize}
-
-  \end{itemize}
-
-  \onslide<1->
-
-  \begin{block}{Příklady}
-\begin{lstlisting}[belowskip=0pt]
-void fun(const char *str) {
-  char *p;
-
-  if ((p = strchr(str, 'e')))
-    printf("'e' found in %s here: %s\n", str, p);
-\end{lstlisting}
-  \onslide<2->
-\begin{lstlisting}[belowskip=0pt]
-  if ((p = strstr(str, "end")))
-    printf("'end' found in %s here: %s\n", str, p);
-\end{lstlisting}
-  \onslide<1->
-\begin{lstlisting}[aboveskip=0pt]
-}
-\end{lstlisting}
-  \end{block}
-
-\end{frame}
-
-\begin{frame}{Úkol}
-
-  \heading{Řeťezcové funkce}
-  \begin{enumerate}
-    \item Vypište délku řetězce
-    \begin{itemize}
-      \item Využijte \code{strlen}
-    \end{itemize}
-
-    \item Vytvořte si kopii řetězce
-    \item Vypište ji
-    \item Přeložte a spusťte
-  \end{enumerate}
-
-\end{frame}
-
-\begin{frame}{Testování znaků v řetězci <ctype.h>}
-
-\begin{table}
-{ \footnotesize
-\begin{tabular}{|l|l|} \hline
-\textbf{Funkce}   & \textbf{Je znak \code{c} \dots} \\ \hline
-\code{isalpha(c)} & písmeno (malé nebo velké)? \\ \hline
-\code{isdigit(c)} & dekadická číslice? \\ \hline
-\code{isxdigit(c)}& hexadecimální číslice (0-9, a-f, A-F)? \\ \hline
-\code{isalnum(c)} & písmeno nebo číslice? \\ \hline
-\code{ispunct(c)} & speciální (tisknutelný, ale ani písmeno ani číslice)? \\ \hline
-\code{isprint(c)} & tisknutelný (písmeno, číslice, speciální nebo mezera)? \\ \hline
-\code{isgraph(c)} & s grafickou podobou (písmeno, číslice, speciální, ne mezera)? \\ \hline
-\code{isspace(c)} & bílý znak (mezera, tabulátor, nový řádek, \dots)? \\ \hline
-\code{iscntrl(c)} & řídicí znak (v ASCII jsou to znaky s kódem $<32$ nebo $=127$)? \\ \hline
-\code{isupper(c)} & velké písmeno? \\ \hline
-\code{islower(c)} & malé písmeno? \\ \hline
-\end{tabular}
-}
-\caption{Klasifikace znaků}
-\end{table}
-
-\pause
-
-\begin{table}
-{ \footnotesize
-\begin{tabular}{|l|l|} \hline
-\textbf{Funkce}   & \textbf{Návratová hodnota} \\ \hline
-\code{toupper(c)} & \code{islower(c)} $\Rightarrow$ velké písmeno odpovídající \code{c}, jinak \code{c} \\ \hline
-\code{tolower(c)} & \code{isupper(c)} $\Rightarrow$ malé písmeno odpovídající \code{c}, jinak \code{c} \\ \hline
-\end{tabular}
-}
-\caption{Převod znaků -- z malých písmen na velká a naopak}
-\end{table}
-
-\end{frame}
-
-\begin{frame}{Časté problémy}
-
-  \begin{itemize}
-    \item Nedostatečně velký cílový řetězec
-    \begin{itemize}
-      \item Např.\ při \code{strcpy}
-    \end{itemize}
-
-    \pause
-
-    \item Chybějící koncová nula
-    \begin{itemize}
-      \item Následné funkce nad řetězcem nefungují korektně
-      \item Vznikne např.\ nevhodným přepisem (N+1 problém)
-    \end{itemize}
-
-    \pause
-
-    \item Nevložení koncové nuly
-    \begin{itemize}
-      \item Např.\ při \code{strncpy}
-    \end{itemize}
-
-    \pause
-
-    \item Délka/velikost řetězce bez místa pro koncovou nulu
-    \begin{itemize}
-      \item Např.\ při \code{strlen}
-    \end{itemize}
-
-    \pause
-
-    \item \code{if (str == "Hello") \{ ... \}}
-    \begin{itemize}
-      \item Špatně, porovnává hodnotu ukazatelů, nikoli obsah řetězců
-      \item Nutno použít \code{if (strcmp(str, "Hello") == 0) \{ ... \}}
-    \end{itemize}
-
-    \pause
-
-    \item Spájení řetězců pomocí \code{+}
-    \begin{itemize}
-      \item Sčítá ukazatele namísto obsahu
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{Problémy s řetězci}{Příklad}
-
-\begin{lstlisting}
-char str1[] = "Hello";
-strcpy(str1, "Hello world");
-puts(str1);
-\end{lstlisting}
-\pause
-\begin{lstlisting}
-char str2[] = "Hello";
-str2[strlen(str2)] = '!';
-puts(str2);
-\end{lstlisting}
-\pause
-\begin{lstlisting}
-char str3[] = "Hello";
-strncpy(str3, "Hello world", sizeof(str3));
-\end{lstlisting}
-\pause
-\begin{lstlisting}
-char str4[] = "Hello";
-char str5[strlen(str4)];
-strcpy(str4, str5);
-\end{lstlisting}
-\pause
-\begin{lstlisting}
-char str6[] = "Hello";
-  if (str6 == "Hello") {
-}
-\end{lstlisting}
-
-\end{frame}
-
-\begin{frame}{Pole řetězců}
-
-  \begin{itemize}
-    \item Pole ukazatelů na řetězce
-
-    \pause
-
-    \item Typicky nepravoúhlé (řetězce jsou různé dlouhé)
-
-    \pause
-
-    \item Použití často pro skupinu konstantních řetězců
-    \begin{itemize}
-      \item Např.\ dny v týdnu
-      \item \code{char *days[] = \{ "Pondeli", "Utery", "Streda" \};}
-      \begin{itemize}
-	\item Pole se třemi položkami typu \code{char *}
-	\item \code{days[0]} ukazuje na konstantní řetězec \code{\"Pondeli"}
-      \end{itemize}
-    \end{itemize}
-
-    \pause
-
-    \item Co způsobí \code{strcpy(days[0], "Ctvrtek")}?
-    \begin{itemize}
-      \item Zapisujeme do paměti s konstantním řetězcem
-      \item Pravděpodobně způsobí pád
-      \item Vhodné kontrolovat překladačem
-      \begin{itemize}
-	\item Klíčové slovo \code{const}
-      \end{itemize}
-    \end{itemize}
-
-  \end{itemize}
-
-%\pause
-%\begin{lstlisting}
-%char *days[] = { "Pondeli", "Utery", "Streda" };
-%puts(days[0]);
-%strcpy(days[0], "Ctvrtek");
-%\end{lstlisting}
-
-\end{frame}
-
-\subsection*{Klíčové slovo \texttt{const}}
-\frame{\subsectionpage}
-
-\begin{frame}[fragile]{Klíčové slovo \texttt{const}}
-
-  \begin{itemize}
-    \item Zavedeno pro zvýšení robustnosti kódu
-    \begin{itemize}
-      \item Chceme označit proměnnou, která nemá být měněna
-      \item Typicky konstanta, např.\ počet měsíců v roce
-    \end{itemize}
-
-    \pause
-
-    \item Kontroluje přímo překladač
-    \pause
-    \begin{itemize}
-      \item A navíc může optimalizovat
-    \end{itemize}
-
-    \pause
-
-    \item Používejte kdykoliv je to možné
-
-    \pause
-
-    \item Dokumentační účel
-    \begin{itemize}
-      \item Jiný programátor získá lepší představu o ,,ne/proměnných''
-    \end{itemize}
-
-  \end{itemize}
-
-  \pause
-
-\begin{block}{Příklad}
-\begin{lstlisting}
-void fun(const int *param) {
-  //const int a, b = 0; // error, uninitialized const 'a'
-  const int months_in_year = 12;
-  printf("Number of months in year: %d\n", months_in_year);
-
-  months_in_year = 13; // error: assignment of read-only variable
-  *param = 1; // error: assignment of read-only location
-}
-\end{lstlisting} %stopzone
-\end{block}
-
-\end{frame}
-
-\begin{frame}[fragile]{Řetězcové literály}
-
-  \begin{itemize}
-    \item \code{puts("ahoj");}
-    \begin{itemize}
-      \item Řetězec \code{\"ahoj"} je uložen v konstantní sekci
-      \item Je typu \code{char *}, ale zároveň v konstantní sekci
-      \begin{itemize}
-	\item Při zápisu pravděpodobně pád programu
-      \end{itemize}
-    \end{itemize}
-
-    \onslide<4->
-
-    \item Používejte tedy \code{const char *}
-    \begin{itemize}
-      \item Překladač hlídá pokus o zápis do konstantní sekce
-      \item \code{const char *days[] = \{ "Pondeli", "Utery", "Streda" \}}
-    \end{itemize}
-  \end{itemize}
-
-  \onslide<2->
-
-\begin{block}{Příklad}
-\begin{lstlisting}
-char *get_string() { return "Unmodifiable string"; }
-const char *get_const_string() { return "Unmodifiable string"; }
-\end{lstlisting}
-\onslide<3->
-\begin{lstlisting}
-void fun() {
-  char *value = get_string();
-  value[1] = 'x'; // read-only memory write -- problem
-  char *value2 = get_const_string(); // error: invalid conversion
-}
-\end{lstlisting}
-\end{block}
-
-\end{frame}
-
-\begin{frame}[fragile]{\texttt{const} ukazatel}
-
-  \begin{itemize}
-    \item Konstantní je pouze hodnota označené proměnné
-    \begin{itemize}
-      \item Platí i pro ukazatel včetně dereference
-      \item \code{int value = 10; const int *p = \&value;}
-    \end{itemize}
-
-    \pause
-
-    \item Konstantní ale není objekt proměnnou odkazovaný
-    \begin{itemize}
-      \item \code{const} je ,,plytké''
-      \item Konstantní proměnnou lze modifikovat přes nekonstantní ukazatel
-    \end{itemize}
-
-  \end{itemize}
-
-  \pause
-
-\begin{block}{Příklad}
-\begin{lstlisting}
-const int value = 10;
-const int *p1 = &value;
-int *p2 = (int *)&value;
-
-value = 10; // error
-*p1 = 10; // error
-*p2 = 10; // possible
-\end{lstlisting}
-\end{block}
-
-\end{frame}
-
-\begin{frame}[fragile]{Předání \texttt{const} ukazatele do funkce}
-
-\begin{lstlisting}
-void foo(const int *carray) {
-  // error: assignment of read-only location 'carray'
-  carray[0] = 1;
-  int *tmp = (int *)carray;
-  // possible, but unwanted! (array was const, tmp is not)
-  tmp[0] = 1;
-}
-
-int main() {
-  int array[10];
-  foo(array);
-  return 0;
-}
-\end{lstlisting}
-
-\end{frame}
-
-\subsection*{Argumenty funkce \code{main}}
-\frame{\subsectionpage}
-
-\begin{frame}{Argumenty funkce \code{main}}
-
-  \begin{itemize}
-    \item Funkce main může mít tři verze:
-    \begin{enumerate}
-      \item \code{int main(void);}
-      \begin{itemize}
-	\item Bez parametrů
-      \end{itemize}
-
-      \pause
-
-      \item \code{int main(int argc, char *argv[]);}
-      \begin{itemize}
-	\item Parametry předané programu při spuštění
-	\item \code{**argv == *argv[]}
-      \end{itemize}
-
-      \pause
-
-      \item \code{int main(int argc, char **argv, char **envp);}
-      \begin{itemize}
-	\item Navíc proměnné prostředí
-      \end{itemize}
-
-    \end{enumerate}
-
-    \item Např.\ \cmd{./binary -param1 -param2 hello "hello world"}
-
-    \pause
-
-    \item \code{argc} obsahuje počet parametrů + 1
-
-    \pause
-
-    \item \code{argv[]} je pole řetězců, každý obsahuje jeden parametr
-    \begin{itemize}
-      \item \code{argv[0]}: cesta k programu (je-li \code{argc > 0})
-      \item \code{argv[1]}: první parametr
-    \end{itemize}
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{Úkol}
-
-  \heading{Výpis parametrů main}
-  \begin{enumerate}
-    \item Projděte a vypište všechny parametry příkazové řádky
-    \item Pro každý vypište, kolik obsahuje čísel a znaků
-    \begin{itemize}
-      \item \code{isalpha}, \code{isdigit}
-    \end{itemize}
-
-    \item Každý převeďte na velká písmena a vypište
-    \begin{itemize}
-      \item \code{toupper}
-    \end{itemize}
-
-    \item Přeložte a spusťte s nějakými parametry
-    \begin{itemize}
-      \item V \qtcu\ nastavte v Projects $\rightarrow$ Run $\rightarrow$
-	Arguments
-    \end{itemize}
-  \end{enumerate}
-
-\end{frame}
-
-% move before strings
-
 \subsection*{Funkční ukazatel}
 \frame{\subsectionpage}
 
 \begin{frame}{Funkční ukazatel}{Motivace}
 
   \begin{itemize}
-    \item Antivirus umožňuje provést analýzu souborů
-    \begin{itemize}
-      \item Funkce \code{int analyze(const char *filepath);}
-    \end{itemize}
-
-    \pause
-
     \item Antivirus běží na pozadí a analyzuje soubory
     \begin{itemize}
       \item Při čtení nebo zápisu na disk
+      \item Zavolá se funkce \code{int analyze(const char *filepath);}
     \end{itemize}
 
     \pause
@@ -4209,7 +3315,7 @@ void fun(void) {
     \pause
 
     \item Do funkčního ukazatele s danou signaturou můžeme přiřadit adresy
-      všech funkcí se stejnou signaturou
+      jakékoliv funkce se stejnou signaturou
 
     \onslide<5->
 
@@ -4483,15 +3589,12 @@ memset(array2, 0, sizeof(array2));
 
 \begin{frame}[fragile]{Přetypování ukazatelů}{Využití}
 
+  \heading{Některé operace fungují na úrovni bitů}
   \begin{itemize}
-    \item Některé operace fungují na úrovni bitů
-    \begin{itemize}
-      \item Např.\ XOR, AND, \dots
-      \item Instrukce procesoru u \xes pracují na úrovni 32/64 bitů
-      \item Při práci na úrovni např.\ \code{char} (8 bitů) se nevyužívá celý
-	potenciál šířky registru (32/64 bitů)
-    \end{itemize}
-
+    \item Např.\ XOR, AND, \dots
+    \item Instrukce procesoru u \xes pracují na úrovni 32/64 bitů
+    \item Při práci na úrovni např.\ \code{char} (8 bitů) se nevyužívá celý
+      potenciál šířky registru (32/64 bitů)
   \end{itemize}
 
   \pause
@@ -4512,12 +3615,886 @@ for (int i = 0; i < (sizeof(array) / sizeof(int)); i++)
 
 \end{frame}
 
+\section{Řetězce}
+\frame{\sectionpage}
+
+\begin{frame}{Pole znaků, řetězce}
+
+  \begin{itemize}
+    \item Jak uchovat jeden znak?
+    \begin{itemize}
+      \item Umíme: \code{char}
+
+      \pause
+
+      \item Jak uchovat celé slovo, popř.\ větu?
+    \end{itemize}
+
+    \pause
+
+    \item Nepraktická možnost -- nezávislé proměnné
+    \begin{itemize}
+      \item \code{char first = 'E'; char second = 'T';}
+      \item \code{printf("\%c\%c", first, second);}
+    \end{itemize}
+
+    \pause
+
+    \item Praktičtější možnost -- pole znaků
+    \begin{itemize}
+      \item \code{char sentence[10];}
+      \item \code{for (int i = 0; i < sizeof(sentence); i++)} \\
+        ~~\code{printf("\%c", sentence[i]);}
+    \end{itemize}
+
+    \pause
+
+    \item Jak se pozná konec slova/věty?
+    \begin{itemize}
+      \item Speciální znak: \code{\\0} (binární nula)
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Řetězce v C}
+
+  \begin{itemize}
+    \item Řetězce v C jsou pole znaků ukončené binární nulou
+
+    \pause
+
+    \item \code{\"Hello"}
+    \begin{itemize}
+      \item \code{\{ 'H', 'e', 'l', 'l', 'o', 0 \}}
+    \end{itemize}
+
+    \pause
+
+    \item Díky ukončovací nule nemusíme udržovat délku pole
+    \begin{itemize}
+      \item Pole znaků procházíme do výskytu koncové nuly
+      \item Řetězec lze ,,zkrátit'' zapsáním nuly dříve
+%      \item Vzniká riziko jejího přepsání (viz dále)
+    \end{itemize}
+
+    \pause
+
+    \item Deklarace řetězců
+    \begin{itemize}
+      \item \code{char str1[100]; // max. 99 znaku + koncova nula}
+      \item \code{char str2[] = "Hello"; // delka dle konstanty, viz dale}
+    \end{itemize}
+
+    \pause
+
+    \item Od C99 lze i široké (wide) znaky/řetězce
+    \begin{itemize}
+      \item \code{wchar_t wide_str[100]; // max. 99 unicode znaku + koncova
+        nula}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Řetězcová konstanta v C}
+
+  \begin{itemize}
+    \item Je uzavřená v uvozovkách \code{\""}
+
+    \pause
+
+    \item Je uložena v datové sekci programu
+
+    \pause
+
+    \item Obsahuje koncovou nulu (binární 0, zápis 0 nebo \code{\\0})
+    \begin{itemize}
+      \item \pozor: \code{'0'} NENÍ binární nula (je to ASCII znak s hodnotou
+	48)
+      \pause
+      \item Co se zobrazí při výpisu \code{\"ahoj0svet\\0e"}?
+    \end{itemize}
+
+    \onslide<6->
+
+    \item Konstanty pro široké (unicode) řetězce mají předřazené \code{L}
+    \begin{itemize}
+      \item \code{L"}\texttt{Děsně šťavňaťoučké}\code{\"}
+      \item \code{sizeof(L"Hello") == sizeof("Hello") * sizeof(wchar_t)}
+    \end{itemize}
+
+  \end{itemize}
+
+  \onslide<5->
+
+  \begin{block}{Příklady}
+  \begin{center}
+    \begin{tabular}{|l|l|l|l|} \hline
+      Řetězec		& Délka & Místo v paměti & Poznámka \\ \hline
+      \code{\""}	& 0 & 1 & Pouze koncová 0 \\ \hline
+      \code{\"Hello"}	& 5 & 6 & \\ \hline
+      \code{\"Hello world"} & 11 & 12 & \\ \hline
+      \code{\"Hello \\t wor\\0ld"} & 11 & 15 & \\ \hline
+    \end{tabular}
+  \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Inicializace řetězců}
+
+  \begin{itemize}
+    \item Řetězec je pole znaků ukončené nulou, jak inicializovat?
+    \begin{itemize}
+      \item Jako pole: \code{char str1[] = \{ 'W', 'o', 'r' , 'l' , 'd',
+        0 \};}
+
+      \pause
+
+      \begin{itemize}
+	\item \pozor: \code{char str_bad[] = \{ 'W', 'o', 'r' , 'l' , 'd' \};}
+	\item \code{str_bad} \emph{neobsahuje} koncovou nulu, \code{str1} ano
+      \end{itemize}
+
+      \pause
+
+      \item Pomocí konstanty: \code{char str2[] = "World";}
+
+      \pause
+
+      \item \footnotesize \code{sizeof(str1) == sizeof(str2) == sizeof("World") == 6 * sizeof(char)}
+    \end{itemize}
+
+    \pause
+
+    \item Pozor na rozdíl ukazatel a pole
+    \begin{itemize}
+      \item \code{char str[50] = "Hello";}
+      \begin{itemize}
+	\item Pole, na začátku inicializované na \code{\"Hello"}
+      \end{itemize}
+
+      \pause
+
+      \item \code{char *str = "Hello";}
+      \begin{itemize}
+	\item Ukazatel na řetězcovou konstantu
+
+	\pause
+
+	\item Řetězcové konstanty nelze měnit
+
+	\item \code{str[5] = 'y'; // spatne}
+
+	\pause
+
+	\item Vhodné použít \code{const char *str = "Hello";}
+      \end{itemize}
+
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Manipulace řetězci}
+
+  \begin{enumerate}
+    \item Jako s ukazatelem
+    \begin{itemize}
+      \item Využití ukazatelové aritmetiky, operátory \code{+}, \code{\-}, \dots
+    \end{itemize}
+
+    \pause
+
+    \item Jako s polem
+    \begin{itemize}
+      \item Využití operátoru \code{[]}
+    \end{itemize}
+
+    \pause
+
+    \item Pomocí knihovních funkcí
+    \begin{itemize}
+      \item Hlavičkový soubor \header{string.h}
+      \item \code{strcpy}, \code{strcmp}, \code{strcat}, \dots
+    \end{itemize}
+
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Ukazatelová aritmetika s řetězci}
+
+  \begin{itemize}
+    \item Řetězec $\sim$ pole znaků $\sim$ ukazatel
+    \begin{itemize}
+      \item \code{char str1[] = "Hello world";}
+      \item \code{str1[4]; *(str1 + 4)}
+      \item \code{str1 + 6} je \code{\"world"}
+    \end{itemize}
+
+    \pause
+
+    \item Můžeme uchovávat ukazatel doprostřed jiného řetězce
+    \begin{itemize}
+      \item \code{char *str2 = str1 + 6; // str2 is "world"}
+    \end{itemize}
+
+    \pause
+
+    \item Můžeme řetězec ukončit vložením nuly
+    \begin{itemize}
+      \item \code{str1[5] = 0; // str1 is "Hello"}
+    \end{itemize}
+
+    \pause
+
+    \item \pozor: řetězce v C nemění automaticky svou velikost
+    \begin{itemize}
+      \item Nedochází k automatickému zvětšení řetězce na potřebnou délku
+      \item Nekorektní použití může vést k zápisu za konec pole
+      \begin{itemize}
+	\item A pádu!
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item \code{str1 + str2} je sčítání \emph{ukazatelů} na řetězce
+    \begin{itemize}
+      \item Nikoli jejich řetězení (jak je např.\ v C++ nebo Javě pro typ
+	\code[language=C++]{string})
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Řetězec a jeho průchod}
+  \begin{enumerate}
+    \item Otevřete si čistý projekt \file{07/main.pro}
+    \item Deklarujte si proměnnou typu \code{char []} (řetězec)
+    \item Inicializujte libovolným řetězcem
+
+    \item Vypište řetězec
+    \begin{itemize}
+      \item \code{print_string}
+    \end{itemize}
+
+    \item Projděte řetězec cyklem jako pole a vypište jednotlivé znaky
+    \begin{itemize}
+      \item \code{print_char}
+      \item Než narazíte na koncovou \code{0}
+    \end{itemize}
+
+    \item Vypište hodnotu iterátoru = délku řetězce
+
+    \item Vypište si hodnotu ukazatele na 1. (v C nultý) a poslední znak
+    \begin{itemize}
+      \item \code{print_pointer}
+    \end{itemize}
+
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Knihovní funkce pro práci s řetězci}
+
+  \begin{itemize}
+    \item Hlavičkový soubor \header{string.h}
+    \begin{itemize}
+      \item \code{\#include <string.h>}
+    \end{itemize}
+
+    \pause
+
+    \item Nejdůležitější funkce
+    \begin{itemize}
+      \item \code{strcpy}, \code{strcat}, \code{strlen}, \code{strcmp},
+        \code{strchr}, \code{strstr}, \dots
+      \item Výpis řetězce: \code{puts(str)}, \code{printf("\%s", str);
+        // stdio.h}
+    \end{itemize}
+
+    \pause
+
+    \item Obecná pravidla
+    \begin{itemize}
+      \item Korektní C řetězec ukončený nulou
+
+      \pause
+
+      \item Dostatečný paměťový prostor při modifikaci
+      \begin{itemize}
+	\item Funkce jako \code{strcpy}, \code{strcat}, \dots
+	\item Jinak zápis za konec alokovaného místa
+      \end{itemize}
+
+      \pause
+
+      \item Při modifikaci dochází k umístění koncové \code{0}
+      \begin{itemize}
+	\item Až na výjimky
+      \end{itemize}
+
+    \end{itemize}
+
+    \pause
+
+    \item Dokumentace
+    \begin{itemize}
+      \item V terminálu: \cmd{man strcpy}
+      \item \url{http://www.cplusplus.com/reference/clibrary/cstring/}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Jak číst dokumentaci?}
+
+\begin{lstlisting}[language=XML]
+NAME
+       strcpy, strncpy - copy a string
+
+SYNOPSIS
+       #include <string.h>
+
+       char *strcpy(char *dest, const char *src);
+       char *strncpy(char *dest, const char *src, size_t n);
+
+DESCRIPTION
+       The strcpy() function copies the string pointed to by src, including the terminating
+       null byte ('\0'), to the buffer pointed to by dest.  The strings  may  not  overlap,
+       and the destination string dest must be large enough to receive the copy.  Beware of
+       buffer overruns!  (See BUGS.)
+...
+
+RETURN VALUE
+       The  strcpy()  and  strncpy()  functions  return a pointer to the destination string
+       dest.
+
+SEE ALSO
+       bcopy(3),  memccpy(3),  memcpy(3),  memmove(3),  stpcpy(3),  stpncpy(3),  strdup(3),
+       string(3), wcscpy(3), wcsncpy(3)
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Nejdůležitější funkce pro řetězce}
+
+  \begin{itemize}
+    \item \code{strlen(a)} -- délka řetězce \code{a} bez koncové nuly
+
+    \pause
+
+    \item \code{strcpy(a, b)} -- kopíruje obsah řetězce \code{b} do \code{a}
+    \begin{itemize}
+      \item \code{a} musí být dostatečně dlouhý pro \code{b}
+    \end{itemize}
+
+    \pause
+
+    \item \code{strcat(a, b)} -- připojí řetězec \code{b} za \code{a}
+    \begin{itemize}
+      \item Nutná délka pro \code{a}: \code{strlen(a) + strlen(b) + 1} (koncová
+        nula)
+    \end{itemize}
+
+    \pause
+
+    \item \code{strcmp(a, b)} -- porovná shodu \code{a} s \code{b}
+    \begin{itemize}
+      \item Vrací $0$, pokud jsou \code{a} a \code{b} shodné (znaky i délka)
+      \item Vrací $>0$ pokud je \code{a} ,,větší'' než \code{b}
+      \item Vrací $<0$ pokud je \code{a} ,,menší'' než \code{b}
+    \end{itemize}
+
+  \end{itemize}
+
+  \onslide<1->
+
+  \begin{block}{Příklady}
+\begin{lstlisting}[belowskip=0pt]
+void fun(const char *str1, const char *str2) {
+  int copy[strlen(str1) + strlen(str2) + 1]; // copy is now garbage
+\end{lstlisting}
+  \onslide<2->
+\begin{lstlisting}[belowskip=0pt,aboveskip=0pt]
+  strcpy(copy, str1); // copy is now str1
+\end{lstlisting}
+  \onslide<3->
+\begin{lstlisting}[belowskip=0pt,aboveskip=0pt]
+  strcat(copy, str2); // copy is now str1str2 (joined with no space)
+\end{lstlisting}
+  \onslide<4->
+\begin{lstlisting}[belowskip=0pt,aboveskip=0pt]
+  if (strcmp(str1, str2))
+    printf("%s and %s differ\n", str1, str2);
+\end{lstlisting}
+  \onslide<1->
+\begin{lstlisting}[aboveskip=0pt]
+}
+\end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Nejdůležitější funkce pro řetězce}
+
+  \begin{itemize}
+    \item \code{strchr(a, c)} -- hledá výskyt \emph{znaku} \code{c} v řetězci
+      \code{a}
+    \begin{itemize}
+      \item Vrací ukazatel na první výskyt \code{c}, nebo \code{NULL}
+    \end{itemize}
+
+    \pause
+
+    \item \code{strstr(a, b)} -- hledá výskyt \emph{řetězce} \code{b} v řetězci
+      \code{a}
+    \begin{itemize}
+      \item Vrací ukazatel na první výskyt \code{b}, nebo \code{NULL}
+    \end{itemize}
+
+    \pause
+
+    \item Analogické funkce pro \emph{široké} znaky
+    \begin{itemize}
+      \item V hlavičkovém souboru \header{wchar.h}
+      \item Název funkce obsahuje \code{wcs} namísto \code{str}
+
+      \pause
+
+      \item Např.\ \code{wchar_t *wcscpy(wchar_t *, const wchar_t *)}
+    \end{itemize}
+
+  \end{itemize}
+
+  \onslide<1->
+
+  \begin{block}{Příklady}
+\begin{lstlisting}[belowskip=0pt]
+void fun(const char *str) {
+  char *p;
+
+  if ((p = strchr(str, 'e')))
+    printf("'e' found in %s here: %s\n", str, p);
+\end{lstlisting}
+  \onslide<2->
+\begin{lstlisting}[belowskip=0pt]
+  if ((p = strstr(str, "end")))
+    printf("'end' found in %s here: %s\n", str, p);
+\end{lstlisting}
+  \onslide<1->
+\begin{lstlisting}[aboveskip=0pt]
+}
+\end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Řetězcové funkce}
+  \begin{enumerate}
+    \item Vypište délku řetězce
+    \begin{itemize}
+      \item Využijte \code{strlen}
+    \end{itemize}
+
+    \item Vytvořte si kopii řetězce
+    \item Vypište ji
+    \item Přeložte a spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Testování znaků v řetězci <ctype.h>}
+
+\begin{table}
+{ \footnotesize
+\begin{tabular}{|l|l|} \hline
+\textbf{Funkce}   & \textbf{Je znak \code{c} \dots} \\ \hline
+\code{isalpha(c)} & písmeno (malé nebo velké)? \\ \hline
+\code{isdigit(c)} & dekadická číslice? \\ \hline
+\code{isxdigit(c)}& hexadecimální číslice (0-9, a-f, A-F)? \\ \hline
+\code{isalnum(c)} & písmeno nebo číslice? \\ \hline
+\code{ispunct(c)} & speciální (tisknutelný, ale ani písmeno ani číslice)? \\ \hline
+\code{isprint(c)} & tisknutelný (písmeno, číslice, speciální nebo mezera)? \\ \hline
+\code{isgraph(c)} & s grafickou podobou (písmeno, číslice, speciální, ne mezera)? \\ \hline
+\code{isspace(c)} & bílý znak (mezera, tabulátor, nový řádek, \dots)? \\ \hline
+\code{iscntrl(c)} & řídicí znak (v ASCII jsou to znaky s kódem $<32$ nebo $=127$)? \\ \hline
+\code{isupper(c)} & velké písmeno? \\ \hline
+\code{islower(c)} & malé písmeno? \\ \hline
+\end{tabular}
+}
+\caption{Klasifikace znaků}
+\end{table}
+
+\pause
+
+\begin{table}
+{ \footnotesize
+\begin{tabular}{|l|l|} \hline
+\textbf{Funkce}   & \textbf{Návratová hodnota} \\ \hline
+\code{toupper(c)} & \code{islower(c)} $\Rightarrow$ velké písmeno odpovídající \code{c}, jinak \code{c} \\ \hline
+\code{tolower(c)} & \code{isupper(c)} $\Rightarrow$ malé písmeno odpovídající \code{c}, jinak \code{c} \\ \hline
+\end{tabular}
+}
+\caption{Převod znaků -- z malých písmen na velká a naopak}
+\end{table}
+
+\end{frame}
+
+\begin{frame}{Časté problémy}
+
+  \begin{itemize}
+    \item Nedostatečně velký cílový řetězec
+    \begin{itemize}
+      \item Např.\ při \code{strcpy}
+    \end{itemize}
+
+    \pause
+
+    \item Chybějící koncová nula
+    \begin{itemize}
+      \item Řetězcové funkce nefungují korektně
+      \item Vznikne např.\ nevhodným přepisem (N+1 problém)
+    \end{itemize}
+
+    \pause
+
+    \item Nevložení koncové nuly
+    \begin{itemize}
+      \item Např.\ při \code{strncpy}
+    \end{itemize}
+
+    \pause
+
+    \item Délka/velikost řetězce bez místa pro koncovou nulu
+    \begin{itemize}
+      \item Např.\ při \code{strlen}
+    \end{itemize}
+
+    \pause
+
+    \item \code{if (str == "Hello") \{ ... \}}
+    \begin{itemize}
+      \item Špatně, porovnává hodnotu ukazatelů, nikoli obsah řetězců
+      \item Nutno použít \code{if (strcmp(str, "Hello") == 0) \{ ... \}}
+    \end{itemize}
+
+    \pause
+
+    \item Spájení řetězců pomocí \code{+}
+    \begin{itemize}
+      \item Sčítá ukazatele namísto obsahu
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Problémy s řetězci}{Příklad}
+
+\begin{lstlisting}
+char str1[] = "Hello";
+strcpy(str1, "Hello world");
+puts(str1);
+\end{lstlisting}
+\pause
+\begin{lstlisting}
+char str2[] = "Hello";
+str2[strlen(str2)] = '!';
+puts(str2);
+\end{lstlisting}
+\pause
+\begin{lstlisting}
+char str3[] = "Hello";
+strncpy(str3, "Hello world", sizeof(str3));
+\end{lstlisting}
+\pause
+\begin{lstlisting}
+char str4[] = "Hello";
+char str5[strlen(str4)];
+strcpy(str4, str5);
+\end{lstlisting}
+\pause
+\begin{lstlisting}
+char str6[] = "Hello";
+if (str6 == "Hello") {
+  // never executed
+}
+\end{lstlisting}
+
+\end{frame}
+
+\begin{frame}{Pole řetězců}
+
+  \begin{itemize}
+    \item Pole ukazatelů na řetězce
+
+    \pause
+
+    \item Typicky nepravoúhlé (řetězce jsou různé dlouhé)
+
+    \pause
+
+    \item Použití často pro skupinu konstantních řetězců
+    \begin{itemize}
+      \item Např.\ dny v týdnu
+      \item \code{char *days[] = \{ "Pondeli", "Utery", "Streda" \};}
+      \begin{itemize}
+	\item Pole se třemi položkami typu \code{char *}
+	\item \code{days[0]} ukazuje na konstantní řetězec \code{\"Pondeli"}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item Co způsobí \code{strcpy(days[0], "Ctvrtek")}?
+    \begin{itemize}
+      \item Zapisujeme do paměti s konstantním řetězcem
+      \item Pravděpodobně způsobí pád
+      \item Vhodné kontrolovat překladačem
+      \begin{itemize}
+	\item Klíčové slovo \code{const}
+      \end{itemize}
+    \end{itemize}
+
+  \end{itemize}
+
+%\pause
+%\begin{lstlisting}
+%char *days[] = { "Pondeli", "Utery", "Streda" };
+%puts(days[0]);
+%strcpy(days[0], "Ctvrtek");
+%\end{lstlisting}
+
+\end{frame}
+
+\subsection*{Klíčové slovo \texttt{const}}
+\frame{\subsectionpage}
+
+\begin{frame}[fragile]{Klíčové slovo \texttt{const}}
+
+  \begin{itemize}
+    \item Zavedeno pro zvýšení robustnosti kódu
+    \begin{itemize}
+      \item Chceme označit proměnnou, která nemá být měněna
+      \item Typicky konstanta, např.\ počet měsíců v roce
+    \end{itemize}
+
+    \pause
+
+    \item Kontroluje přímo překladač
+    \pause
+    \begin{itemize}
+      \item A navíc může optimalizovat
+    \end{itemize}
+
+    \pause
+
+    \item Používejte kdykoliv je to možné
+
+    \pause
+
+    \item Dokumentační účel
+    \begin{itemize}
+      \item Jiný programátor získá lepší představu o ,,ne/proměnných''
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+void fun(const int *param) {
+  //const int a, b = 0; // error, uninitialized const 'a'
+  const int months_in_year = 12;
+  printf("Number of months in year: %d\n", months_in_year);
+
+  months_in_year = 13; // error: assignment of read-only variable
+  *param = 1; // error: assignment of read-only location
+}
+\end{lstlisting} %stopzone
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{Řetězcové literály}
+
+  \onslide<3->
+
+  \heading{Pro literály používejte} \code{const char *}
+  \begin{itemize}
+    \item Překladač hlídá pokus o zápis do konstantní sekce
+    \item \code{const char *days[] = \{ "Pondeli", "Utery", "Streda" \}}
+  \end{itemize}
+
+  \onslide<1->
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+char *get_string() { return "Unmodifiable string"; }
+const char *get_const_string() { return "Unmodifiable string"; }
+\end{lstlisting}
+\onslide<2->
+\begin{lstlisting}
+void fun() {
+  char *value = get_string();
+  value[1] = 'x'; // read-only memory write -- problem
+  char *value2 = get_const_string(); // error: invalid conversion
+}
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{const} ukazatel}
+
+  \heading{Konstantní je pouze označená proměnná}
+  \begin{itemize}
+    \item I ukazatel může být konstantní
+    \begin{itemize}
+      \item \code{int value = 10; const int *p = \&value;}
+    \end{itemize}
+
+    \pause
+
+    \item Konstantní ale není odkazovaný objekt
+    \begin{itemize}
+      \item \code{const} je ,,plytké''
+      \item Konstantní proměnnou lze modifikovat přes nekonstantní ukazatel
+    \end{itemize}
+
+  \end{itemize}
+
+  \pause
+
+\begin{block}{Příklad}
+\begin{lstlisting}
+const int value = 10;
+const int *p1 = &value;
+int *p2 = (int *)&value;
+
+value = 10; // error
+*p1 = 10; // error
+*p2 = 10; // possible
+\end{lstlisting}
+\end{block}
+
+\end{frame}
+
+%\begin{frame}[fragile]{Předání \texttt{const} ukazatele do funkce}
+%
+%\begin{lstlisting}
+%void foo(const int *carray) {
+%  // error: assignment of read-only location 'carray'
+%  carray[0] = 1;
+%  int *tmp = (int *)carray;
+%  // possible, but unwanted! (array was const, tmp is not)
+%  tmp[0] = 1;
+%}
+%
+%int main() {
+%  int array[10];
+%  foo(array);
+%  return 0;
+%}
+%\end{lstlisting}
+%
+%\end{frame}
+
+\subsection*{Argumenty funkce \code{main}}
+\frame{\subsectionpage}
+
+\begin{frame}{Argumenty funkce \code{main}}
+
+  \begin{itemize}
+    \item Funkce main může mít tři verze:
+    \begin{enumerate}
+      \item \code{int main(void);}
+      \begin{itemize}
+	\item Bez parametrů
+      \end{itemize}
+
+      \pause
+
+      \item \code{int main(int argc, char *argv[]);}
+      \begin{itemize}
+	\item Parametry předané programu při spuštění
+	\item \code{**argv == *argv[]}
+      \end{itemize}
+
+      \pause
+
+      \item \code{int main(int argc, char **argv, char **envp);}
+      \begin{itemize}
+	\item Navíc proměnné prostředí
+	\item Ale není standardizováno
+      \end{itemize}
+
+    \end{enumerate}
+
+    \item Např.\ \cmd{./binary -param1 -param2 hello "hello world"}
+
+    \pause
+
+    \item \code{argc} obsahuje počet parametrů + 1
+
+    \pause
+
+    \item \code{argv[]} je pole řetězců, každý obsahuje jeden parametr
+    \begin{itemize}
+      \item \code{argv[0]}: cesta k programu (je-li \code{argc > 0})
+      \item \code{argv[1]}: první parametr
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Výpis parametrů main}
+  \begin{enumerate}
+    \item Projděte a vypište všechny parametry příkazové řádky
+    \item Pro každý vypište, kolik obsahuje čísel a znaků
+    \begin{itemize}
+      \item \code{isalpha}, \code{isdigit}
+    \end{itemize}
+
+    \item Každý převeďte na velká písmena a vypište
+    \begin{itemize}
+      \item \code{toupper}
+    \end{itemize}
+
+    \item Přeložte a spusťte s nějakými parametry
+    \begin{itemize}
+      \item V \qtcu\ nastavte v Projects $\rightarrow$ Run $\rightarrow$
+	Arguments
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
 % skipped Typový systém z pb071_05_typydynalokace_2016.pdf
+
+\fi
+
+% XXX TODO continue reviewing here
 
 \section{Práce s pamětí}
 \frame{\sectionpage}
-
-\end{document}
 
 \begin{frame}{Organizace paměti}
 
@@ -4868,6 +4845,8 @@ void allocate_2D_array() {
 
 \section{Uživatelské datové typy}
 \frame{\sectionpage}
+
+\end{document}
 
 \begin{frame}{Uživatelské datové typy}
 
