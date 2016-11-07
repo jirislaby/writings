@@ -62,7 +62,7 @@
   \medskip
   \pause
 
-  \heading{Demo:} pb173/07 \\
+  \heading{Demo:} pb173/08 \\
   \heading{Úkol:} Přečíst port 0x80, zapsat do něj 1B a znovu přečíst
 
 \end{frame}
@@ -97,7 +97,7 @@
 
     \item Mapování: \code{virt = ioremap(phys)}, \code{iounmap(virt)}
     \begin{itemize}
-      \item \code{/proc/vmallocinfo} (novější jádra)
+      \item \code{/proc/vmallocinfo} (ne stará jádra)
     \end{itemize}
 
     \pause
@@ -123,7 +123,7 @@
 
     \item Hierarchická sběrnice
     \begin{itemize}
-      \item Identifikace doména:bus:slot:funkce
+      \item Identifikace doména:bus:slot.funkce
       \item Bridge (=routery)
     \end{itemize}
 
@@ -199,7 +199,7 @@
   \pause
 
   \begin{block}{Iterace přes zařízení}
-  \begin{lstlisting}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 struct pci_dev *pdev = NULL;
 
 while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
@@ -208,11 +208,11 @@ while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
           PCI_SLOT(pdev->devfn),
           PCI_FUNC(pdev->devfn));
 }
-  \end{lstlisting} %stopzone
+    \end{lstlisting} %stopzone
   \end{block}
 
   \pause
-  \medskip
+  \smallskip
 
   \heading{Úkol:} vypsat všechna zařízení v systému (jejich
   \emph{vendor+device} ID)
@@ -233,11 +233,10 @@ while ((pdev = pci_get_device(VENDOR, DEVICE, pdev))) {
   \end{itemize}
 
   \begin{block}{\footnotesize Události a PCI zařízení}
-  \begin{lstlisting}[language=C]
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 static struct pci_device_id my_table[] = {
   { PCI_DEVICE(VENDOR1, DEVICE1) }, { PCI_DEVICE(VENDOR1, DEVICE2) },
-  { PCI_DEVICE(0x8086, PCI_ANY_ID), .driver_data = 1 },
-  { 0, }
+  { PCI_DEVICE(0x8086, PCI_ANY_ID), .driver_data = 1 },       { 0, }
 };
 MODULE_DEVICE_TABLE(pci, my_table);
 static struct pci_driver my_pci_driver = {
@@ -247,43 +246,42 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
   pr_info("%2.x %lu\n", pdev->bus->number, id->driver_data);
   return 0;
 }
-  \end{lstlisting} %stopzone
+    \end{lstlisting} %stopzone
   \end{block}
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Úkol}
+\begin{frame}{Úkol}
 
   \heading{Navázání PCI zařízení}
   \begin{enumerate}
     \item \header{linux/pci.h}
 
-    \item Definice \code{struct pci_device_id}
+    \item Definujte \code{struct pci_device_id}
     \begin{itemize}
-      \item \cmd{lspci -nn} a najít EDU a jeho vendor+device ID
+      \item \cmd{lspci -nn} a najděte EDU a jeho vendor+device ID
     \end{itemize}
 
-    \item Definice \code{struct pci_driver}
+    \item Definujte \code{struct pci_driver}
     \begin{itemize}
       \item \code{probe}, \code{remove}, \code{name}, \code{id_table}
     \end{itemize}
 
-    \item Definice háčků (viz definici \code{struct pci_driver})
+    \item Definujte háčky (viz definici \code{struct pci_driver})
     \begin{itemize}
       \item \scriptsize{\code{int (*probe)(struct pci_dev *, const struct pci_device_id *)}}
       \item \scriptsize{\code{void (*remove)(struct pci_dev *)}}
     \end{itemize}
 
-    \item V probe a remove vypsat
+    \item V \code{probe} a \code{remove} vypište
     \begin{itemize}
       \item \code{pdev->bus->number}
       \item \code{PCI_SLOT(pdev->devfn)}
       \item \code{PCI_FUNC(pdev->devfn)}
     \end{itemize}
 
-    \item Zavolat \code{pci_register_driver} a \code{pci_unregister_driver}
-    \item Vložit a odebrat modul (a zkontrolovat \cmd{dmesg})
+    \item Zavolejte \code{pci_register_driver} a \code{pci_unregister_driver}
+    \item Vložte a odeberte modul a zkontrolujte \cmd{dmesg}
   \end{enumerate}
 
 \end{frame}
@@ -301,10 +299,13 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
     \pause
 
-    \item Rezervace a mapování I/O (jako v první části \iffimuni cvičení \else
-      sekce \fi)
+    \item Rezervace a mapování I/O (jako v první části \iffimuni cvičení\else
+      sekce\fi)
     \begin{itemize}
       \item Požadavek: \code{pci_request_region}, \code{pci_request_regions}
+
+      \pause
+
       \item Mapování: \code{pci_ioremap_bar} -- alias pro
 	\code{ioremap(pci_resource_start(), pci_resource_len())}
     \end{itemize}
@@ -323,7 +324,7 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
   \heading{Remove}
   \begin{itemize}
     \item Opak Probe
-    \item \code{iounmap}, \code{pci_release_region}(\code{s}),
+    \item Tj.\ \code{iounmap}, \code{pci_release_region}(\code{s}),
       \code{pci_disable_device}
   \end{itemize}
 
@@ -336,10 +337,10 @@ int my_probe(struct pci_dev *pdev, const struct pci_device_id *id) {
 
   \heading{Většina ostatních sběrnic funguje stejně}
   \begin{itemize}
-  \item USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \dots
-  \item Nějaké probe/remove
-  \item Seznam ID
-  \item Registrace ,,ovladače''
+    \item Např.\ USB, I$^2$C, HID, IEEE1394, ACPI, INPUT, EISA, \dots
+    \item Nějaké probe/remove
+    \item Seznam ID
+    \item Registrace ,,ovladače''
   \end{itemize}
 
 \end{frame}
@@ -384,7 +385,12 @@ Offset & Len & R/W & Meaning \\ \hline\hline
     \item Rezervujte bar 0 (\code{pci_request_region})
     \item Vypište fyzickou adresu baru 0 a porovnejte s výstupem \cmd{lspci}
     \item Přemapujte bar 0 (\code{ioremap})
+
     \item Přečtěte a \emph{rozkódujte} identifikaci a revizi (\code{readX})
+    \begin{itemize}
+      \item Vypište zvlášť major a minor revizi
+    \end{itemize}
+
     \item Ověřte živost karty pomocí invertovacího registru
 
     \iffimuni\else
