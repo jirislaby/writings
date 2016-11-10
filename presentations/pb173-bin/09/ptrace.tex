@@ -93,13 +93,14 @@
 \begin{frame}{\code{ptrace}}{Krokování}
 
   \begin{itemize}
-    \item \code{ptrace(PTRACE_CONT)} -- pokračuj ve vykonávání
-    \item Přerušení klasickým \code{kill}
+    \item \code{ptrace(PTRACE_CONT, pid, NULL, NULL)} -- pokračuj ve vykonávání
+    \item Přerušení klasickým \code{kill(pid, SIGSTOP)}
 
     \pause
 
-    \item \code{ptrace(PTRACE_SYSCALL)} -- do příštího systémového volání
-    \item \code{ptrace(PTRACE_SINGLESTEP)} -- jedna instrukce
+    \item \code{ptrace(PTRACE_SYSCALL, pid, NULL, NULL)} -- do příštího
+      systémového volání
+    \item \code{ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL)} -- jedna instrukce
 
     \pause
 
@@ -113,10 +114,12 @@
 
   \heading{Krokování potomka}
   \begin{enumerate}
-    \item V rodiči v cyklu:
+    \item Připište do rodiče cyklus
+
+    \item V cyklu čekejte na standardní vstup
+    \item A poté vždy krokujte potomka po instrukci
     \begin{itemize}
-      \item Čekejte na standardní vstup
-      \item Krokujte potomka po instrukci
+      \item \code{PTRACE_SINGLESTEP}
     \end{itemize}
 
     \item Nezapomeňte ošetřit stav, kdy potomek skončil
@@ -162,12 +165,21 @@
 
   \heading{Manipulace s procesem}
   \begin{enumerate}
-    \item V rodiči v cyklu navíc:
+    \item Dopisujte navíc do cyklu v rodiči
+
+    \item Vypište adresu aktuálně zastavené instrukce
     \begin{itemize}
-      \item Vypište adresu aktuálně zastavené instrukce
-      \item První byte instrukce
+      \item \code{PTRACE_GETREGS} a \code{eip}/\code{rip} v \code{struct
+	user_fpregs_struct}
     \end{itemize}
+
+    \item První byte instrukce
+    \begin{itemize}
+      \item \code{PTRACE_PEEKTEXT} a \code{eip}/\code{rip} shora
+    \end{itemize}
+
     \item Vyzkoušejte
+    \item Můžete ověřit pomocí \cmd{objdump -d} binárky
   \end{enumerate}
 
 \end{frame}
