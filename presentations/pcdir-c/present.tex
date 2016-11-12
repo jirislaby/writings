@@ -6,6 +6,8 @@
 
 \pcdirctrue
 
+\newif\ifheapemph
+
 \begin{document}
 
 \frame{\titlepage}
@@ -2215,44 +2217,7 @@ int div(int a, int b) {
 
 \end{frame}
 
-\begin{frame}{Obsah paměti}
-
-  \begin{itemize}
-    \item Instrukce (program)
-    \begin{itemize}
-      \item Nemění se
-    \end{itemize}
-
-    \pause
-
-    \item Statická data (static)
-    \begin{itemize}
-      \item Většina se nemění, jsou přímo v binárce
-      \item Řetězce, konstanty (nemění se)
-      \item Globální proměnné (mění se)
-    \end{itemize}
-
-    \pause
-
-    \item Zásobník (stack)
-    \begin{itemize}
-      \item Mění se pro každý blok (a funkci)
-      \item Lokální proměnné
-    \end{itemize}
-
-    \pause
-
-    \item Halda (heap)
-    \begin{itemize}
-      \item Dynamicky alokované proměnné
-      \item Mění se při každém \code{malloc}, \code{free}
-    \end{itemize}
-
-  \end{itemize}
-
-  % XXX obrazek
-
-\end{frame}
+\input{mem.tex}
 
 \begin{frame}{Proměnná}{Opakování}
 
@@ -2903,7 +2868,7 @@ for (int i = 0; i < 10; i++)
 \begin{frame}[fragile]{Jednorozměrné pole}{Proměnná délka}
 
   \begin{itemize}
-    \item Deklarace pole s variabilní délkou
+    \item Deklarace pole s proměnnou délkou
     \begin{itemize}
       \item Variable length array (VLA)
       \item Až od C99 (používáme)
@@ -4489,49 +4454,12 @@ value = 10; // error
 
 % skipped Typový systém z pb071_05_typydynalokace_2016.pdf
 
-\fi
-
-% XXX TODO continue reviewing here
-
 \section{Práce s pamětí}
 \frame{\sectionpage}
 
-\begin{frame}{Organizace paměti}
+\heapemphtrue
 
-  \begin{itemize}
-    \item Instrukce (program)
-    \begin{itemize}
-      \item Nemění se
-    \end{itemize}
-
-    \pause
-
-    \item Statická data (static)
-    \begin{itemize}
-      \item Většina se nemění, jsou přímo v binárce
-      \item Řetězce, konstanty (nemění se)
-      \item Globální proměnné (mění se)
-    \end{itemize}
-
-    \pause
-
-    \item Zásobník (stack)
-    \begin{itemize}
-      \item Mění se pro každý blok (a funkci)
-      \item Lokální proměnné
-    \end{itemize}
-
-    \pause
-
-    \item \emph{Halda (heap)}
-    \begin{itemize}
-      \item Dynamicky alokované proměnné
-      \item Mění se při každém \code{malloc}, \code{free}
-    \end{itemize}
-
-  \end{itemize}
-
-\end{frame}
+\input{mem.tex}
 
 \input{../pcdir-linux/dynmem.tex}
 
@@ -4601,35 +4529,31 @@ value = 10; // error
 
 \end{frame}
 
-\begin{frame}[fragile]{Úniky paměti}{Demo}
+\begin{frame}[fragile]{Úniky paměti -- příklady}
 
   \begin{itemize}
     \item Násobná alokace do stejného ukazatele
 
     \pause
 
-    \item Dealokace nad modifikovaným ukazatelem
+    \item Dealokace modifikovaného ukazatele
   \end{itemize}
 
 \onslide<1->
 
-%\begin{block}{Příklad}
+\begin{block}{Příklad}
 \begin{lstlisting}
-#include <stdlib.h>
+static const int array_len = 25;
 
 int main(int argc, char *argv[]) {
-  const int array_len = 25;
-  int *array1;
-  array1 = malloc(array_len * sizeof(int));
-  if (argc == 2) {
+  int *array1 = malloc(array_len * sizeof(int));
+  if (argc == 2)
     array1 = malloc(array_len * sizeof(int)); // the original array1 is lost
-  }
   free(array1);
 \end{lstlisting}
 \begin{onslide}<2->
 \begin{lstlisting}
-  int *array2;
-  array2 = malloc(array_len * sizeof(int));
+  int *array2 = malloc(array_len * sizeof(int));
   array2 += 20; // error source
   free(array2); // error
 \end{lstlisting}
@@ -4638,7 +4562,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 \end{lstlisting}
-%\end{block}
+\end{block}
 
 \end{frame}
 
@@ -4676,50 +4600,65 @@ int main() {
   int value1 = 1;
   int value2 = 1;
   value_passing_demo(value1, &value2);
+  print_int(value1); // prints 1
+  print_int(value2); // prints 7
 
   return 0;
 }
 \end{lstlisting}
 \end{block}
 
-  \begin{itemize}
-    \item Proměnná \code{arg_value1} i \code{arg_value2} zaniká, ale zápis do
-      \code{value2} zůstává
-  \end{itemize}
-
 \end{frame}
 
 \begin{frame}[fragile]{Předávání alokovaného pole z funkce}
 
+  \heading{Jak předat pole dynamicky alokované ve funkci?}
   \begin{itemize}
-    \item Jak předat pole dynamicky alokované ve funkci?
-    \begin{itemize}
-      \item Ukazatel na ukazatel
-    \end{itemize}
-
+    \item Ukazatel na ukazatel
   \end{itemize}
 
   \pause
 
-\begin{block}{Příklad}
-\begin{lstlisting}
+  \begin{block}{Příklad}
+    \begin{lstlisting}[belowskip=0pt]
 void allocate_array(int *p1, int **p2) {
+    \end{lstlisting}
+    \onslide<3->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   p1 = malloc(10 * sizeof(int)); // address will be lost, memory leak
-  *p1 = malloc(10 * sizeof(int)); // warning: integer from pointer - WRONG
-  *p2 = malloc(10 * sizeof(int)); // OK
+    \end{lstlisting}
+    \onslide<4->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+  *p1 = malloc(10 * sizeof(int)); // warning: integer from pointer -- WRONG
+    \end{lstlisting}
+    \onslide<6->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+  *p2 = malloc(10 * sizeof(int)); // CORRECT
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 }
 
 int main() {
   int *pointer1, *pointer2;
 
   allocate_array(pointer1, &pointer2);
+    \end{lstlisting}
+    \onslide<5->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   free(pointer1); // freeing invalid pointer
-  free(pointer2); // OK
+    \end{lstlisting}
+    \onslide<7->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+  free(pointer2); // CORRECT
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 
   return 0;
 }
-\end{lstlisting}
-\end{block}
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -4763,13 +4702,40 @@ void allocate_2D_array() {
     \begin{itemize}
       \item Položky na haldě
       \item Logicky propojené ukazateli
-%      \item 13,7,13,-45,154
+      \item 3, 7, -8
     \end{itemize}
 
     \pause
 
     \item Položky nejsou v poli za sebou
   \end{itemize}
+
+  \onslide<1->
+  \bigskip
+
+  \begin{center}
+    \tikzstyle{box} = [inner sep=0pt]
+    \tikzstyle{conn} = [<-, semithick, in=355,out=175, > = stealth']
+    \begin{tikzpicture}
+      \node[box] (E1) {
+	\begin{tabular}{|c|c|} \hline
+	  3 & \code{next} \\ \hline
+	\end{tabular}
+      };
+      \node [box,right=of E1] (E2) {
+	\begin{tabular}{|c|c|} \hline
+	  7 & \code{next} \\ \hline
+	\end{tabular}
+      } edge[conn] (E1);
+      \node [box,right=of E2] (E3) {
+	\begin{tabular}{|c|c|} \hline
+	  -8 & \code{next} \\ \hline
+	\end{tabular}
+      } edge[conn] (E2);
+      \node [box,inner sep=2pt,right=of E3] (E4) {\code{NULL}}
+	edge[conn] (E3);
+    \end{tikzpicture}
+  \end{center}
 
 \end{frame}
 
@@ -4843,10 +4809,12 @@ void allocate_2D_array() {
 
 \end{frame}
 
+\fi
+
+% XXX TODO continue reviewing here
+
 \section{Uživatelské datové typy}
 \frame{\sectionpage}
-
-\end{document}
 
 \begin{frame}{Uživatelské datové typy}
 
@@ -5990,6 +5958,8 @@ void fun(void); // the same
 
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
+
+\end{document}
 
 \begin{frame}{Standardní vstup a výstup}
 

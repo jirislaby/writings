@@ -70,7 +70,7 @@
 
     \pause
 
-    \item Specialitou je \emph{alokace polí} s variabilní délkou (od C99)
+    \item Specialitou je \emph{alokace polí} s proměnnou délkou (od C99)
     \begin{itemize}
       \item Délka není známa v době překladu
       \item Ale alokuje se na zásobníku a automaticky odstraňuje
@@ -83,21 +83,23 @@
 
 \end{frame}
 
-\begin{frame}{Alokace dynamické paměti}
+\begin{frame}[fragile]{Alokace dynamické paměti}
 
   \begin{itemize}
     \item Hlavička: \header{stdlib.h}
 
+    \pause
+
     \item \code{void *malloc(size_t size)}
     \begin{itemize}
       \item \code{size}: velikost k alokaci
-      \item Návratová hodnota: NULL při chybě, jinak adresa
+      \item Návratová hodnota: \code{NULL} při chybě, jinak adresa
 
       \pause
 
       \item Jeden souvislý blok
       \item Na haldě
-      \item Paměť není inicializována (,,smetí'')
+      \item Paměť není inicializována, obsahuje ,,smetí''
     \end{itemize}
 
     \pause
@@ -114,9 +116,21 @@
     \end{itemize}
   \end{itemize}
 
+  \onslide<2->
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[belowskip=0pt]
+int *a = malloc(sizeof(int));
+    \end{lstlisting}
+    \onslide<4->
+    \begin{lstlisting}[aboveskip=0pt]
+int *b = calloc(10, sizeof(int));
+    \end{lstlisting}
+  \end{block}
+
 \end{frame}
 
-\begin{frame}{Uvolnění dynamické paměti}
+\begin{frame}[fragile]{Uvolnění dynamické paměti}
 
   \begin{itemize}
     \item \code{void free(void *ptr)}
@@ -134,9 +148,23 @@
     \item \pozor
     \begin{itemize}
       \item Nelze přistupovat na paměť po zavolání \code{free}
+
+      \pause
+
       \item \code{free} nemaže \emph{obsah} paměti
     \end{itemize}
   \end{itemize}
+
+  \onslide<1->
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[belowskip=0pt]
+int *a = malloc(sizeof(int));
+int *b = calloc(10, sizeof(int));
+free(b);
+free(a);
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -161,7 +189,7 @@
 
 \end{frame}
 
-\begin{frame}{Změna dynamické paměti}
+\begin{frame}[fragile]{Změna dynamické paměti}
 
   \begin{itemize}
     \item \code{void *realloc(void *ptr, size_t size)}
@@ -187,6 +215,16 @@
       \item Stejně jako při \code{malloc}
     \end{itemize}
   \end{itemize}
+
+  \onslide<1->
+
+  \begin{block}{Příklad bez ošetření chyb}
+    \begin{lstlisting}[belowskip=0pt]
+int *a = malloc(sizeof(int));
+a = realloc(a, 2 * sizeof(int));
+free(a);
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -215,12 +253,12 @@
   \pause
 
   \begin{block}{Příklad}
-  \begin{lstlisting}
-struct {
-  int a, b;
-} *array = malloc(sizeof(*array));
-memset(array, 0, sizeof(*array));
-  \end{lstlisting}
+    \begin{lstlisting}
+char *password = read_passwd();
+print_string(password);
+memset(password, 0, strlen(password));
+free(password);
+    \end{lstlisting}
   \end{block}
 
 \end{frame}
