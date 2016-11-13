@@ -19,7 +19,7 @@
   \tableofcontents
 \end{frame}
 
-\iffalse
+\iftrue
 
 \section{Úvodní informace}
 \frame{\sectionpage}
@@ -4809,8 +4809,6 @@ void allocate_2D_array() {
 
 \end{frame}
 
-\fi
-
 \section{Uživatelské datové typy}
 \frame{\sectionpage}
 
@@ -5646,33 +5644,32 @@ void print_age(struct human_age human) {
 \begin{block}{Příklad}
 \begin{tabular}{ll}
 \begin{lstlisting}
-enum value_type { integer, byte };
-union value_t {
-  int iValue;
-  unsigned char bValue;
+enum value_type { decimal, real };
+union value {
+  int val_dec;
+  float val_real;
+  char val_byte[sizeof(float)];
 };
 struct node {
   struct node *next;
   enum value_type value_type;
-  union value_t value;
+  union value value;
 };
 \end{lstlisting}
 & ~~~~~~
 \onslide<3->
 \begin{lstlisting}
-union value_t value1 = { 257 };
+union value value1 = { 257 };
 
-union value_t value2 = {
-  .bValue[0] = 3,
-  .bValue[3] = 7,
+union value value2 = {
+  .val_byte[0] = 3,
+  .val_byte[3] = 7,
 };
 \end{lstlisting}
 \end{tabular}
 \end{block}
 
 \end{frame}
-
-% XXX TODO continue reviewing here
 
 \subsection*{Paměťové třídy}
 \frame{\subsectionpage}
@@ -5712,15 +5709,9 @@ void fun(void) {
 \begin{frame}[fragile]{Klíčové slovo \texttt{static}}
 
   \begin{itemize}
-    \item Proměnná deklarovaná \code{static} zachová svou hodnotu i po konci
-      bloku s deklarací
-
-    \pause
-
     \item Statické proměnné jsou inicializovány v době překladu
     \begin{itemize}
       \item Trvalé místo pro proměnnou stejně jako pro globální proměnné
-      \item Při novém ,,vzniku'' proměnné obsahuje poslední hodnotu
     \end{itemize}
 
     \pause
@@ -5729,7 +5720,7 @@ void fun(void) {
 
     \pause
 
-    \item Proměnná se \code{static} je lokální v rámci \emph{souboru}
+    \item Statická proměnná je lokální v rámci \emph{souboru}
 
   \end{itemize}
 
@@ -5758,12 +5749,12 @@ void fun(void) {
     \item Proměnná může být měněna i mimo náš kód
     \begin{itemize}
       \item Rutinou přerušení, hardwarem, sdílená paměť, \dots
-      \item Z analýzy zdrojového kódu nelze určit místa změny proměnné
+      \item Překladač nemůže znát místa změny proměnné
     \end{itemize}
 
     \pause
 
-    \item Nahráje hodnotu proměnné do registru před každou operací
+    \item Nahraje hodnotu proměnné do registru před každou operací
     \begin{itemize}
       \item Překladač nemůže příliš optimalizovat
     \end{itemize}
@@ -5787,9 +5778,6 @@ while (a == 10) // waiting for somebody else to change it
 
   \begin{itemize}
     \item Doporučení pro překladač, aby proměnnou uložil v registru
-    \begin{itemize}
-      \item Před vykonáním instrukce musí být hodnoty do registru přeneseny
-    \end{itemize}
 
     \pause
 
@@ -5868,12 +5856,12 @@ void foo(int *restrict a, int *restrict b, int *restrict c) {
   \begin{itemize}
     \item Proměnná/funkce je definovaná jinde (externě)
     \begin{itemize}
-      \item Typicky v jiném zdrojovém souboru
+      \item V jiném zdrojovém souboru
     \end{itemize}
 
     \pause
 
-    \item Výchozí volba pro prototypy funkcí
+    \item Výchozí stav pro prototypy funkcí
     \begin{itemize}
       \item Po \code{\#include} hlavičky s prototypem může překladač
 	pokračovat
@@ -5888,10 +5876,10 @@ void foo(int *restrict a, int *restrict b, int *restrict c) {
 
     \pause
 
-    \item Externí proměnné jsou dostupné ve všech zdrojových kódech
+    \item Externí proměnné jsou dosažitelné ve všech zdrojových kódech
     \begin{itemize}
       \item Nemělo by se používat často
-      \item Např.\ vhodné pro zámky
+      \item Vhodné např.\ pro zámky
     \end{itemize}
 
   \end{itemize}
@@ -5935,7 +5923,7 @@ void fun(void); // the same
       \item \code{extern int nazev;}
     \end{itemize}
 
-    \item Z \code{main} funkce zavolejte vaši funkci
+    \item Z \code{main} funkce zavolejte svou funkci
     \begin{itemize}
       \item \code{extern void nazev();}
     \end{itemize}
@@ -5972,7 +5960,7 @@ void fun(void); // the same
 
       \pause
 
-      \item Změnit umístění proměnné (\code{register}, \code{extern})
+      \item Změnit viditelnost (\code{static}, \code{extern})
     \end{itemize}
 
     \pause
@@ -5993,26 +5981,21 @@ void fun(void); // the same
 \section{Terminálový vstup a výstup}
 \frame{\sectionpage}
 
-\end{document}
-
 \begin{frame}{Standardní vstup a výstup}
 
   \begin{itemize}
-    \item Koncept standardního vstupu a výstupu
+    \item Program nemusí vědět
     \begin{itemize}
-      \item Program nemusí vědět
-      \begin{itemize}
-	\item Kdo mu dává vstupní data
-	\item Kam vypisuje výstupní data
-      \end{itemize}
+      \item Kdo mu dává vstupní data
+      \item Kam vypisuje výstupní data
+    \end{itemize}
 
-      \pause
+    \pause
 
-      \item Výchozí
-      \begin{itemize}
-	\item Standardní vstup je klávesnice
-	\item Standardní výstup je obrazovka
-      \end{itemize}
+    \item Výchozí stav
+    \begin{itemize}
+      \item Standardní vstup je klávesnice
+      \item Standardní výstup je obrazovka
     \end{itemize}
 
     \pause
@@ -6024,6 +6007,9 @@ void fun(void); // the same
 	\item Windows: \cmd{program.exe < soubor.txt}
 	\item Unix: \cmd{./program < soubor.txt}
       \end{itemize}
+
+      \pause
+
       \item Standardní výstup do souboru
       \begin{itemize}
 	\item Windows: \cmd{program.exe > output.txt}
@@ -6037,42 +6023,31 @@ void fun(void); // the same
 
 \begin{frame}{Vstup a výstup v C}
 
+  \heading{Funkce pro vstup a výstup jsou ve standardní knihovně}
   \begin{itemize}
-%    \item Základní možnosti vstupu a výstupu už známe
-%    \begin{itemize}
-%      \item Výstup na obrazovku (\code{puts}, \code{printf})
-%      \item Vstup z klávesnice (\code{getc}, \code{scanf})
-%    \end{itemize}
-%
-%    \pause
-%
-    \item Funkce pro vstup a výstup jsou poskytovány standardní knihovnou
-      (\header{stdio.h})
+    \item \file{libc}, \header{stdio.h}
+
+    \pause
+
+    \item Nejsou přímo součástí jazyka
+
+    \pause
+
+    \item Jsou ale součástí standardní knihovny
     \begin{itemize}
-      \item Nejsou tedy přímo součástí jazyka
+      \item Výjimkou jsou embedded platformy, jádra OS, \dots
+      \item Překlad bez standardních knihoven: \code{gcc -nostdlib}
+    \end{itemize}
+
+    \pause
+
+    \item Dva módy operací
+    \begin{itemize}
+      \item Binární -- jaké bajty zapíšeme, takové přečteme
 
       \pause
 
-      \item Jsou ale součástí (téměř) vždy dostupné standardní knihovny
-      \begin{itemize}
-	\item Výjimkou jsou některé omezené (embedded) platformy nebo jádro OS
-	\item Lze překládat i bez standardních knihoven \code{gcc -nostdlib}
-      \end{itemize}
-    \end{itemize}
-
-    \pause
-
-    \item Binární data
-    \begin{itemize}
-      \item Jaké bajty zapíšeme, takové přečteme
-    \end{itemize}
-
-    \pause
-
-    \item Textová data
-    \begin{itemize}
-      \item Na nejnižší úrovni stále binární data, ale \emph{interpretovaná}
-	jako text
+      \item Textová -- binární data \emph{interpretovaná} jako text
     \end{itemize}
 
   \end{itemize}
@@ -6081,11 +6056,8 @@ void fun(void); // the same
 
 \begin{frame}{Textová data}
 
+  \heading{Pro vyjádření běžného textu}
   \begin{itemize}
-    \item Použito pro vyjádření běžného textu
-
-    \pause
-
     \item Písmena, číslice, mezery, oddělovače, závorky, \dots
     \begin{itemize}
       \item Tisknutelné znaky (ASCII $\geq$ 32)
@@ -6095,14 +6067,15 @@ void fun(void); // the same
 
     \item Textová data narozdíl od binárních přímo interpretujeme
     \begin{itemize}
-      \item S bajtem o hodnotě 71 pracujeme jako s písmenem ,,G''
+      \item Bajt o hodnotě 71 považujeme za písmeno G
+      \item Bajt o hodnotě 10 považujeme za odřádkování (\code{\\n})
     \end{itemize}
 
     \pause
 
     \item Jak interpretovat ostatní (netextové) hodnoty?
     \begin{itemize}
-      \item Různé zástupné symboly, pípnutí, \dots
+      \item Backspace, pípnutí, escape, \dots
     \end{itemize}
 
   \end{itemize}
@@ -6112,32 +6085,35 @@ void fun(void); // the same
 \begin{frame}{Nový řádek}
 
   \begin{itemize}
-    \item \code{printf("Prvni radek \\n Druhy radek");}
+    \item Nový řádek v C je speciální znak -- \code{\\n}
     \begin{itemize}
-      \item Nový řádek v C je speciální znak (\code{\\n})
+      \item \code{print_string("Prvni radek \\n Druhy radek");}
     \end{itemize}
 
     \pause
 
-    \item Nový řádek -- implementačně závislé na OS
+    \item Závislý na OS
     \begin{itemize}
       \item Unix: \code{\\n} (ASCII 10, \textit{new line})
       \begin{itemize}
-	\item \code{\\n} posun dolů o jeden řádek
+	\item \code{\\n} -- posun dolů o jeden řádek
       \end{itemize}
+
+      \pause
 
       \item Windows: \code{\\r\\n} (ASCII 13 10)
       \begin{itemize}
-	\item \code{\\r} carriage return -- návrat válce psacího stroje doleva
-	\item \code{\\n} posun dolů o jeden řádek
+	\item \code{\\r} -- návrat válce psacího stroje doleva
+	  (\textit{carriage return})
+	\item \code{\\n} -- posun dolů o jeden řádek
       \end{itemize}
     \end{itemize}
 
     \pause
 
-    \item \code{printf("Prvni radek \\n");}
+    \item \code{print_string("Prvni radek \\n");}
     \begin{itemize}
-      \item Na Unixu: \code{Prvni radek \\n}
+      \item Na Unixu se vypíše: \code{Prvni radek \\n}
       \item Na Windows: \code{Prvni radek \\r\\n}
     \end{itemize}
 
@@ -6148,32 +6124,31 @@ void fun(void); // the same
 \begin{frame}{Vyrovnávací paměť pro vstup a výstup}
 
   \begin{itemize}
-    \item Data mezi producentem a konzumentem nemusí být přenesena ihned
+    \item Data mezi producentem a konzumentem nejsou přenášena ihned
     \begin{itemize}
       \item Text na obrazovku vypisován po řádcích
       \item Data na disk zapisována po blocích
-      \item Z optimalizačních důvodů se nevolá konzument pro každý elementární
-	znak
+      \item Kvůli optimalizaci se konzument nevolá pro každý znak
     \end{itemize}
 
     \pause
 
-    \item Produkovaná data jsou ukládána do vyrovnávací paměti
+    \item Data jsou ukládána do vyrovnávací paměti
     \begin{itemize}
       \item Tzv.\ buffering
 
       \pause
 
-      \item Vyčtení proběhne při jejím zaplnění
+      \item Přenos proběhne při jejím zaplnění
       \begin{itemize}
 	\item Nastavení aplikace nebo OS
       \end{itemize}
 
       \pause
 
-      \item Nebo externím vynucením
+      \item Nebo po externím vynucením
       \begin{itemize}
-	\item \code{fflush(stdout)}
+	\item Např.\ \code{fflush(stdout)}
       \end{itemize}
     \end{itemize}
 
@@ -6183,15 +6158,27 @@ void fun(void); // the same
 
 \begin{frame}[fragile]{Práce s vyrovnávací pamětí}
 
-\begin{lstlisting}
+  \begin{lstlisting}[belowskip=0pt]
 int get_put_char(void) {
   printf("Zadavej znaky a pak Enter: ");
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   fflush(stdout); // force output of printf
+  \end{lstlisting}
+  \onslide<1->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
 
   int input;
   while ((input = getchar()) != '\n') {
     putchar(input + 1);
-    //fflush(stdout);
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
+    fflush(stdout);
+  \end{lstlisting}
+  \onslide<1->
+  \begin{lstlisting}[aboveskip=0pt]
   }
   printf("\n"); // emit newline to indent program output
 
@@ -6217,7 +6204,7 @@ int get_put_char(void) {
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-void fun(const char *str) {
+void dump_string(const char *str) {
   for (unsigned int a = 0; a < strlen(str); a++) {
     print_character(str[a]); // ours
     putchar(str[a]); // from the standard library
@@ -6233,16 +6220,46 @@ void fun(const char *str) {
   \code{int getchar(void);} (\header{stdio.h})
   \begin{itemize}
     \item Načte ze standardního vstupu znak a vrátí ho
+
+    \pause
+
+    \item Vrací konstantu \code{EOF} při ukončení vstupu
   \end{itemize}
 
-\begin{block}{Příklad}
-\begin{lstlisting}
-void fun(void) {
+  \onslide<1->
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}
+void repeat(void) {
   while ((int c = getchar()) != '\n')
     putchar(c);
 }
-\end{lstlisting}
-\end{block}
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Opakování vstupu až do konce}
+  \begin{enumerate}
+    \item Opakujte vstup od uživatele na výstup
+    \begin{itemize}
+      \item \code{getchar} a \code{putchar}
+    \end{itemize}
+
+    \item Opakování ukončete, pokud byl vstup ukončen
+    \begin{itemize}
+      \item \code{getchar} vrací \code{EOF}
+    \end{itemize}
+
+    \item Přeložte a spusťte
+
+    \item Vypisuje se po znacích?
+    \begin{itemize}
+      \item Vysvětlete
+    \end{itemize}
+  \end{enumerate}
 
 \end{frame}
 
@@ -6263,7 +6280,7 @@ void fun(void) {
 
 \begin{block}{Příklad}
 \begin{lstlisting}
-void fun(const char *str) {
+void dump_string2(const char *str) {
   print_string(str); // ours
   puts(str); // from the standard library
 }
@@ -6304,40 +6321,47 @@ void fun(const char *str) {
 
   \onslide<2->
 
-\begin{block}{Příklad}
-\begin{lstlisting}
-void fun(int a, char c, const char *str) {
+  \begin{block}{Příklad}
+    \begin{lstlisting}
+void print_formatted(int a, char c, const char *str) {
   printf("ahoj\n");
   printf("%d %c %d %s\n", a, c, c, str);
 }
-\end{lstlisting}
-\end{block}
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
-\begin{frame}[fragile]{\texttt{printf}}{Formátovací znaky}
-
+\begin{frame}[fragile]{Formátovací znaky \texttt{printf}}
 
 \begin{table}
 { \scriptsize
 \begin{tabular}{|l|l|l|} \hline
 \textbf{Specifier}   & \textbf{Výstup} & \textbf{Příklad} \\ \hline
-d nebo i& Signed decimal integer	 & 392 \\ \hline
-u	& Unsigned decimal integer	 & 7235 \\ \hline
-o	& Unsigned octal	 & 610 \\ \hline
-x	& Unsigned hexadecimal integer	 & 7fa \\ \hline
-X	& Unsigned hexadecimal integer (uppercase)	 & 7FA \\ \hline
-f	& Decimal floating point, lowercase	 & 392.65 \\ \hline
-e	& Scientific notation (mantissa/exponent), lowercase	 & 3.9265e+2 \\ \hline
-g	& Use the shortest representation: \%e or \%f	 & 392.65 \\ \hline
-c	& Character	 & a \\ \hline
-s	& String of characters	 & sample \\ \hline
-p	& Pointer address	 & b8000000 \\ \hline
-\%	& A \% followed by another \% character will write \% to the stream.	 & \% \\ \hline
+d nebo i& Znaménkové desítkové číslo			& 392 \\ \hline
+u	& Neznaménkové desítkové číslo			& 7235 \\ \hline
+o	& Neznaménkové osmičkové			& 610 \\ \hline
+x	& Neznaménkové šestnáctkové			& 7fa \\ \hline
+X	& Neznaménkové šestnáctkové (velkými)		& 7FA \\ \hline
+f	& Reálné číslo					& 392.65 \\ \hline
+e	& Reálné -- vědecká norace (mantisa+exponent)	& 3.9265e+2 \\ \hline
+g	& Reálné -- co je kratší: \%e nebo \%f		& 392.65 \\ \hline
+c	& Znak						& a \\ \hline
+s	& Řetězec					& priklad \\ \hline
+p	& Ukazatel					& b8000000 \\ \hline
+\%	& \%\% je samotné procento			& \% \\ \hline
 \end{tabular}
 }
 \caption{Tabulka běžných formátovacích znaků}
 \end{table}
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+void print_formatted(int a, char c, const char *str) {
+  printf("%d %c %d %s %p %%\n", a, c, c, str, str);
+}
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -6353,7 +6377,7 @@ p	& Pointer address	 & b8000000 \\ \hline
 
     \item Omezení/rozšíření počtu vypisovaných desetinných míst
     \begin{itemize}
-      \item Defaultně 6 desetinných míst
+      \item Výchozí: 6 desetinných míst
       \item \code{\%.2f}, \code{\%.8f}, \code{\%.0f}
     \end{itemize}
 
@@ -6372,11 +6396,11 @@ p	& Pointer address	 & b8000000 \\ \hline
 \begin{block}{Příklad}
 \begin{lstlisting}
 void fun(void) {
-  float fValue = 3.1415926535;
-  printf("%f\n", fValue);           // prints 3.141593
-  printf("%.2f\n", fValue);         // prints 3.14
-  printf("%.8f\n", fValue);         // prints 3.14159274
-  printf("%10f\n", fValue);         // prints   3.141593
+  float real = 3.1415926535;
+  printf("%f\n", real);           // prints 3.141593
+  printf("%.2f\n", real);         // prints 3.14
+  printf("%.8f\n", real);         // prints 3.14159274
+  printf("%10f\n", real);         // prints   3.141593
 }
 \end{lstlisting}
 \end{block}
@@ -6424,25 +6448,21 @@ void fun(void) {
 
 \end{frame}
 
-\begin{frame}[fragile]{\texttt{printf}}{Chybný formátovací řetězec}
+\begin{frame}[fragile]{Chybný formátovací řetězec}
 
   \begin{itemize}
     \item Pozor na chybný formátovací řetězec
     \begin{itemize}
       \item Formátování se provede, ale pro jiný typ
-%      \item Viz funkce s proměnným počtem parametrů
-%      \begin{itemize}
-%	\item \code{va_arg(arg, int)}
-%      \end{itemize}
+
+      \pause
+
+      \item Vypíše se chybná hodnota
     \end{itemize}
 
     \pause
 
-    \item Typicky se vypíše chybná hodnota
-
-    \pause
-
-    \item Při chybné specifikaci \code{\%s} se výpíše smetí nebo dojde k pádu
+    \item Při chybné specifikaci \code{\%s} se vypíše smetí nebo dojde k pádu
     \begin{itemize}
       \item V paměti se hledá koncová nula
     \end{itemize}
@@ -6451,7 +6471,7 @@ void fun(void) {
 
     \item Překladač může upozornit varováním
     \begin{itemize}
-      \item \texttt{warning: format ‘\%d’ expects argument of type ‘int’, but argument 2 has type ‘double’}
+      \item \scriptsize{\texttt{warning: format `\%d' expects argument of type `int', but argument 2 has type `double'}}
       \item \emph{Neignorujte!}
     \end{itemize}
   \end{itemize}
@@ -6459,13 +6479,13 @@ void fun(void) {
 \onslide<2->
 \begin{block}{Příklad}
 \begin{lstlisting}
-float fValue = 3.1415926535;
-printf("%d\n", fValue);           // prints 803067992
+float real = 3.1415926535;
+printf("%d\n", real);           // prints 803067992
 \end{lstlisting}
 \onslide<3->
 \begin{lstlisting}
-printf("%s\n", &fValue);          // prints *I@
-printf("%s\n", fValue);           // CRASH
+printf("%s\n", &real);          // prints *I@
+printf("%s\n", real);           // CRASH
 \end{lstlisting}
 \end{block}
 
@@ -6477,7 +6497,7 @@ printf("%s\n", fValue);           // CRASH
   \begin{enumerate}
     \item Přepracujte úkol s lidmi, aby používal \code{printf}
     \begin{itemize}
-      \item Výpis atributů proveďte na jeden řádek
+      \item Výpis všech atributů proveďte na jeden řádek
     \end{itemize}
 
     \item Přeložte a spusťte
@@ -6520,7 +6540,7 @@ printf("%s\n", fValue);           // CRASH
 
     \item \code{scanf} vrací počet načtených položek
     \begin{itemize}
-      \item \code{EOF} (End Of File), pokud se nepodařilo načíst nic
+      \item \code{EOF}, pokud se nepodařilo načíst nic
     \end{itemize}
 
   \end{itemize}
@@ -6538,24 +6558,24 @@ scanf("%s", small_string);
 
 \end{frame}
 
-\begin{frame}[fragile]{\texttt{scanf}}{Ukázka Avatar}
+\begin{frame}[fragile]{\texttt{scanf}}{Ukázka člověk}
 
 \begin{lstlisting}
-enum weapon_t { sword, axe, bow };
+enum hair { red, blonde, gray, };
 
 struct human {
-  char nick[32];
-  float energy;
-  enum weapon_t weapon;
+  char name[32];
+  float age;
+  enum hair hair;
 };
 
 void scanf_demo() {
-  struct human avat;
-  scanf("%s", avat.nick);
-  scanf("%f", &avat.energy);
-  scanf("%d", &avat.weapon);
+  struct human person;
+  scanf("%s", person.name);
+  scanf("%f", &person.age);
+  scanf("%d", &person.hair);
 
-  printf("name=%s energy=%f weapon=%d\n", avat.nick, avat.energy, avat.weapon);
+  printf("name=%s age=%f hair=%d\n", person.nick, person.energy, person.weapon);
 }
 \end{lstlisting}
 
@@ -6581,7 +6601,7 @@ void scanf_demo() {
 
       \item \code{\%50s} omezí načtenou délku na 50 znaků
       \begin{itemize}
-	\item Koncová nula pak ale na 51. pozici!
+	\item Koncová nula pak ale na 51.\ pozici!
       \end{itemize}
     \end{itemize}
 
@@ -6609,8 +6629,20 @@ printf("%s\n", small_string);
   \begin{enumerate}
     \item Pokračujte v úkolu s lidmi
     \item Jako první načtěte číslo, kolik osob máte vytvořit
-    \item Potom začněte vytvářet osoby
-    \item Přečtěte jméno každé osoby ze vstupu
+    \begin{itemize}
+      \item Číslo vypište
+    \end{itemize}
+
+    \item Vytvořte si pole s lidmi
+    \begin{itemize}
+      \item Můžete staticky: \code{struct human people[cislo];}
+    \end{itemize}
+
+    \item Přečtěte postupně jméno každé osoby ze vstupu
+    \begin{itemize}
+      \item \code{scanf("\%s", people[0].name);}
+    \end{itemize}
+
     \item Přeložte a spusťte
     \item Můžete rozšířit na načítaní pohlaví a věku
   \end{enumerate}
@@ -6672,23 +6704,23 @@ printf("%s\n", small_string);
 \begin{lstlisting}
 #include <stdio.h>
 
-enum weapon_t { sword, axe, bow };
+enum hair { red, blonde, gray, };
 
 struct human {
-  char nick[32];
-  float energy;
-  enum weapon_t weapon;
+  char name[32];
+  float age;
+  enum hair hair;
 };
 
 int main() {
-  struct human pers = { "Jan", 32, blonde };
+  struct human person = { "Jan", 32, blonde };
   char message[1000];
 \end{lstlisting}
 
 \onslide<2->
 
 \begin{lstlisting}
-  sprintf(message, "Avatar '%s' with energy %.2f is ready!", pers.nick, pers.energy);
+  sprintf(message, "Person '%s' with age %.2f is ready!", person.name, person.age);
   puts(message);
 \end{lstlisting}
 
@@ -6768,11 +6800,8 @@ int main() {
 
 \begin{frame}{Preprocesor}{Motivace}
 
+  \heading{Preprocesor předzpracuje zdrojový kód pro překladač}
   \begin{itemize}
-    \item Preprocesor předzpracuje zdrojový kód pro překladač
-
-    \pause
-
     \item Potřebuje překladač zpracovávat poznámky?
     \begin{itemize}
       \item Ne, neovlivní nijak výsledný kód, zahodí se
@@ -6782,16 +6811,16 @@ int main() {
 
     \item Musíme mít veškerý kód v jediném souboru?
     \begin{itemize}
-      \item Ne, je výhodné dělit do podčástí (knihovny apod.)
-      \item Až před poskytnutím překladači jsou části kódu spojené
+      \item Ne, je výhodné dělit do podčástí
+      \item Až při linkování jsou části kódu spojené
     \end{itemize}
 
     \pause
 
     \item Jak říct, že funkce \code{printf} existuje, ale je v jiném souboru?
     \begin{itemize}
-      \item Musíme uvést prototyp funkce pro překladač (deklarace)
-      \item Zbytečné psát prototyp \code{printf} v každém souboru
+      \item Prototyp funkce -- deklarace
+      \item Otravné psát prototyp \code{printf} v každém souboru
 
       \pause
 
@@ -6843,6 +6872,13 @@ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
 \begin{frame}{Preprocesor}
 
   \begin{itemize}
+    \item Provádí textové náhrady nad zdrojovým kódem
+    \begin{itemize}
+      \item Jazykově nezávislé, ,,neví'' nic o syntaxi jazyka C
+    \end{itemize}
+
+    \pause
+
     \item Většina příkazů preprocesoru začíná znakem \code{\#}
 
     \pause
@@ -6854,14 +6890,7 @@ _-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_
       \pause
 
       \item NE: \code{int a = 1;} \code{\#define DEBUG}
-      \item Ano: ~~~~~~~~~~\code{\#define DEBUG}
-    \end{itemize}
-
-    \pause
-
-    \item Provádí textové náhrady nad zdrojovým kódem
-    \begin{itemize}
-      \item Jazykově nezávislé, ,,neví'' nic o syntaxi jazyka C
+      \item Ano: ~~~~~~~~\code{\#define DEBUG}
     \end{itemize}
 
     \pause
@@ -7035,7 +7064,7 @@ value = X;
     \item Chceme vždy přeložit celý zdrojový kód?
     \begin{itemize}
       \item Ne nutně, část kódu se může vynechat
-      \item Chceme mít zároveň jediný zdrojový kód, ne několik podobných kopií
+      \item Zároveň chceme 1 zdrojový kód, ne několik podobných kopií
     \end{itemize}
 
     \pause
@@ -7043,7 +7072,7 @@ value = X;
     \item Např.\ v ladicím režimu chceme dodatečné výpisy
 \begin{lstlisting}
 #ifdef DEBUG
-printf("Just testing");
+puts("Just testing");
 #endif
 \end{lstlisting}
 
@@ -7186,7 +7215,8 @@ int main(void) {
 
     \item Preprocesor nahradí výskyty makra včetně zadaných argumentů
     \begin{itemize}
-      \item Argumenty v definici se nahradí za argumenty z místa použití makra
+      \item Nahradí se argumenty v definici makra
+      \item Za argumenty z místa použití makra
     \end{itemize}
 
   \end{itemize}
@@ -7236,11 +7266,11 @@ int main(void) {
 
     \pause
 
-    \item Při použití makra vložen přímo kód makra namísto volání
+    \item Při použití makra vložen přímo kód z makra
 
     \pause
 
-    \item Překladač ale může sám vložit kód funkce namísto volání
+    \item Překladač ale sám vkládá kód funkce namísto volání
     \begin{itemize}
       \item Tzv.\ \textit{inlining}
       \item Rychlostní optimalizace na úkor paměti -- delší kód
@@ -7372,7 +7402,13 @@ int main(void) {
     \begin{itemize}
       \item \code{\#include} je OK
       \item \code{\#ifndef SOUBOR_H} je OK
+
+      \pause
+
       \item \code{\#define MAX 10} -- raději \code{const int MAX = 10;}
+
+      \pause
+
       \item \code{\#define VALUE_T int} -- lépe \code{typedef int value_t;}
     \end{itemize}
 
@@ -7392,6 +7428,8 @@ int main(void) {
   \end{itemize}
 
 \end{frame}
+
+\fi
 
 \section{Bitové operace}
 \frame{\sectionpage}
@@ -7447,7 +7485,7 @@ int main(void) {
 \begin{frame}{Bitové operátory}{Využití}
 
   \begin{itemize}
-    \item Sada příznaků TRUE/FALSE (pro úsporu prostoru)
+    \item Sada bitů TRUE/FALSE (pro úsporu prostoru)
     \begin{itemize}
       \item Např.\ do jednoho \code{int} (32b) uchováme 32 hodnot
       \item \code{unsigned int flags = 0x00000000;}
@@ -7487,8 +7525,6 @@ int main(void) {
       \item Maska pro celý bajt je \code{255}, tedy \code{0xFF}
       \item \code{unsigned char lowByte = flags \& 0xFF;}
     \end{itemize}
-
-%    \item ! Nepoužívejte se signed hodnotami (není fixní bitová reprezentace)
   \end{itemize}
 
 \end{frame}
@@ -7499,30 +7535,30 @@ int main(void) {
     \item Operace nutné na úrovni bitů
     \begin{itemize}
       \item Např.\ převod BASE64, šifrovací algoritmy, \dots
-      \item Maska pro dolních 6 bitů: $2^0+2^1+2^2+2^3+2^4+2^5 = 63_{10} =$
-        \code{0x3F}
-      \item Maska pro horní 2 bity: $2^6+2^7 = 192_{10} =$ \code{0xC0}
+      \item Maska pro dolních 6 bitů: $2^0+2^1+2^2+2^3+2^4+2^5 = 63_{10} =
+	 \text{3F}_{16}$
+      \item Maska pro horní 2 bity: $2^6+2^7 = 192_{10} = \text{C0}_{16}$
     \end{itemize}
 
     \pause
 
     \item Rychlé násobení mocninou dvojky $X \cdot 2^{posun}$
     \begin{itemize}
-      \item $0011_2$ (3 dekadicky)
+      \item $3_{10} = 0011_2$
 
       \pause
 
-      \item $0011_2$ \code{<<} $1 \rightarrow 0110_2$ (6 dekadicky)
+      \item $0011_2\ \text{\code{<<}}\ 1 = 0110_2 = 6_{10}$
 
       \pause
 
-      \item $0011_2$ \code{<<} $2 \rightarrow 1100_2$ (12 dekadicky)
+      \item $0011_2\ \text{\code{<<}}\ 2 = 1100_2 = 12_{10}$
     \end{itemize}
 
     \pause
 
     \item Pozor na rozlišení \code{\&} a \code{\&\&}, resp.\ \code{|} a
-      \code{II}
+      \code{||}
     \begin{itemize}
       \item Např.\ záměna \code{\&} za \code{\&\&}
       \begin{itemize}
