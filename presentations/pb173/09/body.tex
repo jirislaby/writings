@@ -23,10 +23,13 @@
   \frametitle{Časovače}
 
   \begin{itemize}
-  \item \doc{Documentation/timers/*}
-  \item Činnost v nastavených časech (i periodicky)
-  \item Kód je volán v kontextu přerušení (nelze spát)
-  \item \file{/proc/timer_list} (jen nová jádra)
+    \item \doc{Documentation/timers/*}
+    \item Činnost v nastavených časech (i periodicky)
+
+    \pause
+
+    \item Kód je volán v kontextu přerušení (nelze spát)
+    \item \file{/proc/timer_list} (mimo historická jádra)
   \end{itemize}
 
   \pause
@@ -34,10 +37,16 @@
   \heading{Obyčejné časovače}
   \begin{itemize}
     \item Fungují na každé architektuře
+
+    \pause
+
     \item Založené na \code{jiffies}
     \begin{itemize}
       \item Proměnná zvyšující se o 1 s frekvencí \code{HZ}
     \end{itemize}
+
+    \pause
+
     \item Rozlišení: 1--10 ms (pro \code{HZ}: 1000--100)
   \end{itemize}
 
@@ -45,8 +54,7 @@
 
   \heading{High-res časovače}
   \begin{itemize}
-    \item \header{linux/hrtimer.h}
-    \item \code{usleep_range}
+    \item \code{usleep_range} (\header{linux/hrtimer.h})
     \item Rozlišení: $\sim \mu$s
   \end{itemize}
 
@@ -57,16 +65,24 @@
 
   \heading{API}
   \begin{itemize}
-  \item \header{linux/timer.h}, \code{struct timer_list}
-  \item \code{DEFINE_TIMER}$_S$, \code{setup_timer}$_D$
-  \item \code{mod_timer} (=\code{del_timer}+\code{add_timer})
-  \item \code{del_timer_sync} (\emph{POZOR})
+    \item \header{linux/timer.h}, \code{struct timer_list}
+    \item \code{DEFINE_TIMER}$_S$, \code{setup_timer}$_D$
+
+    \pause
+
+    \item Načasování: \code{mod_timer} (=\code{del_timer}+\code{add_timer})
+    \item Zrušení: \code{del_timer_sync} (\emph{POZOR})
   \end{itemize}
 
+  \onslide<1->
+
   \begin{block}{Příklad}
-  \begin{lstlisting}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=0pt]
 static void my_fun(unsigned long data);
 static DEFINE_TIMER(my_timer, my_fun, 0, 30);
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}[aboveskip=0pt,belowskip=2pt]
 static void my_fun(unsigned long data)
 {
   my_timer.data *= 2;
@@ -76,13 +92,13 @@ static void my_fun(unsigned long data)
   mod_timer(&my_timer, jiffies + msecs_to_jiffies(100));
 ...
   del_timer_sync(&my_timer);
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
 
-  \begin{textblock*}{4.1cm}(8.2cm,6.5cm)
-    \begin{onlyenv}<2->
+  \begin{textblock*}{4.1cm}(\textwidth - 4.3cm,\textheight - 3cm)
+    \begin{onlyenv}<3->
       \heading{Úkol:} Každou vteřinu, kdy je modul v systému, vypište \code{HZ}
-      (\code{\%u}) a \code{jiffies} (\code{\%lu})
+	(\code{\%u}) a \code{jiffies} (\code{\%lu})
     \end{onlyenv}
   \end{textblock*}
 
@@ -173,9 +189,9 @@ static void my_fun(unsigned long data)
   \begin{itemize}
     \item \doc{Documentation/workqueue.txt}
 
-    \item Speciální \emph{proces} volající funkce řazené do fronty
+    \item Speciální \emph{procesy} volající funkce řazené do fronty
     \begin{itemize}
-      \item Globální, společný pro všechny -- většinou stačí
+      \item Globální, společné pro všechny -- většinou stačí
 
       \pause
 
@@ -184,7 +200,7 @@ static void my_fun(unsigned long data)
 
     \pause
 
-    \item Lze v něm spát
+    \item Lze v nich spát
 
     \item Spustí se, až se plánovač rozhodne
     \begin{itemize}
@@ -226,7 +242,7 @@ static void my_fun(unsigned long data)
   \pause
   \medskip
 
-  \heading{Úkol:} v \code{module_init} nahrájte modul \code{ieee80211} nebo
+  \heading{Úkol:} v \code{module_init} nahrajte modul \code{ieee80211} nebo
     \code{mac80211} (\code{request_module}). \code{request_module} nelze volat
     přímo v \code{module_init} a je nutný i vlastní workqueue proces.
 
@@ -260,7 +276,7 @@ static void my_fun(unsigned long data)
   \pause
   \bigskip
 
-  \heading{Úkol:} vytvořit tasklet, spustit a vypsat posloupnost volání pomocí
+  \heading{Úkol:} vytvořte tasklet, spusťte a vypište posloupnost volání pomocí
     \code{dump_stack}
 
 \end{frame}
