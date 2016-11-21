@@ -31,6 +31,8 @@
     \begin{itemize}
       \item Známe: \code{read}, \code{write}, \code{ioctl}, \dots
 
+      \pause
+
       \item U všeho nutné kopírování dat
       \begin{itemize}
 	\item \code{copy_\{from,to\}_user} apod.
@@ -61,23 +63,24 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off);
 
   \heading{Alokace pomocí \code{mmap} (uživatelský prostor)}
   \begin{enumerate}
+    \item Upravujte nějaký \code{main.c} v uživatelském prostoru
     \item Anonymní paměť
     \begin{itemize}
       \item \footnotesize{\code{void *mmap(void *addr, size_t len,
 	int prot, int flags, int fd, off_t off)}}
-      \item \code{len} \dots\ 20M
-      \item \code{prot} \dots\ \code{PROT_READ | PROT_WRITE}
-      \item \code{flags} \dots\ \code{MAP_PRIVATE | MAP_ANONYMOUS}
-      \item \code{fd} \dots\ -1
+      \item \code{len}: 20M
+      \item \code{prot}: \code{PROT_READ | PROT_WRITE}
+      \item \code{flags}: \code{MAP_PRIVATE | MAP_ANONYMOUS}
+      \item \code{fd}: -1
     \end{itemize}
 
     \pause
 
-    \item Mapování /dev/zero
+    \item Mapování \file{/dev/zero}
     \begin{itemize}
       \item \code{len} a \code{prot} stejné
-      \item \code{flags} \dots\ \code{MAP_PRIVATE}
-      \item \code{fd} \dots\ deskriptor otevřeného /dev/zero
+      \item \code{flags}: \code{MAP_PRIVATE}
+      \item \code{fd}: deskriptor otevřeného \code{/dev/zero}
     \end{itemize}
   \end{enumerate}
 \end{frame}
@@ -86,8 +89,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off);
 \subsection{\code{mmap} v jádře}
 \fi
 
-\begin{frame}[fragile]
-  \frametitle{Parametry \code{mmap} v jádře}
+\begin{frame}[fragile]{Parametry \code{mmap} v jádře}
 
   \begin{itemize}
     \item V uživatelském prostoru
@@ -98,7 +100,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off);
 
     \pause
 
-    \item V jádře (opět) jedna položka v \code{struct file_operations}
+    \item V jádře (opět) jedna položka ve \code{struct file_operations}
     \begin{itemize}
       \item \footnotesize{\code{int mmap(struct file *filp,
 	struct vm_area_struct *vma)}}
@@ -106,50 +108,69 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off);
       \pause
 
       \item Parametry jsou předány přes \code{struct vm_area_struct}
+
+      \onslide<10->
+
+      \item Ovladač musí mapovat stránky mezi \code{vm_start} a \code{vm_end}
+      \item Ale \emph{POZOR}, také ověřit privilegia (čtení, zápis, spuštění).
+
     \end{itemize}
   \end{itemize}
 
+  \onslide<4->
   \pause
 
   \begin{block}{\code{struct vm_area_struct}}
-  \begin{lstlisting}
+    \begin{lstlisting}[belowskip=0pt]
   unsigned long vm_start; /* addr or random when addr is NULL */
   unsigned long vm_end;   /* vm_end = vm_start+len */
+    \end{lstlisting}
+    \pause
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   unsigned long vm_pgoff; /* vm_pgoff = off/PAGE_SIZE */
+    \end{lstlisting}
+    \pause
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   unsigned long vm_flags; /* vm_flags = encoded(flags|prot), see VM_READ etc. */
+    \end{lstlisting}
+    \pause
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   pgprot_t vm_page_prot;  /* only for remap_* functions */
   ...
+    \end{lstlisting}
+    \pause
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   const struct vm_operations_struct *vm_ops; /* later ... */
+    \end{lstlisting}
+    \pause
+    \begin{lstlisting}[aboveskip=0pt]
   void *vm_private_data;
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
-
-  \pause
-
-  Ovladač musí mapovat stránky mezi \code{vm_start} a \code{vm_end}. \\
-  Ale \emph{POZOR}, také ověřit privilegia (čtení, zápis, spuštění).
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Základní \code{mmap} funkce}
+\begin{frame}[fragile]{Základní \code{mmap} funkce}
 
-  \heading{API}
   \begin{itemize}
-  \item \header{linux/mm.h}, \code{struct vm_area_struct}
-  \item \code{__get_free_page/pages} $\Rightarrow$
-  \code{remap_pfn_range}
-  \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
+    \item \header{linux/mm.h}, \code{struct vm_area_struct}
+    \item \code{__get_free_page/pages} $\Rightarrow$
+      \code{remap_pfn_range}
+    \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
   \end{itemize}
 
   \begin{block}{Příklad}
-  \begin{lstlisting}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 int my_init(void)
 {
   mem = __get_free_pages(GFP_KERNEL, 2);
   /* mem = vmalloc_user(PAGE_SIZE); */
 }
-...
+    \end{lstlisting}
+
+    \pause
+
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
 int my_mmap(struct file *filp, struct vm_area_struct *vma)
 {
   if ((vma->vm_flags & (VM_WRITE | VM_READ)) != VM_READ)
@@ -158,7 +179,7 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
       4 * PAGE_SIZE, vma->vm_page_prot);
   /* return remap_vmalloc_range(vma, mem, 0); */
 }
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
 
 \end{frame}
@@ -169,8 +190,8 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
   \begin{enumerate}
     \item Alokujte 2+2 stránky
     \begin{itemize}
-      \item Dvoustránku pomocí \code{vmalloc_user}
-      \item Dvoustránku pomocí stránkového alokátoru
+      \item Dvojstránku pomocí \code{vmalloc_user}
+      \item Dvojstránku pomocí stránkového alokátoru
     \end{itemize}
 
     \item Zapište na všechny 4 stránky libovolný, ale různý řetězec
@@ -185,10 +206,9 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
         mapování
     \end{itemize}
 
-    \item Z userspace 2$\times$ \code{mmap} s \code{off} \code{0} a
-      \code{2*4096}
+    \item Z userspace vyzkoušejte
     \begin{itemize}
-      \item Již hotovo v \file{pb173/09/pb173.c}
+      \item Prostudujte a spusťte \file{pb173/10/pb173.c}
     \end{itemize}
   \end{enumerate}
 
@@ -196,11 +216,11 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
   \heading{API (opakování)}
   \begin{itemize}
-  \item \header{linux/mm.h}, \code{struct vm_area_struct}
-  \item \footnotesize{\code{int mmap(struct file *filp,
-    struct vm_area_struct *vma)}}
-  \item \code{__get_free_page*} $\Rightarrow$ \code{remap_pfn_range}
-  \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
+    \item \header{linux/mm.h}, \code{struct vm_area_struct}
+    \item \footnotesize{\code{int mmap(struct file *filp,
+      struct vm_area_struct *vma)}}
+    \item \code{__get_free_page*} $\Rightarrow$ \code{remap_pfn_range}
+    \item \code{vmalloc_user} $\Rightarrow$ \code{remap_vmalloc_range}
   \end{itemize}
 
 \end{frame}
@@ -209,15 +229,14 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 \subsection{\code{mmap} po stránkách}
 \fi
 
-\begin{frame}[fragile]
-  \frametitle{\code{mmap} po stránkách}
+\begin{frame}[fragile]{\code{mmap} po stránkách}
 
   \begin{block}{\code{struct vm_operations_struct}}
-  \begin{lstlisting}
-  void (*open)(struct vm_area_struct *vma);
-  void (*close)(struct vm_area_struct *vma);
-  int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
-  \end{lstlisting}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+void (*open)(struct vm_area_struct *vma);
+void (*close)(struct vm_area_struct *vma);
+int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
+    \end{lstlisting}
   \end{block}
 
   \heading{Přemapování roztroušených stránek}
@@ -255,15 +274,14 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{\code{mmap} po stránkách -- příklad}
+\begin{frame}[fragile]{\code{mmap} po stránkách -- příklad}
 
-  \begin{lstlisting}
+  \begin{lstlisting}[belowskip=0pt]
 int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 { /* my_data == vma->vm_private_data; */
   \end{lstlisting}
   \begin{uncoverenv}<2->
-  \begin{lstlisting}
+    \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   unsigned long offset = vmf->pgoff << PAGE_SHIFT;
   struct page *page;
 
@@ -273,14 +291,12 @@ int my_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
   get_page(page);
   vmf->page = page;
   return 0;
-  \end{lstlisting}
+    \end{lstlisting}
   \end{uncoverenv}
-  \begin{lstlisting}
+  \begin{lstlisting}[aboveskip=0pt]
 }
 
-struct vm_operations_struct my_vm_ops = {
-  .fault = my_fault,
-};
+struct vm_operations_struct my_vm_ops = { .fault = my_fault, };
 
 int my_mmap(struct file *filp, struct vm_area_struct *vma)
 { /* don't forget to check ranges */
@@ -317,7 +333,7 @@ int my_mmap(struct file *filp, struct vm_area_struct *vma)
 
   \heading{Potřebné podkroky}
   \begin{itemize}
-    \item Definice \footnotesize{\code{int fault(struct vm_area_struct *vma,
+    \item Definice {\footnotesize\code{int fault(struct vm_area_struct *vma,
       struct vm_fault *vmf);}}
     \item Kontrola rozsahů v \code{mmap} (\code{end-start < 2*PAGE_SIZE}
       apod.)
