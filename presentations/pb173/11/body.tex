@@ -50,7 +50,7 @@
 \begin{frame}
   \frametitle{Princip DMA}
 
-  \heading{Princip\only<1>{ odesílání}\only<2>{ příjmu}}
+  \heading{Princip \only<1>{odesílání}\only<0|handout:1->{ a }\only<2>{příjmu}}
   \begin{enumerate}
   \item Alokace (speciální) paměti
   \item<1> Vyplnění daty (paket, zvuk, data na disk, \dots)
@@ -76,11 +76,11 @@
 
   \footnotesize{\code{void *dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle, gfp_t gfp)}}\\[-0.3em]
   \begin{itemize}
-  \item \code{dev} -- zařízení, které bude k paměti přistupovat
+  \item \code{dev}: zařízení, které bude k paměti přistupovat
     (\code{NULL} pokud neznáme)
-  \item \code{size} -- velikost, jakou požadujeme
-  \item \code{dma_handle} -- DMA adresa (návratová hodnota) -- \emph{pro zařízení}
-  \item návratová hodnota -- virtuální adresa -- \emph{pro nás}
+  \item \code{size}: velikost, jakou požadujeme
+  \item \code{dma_handle}: DMA adresa (návratová hodnota) -- \emph{pro zařízení}
+  \item Návratová hodnota: virtuální adresa -- \emph{pro nás}
   \end{itemize}
 
 \end{frame}
@@ -152,17 +152,22 @@ int my_do_DMA(struct device *dev)
     \end{itemize}
   \end{itemize}
 
-  \pause
+  \onslide<1->
 
   \begin{block}{Příklad z \code{probe}}
-  \begin{lstlisting}
+    \begin{lstlisting}
   ... /* pci_enable etc. here */
   ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(27));
-
+  ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(27));
+    \end{lstlisting}
+    \onslide<2->
+    \begin{lstlisting}
   pci_set_master(pdev);
-
+    \end{lstlisting}
+    \onslide<1->
+    \begin{lstlisting}
   virt = dma_alloc_coherent(&pdev->dev, 100, &phys, GFP_KERNEL);
-  \end{lstlisting}
+    \end{lstlisting}
   \end{block}
 
 \end{frame}
@@ -218,7 +223,7 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
     \begin{itemize}
       \item Zapisuje se po nastavení ostatních registrů
       \item Zapisuje se \emph{jednou}, a to kombinací bitů
-      \item Bit 0: \code{RUN} (start transfer now)
+      \item Bit 0: \code{RUN/STATUS} (start transfer now/is running?)
       \item Bit 1: \code{DIRECTION} (0: from RAM to EDU, 1: from EDU to RAM)
       \item Bit 2: \code{RQINT} (generate an interrupt after the transaction)
     \end{itemize}
@@ -231,15 +236,17 @@ Offset & Len & R/W & Contents & Meaning \\ \hline\hline
 
   \heading{Práce s DMA na EDU}
   \begin{enumerate}
-    \item 10~B DMA paměti inicializujte textovým řetězcem
-    \item Přeneste 10~B do lokální paměti EDU na adresu 0x40000
+    \item 10~B své alokované DMA paměti inicializujte textovým řetězcem
+    \item Přeneste 10~B do lokální paměti EDU na adresu \code{0x40000}
     \begin{itemize}
       \item Nastavte všechny 4 registry
+      \item Zdrojová adresa je vaše DMA adresa
+      \item Cílová adresa je \code{0x40000}
       \item Bez přerušení (bez \code{RQINT})
       \item Počkejte na nulovou hodnotu bitu \code{RUN} (na dokončení přenosu)
     \end{itemize}
 
-    \item Přeneste 10~B z EDU na DMA stránku + 10
+    \item Přeneste 10~B zpět z EDU na DMA stránku + 10
     \begin{itemize}
       \item Vznikne za sebou 2$\times$ stejný řetězec
     \end{itemize}

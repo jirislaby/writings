@@ -4,7 +4,7 @@
 
 \subtitle{XI. Komunikace s HW}
 
-\date{10. 12. \the\year}
+\date{29. 11. \the\year}
 
 \begin{document}
 \shorthandoff{-}
@@ -117,8 +117,8 @@
     \item Dopište tělo funkce \code{beep}
     \begin{itemize}
       \item Zapište \code{0xb6} na port \code{0x43}
-      \item Zapište \code{0x1234dd/hz} na port \code{0x42}
-      \item Zapište \code{(0x1234dd/hz) >> 8} na port \code{0x42}
+      \item Zapište \code{div} na port \code{0x42}
+      \item Zapište \code{(div >> 8)} na port \code{0x42}
       \item Přečtěte port \code{0x61} (obsah spodních 2 bitů zahoďte)
       \item Zapište přečtenou hodnotu \code{| 0x03} zpět na port \code{0x61}
     \end{itemize}
@@ -134,7 +134,7 @@
       \item Máte k dispozici \code{usleep}
     \end{itemize}
 
-    \item Přidejte do \code{main} volání \code{ioperm}
+    \item Přidejte do \code{main} před \code{play} volání \code{ioperm}
     \item Spusťte
   \end{enumerate}
 
@@ -142,40 +142,7 @@
 
 \section{PCI zařízení}
 
-\begin{frame}
-  \frametitle{PCI zařízení}
-
-  \begin{itemize}
-    \item PCI, PCI-X, PCIe
-
-    \pause
-
-    \item Hierarchická sběrnice
-    \begin{itemize}
-      \item Identifikace doména:bus:slot:funkce
-      \item Bridge (=routery)
-    \end{itemize}
-
-    \pause
-
-    \item Konfigurační prostor
-    \begin{itemize}
-      \item Automatická konfigurace
-
-      \item ID zařízení (vendor, device), I/O prostory, IRQ
-      \begin{itemize}
-	\item \emph{Obsah} I/O -- specifikace zařízení (výrobce)
-      \end{itemize}
-
-      \item \cmd{lspci}
-    \end{itemize}
-
-    \pause
-
-    \item Podrobnosti v PCI specifikaci
-  \end{itemize}
-
-\end{frame}
+\input{../../pb173/08/pci.tex}
 
 \section{\code{mmap} pro přímou komunikaci}
 
@@ -205,8 +172,15 @@
 
   \heading{Komunikace s EDU zařízením}
   \begin{enumerate}
-    \item Mapujte \file{resource0} PCI zařízení s ID \code{0x11e8} v \cmd{qemu}
+    \item Zjistěte číslo EDU karty z výstupu \cmd{lspci}
     \begin{itemize}
+      \item Má ID \code{0x11e8} v \cmd{qemu}
+      \item Hledáte něco jako \code{01:01.0}
+    \end{itemize}
+
+    \item Mapujte \file{resource0} EDU zařízení
+    \begin{itemize}
+      \item V \file{/sys/bus/pci/devices/...}
       \item Jen v qemu s \cmd{\-device edu}
       \item Mapujte jako \code{volatile uint32_t *}
     \end{itemize}
@@ -236,11 +210,12 @@
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{\file{libpciaccess}}
+\begin{frame}[fragile]{\file{libpciaccess}}
 
   \begin{itemize}
     \item \cmd{gcc ... -lpciaccess} (\header{pciaccess.h})
+
+    \pause
 
     \item Inicializace: \code{pci_system_init}
     \item Deinicializace: \code{pci_system_cleanup}
@@ -250,16 +225,46 @@
 
     \item Vytvoření iterátoru (\code{struct pci_device_iterator *})
     \begin{itemize}
-      \item Vím ID: \code{pci_id_match_iterator_create}
-      \item Vím slot: \code{pci_slot_match_iterator_create}
+      \item Vím ID: \code{pci_id_match_iterator_create} a
+	\code{struct pci_id_match}
+      \item Vím slot: \code{pci_slot_match_iterator_create} a
+	\code{struct pci_slot_match}
     \end{itemize}
+
+    \pause
 
     \item Procházení iterátoru: \code{pci_device_next}
     \begin{itemize}
       \item Vrací \code{struct pci_device *} (a \code{NULL} nakonec)
     \end{itemize}
+
+    \pause
+
     \item Zničení iterátoru: \code{pci_iterator_destroy}
   \end{itemize}
+
+  \onslide<3->
+
+  \begin{block}{Struktury \code{pci_id_match} a \code{pci_slot_match}}
+    \begin{tabular}{lp{6em}lp{6em}l}
+      \begin{lstlisting}
+uint32_t vendor_id;
+uint32_t device_id;
+uint32_t subvendor_id;
+uint32_t subdevice_id;
+      \end{lstlisting} &&
+      \begin{lstlisting}
+uint32_t domain;
+uint32_t bus;
+uint32_t dev;
+uint32_t func;
+      \end{lstlisting} &&
+      \begin{lstlisting}
+PCI_MATCH_ANY
+      \end{lstlisting}
+    \end{tabular}
+  \end{block}
+
 
 \end{frame}
 
@@ -316,7 +321,7 @@
 
     \item Konfigurační prostor
     \begin{itemize}
-      \item Zapisuje BIOS/je v ROM
+      \item Zapisuje BIOS a OS
       \item Informace o zařízení
       \item Čtení: \code{pci_device_cfg_read*}
       \item Zápis: \code{pci_device_cfg_write*}
