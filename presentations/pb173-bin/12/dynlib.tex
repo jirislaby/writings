@@ -1,0 +1,286 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}{Knihovny}
+
+  \begin{itemize}
+    \item Statické knihovny
+    \begin{itemize}
+      \item \cmd{ar} archiv
+      \item Jejích \emph{obsah} je v každé binárce, kam se linkovaly
+      \item Zvyšují velikost na disku
+      \item Binárka ale nemá žádné externí závislosti
+
+      \pause
+
+      \item Výroba: \cmd{gcc -c} a \cmd{ar rcs lib.a *.o}
+    \end{itemize}
+
+    \pause
+
+    \item Dynamické knihovny
+    \begin{itemize}
+      \item ELF, který se linkuje za chodu
+      \begin{itemize}
+	\item Podpora pluginů
+	\item Ale zpomaluje spuštění
+
+	\pause
+
+	\item Dynamický linker \file{ld.so} (\doc{man ld.so})
+      \end{itemize}
+
+      \pause
+
+      \item Výroba: \cmd{gcc \-shared}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\iffimuni
+\begin{frame}{Úkol}
+
+  \heading{Výroba statické knihovny}
+  \begin{enumerate}
+    \item Proveďte \cmd{make} v \file{pb173-bin/12}
+
+    \item Z \file{lib.o} vyrobte statickou knihovnu \file{libX.a}
+    \begin{itemize}
+      \item \cmd{ar rcs ...}
+    \end{itemize}
+
+    \item Knihovnu přilinkujte k \file{main.o}
+    \begin{itemize}
+      \item \cmd{gcc -L. -lX}
+    \end{itemize}
+
+    \item Spusťte výsledek
+  \end{enumerate}
+
+\end{frame}
+\fi
+
+\begin{frame}{Použití dynamické knihovny}
+
+  \begin{enumerate}
+    \item Přilinkování pomocí linkeru
+    \begin{itemize}
+      \item \cmd{gcc -lknihovna}
+      \item \file{ld.so} před spuštěním načte a slinkuje potřebné symboly
+
+      \pause
+
+      \item \heading{Demo:} \cmd{ldd} k ověření
+    \end{itemize}
+
+    \pause
+
+    \item Načtení explicitně až za běhu
+    \begin{itemize}
+      \item Viz dále
+    \end{itemize}
+
+    \pause
+
+    \item Proměnnými prostředí
+    \begin{itemize}
+      \item \cmd{LD_PRELOAD} nahraje knihovnu před spuštěním
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Načtení dynamické knihovny}
+
+  \begin{itemize}
+    \item Knihovna \file{dl} (linkujte s \cmd{\-ldl}) (\header{dlfcn.h})
+
+    \pause
+
+    \item Otevření: \code{void *dlopen(const char *filename, int flags)}
+    \begin{itemize}
+      \item \code{filename}: jméno knihovny, nebo cesta
+      \item \code{flags}: \code{RTLD_LAZY} nebo \code{RTLD_NOW} spolu s
+        dalšími
+      \item Návratová hodnota: držátko knihovny nebo \code{NULL} při chybě
+    \end{itemize}
+
+    \pause
+
+    \item Zavření: \code{int dlclose(void *handle)}
+
+    \pause
+
+    \item Symbol z knihovny: \code{void *dlsym(void *handle, const char *symbol)}
+    \begin{itemize}
+      \item \code{handle}: držátko z \code{dlopen}
+      \item \code{symbol}: název symbolu (funkce, proměnné, \dots)
+      \item Návratová hodnota: ukazatel na začátek symbolu
+    \end{itemize}
+
+    \pause
+
+    \item Řetězec chyby: \code{char *dlerror(void)}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Načtení dynamické knihovny -- příklad}
+
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+#include <dlfcn.h>
+#include <err.h>
+#include <stdio.h>
+
+int main(void) {
+  void *h = dlopen("libm.so.6", RTLD_LAZY);
+  if (!h)
+    errx(1, "dlopen: %s", dlerror());
+  \end{lstlisting}
+  \begin{uncoverenv}<2->
+  \begin{lstlisting}
+  double (*kos)(double) = dlsym(h, "cos");
+  if (!kos)
+    errx(1, "dlsym(cos): %s", dlerror());
+  \end{lstlisting}
+  \end{uncoverenv}
+  \begin{uncoverenv}<3->
+  \begin{lstlisting}
+  printf("%f\n", kos(0));
+  \end{lstlisting}
+  \end{uncoverenv}
+  \begin{lstlisting}
+  dlclose(h);
+
+  return 0;
+}
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Načtení dynamické knihovny}
+  \begin{enumerate}
+    \item Načtěte dynamickou knihovnu
+    \begin{itemize}
+      \item Zadaná na příkazové řádce
+    \end{itemize}
+
+    \item Načtěte symbol
+    \begin{itemize}
+      \item Zadaný také na příkazové řádce
+    \end{itemize}
+
+    \item Zavolejte symbol
+    \begin{itemize}
+      \item S řetězcem jako parametr
+    \end{itemize}
+    \item Vyzkoušejte
+    \begin{itemize}
+      \item Např.\ \cmd{./main libc.so.6 puts}
+      \item A \code{printf}
+      \item A \code{fclose}?
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\mysection{Vytváření dynamických knihoven}
+
+\begin{frame}{Pojmenování dynamických knihoven}
+
+  \begin{itemize}
+    \item Jméno knihovny (,,soname'')
+    \begin{itemize}
+      \item \file{libXXX.so.maj_verze}
+      \item Např.\ \file{libelf.so.0}
+    \end{itemize}
+
+    \item Reálné jméno (soubor)
+    \begin{itemize}
+      \item \file{libXXX.so.maj_verze.min_verze.release}
+      \item Např.\ \file{libelf.so.0.8.13}
+    \end{itemize}
+
+    \item Jméno pro linker
+    \begin{itemize}
+      \item \file{libXXX.so}
+      \item Např.\ \file{libelf.so}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Vytváření dynamických knihoven}
+
+  \begin{itemize}
+    \item Všechen kód musí být nezávislý na pozici, kde bude nahrán
+    \begin{itemize}
+      \item $\Rightarrow$ nutno překládat i linkovat s \cmd{\-fPIC}, popř.\ 
+        lépe s \cmd{\-fpic}
+    \end{itemize}
+
+    \pause
+
+    \item Linker by měl znát soname
+    \begin{itemize}
+      \item $\Rightarrow$ nutno linkovat s \cmd{\-Wl,-soname,jmeno}
+    \end{itemize}
+
+    \pause
+
+    \item Linkovat sdíleně
+    \begin{itemize}
+      \item $\Rightarrow$ nutno linkovat s \cmd{\-shared}
+    \end{itemize}
+
+  \end{itemize}
+
+  \begin{block}{Příklad vytvoření knihovny}
+  \begin{lstlisting}[language=bash]
+gcc -fpic -g -c -Wall a.c
+gcc -fpic -g -c -Wall b.c
+gcc -fpic -shared -Wl,-soname,libmylib.so.1 -o libmylib.so.1.2.3 a.o b.o -lc
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Vytvoření dynamické knihovny}
+  \begin{enumerate}
+    \iffimuni {
+      \item Z \file{lib.o} vytvořte dynamickou knihovnu
+      \begin{itemize}
+	\item \cmd{gcc -shared -Wl,-soname,...}
+      \end{itemize}
+      \item Knihovnu přilinkujte k \file{main.o} namísto statické
+      \begin{itemize}
+	\item \cmd{gcc -L. -lX}
+      \end{itemize}
+
+      \item Ověte pomocí \cmd{ldd}
+      \item Spusťte výsledek
+    } \else {
+      \item Pracujte v adresáři \file{13} repozitáře
+      \item Používejte k překladu/linkování jen příkazovou řádku
+
+      \item Vytvořte dynamickou knihovnu
+      \begin{itemize}
+	\item Ze zdrojů \file{mylib.*}
+	\item Dopište nějakou funkci, která něco vypíše
+      \end{itemize}
+
+      \item Ve funkci \code{main} z \file{main.c} ji zavolejte
+
+      \item Slinkujte a vyzkoušejte
+      \begin{itemize}
+	\item Pomocí \cmd{ldd} ověřte, že se vše povedlo
+      \end{itemize}
+    } \fi
+  \end{enumerate}
+
+\end{frame}

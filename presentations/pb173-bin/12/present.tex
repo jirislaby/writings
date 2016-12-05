@@ -2,9 +2,8 @@
 
 \input{../header.tex}
 
-\subtitle{XII. Komunikace mezi procesy} %, část 1
-
-\date{17. 12. \the\year}
+\subtitle{XII. Knihovny}
+\date{6. 12. \the\year}
 
 \begin{document}
 \shorthandoff{-}
@@ -13,42 +12,86 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{frame}
-  \frametitle{Komunikace mezi procesy}
-
-  Alespoň 2 procesy, které chtějí komunikovat
-
-  \bigskip
-  \pause
-
-%  \heading{Dnes}
+\begin{frame}{Obsah cvičení}
 
   \tableofcontents
 
-%  \pause
-%  \medskip
-%
-%  \heading{Příště}
-%  \begin{itemize}
-%    \item Netlink
-%    \item RPC
-%  \end{itemize}
+\end{frame}
+
+\section{Knihovny}
+\frame{\sectionpage}
+
+\input{dynlib.tex}
+
+\begin{frame}[fragile]{Přesměrování funkcí}
+
+  \begin{itemize}
+    \item Knihovny mohou podvrhnout své implementace funkcí
+    \begin{itemize}
+      \item Např.\ \code{malloc} pro sledování paměti
+    \end{itemize}
+
+    \pause
+
+    \item Podmínka: funkce musí být z dynamické knihovny
+
+    \pause
+
+    \item \code{LD_PRELOAD} nahraje knihovnu i se zvláštní implementací
+
+    \pause
+
+    \item \code{dlsym} lze použít k nalezení originálu
+    \begin{itemize}
+      \item \code{void *dlsym(void *handle, const char *symbol)}
+      \item Speciální \code{handle} -- \code{RTLD_NEXT}
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+void *malloc(size_t size)
+{
+  static void *(*c_malloc)(size_t);
+  if (!c_malloc)
+    c_malloc = dlsym(RTLD_NEXT, "malloc");
+
+  write(1, "Somebody called malloc!\n", 24);
+  return c_malloc(size);
+}
+  \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
-\section{Roura}
-\frame{\sectionpage}
+\begin{frame}{Úkol}
 
-\input{roury.tex}
+  \heading{Přesměrování \code{malloc} (domácí)}
+  \begin{enumerate}
+    \item Vytvořte novou knihovnu
 
-\section{Sdílená paměť}
-\frame{\sectionpage}
+    \item Přesměrujte volání \code{malloc} a \code{free} do své knihovny
+    \begin{itemize}
+      \item Volejte originály
+      \item Originály zjistěte
+    \end{itemize}
 
-\input{mmap.tex}
+    \item Spočítejte, kolikrát se oba zavolají
+    \item Spočítejte, kolik MiB se alokovalo a uvolnilo
 
-\section{Plná meziprocesová komunikace}
-\frame{\sectionpage}
+    \item Na konci vypište statistiku
+    \begin{itemize}
+      \item A tu vepište do commitlogu
+      \item Můžete použít např.\ \code{atexit} nebo \code{destructor}
+    \end{itemize}
 
-\input{sysvipc.tex}
+    \item Spusťte na libovolném programu, který používá alokace
+    \item Zkuste z \code{malloc} občas vrátit \code{NULL}
+    \begin{itemize}
+      \item Co se stane?
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
 
 \end{document}
