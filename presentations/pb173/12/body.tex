@@ -33,8 +33,10 @@
       \node [sized] (LINKEX) [right=of LINK] {Ethernet driver};
       \node [sized] (HWEX) [right=of HW] {Ethernet};
 
-      \node [minimum width=2.5cm] (EX) [above=0mm of USERAEX]
-        {\textbf{Example}};
+      \path (HWEX.south east) -- (USERAEX.north east)
+	node [midway,rotate=270,anchor=south] {\textbf{Příklady}};
+      \path (HW.south west) -- (USERA.north west)
+	node [midway,xshift=-4pt,rotate=90,anchor=south] {\textbf{Vrstvy}};
 
   \end{tikzpicture}
 \end{center}
@@ -57,15 +59,26 @@
       \node [tl_statenet] (DD) [below=of DAI] {Device drivers};
       \node [tl_statenet] (HW) [below=of DD] {Physical device hardware};
 
-      \node [sized] (USERSPACE) [left=of APP] {Userspace};
-      \node [sized] (KERNELSPACE) [left=of PROTO] {Kernelspace};
+      \node [sized] (USERSPACE) [left=of APP] {\textbf{Userspace}};
+      \node [sized] (KERNELSPACE) [left=of PROTO] {\textbf{Kernelspace}};
 
       \begin{pgfonlayer}{background}
-	\node [tl_statenet,fit=(APP)] {};
-	\node [tl_statenet,fit=(SYSCALL)(PAI)(PROTO)(DAI)(DD)] {};
+	\node [tl_statenet,fit=(APP)] (US) {};
+	\node [tl_statenet,fit=(SYSCALL)(PAI)(PROTO)(DAI)(DD)] (KS) {};
       \end{pgfonlayer}
 
+      \path (US.south east) -- (KS.north east)
+	node [midway,inner sep=0pt,minimum size=0pt] (MID1) {};
+      \node [left=7cm of MID1] {}
+        edge [draw,dashed] (MID1);
+
+      \path (KS.south east) -- (HW.north east)
+	node [midway,inner sep=0pt,minimum size=0pt,xshift=2pt] (MID2) {};
+      \node [left=7cm of MID2] {}
+        edge [draw,dashed] (MID2);
+
   \end{tikzpicture}
+
 \end{center}
 
 \end{frame}
@@ -152,18 +165,32 @@
       \item \code{priv_size} může být \code{0}
     \end{itemize}
 
+    \pause
+
     \item Inicializace informací
     \begin{itemize}
       \item Nastavení háčků (\code{net_device_ops} do \code{dev->netdev_ops})
+
+      \pause
+
       \item Nastavení MAC adresy (\code{dev->dev_addr})
+
+      \pause
+
       \item Získání ukazatele na paměť alokovanou navíc
       \begin{itemize}
-	\item Funkcí \code{netdev_priv}
+	\item Funkcí \code{netdev_priv(dev)}
 	\item Jen při alokaci s \code{priv_size} > 0
       \end{itemize}
     \end{itemize}
+
+    \pause
+
     \item Registrace (\code{register_netdev})
     \item \dots
+
+    \pause
+
     \item Deregistrace (\code{unregister_netdev})
     \item Uvolnění (\code{free_netdev})
   \end{enumerate}
@@ -203,12 +230,18 @@
 \begin{frame}
   \frametitle{Pakety}
 
-  \heading{Tzv. socket buffery}
+  \heading{Tzv.\ socket buffery}
   \begin{itemize}
     \item \header{linux/skbuff.h}, \code{struct sk_buff}
-    \item Obecně: \code{dev_alloc_skb}$_D$
-    \item \emph{Pro netdevice:} \code{netdev_alloc_skb}$_D$
-    \item Uvolnění: \code{dev_kfree_skb}$_D$
+    \item Obecně: \code{dev_alloc_skb}
+
+    \pause
+
+    \item \emph{Pro netdevice:} \code{netdev_alloc_skb}
+
+    \pause
+
+    \item Uvolnění: \code{dev_kfree_skb}
 
     \pause
 
@@ -217,10 +250,16 @@
       \item Ukazuje na alokovanou paměť
       \item Plní/čte se klasicky přes \code{memcpy} apod.
     \end{itemize}
+
+    \pause
+
     \item Délka obsahu: \code{skb->len}
+
+    \pause
+
     \item Protokol: \code{skb->protocol}
     \begin{itemize}
-      \item Při příjmu nutno nastavit!
+      \item Při příjmu nutné nastavit před předáním systému!
     \end{itemize}
   \end{itemize}
 
@@ -269,6 +308,10 @@
 
     \item Vložte modul do systému
     \item Pusťte si \cmd{arping}
+    \begin{itemize}
+      \item \cmd{\-I vase_rozhrani nejaka_IP_adresa}
+    \end{itemize}
+
     \item Pozorujte \cmd{dmesg}
   \end{enumerate}
 
@@ -280,18 +323,26 @@
   \begin{enumerate}
     \item \code{skb = netdev_alloc_skb(dev, len)}
     \begin{itemize}
-      \item \code{len} např.\ MTU nebo přesná velikost
+      \item \code{len}: např.\ MTU nebo přesná velikost
     \end{itemize}
+
+    \pause
 
     \item Naplnění daty z HW do \code{skb->data} o délce max.\ \code{len}
     \item Nastavení \code{skb->len}
     \begin{itemize}
       \item \code{skb->len} $\leq$ \code{len}
     \end{itemize}
+
+    \pause
+
     \item Nastavení protokolu
     \begin{itemize}
       \item \code{skb->protocol = eth_type_trans(skb, dev)}
+      \item Je to nutné!
     \end{itemize}
+
+    \pause
 
     \item Předání \code{skb} jádru
     \begin{itemize}
