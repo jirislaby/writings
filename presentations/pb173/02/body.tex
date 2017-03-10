@@ -225,8 +225,7 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
 
 \end{frame}
 
-\begin{frame}
-  \frametitle{Vytvoření znakového zařízení}
+\begin{frame}[fragile]{Vytvoření znakového zařízení}
 
   \begin{itemize}
   \item LDD3 3.\ a 6.\ kapitola
@@ -262,6 +261,19 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   \end{enumerate}
 
   \end{itemize}
+
+% TODO rozdelit na 3 slidy a predelat
+%  \begin{block}{Prototypy}
+%    \begin{lstlisting}
+%int alloc_chrdev_region(dev_t *dev, unsigned baseminor, unsigned count, const char *name);
+%int register_chrdev_region(dev_t from, unsigned count, const char *name);
+%void unregister_chrdev_region(dev_t from, unsigned count);
+%
+%void cdev_init(struct cdev *cdev, const struct file_operations *fops);
+%int cdev_add(struct cdev *p, dev_t dev, unsigned count);
+%void cdev_del(struct cdev *p);
+%    \end{lstlisting}
+%  \end{block}
 
 \end{frame}
 
@@ -398,56 +410,68 @@ ssize_t my_write(struct file *filp, const char __user *buf, size_t count, loff_t
   \end{enumerate}
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Datové typy}
+\begin{frame}[fragile]{Datové typy}
+
   \begin{itemize}
-  \item Jádro a proces může běžet s různými bitovými šířkami (32, 64-bit)
-  \item Problém s ukazateli a \code{long} proměnnými
-  \begin{itemize}
-  \item Jiná délka dat
-  \item Jiné zarovnání struktur
-  \end{itemize}
+    \item Jádro a proces může běžet s různými bitovými šířkami (32, 64-bit)
+
+    \pause
+
+    \item Problém s ukazateli a \code{long} proměnnými
+    \begin{itemize}
+      \item Jiná délka dat
+      \item Jiné zarovnání struktur
+    \end{itemize}
   \end{itemize}
 
-  \bigskip
+  \pause
 
-  \begin{center}
-  \begin{tabular}{|p{2.8cm}|c|p{2.8cm}|} \hline
-  Uživatel (32-bit) & & Jádro (64-bit) \\ \hline
-  \code{data} \dots\ 4 bajty na offsetu 4 &
-  \begin{lstlisting}[language=C]
+  \begin{block}{Příklad}
+    \begin{center}
+      \begin{tabular}{|p{2.8cm}|c|p{2.8cm}|} \hline
+	Uživatel (32-bit) & & Jádro (64-bit) \\ \hline
+	\code{data} \dots\ 4 bajty na offsetu 4 &
+	\begin{lstlisting}
 struct my {
   char x;
   void *data;
 };
-  \end{lstlisting} &
-  \code{data} \dots\ 8 bajtů na offsetu 8 \\ \hline
-  \end{tabular}
-  \end{center}
+	\end{lstlisting} &
+	\code{data} \dots\ 8 bajtů na offsetu 8 \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
 
 \end{frame}
 
-\begin{frame}[fragile]
-  \frametitle{Pevné typy v jádře}
-  \framesubtitle{z hlediska počtu bitů}
+\begin{frame}[fragile]{Pevné typy v jádře}{z hlediska počtu bitů}
 
   \begin{itemize}
-  \item \header{linux/types.h}
-  \item \code{__u8}, \code{__u16}, \code{__u32}, \code{__u64}
-  \item \code{__s8}, \code{__s16}, \code{__s32}, \code{__s64}
-  \item Ukazatele musí být v \code{union} s \code{__u64}
+    \item \header{linux/types.h}
+    \item \code{__u8}, \code{__u16}, \code{__u32}, \code{__u64}
+
+    \pause
+
+    \item \code{__s8}, \code{__s16}, \code{__s32}, \code{__s64}
+
+    \pause
+
+    \item Ukazatele musí být v \code{union} s \code{__u64}
   \end{itemize}
 
-  \begin{center}
-  \begin{tabular}{ccc}
-  \begin{lstlisting}
+  \pause
+
+  \begin{block}{Příklad}
+    \begin{center}
+      \begin{tabular}{ccc}
+	\begin{lstlisting}
 struct bad {
   unsigned long flags;
   short index;
   void *data;
 } my;
-  \end{lstlisting} & $\Rightarrow$ &
-  \begin{lstlisting}
+	\end{lstlisting} & $\Rightarrow$ &
+	\begin{lstlisting}
 struct good {
   __u64 flags;
   __s16 index;
@@ -456,14 +480,15 @@ struct good {
     __u64 filler;
   };
 } my;
-  \end{lstlisting}
-  \end{tabular}
-  \end{center}
+	\end{lstlisting}
+      \end{tabular}
+    \end{center}
 
-  \begin{lstlisting}[columns=fullflexible]
+    \begin{lstlisting}[columns=fullflexible]
 read(fd, &my, sizeof(my));
 ioctl(fd, DO_SOMETHING, &my);
-  \end{lstlisting}
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
