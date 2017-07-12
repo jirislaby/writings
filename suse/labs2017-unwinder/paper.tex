@@ -1,0 +1,358 @@
+% vim: tw=78 ai spell spelllang=en_gb sw=2
+% syntax spell toplevel
+
+\documentclass[10pt]{llncs}
+\usepackage{color}
+\usepackage{colortbl}
+\usepackage{url}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage{xspace}
+\pagestyle{plain}
+
+\usetikzlibrary{arrows, positioning, decorations.pathreplacing}
+
+\lstset{language=C,tabsize=2,showstringspaces=false,
+	breaklines=true,breakatwhitespace=true,escapeinside={(*@}{@*)},
+	captionpos=b,basicstyle=\sffamily\small}
+%numbers=left,frame=l
+
+\newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
+\newcommand{\codeasm}[2][]{\code[language={[x86masm]Assembler},#1]{#2}}
+
+\newcommand{\xes}{\texttt{x86}\xspace}
+\newcommand{\xesl}{\texttt{x86\_32}\xspace}
+\newcommand{\xesh}{\texttt{x86\_64}\xspace}
+
+\newcommand{\gcc}{\textsc{Gcc}\xspace}
+\newcommand{\orc}{\textsc{Orc}\xspace}
+
+\setcounter{tocdepth}{1}
+
+\begin{document}
+
+\title{Unwinding the State of Unwinder}
+\author{Jiri~Slaby}
+\institute{Suse Labs \\
+\email{jslaby@suse.cz}}
+
+\maketitle
+
+\begin{abstract}
+  We have been using our own implementation of DWARF unwinder in every SUSE
+  release in the past decade. First, it makes the kernel faster, second, it
+  prunes the backtraces from false positives. However, this is obviously an
+  out-of-tree solution. Given the progress in the live patching area in
+  upstream, there is a call for some reliable unwinder in upstream too. This
+  talk describes the path of our unwinder to upstream, its rejection, proposed
+  solution and final SLE15 implementation.
+\end{abstract}
+
+\section{Introduction} \label{sec:intro}
+Most of us already met a kernel crash, \textit{BUG}, or at least a kernel
+\textit{WARNING}. If the report produced by the kernel did not contain
+information what functions were visited up to the point of failure, such
+report would be helpless for developers. This piece of information is called a
+\textit{stack trace} and an example is depicted in Fig.\
+\ref{fig:stack_trace}.
+
+\begin{figure}[htb]
+  \begin{center}
+%RIP: 0010:crash_now+0xae/0x170 [crasher]
+%RSP: 0018:ffffb82980d1bc80 EFLAGS: 00010282
+%RAX: 0000000000000023 RBX: 0000000000000000 RCX: 0000000000000000
+%RDX: ffff902dd3296888 RSI: ffff902dd328e568 RDI: ffff902dd328e568
+%RBP: ffffb82980d1bc88 R08: 0000000000000000 R09: 0000000000000000
+%R10: 0000000000000000 R11: 0000000000000000 R12: ffffffffc04a8000
+%R13: ffff902dcb5c8e20 R14: 0000000000000001 R15: ffff902d7580f880
+%FS:  00007fa4fa242040(0000) GS:ffff902dd3280000(0000) knlGS:0000000000000000
+%CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+%CR2: 0000000000000000 CR3: 0000000089138000 CR4: 00000000000006e0
+%Call Trace:
+    \begin{tabular}{c}
+      \begin{lstlisting}[language=XML,columns=fullflexible]
+crasher_init+0x4d/0x1000 [crasher](*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (LSTSTMODINIT) {};}@*)
+(*@\tikz[remember picture,baseline=-1.5ex]{\node [coordinate] (LSTSTINITTOP) {};}@*)do_one_initcall+0x50/0x1a0
+do_init_module+0x5f/0x1f0
+(*@\tikz[remember picture,baseline=0ex]{\node [coordinate] (LSTSTINITBOT) {};}@*)load_module+0x1694/0x1ea0
+(*@\tikz[remember picture,baseline=-1.5ex]{\node [coordinate] (LSTSTMODPTOP) {};}@*)SYSC_finit_module+0xd7/0xf0
+(*@\tikz[remember picture,baseline=0ex]{\node [coordinate] (LSTSTMODPBOT) {};}@*)SyS_finit_module+0xe/0x10
+entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (LSTSTSYSCALL) {};}@*)
+      \end{lstlisting}
+
+  \tikzstyle{ptr} = [->,>=stealth',shorten > =3pt]
+  \begin{tikzpicture}[remember picture,overlay,node distance=1.5em]
+    \node [right=of LSTSTMODINIT] { module's init function }
+      edge[ptr] (LSTSTMODINIT);
+
+    \node [coordinate,right=4.4cm of LSTSTINITTOP] (ITOPSHIFTED) {};
+    \node [coordinate,right=4.4cm of LSTSTINITBOT] (IBOTSHIFTED) {};
+    \draw[-,thick,decorate,decoration={brace,amplitude=4pt}] (ITOPSHIFTED) -- (IBOTSHIFTED)
+      node[midway] (MID) {};
+    \node [right=1mm of MID] { load and init module };
+
+    \node [coordinate,right=4.7cm of LSTSTMODPTOP] (MTOPSHIFTED) {};
+    \node [coordinate,right=4.7cm of LSTSTMODPBOT] (MBOTSHIFTED) {};
+    \draw[-,thick,decorate,decoration={brace,amplitude=3pt}] (MTOPSHIFTED) -- (MBOTSHIFTED)
+      node[midway] (MID) {};
+    \node [right=1mm of MID] { \code{modprobe} system call };
+
+    \node [right=of LSTSTSYSCALL] { system call }
+      edge[ptr] (LSTSTSYSCALL);
+  \end{tikzpicture}
+    \end{tabular}
+  \end{center}
+
+  \caption{Example of a stack trace. Read from bottom to top.}
+  \label{fig:stack_trace}
+\end{figure}
+
+A developer can take reports like these and start debugging using
+disassembler, \textsc{gdb}, debug-enabled kernels and so on. As we can see,
+offsets in the functions are reported too, so we can actually track precisely
+which \codeasm{call}s were invoked in the chain in every function.
+
+\subsection{Frames and (Optional) Frame Pointers} \label{sec:fp}
+There are many approaches on where and how to extract a stack trace entries.
+In the kernel, we use the fact that every \codeasm{call} to a function
+implicitly stores a \emph{return address} to the stack before yielding the
+execution to the function and every \code{return} reads and implicitly removes
+this address.  So every call is said to create a \emph{stack frame} for a
+particular function call. And every \code{return} destroys it.  There is an
+example of code and stack in Fig.\ \ref{fig:stack_frame}. On the left side,
+there are three functions which cause the program to crash by \code{abort}.
+When that happens, the possible state of the stack is depicted on the right
+side.
+
+\begin{figure}[htb]
+  \begin{center}
+      \tikzstyle{ptr} = [->,>=stealth',shorten > =3pt,semithick]
+      \tikzstyle{border} = [thick]
+      \tikzstyle{leftbrace} = [-,semithick,decorate,
+	decoration={brace,mirror,amplitude=5pt,raise=2pt}]
+      \tikzstyle{lefttext} = [left=5pt of MID,anchor=south,rotate=90,
+	align=center]
+      \newlength{\hw}
+      \setlength{\hw}{1.7cm}
+      \begin{tikzpicture}[node distance=2mm]
+	\node (PRE) { \vdots };
+
+	\node[below=of PRE,align=center] (CFA1) { return address \\
+	  from \code{fun1} (to \code{main}) };
+	\node[below=of CFA1] (SRBP1) { saved \code{BP} of \code{main}};
+	\node[below=of SRBP1] (X) { variable \code{xx} };
+
+	\node[below=of X,align=center] (CFA2) { return address \\
+	  from \code{fun2} (to \code{fun1}) };
+	\node[below=of CFA2] (SRBP2) { saved \code{BP} of \code{fun1}};
+	\node[below=of SRBP2] (Y) { variable \code{yy} };
+
+	\node[below=of Y,align=center] (POSTCOM) { stack grows here \\
+	  up to \code{abort}};
+	\node[coordinate,below=6mm of POSTCOM] (POST) {}
+	  edge[ptr,<-,shorten > =0pt,shorten < = 2pt] (POSTCOM);
+
+	\node [left=\hw of PRE.north] (TL) {};
+	\node [right=\hw of PRE.north] (TR) {};
+	\node [below left=1mm and \hw of POST.south] (BL) {};
+	\draw[border] (TL) -- (BL) node[midway] (LCEN) {};
+	\node [below right=1mm and \hw of POST.south] {}
+	  edge[border] (TR);
+
+	\foreach \from/\to/\left/\right/\line in
+	    {PRE/CFA1/MAINFUN1/CALLFUN1/thick, CFA1/SRBP1/D1/D2/dashed,
+	    SRBP1/X/D1/ORBP/dashed, X/CFA2/FUN1FUN2/CALLFUN2/thick,
+	    CFA2/SRBP2/D1/D2/dashed, SRBP2/Y/D1/RBP/dashed,
+	    Y/POSTCOM/D1/RSP/thick} {
+	  \path (\from) -- (\to) node[midway] (MID) {};
+
+	  \node [coordinate,left=\hw of MID] (\left) {};
+	  \node [coordinate,right=\hw of MID] (\right) {}
+	    edge[semithick,\line] (\left);
+	}
+
+	\node[right=7mm of RBP] { \code{BP} }
+	  edge[ptr] (RBP);
+	\node[right=7mm of RSP] { \code{SP} }
+	  edge[ptr] (RSP);
+	\node[above right=-1mm and 8mm of CALLFUN1,align=center] { called \\
+	  \code{fun1} }
+	  edge[ptr,dashed] (CALLFUN1);
+	\node[above right=-1mm and 8mm of CALLFUN2,align=center] { called \\
+	  \code{fun2} }
+	  edge[ptr,dashed] (CALLFUN2);
+
+	\draw (SRBP2.east) edge[ptr,in=0,out=30] (ORBP);
+
+	\node[coordinate,above=23mm of ORBP] (TMP) {};
+	\draw (SRBP1.east) edge[ptr,in=0,out=30] (TMP);
+
+	\draw[leftbrace] (TL) -- (MAINFUN1) node[midway] (MID) {};
+	\node[lefttext] { \code{main}'s \\ frame };
+
+	\draw[leftbrace] (MAINFUN1) -- (FUN1FUN2) node[midway] (MID) {};
+	\node[lefttext] { \code{fun1}'s \\ frame };
+
+	\draw[leftbrace] (FUN1FUN2) -- (BL) node[midway] (MID) {};
+	\node[lefttext] { \code{fun2}'s \\ frame };
+
+	\node[left=2.6cm of LCEN] (CODE) {
+	  \begin{lstlisting}
+int main()
+{
+  fun1();
+}
+
+void fun1(void)
+{
+  long xx;
+
+  fun2();
+}
+
+void fun2(void)
+{
+  long yy;
+
+  abort();(*@ \normalfont $\leftarrow$ we are here@*)
+}
+	  \end{lstlisting}
+	};
+
+      \end{tikzpicture}
+  \end{center}
+
+  \caption{Example of code and its possible stack. The stack grows down, so
+    the events happened from the top to bottom (as well as the code).
+    \code{SP} = current stack pointer, \code{BP} = current base/frame
+    pointer.}
+  \label{fig:stack_frame}
+\end{figure}
+
+More precisely, when \code{fun1} is called from \code{main}, the address of
+the instruction right after the \codeasm{call} is stored on the stack (to know
+exactly where to return) and \code{fun1} now continues the execution.
+Traditionally, the first thing a function does is storing the caller's
+base/frame pointer (\code{BP}) to the stack (for later restore) and making
+\code{BP} to point to \code{SP} -- to the current ``bottom'' of the stack,
+i.e.\ the current frame.  This happens in a so-called \emph{prologue}.  Further,
+given \code{fun1} also contains a local variable \code{xx}, which is to be
+allocated on stack, this is done too. Then there is a call to \code{fun2} and
+the steps are repeated until \code{abort}'s body causes the program to exit.
+
+If \code{fun2} ever returned, the \code{fun1}'s function body would be over
+and code at the very end of the function (\emph{epilogue}) would set \code{SP}
+to back to the value in \code{BP} like it was after the prologue.  Finally,
+the function would restore the old (caller's) value of \code{BP} and invoke
+\code{return} -- pop the address off the stack and jump there.
+
+Conclusively, \code{BP} is somewhat static inside a function and changes only
+by \codeasm{call}s and \code{return}s. Exactly, \code{BP} points to the
+current frame plus 2 entries: return address and saved \code{BP}. This renders
+\code{BP} to be only a convenient way for restoring \code{SP} in the epilogue.
+Now, consider that that both \code{SP} and \code{BP} are usually stored in
+registers. On \xesh, these are \codeasm{rsp} and \codeasm{rbp} (\codeasm{esp}
+and \codeasm{ebp} on \xesl), respectively. If we could avoid use of \code{BP},
+we would free up one register for arbitrary use. 
+
+Convenient in the preceding paragraph means that if we properly track
+throughout the function body what we perform with stack, we can easily restore
+the stack state in the epilogue based on the operations. And pushes to and
+pops from the stack are relatively easy to count, especially when the assembly
+is generated by a compiler. So given the offset is known, by default, \gcc
+with optimizations turned on do not use \code{BP} as a frame/base pointer
+storage. Instead, it uses it as another registers. This behaviour can be
+disabled by \code{-fno-omit-frame-pointer}, if needed, however.
+
+\paragraph{Tail calls}
+
+\subsection{Uses of Stack Traces} \label{sec:uses}
+Crashes (incl.\ BUGs and WARNINGs) are obvious users of unwinders. They print
+out the information so that developers can debug the crash. There are also
+other users like \textsc{KMemLeak}, \textsc{KMemCheck}, or \textsc{LockDep}.
+They all do use the stack traces to store information about locations where
+memory accesses, allocations, and locks take place respectively.
+
+We can consider the all above as debugging purposes. There is one more not so
+obvious use of unwinders: \textit{Live patching}.
+
+\section{Pre-rewrite Unwinding} \label{sec:pre}
+
+\subsection{openSUSE \& SLE}
+
+\section{Post-rewrite Unwinding} \label{sec:post}
+In 4.9 by 7c7900f89770.
+
+\subsection{openSUSE \& SLE}
+
+\begin{figure}[tb]
+  \begin{center}
+    \begin{tabular}{|l||c|l|c|l|c|l|} \hline
+      \multicolumn{1}{|c||}{\textbf{Union of Stack Traces}} &
+	\multicolumn{6}{|c|}{\textbf{Unwinder}} \\ \cline{2-7}
+      \multicolumn{1}{|c||}{\textbf{from All Unwinders}} &
+	\multicolumn{2}{|c|}{\textbf{Guess}} &
+	\multicolumn{2}{|c|}{\textbf{Frame Pointer}} &
+	\multicolumn{2}{|c|}{\textbf{\orc}} \\ \hline\hline
+      \code{crash\_now}		 & R & 0x94  & R & 0x99  & R & 0x94 \\
+      \rowcolor[gray]{.9}
+      \code{crash\_timer\_cb}	 &   &       &   & 0xe   &  & \\
+      \code{call\_timer\_fn}	 & ? & 0x2e  &   & 0x33  &  & 0x2e \\
+      \rowcolor[gray]{.9}
+      \code{crash\_now}		 &   &       & ? & 0x170 &  & \\
+      \code{run\_timer\_softirq} & ? & 0x40d &   & 0x414 &  & 0x40d \\
+      \rowcolor[gray]{.9}
+      \code{RANDOM}		 & ? & 0x1f  & ? & 0x2b  & ? & 0x1f \\
+      \rowcolor[gray]{.9}
+      \code{RANDOM}		 & ? & 0x38  & ? & 0x1d  & ? & 0x38 \\
+      \rowcolor[gray]{.9}
+      \code{RANDOM}		 & ? & 0x21  & ? & 0xc8  & ? & 0x21 \\
+      \code{\_\_do\_softirq}	 & ? & 0xde  &   & 0xde  &  & 0xde \\
+      \code{irq\_exit}		 & ? & 0xae  &   & 0xb6  &  & 0xae \\
+      \code{smp\_apic\_timer\_interrupt} & ? & 0x39 &  & 0x3d &  & 0x39 \\
+      \code{apic\_timer\_interrupt} & ? & 0x82 &  & 0x89 &  & 0x82
+      \\ \hline\hline
+
+      \multicolumn{7}{|c|}{--- IRQ ---} \\ \hline\hline
+
+      \code{native\_safe\_halt}	 & ? & 0x2   & R & 0x6   & R & 0x2 \\
+      \code{default\_idle}	 & ? & 0x1a  &   & 0x20  &   & 0x1a \\
+      \rowcolor[gray]{.9}
+      \code{arch\_cpu\_idle}	 &   &       &   & 0xf   &   & \\
+      \rowcolor[gray]{.9}
+      \code{default\_idle\_call} &   &       &   & 0x23  &   & \\
+      \code{do\_idle}		 & ? & 0x16a &   & 0x178 &   & 0x16a \\
+      \code{cpu\_startup\_entry} & ? & 0x5d  &   & 0x62  &   & 0x5d \\
+      \rowcolor[gray]{.9}
+      \code{rest\_init}		 &   &       &   & 0x84  &   & \\
+      \code{start\_kernel}	 & ? & 0x422 &   & 0x429 &   & 0x422 \\
+      \rowcolor[gray]{.9}
+      \code{early\_idt\_handler\_array} & ? & 0x120 & ? & 0x120 & ? & 0x120 \\
+      \rowcolor[gray]{.9}
+      \code{x86\_64\_start\_reservations} &  &  &  & 0x29 &  & \\
+      \code{x86\_64\_start\_kernel} & ? & 0x12c &  & 0x134 &  & 0x12c \\
+      \code{secondary\_startup\_64} & ? & 0x9f &  & 0x9f &  & 0x9f \\ \hline
+    \end{tabular}
+  \end{center}
+    \caption{Precision of unwinders demonstrated by \code{modprobe crasher
+    call\_warn}. The table demonstrares the Guess, Frame Pointer and \orc
+    unwinders. The question mark (?) means non-reliable. ``R'' means this
+    value was in a register. The numerical columns are reported offsets
+    against the start of the respective function. It can be also seen that
+    the offsets of Guess and \orc unwinders are the same. I.e. \orc does not
+    add any code anywhere, it relies only on out-of-band data, but still
+    provides reliable stack traces.}
+  \label{fig:instr}
+\end{figure}
+
+\section{Conclusion} \label{sec:concl}
+Conc
+
+\bibliographystyle{plain}
+%\bibliography{paper}
+
+\end{document}
