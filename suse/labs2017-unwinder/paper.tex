@@ -23,6 +23,7 @@
 
 \newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
 \newcommand{\codeasm}[2][]{\code[language={[x86masm]Assembler},#1]{#2}}
+\newcommand{\commit}[1][]{\texttt{#1}}
 
 \newcommand{\xes}{\texttt{x86}\xspace}
 \newcommand{\xesl}{\texttt{x86\_32}\xspace}
@@ -267,7 +268,7 @@ registers. On \xesh, these are \codeasm{rsp} and \codeasm{rbp}
 (\codeasm{esp}/\codeasm{ebp} on \xesl), respectively. If we avoid using
 \code{BP} for stack tracking, we free up one general purpose register for
 arbitrary use.  This indeed leads to a speed-up, see
-Section~\ref{sec:pre_suse} for more information.
+Section~\ref{sec:suse_predwarf} for more information.
 
 \subsection{Tail calls} \label{sec:tail_calls}
 When the code in Fig.~\ref{fig:stack_frame} is compiled by an optimizing
@@ -325,22 +326,29 @@ When base/frame pointers are enabled (\code{CONFIG\_FRAME\_POINTER}), they can
 be used to identify the start of stack frames and locate return address
 precisely.
 
-There is a run-time penalty stemming from enabled frame pointers. First,
-functions have to contain prologues and epilogues to maintain the frame
-pointer (\code{BP}). Second. The slowdown is approximately
-10\,\%~\cite{fp_slowdown}
+There is a run-time penalty stemming from enabled frame pointers. Functions
+have to contain prologues and epilogues to maintain the frame pointer
+(\code{BP}). It means (a) longer execution time needed, and (b) more
+instruction cache misses due to larger code.  The overall slowdown measured is
+up to 10\,\%~\cite{fp_slowdown} -- depending on the load.
 
-\subsection{Pre-DWARF Unwinding} \label{sec:predwarf}
-DWARF in SLE11 and SL-11.1 since d7af6f6e8a34.
+\section{Rewrite of Unwinding} \label{sec:rewrite}
+As an ongoing effort to use unwinding from Kernel Live Patching, the unwinding
+in the upstream kernel was completely redesigned in 4.9 by commit
+\commit{7c7900f89770} (x86/unwind: Add new unwind interface and
+implementations)~\cite{git_unw_rewrite}.
 
-\subsection{openSUSE \& SLE} \label{sec:pre_suse}
+\subsection{DWARF Approach} \label{sec:unw_dw}
 
-Due to 131484c8da97 in 4.2, SLE12-SP2 \& FP enabled.
+\subsection{ORC Approach} \label{sec:unw_orc}
 
-\section{Post-rewrite Unwinding} \label{sec:rewrite}
-In 4.9 by 7c7900f89770.
+\section{Unwinding in openSUSE \& SLE} \label{sec:suse_unw}
 
-\subsection{openSUSE \& SLE}
+\subsection{Pre-DWARF Unwinding} \label{sec:suse_predwarf}
+DWARF in SLE11 and SL-11.1 since d7af6f6e8a34~\cite{git_add_dwarf}.
+
+\subsection{DWARF Unwinding} \label{sec:suse_dwarf}
+Due to 131484c8da97 in 4.2, SLE12-SP2 \& FP enabled.\cite{git_remove_dwarf}
 
 \begin{figure}[tb]
   \begin{center}
