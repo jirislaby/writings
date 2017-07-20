@@ -23,6 +23,7 @@
 
 \newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
 \newcommand{\codeasm}[2][]{\code[language={[x86masm]Assembler},#1]{#2}}
+\newcommand{\file}[2][]{\code[language={}, #1]{#2}}
 \newcommand{\commit}[1][]{\texttt{#1}}
 
 \newcommand{\xes}{\texttt{x86}\xspace}
@@ -133,7 +134,7 @@ side.
       \tikzstyle{ptr} = [->,>=stealth',shorten > =3pt,semithick]
       \tikzstyle{border} = [thick]
       \tikzstyle{leftbrace} = [-,semithick,decorate,
-	decoration={brace,mirror,amplitude=5pt,raise=2pt}]
+	decoration={brace,mirror,amplitude=5pt,raise=2mm}]
       \tikzstyle{lefttext} = [left=5pt of MID,anchor=south,rotate=90,
 	align=center]
       \newlength{\hw}
@@ -179,12 +180,15 @@ side.
 	  edge[ptr] (RBP);
 	\node[right=7mm of RSP] { \code{SP} }
 	  edge[ptr] (RSP);
-	\node[above right=-1mm and 8mm of CALLFUN1,align=center] { called \\
+	\node[above right=-1mm and 11mm of CALLFUN1,align=center] { called \\
 	  \code{fun1} }
 	  edge[ptr,dashed] (CALLFUN1);
-	\node[above right=-1mm and 8mm of CALLFUN2,align=center] { called \\
+	\node[above right=-1mm and 10mm of CALLFUN2,align=center] { called \\
 	  \code{fun2} }
 	  edge[ptr,dashed] (CALLFUN2);
+	\node[below right=8mm and 6mm of RSP,align=center] {
+	  \code{abort} to \\ be called }
+	  edge[ptr,dashed] (RSP);
 
 	\draw (SRBP2.east) edge[ptr,in=0,out=30] (ORBP);
 
@@ -200,7 +204,7 @@ side.
 	\draw[leftbrace] (FUN1FUN2) -- (BL) node[midway] (MID) {};
 	\node[lefttext] { \code{fun2}'s \\ frame };
 
-	\node[left=2.6cm of LCEN] (CODE) {
+	\node[left=2.5cm of LCEN] (CODE) {
 	  \begin{lstlisting}
 int main()
 {
@@ -308,37 +312,119 @@ to be patched. Including those up to the call chain towards userspace. Hence
 we are very interested in fast and precise unwinding too.
 
 \section{Unwinding} \label{sec:unwinding}
+All unwinders described in this section work similarly. They somehow scan the
+stack and return a call trace. It is important to note, that there is not a
+single stack in the kernel. Whenever an interrupt or exception occurs, the
+stack is switched to the intterupt, NMI, exception, or other stack. So in
+fact, not only a single stack is scanned, but all of them are scanned up to
+the point where userspace invoked the kernel e.g.\ by syscall. Nevertheless,
+we consider a single stack in the text below for simplicity.
 
 \subsection{Simple Approach} \label{sec:unw_guess}
 The simplest method used in the kernel is to scan the stack by 8-byte chunks
-and put all function addresses to a call trace. Function address is easy to
-identify in the kernel. It is an address either inside kernel or inside
-modules. And given the stack contains return addresses, they will be surely
-part of the call trace. And of course with other random material found on the
-stack which by a chance fits in the kernel code space.
+and put every value which is a function address to a call trace. A function
+address is easy to be identified in the kernel. It is an address in
+well-defined ranges: kernel code, modules, and other minor code. There is a
+helper to decide this. It is called \code{\_\_kernel\_text\_address}. And
+given the stack contains return addresses and whole stack is scanned, the
+functions will be surely part of the resulting call trace. And of course with
+other random material found on the stack which by a chance fits in the kernel
+code space.
 
-This approach is used whenever any of the sophisticated methods below are
-available. Since this is the most simple and naive, it is the fastest one. But
-least precise, of course.
+This approach is used whenever all of the sophisticated methods below are
+unavailable/disabled. Since this is the most simple and naive unwinder, it is
+also the fastest one.  But least precise, of course. The implementation can be
+found in \file{arch/x86/kernel/unwind\_guess.c}.
 
 \subsection{Frame Pointers Approach} \label{sec:unw_fp}
 When base/frame pointers are enabled (\code{CONFIG\_FRAME\_POINTER}), they can
-be used to identify the start of stack frames and locate return address
-precisely.
+be used to identify the start of stack frames and to locate a return address
+in them precisely. Since a pointer to the previous stack frame is right next
+to the return address, the unwinder uses it to extract another return address
+from there. This repeats until the bottom of the stack is reached.
 
 There is a run-time penalty stemming from enabled frame pointers. Functions
 have to contain prologues and epilogues to maintain the frame pointer
 (\code{BP}). It means (a) longer execution time needed, and (b) more
 instruction cache misses due to larger code.  The overall slowdown measured is
-up to 10\,\%~\cite{fp_slowdown} -- depending on the load.
-
-\section{Rewrite of Unwinding} \label{sec:rewrite}
-As an ongoing effort to use unwinding from Kernel Live Patching, the unwinding
-in the upstream kernel was completely redesigned in 4.9 by commit
-\commit{7c7900f89770} (x86/unwind: Add new unwind interface and
-implementations)~\cite{git_unw_rewrite}.
+up to 10\,\%~\cite{fp_slowdown} -- depending on the load.  The implementation
+is in \file{arch/x86/kernel/unwind\_frame.c} and is still relatively simple.
 
 \subsection{DWARF Approach} \label{sec:unw_dw}
+There was ongoing effort to use unwinding in Kernel Live Patching to conclude
+no task is in a patched function. While there were sucessfull attempts to make
+frame-pointer-based unwinding reliable, it still drags in the run-time
+overhead described earlier. Hence, it was also proposed by us to use
+DWARF-based unwinding~\cite{use_dwarf}.
+
+DWARF works on a completely different basis. It needs no additional in-code
+operations.  Instead, when a stack is to be unwound, this is performed solely
+on the out-of-band data basis.
+
+
+\subsection{Rewrite of Unwinding -- the New API} \label{sec:rewrite}
+While we (at SUSE) have been using the DWARF unwinder plugged into the
+upstream code for a long time, the interface was not nice and maintaining
+another unwinder was quite hard. Therefore, the unwinding in the upstream
+kernel was completely redesigned in 4.9 by commit \commit{7c7900f89770}
+(``x86/unwind: Add new unwind interface and
+implementations'')~\cite{git_unw_rewrite}. It allows for quite easy switching
+from one unwinder to another. And this cleaned-up API also prepared the field
+for easy use by KLP too. So now, there are three kinds of call traces from the
+new API's point of view:
+\begin{enumerate}
+  \item In case of crash, \textit{BUG}, and so on, a call trace is dumped to
+    the log. It should contain all available data from the stack. So similar
+    to the Guess unwinder in Section~\ref{sec:unw_guess}, everything what is
+    on the stack and is a kernel code address is printed.  This happens
+    despite more precise unwinders might be available in the kernel at that
+    moment. Nevertheless, if they are, the entries reported by the more
+    precise unwinder are not accompanied by the `\code{?}' mark. So in most
+    cases, developers may considered entries with the `\code{?}' mark as
+    irrelevant.  The reason for this behaviour is that unwinders might have
+    troubles to unwind for unpredictable reasons, while we still want to dump
+    at least some call trace. This is invoked via \code{dump\_stack} and
+    derivatives.
+  \item \textsc{LockDep}, \textsc{KMemLeak}, \textsc{FTrace}, and similar
+    tools save the stack trace for their use. Unlike for the previous kind,
+    these traces contain only entries which are reported by the unwinder.
+    This kind of call traces is obtained by \code{save\_stack\_trace}.
+  \item Kernel Live Patching demands only reliable (precise) call traces.  But
+    unwinders sometimes put imprecise entries into call traces in the previous
+    kind. So here, when the unwinder is unsure about any entry, whole call
+    trace shall be discarded and an error returned instead of imprecise call
+    trace.  A new function \code{save\_stack\_trace\_tsk\_reliable} was
+    introduced for this purpose.
+\end{enumerate}
+
+In the new API, there is a common ``core'' for stack unwinding.  Then, there
+are implementations of the respective unwinders. The current API allows only
+one unwinder to be enabled. And the enabled unwinder has to define only a few
+functions. The functions and their meanings are as follows:
+\begin{itemize}
+  \item \code{\_\_unwind\_start} -- initialize the unwinder along with its
+    internal state. This is a preparation for unwinding. Usually, the state is
+    set up according to the state of the process. It can be the currently
+    running process, current process with pre-defined values of registers
+    (program counter, stack pointer, etc.), or a sleeping process. Tasks
+    running on other CPUs are usually ignored as the call stack changes very
+    quickly and also it is not easy to grab call stack of such process.
+  \item \code{unwind\_next\_frame} -- unwind to the next frame. This is called
+    repeatedly until enough frames are unwound or the bottom of the stack is
+    reached. This functions does what was described in previous sections about
+    respective unwinders.
+  \item \code{unwind\_get\_return\_address} -- extract the return address from
+    the current frame and return it.
+  \item \code{unwind\_get\_return\_address\_ptr} -- return pointer to the
+    location of the return address. This is used only for comparison with
+    the current stack pointer when doing \code{dump\_stack} to the log. If
+    they match, the entry is printed as reliable (without the `\code{?}'
+    mark).
+  \item \code{unwind\_get\_entry\_regs} -- implementations should return
+    \code{pt\_regs} structure describing registers. It is dumped to the log.
+    This is useful for example when there was an interrupt and we want to dump
+    the state of registers before the interrupt happened.
+\end{itemize}
 
 \subsection{ORC Approach} \label{sec:unw_orc}
 
@@ -349,6 +435,8 @@ DWARF in SLE11 and SL-11.1 since d7af6f6e8a34~\cite{git_add_dwarf}.
 
 \subsection{DWARF Unwinding} \label{sec:suse_dwarf}
 Due to 131484c8da97 in 4.2, SLE12-SP2 \& FP enabled.\cite{git_remove_dwarf}
+
+\subsection{Summary of Unwinders} \label{sec:unw_summary}
 
 \begin{figure}[tb]
   \begin{center}
