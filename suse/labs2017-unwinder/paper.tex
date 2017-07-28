@@ -30,6 +30,7 @@
 \newcommand{\xesl}{\texttt{x86\_32}\xspace}
 \newcommand{\xesh}{\texttt{x86\_64}\xspace}
 
+\newcommand{\dwarf}{\textsc{Dwarf}\xspace}
 \newcommand{\gcc}{\textsc{Gcc}\xspace}
 \newcommand{\orc}{\textsc{Orc}\xspace}
 
@@ -45,7 +46,7 @@
 \maketitle
 
 \begin{abstract}
-  We have been using our own implementation of DWARF unwinder in every SUSE
+  We have been using our own implementation of \dwarf unwinder in every SUSE
   release in the past decade. First, it makes the kernel faster, second, it
   prunes the backtraces from false positives. However, this is obviously an
   out-of-tree solution. Given the progress in the live patching area in
@@ -122,12 +123,12 @@ There are many approaches on where and how to extract a call trace entries.
 In the kernel, we use the fact that every \codeasm{call} to a function
 implicitly stores a \emph{return address} to the stack before yielding the
 execution to the function and every \code{return} reads and implicitly removes
-this address.  So every call is said to create a \emph{stack frame} for a
-particular function call. And every \code{return} destroys it.  There is an
-example of code and stack in Fig.~\ref{fig:stack_frame}. On the left side,
-there are three functions which cause the program to crash by \code{abort}.
-When that happens, the possible state of the stack is depicted on the right
-side.
+this address from the stack.  So every call is said to create a \emph{stack
+frame} for a particular function call. And every \code{return} destroys it.
+There is an example of code and a stack in Fig.~\ref{fig:stack_frame}. On the
+left side, there are three functions which cause the program to crash by
+\code{abort}.  When that happens, the possible state of the stack is depicted
+on the right side.
 
 \begin{figure}[htb]
   \begin{center}
@@ -245,14 +246,16 @@ base/frame pointer (\code{BP}) to the stack (for later restore) and making
 \code{BP} to point to \code{SP} -- to the current ``bottom'' of the stack,
 i.e.\ the current frame.  This happens in a so-called \emph{prologue}.  Further,
 given \code{fun1} also contains a local variable \code{xx}, which is to be
-allocated on stack, this is done too. Then there is a call to \code{fun2} and
-the steps are repeated until \code{abort}'s body causes the program to exit.
+allocated on stack, this is done now too. Then there is a call to \code{fun2}
+and these steps are repeated until the \code{abort}'s body causes the program
+to exit.
 
 If \code{fun2} ever returned, the \code{fun1}'s function body would be over
 and code at the very end of the function (\emph{epilogue}) would set \code{SP}
-to back to the value in \code{BP} like it was after the prologue.  Finally,
-the function would restore the old (caller's) value of \code{BP} and invoke
-\code{return} -- pop the return address off the stack and jump there.
+back to the value in \code{BP}, i.e.\ to a value which was there after the
+prologue.  Finally, the function would restore the old (caller's) value of
+\code{BP} and invoke \code{return}. This effectively means pop the return
+address off the stack and jump there.
 
 Conclusively, \code{BP} is somewhat static inside a function and changes only
 by \codeasm{call}s and \code{return}s. Exactly, \code{BP} points to the
@@ -350,20 +353,94 @@ instruction cache misses due to larger code.  The overall slowdown measured is
 up to 10\,\%~\cite{fp_slowdown} -- depending on the load.  The implementation
 is in \file{arch/x86/kernel/unwind\_frame.c} and is still relatively simple.
 
-\subsection{DWARF Approach} \label{sec:unw_dw}
+\subsection{\dwarf Approach} \label{sec:unw_dw}
 There was ongoing effort to use unwinding in Kernel Live Patching to conclude
 no task is in a patched function. While there were sucessfull attempts to make
 frame-pointer-based unwinding reliable, it still drags in the run-time
 overhead described earlier. Hence, it was also proposed by us to use
-DWARF-based unwinding~\cite{use_dwarf}.
+\dwarf-based unwinding on the Linux kernel mailing list~\cite{use_dwarf}.
 
-DWARF works on a completely different basis. It needs no additional in-code
-operations.  Instead, when a stack is to be unwound, this is performed solely
-on the out-of-band data basis.
+\dwarf~\cite{dwarf} works on a completely different basis. It needs no
+additional in-code operations.  Instead, when a stack is to be unwound, this
+is performed solely on the out-of-band data basis. Look at the example in
+Fig.~\ref{fig:dwarf}.  The assembly code saves the previous base pointer to
+the stack and replaces it with the current one. Then the code reserves
+\code{0x10} (i.e.\ 16) bytes from the stack, moves \code{2} to variable
+\code{xx} (on stack) which is right below the base pointer. Afterwards,
+\code{fun2} is called. When the CPU returns back to \code{fun1}, the reserved
+stack space is removed by the \codeasm{leave} instruction. It is equivalent to
+restoring \codeasm{rsp} from \codeasm{rbp} and popping the old value of
+\codeasm{rbp} from stack. This very corresponds to the stack content that we
+depicted earlier in Fig.~\ref{fig:stack_frame}.
+
+Now let us have a look at the \dwarf data. First, \code{cfa} in \dwarf is a
+\emph{call frame address} and is considered to be another name for the start of
+the stack frame  equivalent to our term \emph{frame pointer}. Except it refers
+to the real start of the call frame, i.e.\ 16 bytes above \codeasm{rbp}.
+The
+first line defines that \code{cfa} equals to stack pointer with offset 8
+(\codeasm{rsp+8}).
+The next line says, that value of \codeasm{rip} is
+on the stack 8 bytes before cfa defined as above. These two entries are common
+for every standard functions.
+
+
+
+\begin{figure}[tb]
+  \begin{center}
+    \begin{tabular}{cp{4em}c}
+      \begin{lstlisting}
+void fun1(void)
+{
+  long xx = 2;
+
+  fun2();
+}
+      \end{lstlisting}
+      &&
+      \begin{lstlisting}[language={[x86masm]Assembler}]
+<fun1>:
+   0:   push   %rbp
+   1:   mov    %rsp,%rbp
+   4:   sub    $0x10,%rsp
+   8:   mov    $0x2,-0x8(%rbp)
+  10:   call   fun2
+  15:   nop
+  16:   leave
+  17:   ret
+      \end{lstlisting} % stopzone
+      \\
+      (a) C code && (b) Assembly with offsets in hexa\\
+    \end{tabular}
+      \\[1ex]
+    \begin{tabular}{c}
+      {
+	\begin{lstlisting}[language=XML,numbers=left]
+DW_CFA_def_cfa: r7 (rsp) ofs 8
+DW_CFA_offset: r16 (rip) at cfa-8
+DW_CFA_advance_loc: 1 to 0000000000000001
+DW_CFA_def_cfa_offset: 16
+DW_CFA_offset: r6 (rbp) at cfa-16
+DW_CFA_advance_loc: 3 to 0000000000000004
+DW_CFA_def_cfa_register: r6 (rbp)
+DW_CFA_advance_loc: 19 to 0000000000000017
+DW_CFA_def_cfa: r7 (rsp) ofs 8
+	\end{lstlisting} % stopzone
+      }
+      \\ \\
+      (c) \dwarf data
+    \end{tabular}
+  \end{center}
+    \caption{Demonstration of \dwarf data. It is generated by \gcc from the
+    above C code. It was dumped by \code{readelf -wf} and slightly modified
+    for simplicity. The assembly generated by \gcc is also above and is an
+    output of \code{objdump -d}, altered a bit.}
+  \label{fig:dwarf}
+\end{figure}
 
 
 \subsection{Rewrite of Unwinding -- the New API} \label{sec:rewrite}
-While we (at SUSE) have been using the DWARF unwinder plugged into the
+While we (at SUSE) have been using the \dwarf unwinder plugged into the
 upstream code for a long time, the interface was not nice and maintaining
 another unwinder was quite hard. Therefore, the unwinding in the upstream
 kernel was completely redesigned in 4.9 by commit \commit{7c7900f89770}
@@ -430,10 +507,10 @@ functions. The functions and their meanings are as follows:
 
 \section{Unwinding in openSUSE \& SLE} \label{sec:suse_unw}
 
-\subsection{Pre-DWARF Unwinding} \label{sec:suse_predwarf}
-DWARF in SLE11 and SL-11.1 since d7af6f6e8a34~\cite{git_add_dwarf}.
+\subsection{Pre-\dwarf Unwinding} \label{sec:suse_predwarf}
+\dwarf in SLE11 and SL-11.1 since d7af6f6e8a34~\cite{git_add_dwarf}.
 
-\subsection{DWARF Unwinding} \label{sec:suse_dwarf}
+\subsection{\dwarf Unwinding} \label{sec:suse_dwarf}
 Due to 131484c8da97 in 4.2, SLE12-SP2 \& FP enabled.\cite{git_remove_dwarf}
 
 \subsection{Summary of Unwinders} \label{sec:unw_summary}
