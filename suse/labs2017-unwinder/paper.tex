@@ -32,6 +32,7 @@
 
 \newcommand{\dwarf}{\textsc{Dwarf}\xspace}
 \newcommand{\gcc}{\textsc{Gcc}\xspace}
+\newcommand{\objtool}{\textsc{Objtool}\xspace}
 \newcommand{\orc}{\textsc{Orc}\xspace}
 
 \setcounter{tocdepth}{1}
@@ -275,7 +276,7 @@ registers. On \xesh, these are \codeasm{rsp} and \codeasm{rbp}
 (\codeasm{esp}/\codeasm{ebp} on \xesl), respectively. If we avoid using
 \code{BP} for stack tracking, we free up one general purpose register for
 arbitrary use.  This indeed leads to a speed-up, see
-Section~\ref{sec:suse_predwarf} for more information.
+Section~\ref{sec:unw_fp} for more information.
 
 \subsection{Tail calls} \label{sec:tail_calls}
 When the code in Fig.~\ref{fig:stack_frame} is compiled by an optimizing
@@ -336,8 +337,8 @@ code space.
 
 This approach is used whenever all of the sophisticated methods below are
 unavailable/disabled. Since this is the most simple and naive unwinder, it is
-also the fastest one.  But least precise, of course. The implementation can be
-found in \file{arch/x86/kernel/unwind\_guess.c}.
+also the fastest one.  But \emph{least precise}, of course. The implementation
+can be found in \file{arch/x86/kernel/unwind\_guess.c}.
 
 \subsection{Frame Pointers Approach} \label{sec:unw_fp}
 When base/frame pointers are enabled (\code{CONFIG\_FRAME\_POINTER}), they can
@@ -346,19 +347,35 @@ in them precisely. Since a pointer to the previous stack frame is right next
 to the return address, the unwinder uses it to extract another return address
 from there. This repeats until the bottom of the stack is reached.
 
-There is a run-time penalty stemming from enabled frame pointers. Functions
-have to contain prologues and epilogues to maintain the frame pointer
-(\code{BP}). It means (a) longer execution time needed, and (b) more
+There is a run-time \emph{penalty} stemming from enabled frame pointers.
+Functions have to contain prologues and epilogues to maintain the frame
+pointer (\code{BP}). It means (a) longer execution time needed, and (b) more
 instruction cache misses due to larger code.  The overall slowdown measured is
-up to 10\,\%~\cite{fp_slowdown} -- depending on the load.  The implementation
-is in \file{arch/x86/kernel/unwind\_frame.c} and is still relatively simple.
+up to 10\,\% -- depending on the load~\cite{fp_slowdown}.  The code is larger
+about 3.2\,\%~\cite{orc_doc}.  The implementation is in
+\file{arch/x86/kernel/unwind\_frame.c} and is still relatively simple.
+
+For the unwinder to be correct, every function has to handle the frame pointer
+correctly. Especially assembler coders have to write the prologues and
+epilogues explicitly. To ensure correctness for all functions, there is a tool
+called \objtool. It walks all functions and reports any inconsistencies in
+frame pointer handling, including completely omitted handling.
 
 \subsection{\dwarf Approach} \label{sec:unw_dw}
 There was ongoing effort to use unwinding in Kernel Live Patching to conclude
-no task is in a patched function. While there were sucessfull attempts to make
-frame-pointer-based unwinding reliable, it still drags in the run-time
+no task is in a patched function. While there were successful attempts to make
+frame-pointer-based unwinding reliable, (a) it still drags in the run-time
 overhead described earlier. Hence, it was also proposed by us to use
-\dwarf-based unwinding on the Linux kernel mailing list~\cite{use_dwarf}.
+\dwarf-based unwinding on the Linux kernel mailing
+list~\cite{patch_add_dwarf}.
+
+Note that the unwinder was already a part of the Linux kernel since
+2.6.18~\cite{git_dwarf_upstream_add}. But it was dropped by Linus later in
+2.6.20~\cite{git_dwarf_upstream_rm} due to various issues. Especially, the
+code was not so nice and readable and it depends on generated data, which were
+allegedly not always correct. We have actually never seen a single issue
+during our use of the unwinder in SUSE. Nonetheless, our newly submitted
+cleaned-up version tried to address most of the problems.
 
 \dwarf~\cite{dwarf} works on a completely different basis. It needs no
 additional in-code operations.  Instead, when a stack is to be unwound, this
@@ -373,33 +390,7 @@ restoring \codeasm{rsp} from \codeasm{rbp} and popping the old value of
 \codeasm{rbp} from stack. This very corresponds to the stack content that we
 depicted earlier in Fig.~\ref{fig:stack_frame}.
 
-Now let us have a look at the \dwarf data. The data are encoded instructions
-which change the state of a \dwarf state machine.  Every line of the assembly
-has attached some state of the state machine. The state machine can store
-values
-
-They are supposed to be read
-in a top-down fashion.
-
-
-So we start by the first \dwarf instruction and change the state
-machine
-according the instructions until we read
-
-First, \code{cfa} in \dwarf means
-\emph{call frame address} and is considered to be another name for the start
-of the stack frame. The first line of DWARF data (\code{def\_cfa}) defines
-that \code{cfa} equals to the stack pointer with offset 8 (\codeasm{rsp+8}).
-That is exactly right before the stored return address.  The next line says,
-that the value of \codeasm{rip} is stored on the stack 8 bytes before
-\code{cfa}. These two entries are common for every standard function. Again,
-they comply to Fig.~\ref{fig:stack_frame}.
-
-
-
-
-
-\begin{figure}[tb]
+\begin{figure}[tb!]
   \begin{center}
     \begin{tabular}{cp{4em}c}
       \begin{lstlisting}
@@ -413,17 +404,17 @@ void fun1(void)
       &&
       \begin{lstlisting}[language={[x86masm]Assembler}]
 <fun1>:
-   0:   push   %rbp
-   1:   mov    %rsp,%rbp
-   4:   sub    $0x10,%rsp
-   8:   mov    $0x2,-0x8(%rbp)
-  10:   call   fun2
-  15:   nop
-  16:   leave
-  17:   ret
+ 0:  push   %rbp
+ 1:  mov    %rsp,%rbp
+ 4:  sub    $0x10,%rsp
+ 8:  mov    $0x2,-0x8(%rbp)
+10:  call   fun2
+15:  nop
+16:  leave
+17:  ret
       \end{lstlisting} % stopzone
       \\
-      (a) C code && (b) Assembly with offsets in hexa\\
+      (a) C code && (b) Assembly (offsets in hexa) \\
     \end{tabular}
       \\[1ex]
     \begin{tabular}{c}
@@ -441,18 +432,94 @@ DW_CFA_def_cfa: r7 (rsp) ofs 8
 	\end{lstlisting} % stopzone
       }
       \\ \\
-      (c) \dwarf data
+      (c) \dwarf data (line numbers on the left)
+    \end{tabular}
+      \\[1ex]
+    \begin{tabular}{c}
+      {
+	\begin{lstlisting}[language=XML]
+.text+0:  sp:sp+8  bp:(und)     type:call
+.text+1:  sp:sp+16 bp:prevsp-16 type:call
+.text+4:  sp:bp+16 bp:prevsp-16 type:call
+.text+17: sp:sp+8  bp:(und)     type:call
+.text+18: sp:(und) bp:(und)     type:call
+	\end{lstlisting}
+      }
+      \\ \\
+      (d) \orc data
     \end{tabular}
   \end{center}
-    \caption{Demonstration of \dwarf data. It is generated by \gcc from the
-    above C code. It was dumped by \code{readelf -wf} and slightly modified
-    for simplicity. The assembly generated by \gcc is also above and is an
-    output of \code{objdump -d}, altered a bit.}
+    \caption{Demonstration of \dwarf and \orc data. \dwarf was generated by
+    \gcc from the above C code. It was dumped by \code{readelf -wf} and
+    slightly modified for simplicity. \orc was generated by \code{objtool orc
+    generate} and dumped by \code{objtool orc dump}.  The assembly generated
+    by \gcc is also above and is an output of \code{objdump -d}, altered a
+    bit.}
   \label{fig:dwarf}
 \end{figure}
 
+Now have a look at the \dwarf data in Fig.~\ref{fig:dwarf}. The data are
+encoded \dwarf instructions and every function has assigned a block of such
+instructions. The instruction change the state of a \dwarf state machine.
+Every line of the assembly can have attached some state of the state machine.
+The state keeps states of registers at that location, especially the stack
+pointer (\codeasm{rsp}). If we look closer at the Figure, we can spot
+\code{cfa} there. In the language of \dwarf, it means \emph{call frame
+address} and is considered to be another name for the start of the stack
+frame. Next, the instructions are supposed to be read in a top-down fashion.
+So we are at the start of the function and the first line of the DWARF data
+(\code{def\_cfa}) defines that \code{cfa} equals to the stack pointer with
+offset 8 (\codeasm{rsp+8}).  That is exactly right before the stored return
+address as we learnt earlier.  The next line says, that the value of
+\codeasm{rip} is stored on the stack 8 bytes after \code{cfa}. These two lines
+are common for every standard function. And again, they comply to
+Fig.~\ref{fig:stack_frame}.
 
-\subsection{Rewrite of Unwinding -- the New API} \label{sec:rewrite}
+That was all to be done at the beginning of the function. Now, the line three
+instructs us to move to the next line in assembly (\code{advance\_loc}), to
+offset 1. At this point, there is a \codeasm{push} which stores something
+(\codeasm{rbp}) to stack. Hence, \dwarf data at line 4 must tell us that
+\code{cfa} offset changed and is now 16 from the current stack pointer
+(\codeasm{rsp}).  Coincidently, the \codeasm{push} stored \codeasm{rbp} on
+stack, so line 5 also says that the value of this register can be found at
+\code{cfa-16}. The next two \dwarf lines (6--7) force us to use \codeasm{rbp}
+as \code{cfa} from this position on, as (a) \code{rsp} was subtracted, and (b)
+apparently we have frame pointers turned on and it is exactly in
+\codeasm{rbp}. When leaving from the function at assembly line 17,
+\codeasm{rbp} was restored by \codeasm{leave} and we should start using
+\codeasm{rsp} as \code{cfa} again -- according to \dwarf lines 8 and 9.
+
+So the task of the \dwarf unwinder is always read this data and update the
+\dwarf state machine as we did in the previous paragraphs. Finally, the return
+address is read from the stack from \code{cfa} with computed offset.  This
+happens for every function on the call trace. The unwinder starts for the
+current function and ``executes'' the \dwarf instructions up to the actual
+CPU's \code{rip} register. Then it reads the return address and repeats these
+steps from the start of a function containing the address up to the address
+proper. This happens until the bottom of the stack is reached.
+
+Last but not least, the \dwarf data are stored in an ELF section called
+\code{.eh\_frame}. There can also be an index in another section called
+\code{.eh\_frame\_hdr}. It speeds up the lookup of data for an address
+(function). The format of both of them is specified in LSB Core --
+Generic~\cite{LSB_generic}. Our vmlinux from Tumbleweed's kernel-default has
+1.78\,MiB of the data and 290\,KiB of the index. For example, the i915 module
+contains 178\,KiB of the data and no index.
+
+\paragraph{Drawbacks} \dwarf needs a compiler to generate the data. It is fine
+for C -- \gcc handles that perfectly -- but manual annotations are needed for
+assembly. And doing so manually is error-prone. So despite the annotations
+were part of the kernel even though the unwinder was not, they were dropped
+for good in commit \commit{131484c8da97} (``x86/debug: Remove perpetually
+broken, unmaintainable dwarf annotations'')~\cite{git_dwarfinfo_upstream_rm}.
+Since then, the \dwarf unwinder cannot proceed though interrupts, system call
+handlers and other code written in assembly.
+
+The implementation is in our new kernels in \file{kernel/dwarf.c} (the
+unwinder) and \file{arch/x86/kernel/unwind\_dwarf.c} (a glue for the new API
+below). In sum, they are 1917 lines of code.
+
+\subsection{Rewrite of Unwinding -- the New API Upstream} \label{sec:rewrite}
 While we (at SUSE) have been using the \dwarf unwinder plugged into the
 upstream code for a long time, the interface was not nice and maintaining
 another unwinder was quite hard. Therefore, the unwinding in the upstream
@@ -463,7 +530,7 @@ from one unwinder to another. And this cleaned-up API also prepared the field
 for easy use by KLP too. So now, there are three kinds of call traces from the
 new API's point of view:
 \begin{enumerate}
-  \item In case of crash, \textit{BUG}, and so on, a call trace is dumped to
+  \item In case of crash, \textit{BUG}, and similar, a call trace is dumped to
     the log. It should contain all available data from the stack. So similar
     to the Guess unwinder in Section~\ref{sec:unw_guess}, everything what is
     on the stack and is a kernel code address is printed.  This happens
@@ -516,19 +583,100 @@ functions. The functions and their meanings are as follows:
     the state of registers before the interrupt happened.
 \end{itemize}
 
-\subsection{ORC Approach} \label{sec:unw_orc}
+\subsection{\orc Approach} \label{sec:unw_orc}
+The rewrite of the unwinder API allowed for easy plugging of new unwinders.
+And since \dwarf was despised by upstream~\cite{kill_dwarf2}, a new
+unwinder inspired by \dwarf emerged. It was named \orc\ -- \textit{Oops Rewind
+Capability}. It uses also out-of-band data, but they are created independently
+of \dwarf. They are also substantially simpler. Hence \orc cannot handle
+states of all registers, neither complex state machines.  But the basic
+functionality to track the stack pointer and call frames is included and is
+enough for the Linux Kernel.
+
+As we mentioned for \dwarf, the unwind data has to be generated. \orc
+implemented this functionality into \objtool. Before \orc, \objtool served
+for checking frame pointers (c.f.\ Section~\ref{sec:unw_fp}). Since it knew
+about most of the stack operations, it can also generate data for \orc. It has
+to be modified (a) to remember all stack operations, not only prologues and
+epilogues, and (b) to generate the data for \orc. The same as for \dwarf, the
+data are in two ELF sections: \code{.orc\_unwind} and \code{.orc\_unwind\_ip}.
+The former contains an array of \code{orc\_entry} structures. The latter
+contains the same count of addresses associated with those structures. Both
+arrays are sorted by the address they are bound to.
+
+For performance reasons, there exist a third section called
+\code{.orc\_lookup}: fast lookup table. This one is created at runtime after
+the entries above are sorted. It serves as a pseudo hash table and makes the
+search in the large data faster by searching only in small subsets of the
+tables above.
+
+\begin{figure}[htb]
+  \begin{center}
+    \begin{tabular}{c}
+      \begin{lstlisting}
+struct orc_entry {
+  s16      sp_offset;
+  s16      bp_offset;
+  unsigned sp_reg:4;
+  unsigned bp_reg:4;
+  unsigned type:2;
+};
+      \end{lstlisting}
+    \end{tabular}
+  \end{center}
+    \caption{Structure \code{orc\_entry} used by \orc for states assigned to
+    assembly lines.}
+  \label{fig:orc_struct}
+\end{figure}
+
+The format of the \orc structure is depicted in Fig.~\ref{fig:orc_struct}. The
+structure contains information about values of stack (\code{SP}) and
+frame pointers (\code{BP}) before the call to the current function. More
+precisely which register to read and what offset to add to the read value. If
+we look back at the \dwarf example in Fig.~\ref{fig:dwarf}, we also presented
+the \orc data in (d). We can see similarities of \orc to \dwarf. For example,
+the first line says that when the funtcion was called, the previous stack
+pointer (\codeasm{rsp}) can be computed as \codeasm{rsp+8}. After the
+\codeasm{push}, the previous \codeasm{rsp} is current \codeasm{rsp+16} and so
+on. The \code{type} field allows for differentiation of standard calls from
+system calls, interrupts, and exceptions. In the latter, we have to extract
+the state of previous registers from stack, not from registers.
+
+The implementation of the generation part is in \file{tools/objtool/}. The
+unwinder is in \file{arch/x86/kernel/unwind\_orc.c} and is only 582 lines long
+(including comments).
+
+\paragraph{Upstream Status} Parts of the \orc unwinder were accepted in the
+upstream kernel already.  It was especially preparatory
+work~\cite{git_stack_val2}. \orc data generation and the unwinder proper are
+pending in the -tip tree~\cite{git_orc_gen,git_orc_unw}. They are scheduled
+for 4.14.
 
 \section{Unwinding in openSUSE \& SLE} \label{sec:suse_unw}
+This sections is devoted to state of unwinders in SUSE kernels as it
+developed over time.  Until \dwarf unwinder was written and ready to use, we
+had frame pointers enabled to have at least a bit reliable call traces.
 
-\subsection{Pre-\dwarf Unwinding} \label{sec:suse_predwarf}
-\dwarf in SLE11 and SL-11.1 since d7af6f6e8a34~\cite{git_add_dwarf}.
+Even though the \dwarf unwinder was in upstream since 2.6.18 till 2.6.20, none
+of the SUSE products were released in that time-frame. After it was dropped
+from upstream, the authors of the unwinder (Jan Beulich and Andi Kleen)
+pushed it into our trees as \commit{d7af6f6e8a34}~\cite{git_suse_dwarf_add}.
+This happened around 2.6.24, so the first products to have the \dwarf unwinder
+were \textit{SUSE Linux Enterprise 11} (SLE11) and \textit{SUSE Linux 11.1}
+(SL-11.1) -- a predecessor of openSUSE.
 
-\subsection{\dwarf Unwinding} \label{sec:suse_dwarf}
-Due to 131484c8da97 in 4.2, SLE12-SP2 \& FP enabled.\cite{git_remove_dwarf}
+Despite the \dwarf unwinder itself was dropped from upstream, the manual
+annotations of assembly were left in-place. So we could use the unwinder
+also throughout interrupts, system calls etc. But upstream decided with commit
+\commit{131484c8da97} (``x86/debug: Remove perpetually broken, unmaintainable
+dwarf annotations'')~\cite{git_dwarfinfo_upstream_rm}, that they are
+hard to maintain and dropped them. Since that moment, we were unable to unwind
+through assembly properly. This commit was a part of 4.2, so it affected
+SLE12-SP2. We had to enable frame pointers in that release again, which lead
+to slowdown (cf.\ Section~\ref{sec:unw_fp}).
 
-\subsection{Summary of Unwinders} \label{sec:unw_summary}
-
-\begin{figure}[tb]
+\section{Conclusion} \label{sec:concl}
+\begin{table}[tb!]
   \begin{center}
     \begin{tabular}{|l||c|l|c|l|c|l|} \hline
       \multicolumn{1}{|c||}{\textbf{Union of Call Traces}} &
@@ -578,18 +726,34 @@ Due to 131484c8da97 in 4.2, SLE12-SP2 \& FP enabled.\cite{git_remove_dwarf}
     \end{tabular}
   \end{center}
     \caption{Precision of unwinders demonstrated by \code{modprobe crasher
-    call\_warn}. The table demonstrares the Guess, Frame Pointer and \orc
-    unwinders. The question mark (?) means non-reliable. ``R'' means this
-    value was in a register. The numerical columns are reported offsets
-    against the start of the respective function. It can be also seen that
-    the offsets of Guess and \orc unwinders are the same. I.e. \orc does not
-    add any code anywhere, it relies only on out-of-band data, but still
-    provides reliable call traces.}
-  \label{fig:instr}
-\end{figure}
+    call\_warn}. The table demonstrates the Guess, Frame Pointer and \orc
+    unwinders. The question mark (?) means non-reliable entry. ``R'' means
+    this value was in a register. The numerical columns are reported offsets
+    against the start of the respective function. It can be also seen that the
+    offsets of Guess and \orc unwinders are the same. I.e. \orc does not add
+    any code anywhere, it relies only on out-of-band data, but still provides
+    reliable call traces.}
+  \label{tab:instr}
+\end{table}
 
-\section{Conclusion} \label{sec:concl}
-Conc
+We can see that there are currently four unwinders available for the Linux
+kernel. We described them and their upstream status. They all have their pros
+and cons which we described too. In Table~\ref{tab:instr}, we sum up the
+upstream unwinders and how their precision varies. We took call traces from
+all three upstream unwinders using our crasher module. Using the \dwarf
+unwinder gives exactly the same output as \orc. So we made an union of the
+traces and put them into the table. We can see the effect of putting every
+kernel code address in the output (see Section~\ref{sec:rewrite}). When some
+unwinder is turned on, it marks unknown addresses with `\code{?}'.
+
+We can see that the Guess unwinder has no clue. The Frame pointer unwinder
+skips most uninteresting entries, but can make a mistake. \orc is the most
+precise, it leaves only entries which really belong there.
+
+It was also shown, that after the years of \dwarf unwinder in our
+repositories, we can finally switch from it to an upstream solution -- the
+\orc unwinder which emerged recently and is being pushed to upstream as of
+now.
 
 \bibliographystyle{plain}
 \bibliography{paper}
