@@ -22,7 +22,8 @@
 %numbers=left,frame=l
 
 \newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
-\newcommand{\codeasm}[2][]{\code[language={[x86masm]Assembler},#1]{#2}}
+\newcommand{\codeasm}[2][]{\code[language={[x86masm]Assembler},
+	morekeywords={rbp,rsp},#1]{#2}}
 \newcommand{\file}[2][]{\code[language={}, #1]{#2}}
 \newcommand{\commit}[1][]{\texttt{#1}}
 
@@ -48,22 +49,21 @@
 
 \begin{abstract}
   We have been using our own implementation of \dwarf unwinder in every SUSE
-  release in the past decade. First, it makes the kernel faster, second, it
-  prunes the backtraces from false positives. However, this is obviously an
-  out-of-tree solution. Given the progress in the live patching area in
-  upstream, there is a call for some reliable unwinder in upstream too. This
-  talk describes the path of our unwinder to upstream, its rejection, proposed
-  solution and final SLE15 implementation.
+  and openSUSE release in the past decade. First, it makes the kernel faster
+  by approximatelly 10\,\% as it removes the need for enabled frame pointers.
+  Second, it prunes the call traces from false positives as it is precise
+  opposing to frame pointers. Unfortunately, despite attempts to make this
+  upstream, this was an out-of-tree solution most of the time.  And given the
+  progress in the live patching area in upstream, there is a call for some
+  reliable unwinder in upstream now too.  This paper describes the path of our
+  \dwarf unwinder to upstream, its rejection twice, proposed solution, and
+  an implementation which finally went upstream. And thanks to the good
+  timing, this implementation will be a part of the upcomming SUSE Linux
+  Enterprise 15 too.
 \end{abstract}
 
 \section{Introduction} \label{sec:intro}
-Most of us already met a kernel crash, \textit{BUG}, or at least a kernel
-\textit{WARNING}. If the report produced by the kernel did not contain
-information what functions were visited up to the point of failure, such
-report would be helpless for developers. This piece of information is called a
-\emph{call trace} and an example is depicted in Fig.~\ref{fig:call_trace}.
-
-\begin{figure}[htb]
+\begin{figure}[bt]
   \begin{center}
 %RIP: 0010:crash_now+0xae/0x170 [crasher]
 %RSP: 0018:ffffb82980d1bc80 EFLAGS: 00010282
@@ -77,7 +77,7 @@ report would be helpless for developers. This piece of information is called a
 %CR2: 0000000000000000 CR3: 0000000089138000 CR4: 00000000000006e0
 %Call Trace:
     \begin{tabular}{c}
-      \begin{lstlisting}[language=XML,columns=fullflexible]
+      \begin{lstlisting}[language=,columns=fullflexible]
 crasher_init+0x4d/0x1000 [crasher](*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (LSTSTMODINIT) {};}@*)
 (*@\tikz[remember picture,baseline=-1.5ex]{\node [coordinate] (LSTSTINITTOP) {};}@*)do_one_initcall+0x50/0x1a0
 do_init_module+0x5f/0x1f0
@@ -114,30 +114,40 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
   \label{fig:call_trace}
 \end{figure}
 
-A developer can take reports like these and start debugging using
-disassembler, \textsc{gdb}, debug-enabled kernels and so on. As we can see,
-offsets in the functions are reported too, so we can actually track precisely
-which \codeasm{call}s were invoked in the chain in every function.
+Vast majority of us already met a kernel crash, \textit{BUG}, or at least a
+kernel \textit{WARNING}. All such reports produced by the kernel are
+accompanied with sequence of functions which were visited up to the point
+of failure. Among other data, this is an important piece of information that
+helps developers to understand the issue. Without that, such a report would be
+mostly helpless. This sequence of functions is called a \emph{call trace} and
+for demonstration, we attach one in Fig.~\ref{fig:call_trace}.  A developer
+can take reports like these and start debugging the issue using disassembler,
+\textsc{Gdb}, debug-enabled kernels, and so on. As we can see, there are also
+numbers after the plus sign in the output. These are offsets (of total
+function size after the slash) in the functions, so that developers can
+precisely track which \codeasm{call}s were invoked in every function of the
+chain.
 
 \subsection{Frames and (Optional) Frame Pointers} \label{sec:fp}
-There are many approaches on where and how to extract a call trace entries.
-In the kernel, we use the fact that every \codeasm{call} to a function
-implicitly stores a \emph{return address} to the stack before yielding the
-execution to the function and every \code{return} reads and implicitly removes
-this address from the stack.  So every call is said to create a \emph{stack
-frame} for a particular function call. And every \code{return} destroys it.
-There is an example of code and a stack in Fig.~\ref{fig:stack_frame}. On the
-left side, there are three functions which cause the program to crash by
-\code{abort}.  When that happens, the possible state of the stack is depicted
-on the right side.
+There are many approaches on where and how to extract call trace entries.
+In the kernel, we use the fact that for every \codeasm{call} to a function, a
+CPU stores a \emph{return address} to the stack before yielding the execution
+to the function. Similarly, every \code{return} causes the CPU to read this
+address and remove it from the stack. Every \codeasm{call} is said to create a
+\emph{stack frame} for a particular function call. And every \code{return}
+destroys it.  There is an example of a program and its stack in
+Fig.~\ref{fig:stack_frame}. On the left side, there are three functions which
+cause the program to crash by \code{abort} eventually.  When that is about to
+happen -- right before the call to \code{abort} itself -- the possible state
+of the stack is depicted on the right side.
 
-\begin{figure}[htb]
+\begin{figure}[tb]
   \begin{center}
       \tikzstyle{ptr} = [->,>=stealth',shorten > =3pt,semithick]
       \tikzstyle{border} = [thick]
       \tikzstyle{leftbrace} = [-,semithick,decorate,
 	decoration={brace,mirror,amplitude=5pt,raise=2mm}]
-      \tikzstyle{lefttext} = [left=5pt of MID,anchor=south,rotate=90,
+      \tikzstyle{lefttext} = [left=7pt of MID,anchor=south,rotate=90,
 	align=center]
       \newlength{\hw}
       \setlength{\hw}{1.7cm}
@@ -170,7 +180,7 @@ on the right side.
 	    {PRE/CFA1/MAINFUN1/CALLFUN1/thick, CFA1/SRBP1/D1/D2/dashed,
 	    SRBP1/X/D1/ORBP/dashed, X/CFA2/FUN1FUN2/CALLFUN2/thick,
 	    CFA2/SRBP2/D1/D2/dashed, SRBP2/Y/D1/RBP/dashed,
-	    Y/POSTCOM/D1/RSP/thick} {
+	    Y/POSTCOM/FUN2ABORT/RSP/thick} {
 	  \path (\from) -- (\to) node[midway] (MID) {};
 
 	  \node [coordinate,left=\hw of MID] (\left) {};
@@ -198,15 +208,18 @@ on the right side.
 	\draw (SRBP1.east) edge[ptr,in=0,out=30] (TMP);
 
 	\draw[leftbrace] (TL) -- (MAINFUN1) node[midway] (MID) {};
-	\node[lefttext] { \code{main}'s \\ frame };
+	\node[lefttext] { \code{main}'s \\[-.4ex] frame };
 
 	\draw[leftbrace] (MAINFUN1) -- (FUN1FUN2) node[midway] (MID) {};
-	\node[lefttext] { \code{fun1}'s \\ frame };
+	\node[lefttext] { \code{fun1}'s \\[-.4ex] frame };
 
-	\draw[leftbrace] (FUN1FUN2) -- (BL) node[midway] (MID) {};
-	\node[lefttext] { \code{fun2}'s \\ frame };
+	\draw[leftbrace] (FUN1FUN2) -- (FUN2ABORT) node[midway] (MID) {};
+	\node[lefttext] { \code{fun2}'s \\[-.4ex] frame };
 
-	\node[left=2.5cm of LCEN] (CODE) {
+	\draw[leftbrace] (FUN2ABORT) -- (BL) node[midway] (MID) {};
+	\node[lefttext] { so far \\[-.4ex] unused };
+
+	\node[left=3cm of LCEN] (CODE) {
 	  \begin{lstlisting}
 int main()
 {
@@ -232,7 +245,7 @@ void fun2(void)
       \end{tikzpicture}
   \end{center}
 
-  \caption{Example of code and its possible stack. The stack grows down, so
+  \caption{Example of program and its possible stack. The stack grows down, so
     the events happened from the top to bottom (as well as the code).
     \code{SP} = current stack pointer, \code{BP} = current base/frame
     pointer.}
@@ -240,38 +253,40 @@ void fun2(void)
 \end{figure}
 
 More precisely, when \code{fun1} is called from \code{main}, the address of
-the instruction right after the \codeasm{call} is stored on the stack (to know
-exactly where to return) and \code{fun1} now continues the execution.
-Traditionally, the first thing a function does is storing the caller's
-base/frame pointer (\code{BP}) to the stack (for later restore) and making
-\code{BP} to point to \code{SP} -- to the current ``bottom'' of the stack,
-i.e.\ the current frame.  This happens in a so-called \emph{prologue}.  Further,
-given \code{fun1} also contains a local variable \code{xx}, which is to be
-allocated on stack, this is done now too. Then there is a call to \code{fun2}
-and these steps are repeated until the \code{abort}'s body causes the program
-to exit.
+the instruction right after the \codeasm{call} is stored on the stack to know
+exactly where to return. And \code{fun1} now continues the execution.
+Traditionally, the first thing a function performs is (a) storing the caller's
+base/frame pointer (\code{BP}) to the stack (for later restore), and (b)
+making \code{BP} to point to \code{SP} -- to the current ``bottom'' of the
+stack, i.e.\ the current frame.  This setup happens in a so-called
+\emph{prologue}.  Further, given \code{fun1} also contains a local variable
+\code{xx}, which is to be allocated on the stack, this is done now too. Then
+there is a call to \code{fun2} and all these steps are repeated until the
+\code{abort}'s body causes the program to exit.
 
 If \code{fun2} ever returned, the \code{fun1}'s function body would be over
 and code at the very end of the function (\emph{epilogue}) would set \code{SP}
-back to the value in \code{BP}, i.e.\ to a value which was there after the
+back to the value in \code{BP}. I.e.\ to a value which was there after the
 prologue.  Finally, the function would restore the old (caller's) value of
 \code{BP} and invoke \code{return}. This effectively means pop the return
 address off the stack and jump there.
 
 Conclusively, \code{BP} is somewhat static inside a function and changes only
 by \codeasm{call}s and \code{return}s. Exactly, \code{BP} points to the
-current frame plus 2 entries: return address and saved \code{BP}. This renders
-\code{BP} to be only a \emph{convenient} way of restoring \code{SP} in the
-epilogue.  If the code properly tracks what it performs with stack throughout
+current frame plus 2 entries: return address and caller's/saved \code{BP}.
+This renders \code{BP} to be only a \emph{convenient} way of restoring
+\code{SP} in the epilogue.  If the code properly tracks what it performs with
+the stack throughout
 the function body, it can easily restore the stack state (\code{SP}) in the
 epilogue based only on the tracked operations.  And pushes to and pops from
 the stack are relatively easy to count, especially when the code is generated
 by a compiler. Hence, when the code is compiled by \gcc with optimizations
 turned on, by default, \gcc does not use \code{BP} as a frame/base pointer
 storage.  This behaviour can be disabled by \code{-fno-omit-frame-pointer}, if
-needed, however.
+needed, however. And the kernel does so on many configurations,
+leaving frame pointers in place.
 
-Now, consider that that both \code{SP} and \code{BP} are usually stored in
+Now, consider that both \code{SP} and \code{BP} are usually stored in
 registers. On \xesh, these are \codeasm{rsp} and \codeasm{rbp}
 (\codeasm{esp}/\codeasm{ebp} on \xesl), respectively. If we avoid using
 \code{BP} for stack tracking, we free up one general purpose register for
@@ -283,69 +298,77 @@ When the code in Fig.~\ref{fig:stack_frame} is compiled by an optimizing
 compiler, there are not two actual \codeasm{call}s and two \code{return}s.
 \code{main} still calls \code{fun1} the usual way. But since the invocation of
 \code{fun2} is the last thing to do in \code{fun1}, \code{fun1} will not do
-this by \codeasm{call}, but by \code{jump}. This means that no new stack frame
-is created for \code{fun2}. Therefore, \code{return} in \code{fun2} will pop
-the return address from the \code{fun1}'s stack frame, i.e.\ returns directly
-to \code{main}. This is very common in the code and we have to take this into
-account when doing call traces.
+this by a \codeasm{call}, but by a \code[morekeywords=jump]{jump}. This means
+that no new stack frame is created for \code{fun2}. Therefore, \code{return}
+in \code{fun2} will pop the return address from the \code{fun1}'s stack frame,
+i.e.\ returns directly to \code{main}. This kind of optimization is called
+\textit{tail calls} or \textit{sibling calls} and avoids one call frame
+setup+destroy.  This is very common in the code and stack unwinders have to
+take this into account when creating call traces.
 
-\subsection{Unwinders} \label{sec:unwinders}
+\subsection{Use of Call Traces and Our Motivation} \label{sec:uses}
+Crashes (including BUGs, WARNINGs, and similar) are obvious users of call
+traces. They print out the information so that developers can debug the
+problem. There are also other users like \textsc{FTrace} (function tracer),
+\textsc{KMemLeak} (kernel memory leak detector), \textsc{KMemCheck} (kernel
+memory accesses checker), or \textsc{LockDep} (locking issues detector).  They
+all do use the call traces to store information about locations where function
+calls, memory accesses, allocations, and locks take place respectively. These
+traces are reported to the user only if the user request them or some problem
+is detected by the tools. And if the latter happens, it is very useful to know
+where some memory access or lock took place retrospectively.
+
+We can consider the all above as for debugging purposes. There is one more not
+so obvious user of call traces: \textit{Kernel Live Patching} (KLP). Although
+we started providing live patching since SUSE Linux Enterprise 12 (SLE), we
+have not been using stack traces for anything until the upcoming release:
+SLE15. With SLE15, we are very likely to provide the upstream solution which
+evolved in the meantime. And it utilizes call traces to check if a process is
+somewhere in a function that is to be patched. Including those up to the call
+chain towards userspace. Hence we are very interested in fast and precise
+call traces too.
+
+\section{Unwinding} \label{sec:unwinding}
 Now that we know the stack contains stack frames with return addresses,
 stored base pointers (sometimes), and other potentially useful information, we
 can make use of it. The tools to extract stack contents and build call traces
-are called \emph{stack unwinders}. More on the techniques used for unwinding
-is presented in Section~\ref{sec:unwinding}.
-
-\subsection{Use of Call Traces and Our Motivation} \label{sec:uses}
-Crashes (incl.\ BUGs and WARNINGs) are obvious users of unwinders. They print
-out the information so that developers can debug the crash. There are also
-other users like \textsc{KMemLeak} (kernel memory leak detector),
-\textsc{KMemCheck} (kernel memory accesses checker), or \textsc{LockDep}.
-They all do use the call traces to store information about locations where
-memory accesses, allocations, and locks take place respectively. This
-information is sooner or later reported to the user if some problem is
-detected by them.
-
-We can consider the all above as debugging purposes. There is one more not so
-obvious use of unwinders: \textit{Kernel Live Patching} (KLP). Although we
-started providing live patching since SLE12, we have not been using stack
-traces for anything until the upcoming release: SLE15. With SLE15, we are very
-likely to provide the upstream solution which evolved in the meantime. And it
-utilizes call traces to check if a process is somewhere in a function that is
-to be patched. Including those up to the call chain towards userspace. Hence
-we are very interested in fast and precise unwinding too.
-
-\section{Unwinding} \label{sec:unwinding}
-All unwinders described in this section work similarly. They somehow scan the
-stack and return a call trace. It is important to note, that there is not a
-single stack in the kernel. Whenever an interrupt or exception occurs, the
-stack is switched to the intterupt, NMI, exception, or other stack. So in
-fact, not only a single stack is scanned, but all of them are scanned up to
-the point where userspace invoked the kernel e.g.\ by syscall. Nevertheless,
-we consider a single stack in the text below for simplicity.
+are called \emph{stack unwinders}.  All unwinders described in this section
+work similarly. They somehow scan the stack and return a call trace. It is
+important to note, that there is not a single stack in the kernel. Whenever an
+interrupt or exception occurs, the stack is switched to the interrupt, NMI,
+exception, or other stack. So in fact, not only a single stack is scanned, but
+all of them are scanned up to the point where userspace invoked the kernel
+e.g.\ by syscall. Nevertheless, we consider a single stack in the text below
+for simplicity.
 
 \subsection{Simple Approach} \label{sec:unw_guess}
 The simplest method used in the kernel is to scan the stack by 8-byte chunks
-and put every value which is a function address to a call trace. A function
-address is easy to be identified in the kernel. It is an address in
-well-defined ranges: kernel code, modules, and other minor code. There is a
-helper to decide this. It is called \code{\_\_kernel\_text\_address}. And
-given the stack contains return addresses and whole stack is scanned, the
-functions will be surely part of the resulting call trace. And of course with
-other random material found on the stack which by a chance fits in the kernel
-code space.
+and put every value which is a function address to the returned call trace. A
+function address is easy to be identified in the kernel. It is an address in
+well-defined address ranges: kernel code, modules, and other minor code. There
+is even a helper to decide this. It is called
+\code{\_\_kernel\_text\_address}.
 
-This approach is used whenever all of the sophisticated methods below are
-unavailable/disabled. Since this is the most simple and naive unwinder, it is
-also the fastest one.  But \emph{least precise}, of course. The implementation
-can be found in \file{arch/x86/kernel/unwind\_guess.c}.
+This method is complete in the sense that it surely reports all really visited
+functions to the resulting call trace. To prove it, it is enough to realize,
+that the whole stack is scanned and the stack contains return addresses.  And
+of course they are reported as well as other random material found on the
+stack which by coincidence fits in the kernel code space too.
+
+This approach is used whenever all of the sophisticated methods described
+below are unavailable/disabled. Since this is the most simple and naive
+unwinder, it is also the fastest one.  But \emph{least precise}, of course.
+The implementation can be found in \file{arch/x86/kernel/unwind\_guess.c}.
 
 \subsection{Frame Pointers Approach} \label{sec:unw_fp}
-When base/frame pointers are enabled (\code{CONFIG\_FRAME\_POINTER}), they can
-be used to identify the start of stack frames and to locate a return address
-in them precisely. Since a pointer to the previous stack frame is right next
-to the return address, the unwinder uses it to extract another return address
-from there. This repeats until the bottom of the stack is reached.
+When base/frame pointers are enabled (\code{CONFIG\_FRAME\_POINTER} turned
+on), they can be used to identify the start of the current stack frame.
+Afterwards, the unwinder can easily locate a return address in them precisely.
+Since the pointer to the previous stack frame is stored right next to the
+return address in the current frame (cf.\ Fig.~\ref{fig:stack_frame}), the
+unwinder uses the pointer to unwind one level up. Then it extracts another
+return address from there. And another frame pointer. This repeats until the
+bottom of the stack is reached.
 
 There is a run-time \emph{penalty} stemming from enabled frame pointers.
 Functions have to contain prologues and epilogues to maintain the frame
@@ -361,34 +384,47 @@ epilogues explicitly. To ensure correctness for all functions, there is a tool
 called \objtool. It walks all functions and reports any inconsistencies in
 frame pointer handling, including completely omitted handling.
 
+Even if every function contains correct frame pointer handling, the unwinder
+still can miss an entry. Imagine that a function \code{A} calls a function
+\code{B}. A return address from \code{B} to \code{A} is pushed on the stack.
+But if an interrupt comes at this very moment, i.e.\ before a prologue of
+\code{B} is executed, unwinder has hard times to unwind. It is because the
+return address is on the stack, while the frame pointer is not yet. It is
+feasible to deal with this situation in most cases. The kernel currently
+cannot handle interrupted functions which are the first on the stack -- e.g.\
+the syscall handler.
+
 \subsection{\dwarf Approach} \label{sec:unw_dw}
-There was ongoing effort to use unwinding in Kernel Live Patching to conclude
-no task is in a patched function. While there were successful attempts to make
-frame-pointer-based unwinding reliable, (a) it still drags in the run-time
-overhead described earlier. Hence, it was also proposed by us to use
-\dwarf-based unwinding on the Linux kernel mailing
-list~\cite{patch_add_dwarf}.
+There was an ongoing effort to use unwinding in the Kernel Live Patching to
+conclude no task is in a patched function. While there were successful
+attempts to make frame-pointer-based unwinding reliable, it still drags in
+the run-time overhead and imprecisions described earlier. Hence, we also
+proposed on the Linux kernel mailing list to use \dwarf-based unwinding in the
+kernel~\cite{patch_add_dwarf}.
 
 Note that the unwinder was already a part of the Linux kernel since
 2.6.18~\cite{git_dwarf_upstream_add}. But it was dropped by Linus later in
 2.6.20~\cite{git_dwarf_upstream_rm} due to various issues. Especially, the
-code was not so nice and readable and it depends on generated data, which were
-allegedly not always correct. We have actually never seen a single issue
-during our use of the unwinder in SUSE. Nonetheless, our newly submitted
-cleaned-up version tried to address most of the problems.
+code was not so nice and readable and it also depends on generated data, which
+were allegedly not always correct. Noteworthy, we have actually never seen a
+single issue during our use of the unwinder in SUSE. Nonetheless, our newly
+submitted cleaned-up version tried to address most of the problems. We also
+suggested to use userspace programs during build to check and correct the data
+if they were not correct. This approach was more or less accepted, until the
+new \orc unwinder was proposed. See Section~\ref{sec:unw_orc} for the details.
 
-\dwarf~\cite{dwarf} works on a completely different basis. It needs no
-additional in-code operations.  Instead, when a stack is to be unwound, this
-is performed solely on the out-of-band data basis. Look at the example in
-Fig.~\ref{fig:dwarf}.  The assembly code saves the previous base pointer to
-the stack and replaces it with the current one. Then the code reserves
-\code{0x10} (i.e.\ 16) bytes from the stack, moves \code{2} to variable
-\code{xx} (on stack) which is right below the base pointer. Afterwards,
-\code{fun2} is called. When the CPU returns back to \code{fun1}, the reserved
-stack space is removed by the \codeasm{leave} instruction. It is equivalent to
-restoring \codeasm{rsp} from \codeasm{rbp} and popping the old value of
-\codeasm{rbp} from stack. This very corresponds to the stack content that we
-depicted earlier in Fig.~\ref{fig:stack_frame}.
+\dwarf~\cite{dwarf} works on a completely different basis than frame pointers.
+It needs no additional in-code operations.  Instead, when a stack is to be
+unwound, this is performed solely on the out-of-band data. Look at the example
+in Fig.~\ref{fig:dwarf}.  The assembly code in ``(b)'' saves the previous base
+pointer to the stack and replaces it with the current one. Then the code
+reserves \code{0x10} (i.e.\ 16) bytes from the stack, moves \code{2} to
+variable \code{xx} (on stack) which is right below the base pointer.
+Afterwards, \code{fun2} is called. When the CPU returns back to \code{fun1},
+the reserved stack space is removed by the \codeasm{leave} instruction. It is
+equivalent to restoring \codeasm{rsp} from \codeasm{rbp} and popping the old
+value of \codeasm{rbp} from stack, but faster. This indeed very corresponds to
+the stack content that we depicted earlier in Fig.~\ref{fig:stack_frame}.
 
 \begin{figure}[tb!]
   \begin{center}
@@ -419,7 +455,7 @@ void fun1(void)
       \\[1ex]
     \begin{tabular}{c}
       {
-	\begin{lstlisting}[language=XML,numbers=left]
+	\begin{lstlisting}[language=,numbers=left]
 DW_CFA_def_cfa: r7 (rsp) ofs 8
 DW_CFA_offset: r16 (rip) at cfa-8
 DW_CFA_advance_loc: 1 to 0000000000000001
@@ -437,7 +473,7 @@ DW_CFA_def_cfa: r7 (rsp) ofs 8
       \\[1ex]
     \begin{tabular}{c}
       {
-	\begin{lstlisting}[language=XML]
+	\begin{lstlisting}[language=]
 .text+0:  sp:sp+8  bp:(und)     type:call
 .text+1:  sp:sp+16 bp:prevsp-16 type:call
 .text+4:  sp:bp+16 bp:prevsp-16 type:call
@@ -458,66 +494,73 @@ DW_CFA_def_cfa: r7 (rsp) ofs 8
   \label{fig:dwarf}
 \end{figure}
 
-Now have a look at the \dwarf data in Fig.~\ref{fig:dwarf}. The data are
-encoded \dwarf instructions and every function has assigned a block of such
-instructions. The instruction change the state of a \dwarf state machine.
-Every line of the assembly can have attached some state of the state machine.
-The state keeps states of registers at that location, especially the stack
-pointer (\codeasm{rsp}). If we look closer at the Figure, we can spot
-\code{cfa} there. In the language of \dwarf, it means \emph{call frame
-address} and is considered to be another name for the start of the stack
-frame. Next, the instructions are supposed to be read in a top-down fashion.
-So we are at the start of the function and the first line of the DWARF data
-(\code{def\_cfa}) defines that \code{cfa} equals to the stack pointer with
-offset 8 (\codeasm{rsp+8}).  That is exactly right before the stored return
-address as we learnt earlier.  The next line says, that the value of
-\codeasm{rip} is stored on the stack 8 bytes after \code{cfa}. These two lines
-are common for every standard function. And again, they comply to
-Fig.~\ref{fig:stack_frame}.
+Now have a look at the \dwarf data in Fig.~\ref{fig:dwarf} ``(c)''. The data are
+encoded \dwarf instructions~\cite{dwarf_insn} and every function has assigned
+a block of such instructions. An instruction changes the state of a \dwarf
+state machine.  Every line of the assembly can have attached some state of the
+state machine.  The machine keeps states of registers at that location,
+especially the stack pointer (\codeasm{rsp}). If we look closer at the Figure,
+we can spot \code{cfa} there. In the language of \dwarf, it denotes a
+\emph{call frame address} and is considered to be another name for the start
+of the stack frame. Further, the instructions are supposed to be read in a
+top-down fashion.  So we are at the start of the function and the first line
+of the DWARF data (\code{def\_cfa}) defines that \code{cfa} equals to the
+stack pointer with offset 8 (\codeasm{rsp+8}).  That is exactly right before
+the stored return address as we also learnt earlier.  The next line says, that
+the value of \codeasm{rip} is stored on the stack 8 bytes after \code{cfa}.
+These two lines are common for every standard function. And again, they comply
+to earlier Fig.~\ref{fig:stack_frame}.
 
 That was all to be done at the beginning of the function. Now, the line three
 instructs us to move to the next line in assembly (\code{advance\_loc}), to
 offset 1. At this point, there is a \codeasm{push} which stores something
-(\codeasm{rbp}) to stack. Hence, \dwarf data at line 4 must tell us that
-\code{cfa} offset changed and is now 16 from the current stack pointer
-(\codeasm{rsp}).  Coincidently, the \codeasm{push} stored \codeasm{rbp} on
+(\codeasm{rbp}) to the stack. Hence, \dwarf data at line 4 have to tell us
+that \code{cfa} offset changed and is now 16 from the current stack pointer
+(\codeasm{rsp}).  Coincidently, the \codeasm{push} stored \codeasm{rbp} on the
 stack, so line 5 also says that the value of this register can be found at
 \code{cfa-16}. The next two \dwarf lines (6--7) force us to use \codeasm{rbp}
-as \code{cfa} from this position on, as (a) \code{rsp} was subtracted, and (b)
-apparently we have frame pointers turned on and it is exactly in
-\codeasm{rbp}. When leaving from the function at assembly line 17,
-\codeasm{rbp} was restored by \codeasm{leave} and we should start using
-\codeasm{rsp} as \code{cfa} again -- according to \dwarf lines 8 and 9.
+as \code{cfa} from this position on, as (a) \code{rsp} was subtracted to
+allocate some space, and (b) we apparently have frame pointers turned on and
+they are exactly in \codeasm{rbp}. When leaving from the function at assembly
+line 17, \codeasm{rbp} was restored by \codeasm{leave} and we should start
+using \codeasm{rsp} as \code{cfa} again -- according to \dwarf lines 8 and 9.
 
 So the task of the \dwarf unwinder is always read this data and update the
 \dwarf state machine as we did in the previous paragraphs. Finally, the return
-address is read from the stack from \code{cfa} with computed offset.  This
-happens for every function on the call trace. The unwinder starts for the
-current function and ``executes'' the \dwarf instructions up to the actual
-CPU's \code{rip} register. Then it reads the return address and repeats these
-steps from the start of a function containing the address up to the address
-proper. This happens until the bottom of the stack is reached.
+address is read from the stack from \code{cfa} with the computed offset. The
+unwinder performs this for every function on the call trace. The unwinder
+starts in the current function and ``executes'' the \dwarf instructions up to
+the actual CPU's \textit{instruction pointer} (\code{rip}) register. Then it
+reads the return address from the stack and repeats these steps from the start
+of a function containing the address up to the address proper. This happens
+until the bottom of the stack is reached.
 
 Last but not least, the \dwarf data are stored in an ELF section called
-\code{.eh\_frame}. There can also be an index in another section called
-\code{.eh\_frame\_hdr}. It speeds up the lookup of data for an address
-(function). The format of both of them is specified in LSB Core --
+\code{.eh\_frame}. Originally, this \textit{exception handling} section used
+to serve for C++ exceptions, but was later extended for use in C for
+unwinding.  There can also be an index of unwinding data in another section
+called \code{.eh\_frame\_hdr}.  It speeds up the lookup of data for an address
+in some function. The format of both of them is specified in LSB Core --
 Generic~\cite{LSB_generic}. Our vmlinux from Tumbleweed's kernel-default has
 1.78\,MiB of the data and 290\,KiB of the index. For example, the i915 module
 contains 178\,KiB of the data and no index.
 
 \paragraph{Drawbacks} \dwarf needs a compiler to generate the data. It is fine
 for C -- \gcc handles that perfectly -- but manual annotations are needed for
-assembly. And doing so manually is error-prone. So despite the annotations
-were part of the kernel even though the unwinder was not, they were dropped
-for good in commit \commit{131484c8da97} (``x86/debug: Remove perpetually
-broken, unmaintainable dwarf annotations'')~\cite{git_dwarfinfo_upstream_rm}.
-Since then, the \dwarf unwinder cannot proceed though interrupts, system call
-handlers and other code written in assembly.
+assembly. And doing so manually is error-prone as was proven by the history.
+As one example, see commit \commit{e0a5a5d9b006} (``x86, 64-bit, dwarf2: push
+pushes 8 bytes and popf pops 8'') by Alexander van Heukelum. So despite the
+annotations were part of the kernel even though the unwinder was not, they
+were dropped for good in commit \commit{131484c8da97} (``x86/debug: Remove
+perpetually broken, unmaintainable dwarf
+annotations'')~\cite{git_dwarfinfo_upstream_rm}.  Since then, the \dwarf
+unwinder cannot proceed though interrupts, system call handlers, and other
+code written in assembly.
 
-The implementation is in our new kernels in \file{kernel/dwarf.c} (the
-unwinder) and \file{arch/x86/kernel/unwind\_dwarf.c} (a glue for the new API
-below). In sum, they are 1917 lines of code.
+The implementation can be found in some our new kernels in
+\file{kernel/dwarf.c} (the unwinder) and
+\file{arch/x86/kernel/unwind\_dwarf.c} (a glue for the new API below). In sum,
+they are 1917 lines of code.
 
 \subsection{Rewrite of Unwinding -- the New API Upstream} \label{sec:rewrite}
 While we (at SUSE) have been using the \dwarf unwinder plugged into the
@@ -536,28 +579,36 @@ new API's point of view:
     on the stack and is a kernel code address is printed.  This happens
     despite more precise unwinders might be available in the kernel at that
     moment. Nevertheless, if they are, the entries reported by the more
-    precise unwinder are not accompanied by the `\code{?}' mark. So in most
-    cases, developers may considered entries with the `\code{?}' mark as
-    irrelevant.  The reason for this behaviour is that unwinders might have
-    troubles to unwind for unpredictable reasons, while we still want to dump
-    at least some call trace. This is invoked via \code{dump\_stack} and
-    derivatives.
-  \item \textsc{LockDep}, \textsc{KMemLeak}, \textsc{FTrace}, and similar
-    tools save the stack trace for their use. Unlike for the previous kind,
-    these traces contain only entries which are reported by the unwinder.
-    This kind of call traces is obtained by \code{save\_stack\_trace}.
+    precise unwinder are not accompanied by the `\code{?}' mark in the output.
+    So in most cases, developers may considered entries with the `\code{?}'
+    mark as irrelevant and can ignore them.  The reason for this behaviour is
+    that unwinders might have troubles to unwind for some unpredictable
+    reasons, while we still want to dump at least some call trace. This
+    dump-all behaviour is invoked via \code{dump\_stack} and derivatives.
+  \item \textsc{FTrace}, \textsc{KMemCheck}, \textsc{KMemLeak},
+    \textsc{LockDep}, and similar tools save the stack trace for their use.
+    Unlike for the previous kind, these traces contain only entries which are
+    reported by the configured unwinder.  This kind of call traces is obtained
+    by \code{save\_stack\_trace}.
   \item Kernel Live Patching demands only reliable (precise) call traces.  But
     unwinders sometimes put imprecise entries into call traces in the previous
-    kind. So here, when the unwinder is unsure about any entry, whole call
-    trace shall be discarded and an error returned instead of imprecise call
-    trace.  A new function \code{save\_stack\_trace\_tsk\_reliable} was
+    kind. So here, when the unwinder is unsure about any entry, the whole call
+    trace shall be discarded and an error returned instead of some imprecise
+    call trace.  A new function \code{save\_stack\_trace\_tsk\_reliable} was
     introduced for this purpose.
 \end{enumerate}
 
-In the new API, there is a common ``core'' for stack unwinding.  Then, there
-are implementations of the respective unwinders. The current API allows only
-one unwinder to be enabled. And the enabled unwinder has to define only a few
-functions. The functions and their meanings are as follows:
+In the new API, there is a common ``core'' for stack unwinding as an
+underlying layer for the above.  Below that, there are implementations of the
+respective unwinders. However, the current API allows only one unwinder to be
+enabled when compiling the kernel. In our opinion, this is no limitation and
+if users want more than one unwinder to be enabled at the same time, this can
+be relatively easy changed. Having more unwinders in parallel may be good for
+performance reasons -- e.g.\ use frame pointers for \textsc{LockDep} and use
+\dwarf or \orc for Live Patching.
+
+The core requires the enabled unwinder to define only few functions. The
+functions and their meanings are as follows:
 \begin{itemize}
   \item \code{\_\_unwind\_start} -- initialize the unwinder along with its
     internal state. This is a preparation for unwinding. Usually, the state is
@@ -565,50 +616,55 @@ functions. The functions and their meanings are as follows:
     running process, current process with pre-defined values of registers
     (program counter, stack pointer, etc.), or a sleeping process. Tasks
     running on other CPUs are usually ignored as the call stack changes very
-    quickly and also it is not easy to grab call stack of such process.
-  \item \code{unwind\_next\_frame} -- unwind to the next frame. This is called
-    repeatedly until enough frames are unwound or the bottom of the stack is
-    reached. This functions does what was described in previous sections about
-    respective unwinders.
+    quickly and it is also not easy to grab a call stack of such process.
+  \item \code{unwind\_next\_frame} -- unwind to the next frame and internally
+    note for later use its return address, stack pointer, and possibly frame
+    pointer. This is called repeatedly by the core until enough frames are
+    unwound or the bottom of the stack is reached. This function implements
+    the heart of each respective unwinder described in previous sections.
   \item \code{unwind\_get\_return\_address} -- extract the return address from
     the current frame and return it.
-  \item \code{unwind\_get\_return\_address\_ptr} -- return pointer to the
-    location of the return address. This is used only for comparison with
-    the current stack pointer when doing \code{dump\_stack} to the log. If
-    they match, the entry is printed as reliable (without the `\code{?}'
-    mark).
-  \item \code{unwind\_get\_entry\_regs} -- implementations should return
-    \code{pt\_regs} structure describing registers. It is dumped to the log.
-    This is useful for example when there was an interrupt and we want to dump
-    the state of registers before the interrupt happened.
+  \item \code{unwind\_get\_return\_address\_ptr} -- return a pointer to the
+    location of the return address on the stack. This is used only for
+    comparison with the current stack pointer when doing \code{dump\_stack} to
+    the log. If they match, the entry is printed as reliable (without the
+    `\code{?}' mark.)
+  \item \code{unwind\_get\_entry\_regs} -- implementations should return a
+    \code{pt\_regs} structure describing CPU registers. It is dumped to the
+    log.  This is useful for example when there was an interrupt and we want
+    to dump the state of registers before the interrupt happened.
+    Implementations return this usually only when jumping from one stack to
+    another in a particular unwinding step (interrupt $\rightarrow$ process
+    stack switch and similar.)
 \end{itemize}
 
 \subsection{\orc Approach} \label{sec:unw_orc}
 The rewrite of the unwinder API allowed for easy plugging of new unwinders.
 And since \dwarf was despised by upstream~\cite{kill_dwarf2}, a new
 unwinder inspired by \dwarf emerged. It was named \orc\ -- \textit{Oops Rewind
-Capability}. It uses also out-of-band data, but they are created independently
+Capability}. It uses out-of-band data too, but they are created independently
 of \dwarf. They are also substantially simpler. Hence \orc cannot handle
 states of all registers, neither complex state machines.  But the basic
 functionality to track the stack pointer and call frames is included and is
-enough for the Linux Kernel.
+actually enough for the Linux Kernel.
 
 As we mentioned for \dwarf, the unwind data has to be generated. \orc
 implemented this functionality into \objtool. Before \orc, \objtool served
-for checking frame pointers (c.f.\ Section~\ref{sec:unw_fp}). Since it knew
-about most of the stack operations, it can also generate data for \orc. It has
-to be modified (a) to remember all stack operations, not only prologues and
-epilogues, and (b) to generate the data for \orc. The same as for \dwarf, the
-data are in two ELF sections: \code{.orc\_unwind} and \code{.orc\_unwind\_ip}.
-The former contains an array of \code{orc\_entry} structures. The latter
-contains the same count of addresses associated with those structures. Both
-arrays are sorted by the address they are bound to.
+for checking frame pointers only (c.f.\ Section~\ref{sec:unw_fp}.) Since it
+already knew about many of the stack operations, it could also generate data
+for \orc. But it had to be modified (a) to remember all stack operations, not
+only checking prologues and epilogues, and (b) to generate the data for \orc.
+Similar to \dwarf, the data are generated to two ELF sections:
+\code{.orc\_unwind} and \code{.orc\_unwind\_ip}.  The former contains an array
+of \code{orc\_entry} structures. The latter contains the same count of
+addresses associated with those structures. Both arrays are sorted by the
+latter -- the address they are bound to.
 
 For performance reasons, there exist a third section called
 \code{.orc\_lookup}: fast lookup table. This one is created at runtime after
 the entries above are sorted. It serves as a pseudo hash table and makes the
-search in the large data faster by searching only in small subsets of the
-tables above.
+search in the large data faster by searching only in a small subset of the
+arrays above.
 
 \begin{figure}[htb]
   \begin{center}
@@ -632,19 +688,28 @@ struct orc_entry {
 The format of the \orc structure is depicted in Fig.~\ref{fig:orc_struct}. The
 structure contains information about values of stack (\code{SP}) and
 frame pointers (\code{BP}) before the call to the current function. More
-precisely which register to read and what offset to add to the read value. If
-we look back at the \dwarf example in Fig.~\ref{fig:dwarf}, we also presented
-the \orc data in (d). We can see similarities of \orc to \dwarf. For example,
-the first line says that when the funtcion was called, the previous stack
-pointer (\codeasm{rsp}) can be computed as \codeasm{rsp+8}. After the
-\codeasm{push}, the previous \codeasm{rsp} is current \codeasm{rsp+16} and so
-on. The \code{type} field allows for differentiation of standard calls from
-system calls, interrupts, and exceptions. In the latter, we have to extract
-the state of previous registers from stack, not from registers.
+precisely which register to read and what offset to add to the read value.
+This allows recovering the values at any point in the function to the
+starting ones, i.e.\ to exactly unwind one level up. If we look back at the
+\dwarf example in Fig.~\ref{fig:dwarf}, we also present the \orc data in
+`(d)'.  We can see similarities of \orc to \dwarf. For example, the first line
+says that when the function was called, the previous stack pointer
+(\codeasm{rsp}) can be computed as \codeasm{rsp+8}. After the \codeasm{push},
+the previous \codeasm{rsp} is current \codeasm{rsp+16} and so on. The
+\code{type} field of the \code{orc\_entry} structure allows for
+differentiation of standard calls from system calls, interrupts, and
+exceptions. In the latter three, we have to extract the state of previous
+stack and frame registers from the stack, not from registers.
 
 The implementation of the generation part is in \file{tools/objtool/}. The
 unwinder is in \file{arch/x86/kernel/unwind\_orc.c} and is only 582 lines long
-(including comments).
+(including comments.)
+
+\paragraph{Drawbacks} While it is fast and reliable, it relies heavily on the
+output of \gcc. \gcc generates some patterns of register stores and loads
+which \orc was taught to understand. When these patterns change, \orc has to
+be changed too. The alternative would be to parse the \dwarf data and convert
+them to \orc.
 
 \paragraph{Upstream Status} Parts of the \orc unwinder were accepted in the
 upstream kernel already.  It was especially preparatory
@@ -653,17 +718,18 @@ pending in the -tip tree~\cite{git_orc_gen,git_orc_unw}. They are scheduled
 for 4.14.
 
 \section{Unwinding in openSUSE \& SLE} \label{sec:suse_unw}
-This sections is devoted to state of unwinders in SUSE kernels as it
+This sections is devoted to the state of unwinders in SUSE kernels as it
 developed over time.  Until \dwarf unwinder was written and ready to use, we
 had frame pointers enabled to have at least a bit reliable call traces.
 
-Even though the \dwarf unwinder was in upstream since 2.6.18 till 2.6.20, none
-of the SUSE products were released in that time-frame. After it was dropped
-from upstream, the authors of the unwinder (Jan Beulich and Andi Kleen)
-pushed it into our trees as \commit{d7af6f6e8a34}~\cite{git_suse_dwarf_add}.
-This happened around 2.6.24, so the first products to have the \dwarf unwinder
-were \textit{SUSE Linux Enterprise 11} (SLE11) and \textit{SUSE Linux 11.1}
-(SL-11.1) -- a predecessor of openSUSE.
+Even after the \dwarf unwinder was written and was in upstream since 2.6.18
+till 2.6.20, none of the SUSE products were released in that time-frame. After
+it was dropped from upstream, the authors of the unwinder (Jan Beulich and
+Andi Kleen) pushed it into our trees as
+\commit{d7af6f6e8a34}~\cite{git_suse_dwarf_add}.  This happened around 2.6.24,
+so the first products to have the \dwarf unwinder were \textit{SUSE Linux
+Enterprise 11} (SLE11) and \textit{SUSE Linux 11.1} (SL-11.1) -- a predecessor
+of openSUSE.
 
 Despite the \dwarf unwinder itself was dropped from upstream, the manual
 annotations of assembly were left in-place. So we could use the unwinder
@@ -740,11 +806,12 @@ We can see that there are currently four unwinders available for the Linux
 kernel. We described them and their upstream status. They all have their pros
 and cons which we described too. In Table~\ref{tab:instr}, we sum up the
 upstream unwinders and how their precision varies. We took call traces from
-all three upstream unwinders using our crasher module. Using the \dwarf
-unwinder gives exactly the same output as \orc. So we made an union of the
-traces and put them into the table. We can see the effect of putting every
-kernel code address in the output (see Section~\ref{sec:rewrite}). When some
-unwinder is turned on, it marks unknown addresses with `\code{?}'.
+all three upstream ones using our crasher module. We did not include the
+output of the \dwarf unwinder, as it gives exactly the same output as \orc. So
+we made an union of the traces and put them into the table. We can see the
+effect of putting every kernel code address in the output (see
+Section~\ref{sec:rewrite}). When some unwinder is turned on, it marks unknown
+addresses with `\code{?}'.
 
 We can see that the Guess unwinder has no clue. The Frame pointer unwinder
 skips most uninteresting entries, but can make a mistake. \orc is the most
