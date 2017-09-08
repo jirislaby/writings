@@ -6,9 +6,15 @@
 
 \usecolortheme[rgb={.298,.745,.32}]{structure}
 
-\title{Unwinding the State of Unwinder}
-\date[20/09/\the\year, Ostrava]{September 20\textsuperscript{th} \the\year \\
-  Ostrava}
+\tikzset{invisible/.style={opacity=0},
+	visible on/.style={alt={#1{}{invisible}}},
+	alt/.code args={<#1>#2#3}{%
+	\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}} % \pgfkeysalso doesn't change the path
+	},
+}
+
+\title{Unwinding State of Unwinder}
+\date[20/09/2017, Ostrava]{September 20\textsuperscript{th} 2017 \\ Ostrava}
 
 \author[Jiri~Slaby]{\textbf{Jiri~Slaby}}
 
@@ -25,36 +31,255 @@
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-\begin{frame}{Introduction}
+\begin{frame}[fragile]{Introduction}
 
   \begin{itemize}
-    \item Kernel version upgrades hurt
+    \item Crash!
 
     \pause
 
+    \item Where?
     \begin{itemize}
-      \item Functionality-wise
-      \item Performance-wise
+      \item \code{RIP: 0010:crash\_now+0xae/0x170 \[crasher\]}
+
+      \pause
+
+      \item Translated as: ``middle of \code{crash\_now} in module
+	\code{crasher}''
     \end{itemize}
 
     \pause
 
-    \item We upgraded in SLE12-SP1 $\rightarrow$ -SP2
+    \item How did I get to this point?
+
+    \pause
+
     \begin{itemize}
-      \item About 40k LOCs changed
+      \item Answer in \emph{stack/call trace}
+    \end{itemize}
+
+    \onslide<9->
+    \begin{lstlisting}[basicstyle=\small,language=,columns=fullflexible,
+      aboveskip=0pt,belowskip=0pt]
+crasher_init+0x4d/0x1000 [crasher](*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (LSTSTMODINIT) {};}@*)
+    \end{lstlisting}
+
+    \onslide<8->
+
+    \begin{lstlisting}[basicstyle=\small,language=,columns=fullflexible,
+      aboveskip=0pt,belowskip=0pt]
+do_one_initcall+0x50/0x1a0
+do_init_module+0x5f/0x1f0
+load_module+0x1694/0x1ea0(*@\tikz[remember picture,baseline=0ex]{\node [coordinate] (LSTSTINITBOT) {};}@*)
+    \end{lstlisting}
+
+    \onslide<7->
+
+    \begin{lstlisting}[basicstyle=\small,language=,columns=fullflexible,
+      aboveskip=0pt,belowskip=0pt]
+SYSC_finit_module+0xd7/0xf0(*@\tikz[remember picture,baseline=-1.6ex]{\node [coordinate] (LSTSTMODPTOP) {};}@*)
+SyS_finit_module+0xe/0x10
+    \end{lstlisting}
+
+    \onslide<6->
+
+    \begin{lstlisting}[basicstyle=\small,language=,columns=fullflexible,
+      aboveskip=0pt]
+entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (LSTSTSYSCALL) {};}@*)
+    \end{lstlisting}
+
+  \tikzstyle{ptr} = [->,>=stealth',shorten > =3pt]
+  \begin{tikzpicture}[remember picture,overlay,node distance=1.5em]
+    \node<9-> [right=of LSTSTMODINIT] { module's init function }
+      edge[ptr] (LSTSTMODINIT);
+
+    \node [coordinate,right=2mm of LSTSTINITBOT] (IBOTSHIFTED) {};
+    \node [coordinate,above=3em of IBOTSHIFTED] (ITOPSHIFTED) {};
+    \draw<8-> [-,thick,decorate,decoration={brace,amplitude=4pt}] (ITOPSHIFTED) -- (IBOTSHIFTED)
+      node[midway] (MID) {};
+    \node<8-> [right=1mm of MID] { load and init module };
+
+    \node [coordinate,right=2mm of LSTSTMODPTOP] (MTOPSHIFTED) {};
+    \node [coordinate,below=2em of MTOPSHIFTED] (MBOTSHIFTED) {};
+    \draw<7-> [-,thick,decorate,decoration={brace,amplitude=3pt}] (MTOPSHIFTED) -- (MBOTSHIFTED)
+      node[midway] (MID) {};
+    \node<7-> [right=1mm of MID] { \code{modprobe} system call };
+
+    \node<6-> [right=of LSTSTSYSCALL] { system call }
+      edge[ptr] (LSTSTSYSCALL);
+  \end{tikzpicture}
+    \vspace*{-3ex}
+
+    \onslide<10->
+
+    \item The talk is about generators = \emph{unwinders}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Motivation}
+
+  \heading{Uses of Call Traces}
+
+  \begin{itemize}
+    \item Debugging purposes
+    \begin{itemize}
+      \item Crashes (including BUGs, WARNINGs, and similar)
 
       \pause
 
-      \item $\Rightarrow$ Manual inspection impossible
+      \item \textsc{FTrace}, \textsc{KMemLeak}, \textsc{KMemCheck},
+	\textsc{LockDep}
+    \end{itemize}
+
+    \pause
+
+    \item \emph{Kernel Live Patching}
+    \begin{itemize}
+      \item Is any thread in a to-be-patched function?
+
+      \pause
+
+      \item We ship and support KLP $\rightarrow$ we need fast and precise call
+	traces
     \end{itemize}
 
   \end{itemize}
 
 \end{frame}
 
-\frame[label=Presentation Outline]{\tableofcontents}
+%\begin{frame}{Presentation Outline}
+%  \tableofcontents
+%\end{frame}
 
-\begin{frame}[fragile]{\syz and Others}
+\begin{frame}{Unwinders}
+
+  \begin{itemize}[<+->]
+    \item Generate call traces
+    \item Various implementations
+    \begin{itemize}
+      \item Guess unwinder
+      \item Frame pointer unwinder
+      \item DWARF unwinder
+      \item ORC unwinder
+    \end{itemize}
+
+    \item Usually from stack
+  \end{itemize}
+
+\end{frame}
+
+\newlength{\hw}
+\setlength{\hw}{1.7cm}
+
+\begin{frame}[fragile]{Stack}
+
+  \begin{center}
+    \resizebox{!}{.85\textheight}{
+      \tikzstyle{ptr} = [->,>=stealth',shorten > =3pt,semithick]
+      \tikzstyle{border} = [thick]
+      \tikzstyle{leftbrace} = [-,semithick,decorate,
+	decoration={brace,mirror,amplitude=5pt,raise=2mm}]
+      \tikzstyle{lefttext} = [left=7pt of MID,anchor=south,rotate=90,
+	align=center]
+      \begin{tikzpicture}[node distance=2mm]
+	\node (PRE) { \vdots };
+
+	\node[visible on=<2->,below=of PRE,align=center] (CFA1) { return address \\
+	  from \code{fun1} (to \code{main}) };
+	\node[visible on=<2->,below=of CFA1] (SRBP1) { saved \code{BP} of \code{main}};
+	\node[visible on=<3->,below=of SRBP1] (X) { variable \code{xx} };
+
+	\node[visible on=<5->,below=of X,align=center] (CFA2) { return address \\
+	  from \code{fun2} (to \code{fun1}) };
+	\node[visible on=<5->,below=of CFA2] (SRBP2) { saved \code{BP} of \code{fun1}};
+	\node[visible on=<6->,below=of SRBP2] (Y) { variable \code{yy} };
+
+	\node[visible on=<7->,below=of Y,align=center] (POSTCOM) { stack grows here \\
+	  up to \code{abort}};
+	\node[coordinate,below=6mm of POSTCOM] (POST) {}
+	  edge[visible on=<7->,ptr,<-,shorten > =0pt,shorten < = 2pt] (POSTCOM);
+
+	\node [left=\hw of PRE.north] (TL) {};
+	\node [right=\hw of PRE.north] (TR) {};
+	\node [below left=1mm and \hw of POST.south] (BL) {};
+	\draw[border] (TL) -- (BL) node[midway] (LCEN) {};
+	\node [below right=1mm and \hw of POST.south] {}
+	  edge[border] (TR);
+
+	\foreach \from/\to/\left/\right/\line in
+	    {PRE/CFA1/MAINFUN1/CALLFUN1/thick, CFA1/SRBP1/D1/D2/dashed,
+	    SRBP1/X/D1/ORBP/dashed, X/CFA2/FUN1FUN2/CALLFUN2/thick,
+	    CFA2/SRBP2/D1/D2/dashed, SRBP2/Y/D1/RBP/dashed,
+	    Y/POSTCOM/FUN2ABORT/RSP/thick} {
+	  \path (\from) -- (\to) node[midway] (MID) {};
+
+	  \node [coordinate,left=\hw of MID] (\left) {};
+	  \node [coordinate,right=\hw of MID] (\right) {}
+	    edge[semithick,\line] (\left);
+	}
+
+	\node[visible on=<8->,right=7mm of RBP] { \code{BP} }
+	  edge[visible on=<8->,ptr] (RBP);
+	\node[visible on=<8->,right=7mm of RSP] { \code{SP} }
+	  edge[visible on=<8->,ptr] (RSP);
+	\node[above right=-1mm and 11mm of CALLFUN1,align=center] { called \\
+	  \code{fun1} }
+	  edge[ptr,dashed] (CALLFUN1);
+	\node[visible on=<4->,above right=-1mm and 10mm of CALLFUN2,
+	  align=center] { called \\
+	  \code{fun2} }
+	  edge[visible on=<4->,ptr,dashed] (CALLFUN2);
+	\node[visible on=<7->,below right=8mm and 6mm of RSP,align=center] {
+	  \code{abort} to \\ be called }
+	  edge[visible on=<7->,ptr,dashed] (RSP);
+
+	\draw (SRBP2.east) edge[visible on=<5->,ptr,in=0,out=30] (ORBP);
+
+	\node[coordinate,above=23mm of ORBP] (TMP) {};
+	\draw (SRBP1.east) edge[visible on=<2->,ptr,in=0,out=30] (TMP);
+
+	\draw[leftbrace] (TL) -- (MAINFUN1) node[midway] (MID) {};
+	\node[lefttext] { \code{main}'s \\[-.4ex] frame };
+
+	\draw<2->[leftbrace] (MAINFUN1) -- (FUN1FUN2) node[midway] (MID) {};
+	\node<2->[lefttext] { \code{fun1}'s \\[-.4ex] frame };
+
+	\draw<5->[leftbrace] (FUN1FUN2) -- (FUN2ABORT) node[midway] (MID) {};
+	\node<5->[lefttext] { \code{fun2}'s \\[-.4ex] frame };
+
+	\draw<7->[leftbrace] (FUN2ABORT) -- (BL) node[midway] (MID) {};
+	\node<7->[lefttext] { so far \\[-.4ex] unused };
+
+	\node[left=.3\textwidth of LCEN,align=left] (CODE1) {
+	  \input{code.tex}
+	};
+
+      \end{tikzpicture}
+    }
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{Guess and Frame Pointer}
+
+  \begin{itemize}[<+->]
+    \item In upstream for a long time
+    \item Rewritten to a sane interface in 4.9
+    \begin{itemize}
+      \item Allows for new unwinders
+    \end{itemize}
+
+    \item Not fixed yet
+    \begin{itemize}
+      \item \texttt{WARNING at drivers/gpu/drm/ttm/ttm\_bo\_vm.c:265} (GFX)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{and Others}
 
   \begin{itemize}
     \item Fixed
@@ -70,13 +295,13 @@
 
 \end{frame}
 
-\section{Conclusion}
-\frame{\sectionpage}
+%\section{Conclusion}
+%\frame{\sectionpage}
 
 \begin{frame}{Conclusion}
 
   \begin{center} \Large
-    \heading{Is it worth running fuzzers on SLE kernels?}
+    \heading{We are using ORC since SLE15}
   \end{center}
 
   \pause
