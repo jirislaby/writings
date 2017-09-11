@@ -132,7 +132,7 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
       \pause
 
       \item \textsc{FTrace}, \textsc{KMemLeak}, \textsc{KMemCheck},
-	\textsc{LockDep}
+	\textsc{LockDep}, \dots
     \end{itemize}
 
     \pause
@@ -150,10 +150,6 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
   \end{itemize}
 
 \end{frame}
-
-%\begin{frame}{Presentation Outline}
-%  \tableofcontents
-%\end{frame}
 
 \begin{frame}{Unwinders}
 
@@ -188,21 +184,28 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
       \begin{tikzpicture}[node distance=2mm]
 	\node (PRE) { \vdots };
 
-	\node[visible on=<2->,below=of PRE,align=center] (CFA1) { return address \\
+	% stack content
+	\node[visible on=<2->,below=of PRE,align=center] (CFA1) {
+	  return address \\
 	  from \code{fun1} (to \code{main}) };
-	\node[visible on=<2->,below=of CFA1] (SRBP1) { saved \code{BP} of \code{main}};
+	\node[visible on=<2->,below=of CFA1] (SRBP1) { saved \code{BP} of
+	  \code{main}};
 	\node[visible on=<3->,below=of SRBP1] (X) { variable \code{xx} };
 
-	\node[visible on=<5->,below=of X,align=center] (CFA2) { return address \\
+	\node[visible on=<5->,below=of X,align=center] (CFA2) {
+	  return address \\
 	  from \code{fun2} (to \code{fun1}) };
-	\node[visible on=<5->,below=of CFA2] (SRBP2) { saved \code{BP} of \code{fun1}};
+	\node[visible on=<5->,below=of CFA2] (SRBP2) { saved \code{BP} of
+	  \code{fun1}};
 	\node[visible on=<6->,below=of SRBP2] (Y) { variable \code{yy} };
 
-	\node[visible on=<7->,below=of Y,align=center] (POSTCOM) { stack grows here \\
+	\node[visible on=<7->,below=of Y,align=center] (POSTCOM) { stack grows
+	  here \\
 	  up to \code{abort}};
 	\node[coordinate,below=6mm of POSTCOM] (POST) {}
 	  edge[visible on=<7->,ptr,<-,shorten > =0pt,shorten < = 2pt] (POSTCOM);
 
+	% borders
 	\node [left=\hw of PRE.north] (TL) {};
 	\node [right=\hw of PRE.north] (TR) {};
 	\node [below left=1mm and \hw of POST.south] (BL) {};
@@ -210,6 +213,7 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
 	\node [below right=1mm and \hw of POST.south] {}
 	  edge[border] (TR);
 
+	% lines
 	\foreach \from/\to/\left/\right/\line in
 	    {PRE/CFA1/MAINFUN1/CALLFUN1/thick, CFA1/SRBP1/D1/D2/dashed,
 	    SRBP1/X/D1/ORBP/dashed, X/CFA2/FUN1FUN2/CALLFUN2/thick,
@@ -222,20 +226,25 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
 	    edge[semithick,\line] (\left);
 	}
 
-	\node[visible on=<2-4>,right=7mm of ORBP] { \code{BP}
+	% BP
+	\node[visible on=<2-4|handout:0>,right=7mm of ORBP] { \code{BP}
 	  {\uncover<2>{and \code{SP}}} }
-	  edge[visible on=<2-4>,ptr] (ORBP);
+	  edge[visible on=<2-4|handout:0>,ptr] (ORBP);
 	\node[visible on=<5->,right=7mm of RBP] { \code{BP}
-	  {\uncover<5>{and \code{SP}}} }
+	  {\uncover<5|handout:0>{and \code{SP}}} }
 	  edge[visible on=<5->,ptr] (RBP);
 
-	\node[visible on=<1>,below right=0mm and 7mm of CALLFUN1] { \code{SP} }
-	  edge[visible on=<1>,ptr] (CALLFUN1);
-	\node[visible on=<3-4>,below right=0mm and 7mm of CALLFUN2] { \code{SP} }
-	  edge[visible on=<3-4>,ptr] (CALLFUN2);
+	% SP
+	\node[visible on=<1|handout:0>,below right=0mm and 7mm of CALLFUN1]
+	  { \code{SP} }
+	  edge[visible on=<1|handout:0>,ptr] (CALLFUN1);
+	\node[visible on=<3-4|handout:0>,below right=0mm and 7mm of CALLFUN2]
+	  { \code{SP} }
+	  edge[visible on=<3-4|handout:0>,ptr] (CALLFUN2);
 	\node[visible on=<6->,right=7mm of RSP] { \code{SP} }
 	  edge[visible on=<6->,ptr] (RSP);
 
+	% called
 	\node[above right=-1mm and 12mm of CALLFUN1,align=center] { called \\
 	  \code{fun1} }
 	  edge[ptr,dashed] (CALLFUN1);
@@ -247,11 +256,13 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
 	  \code{abort} to \\ be called }
 	  edge[visible on=<7->,ptr,dashed] (RSP);
 
+	% edges
 	\draw (SRBP2.east) edge[visible on=<5->,ptr,in=0,out=30] (ORBP);
 
 	\node[coordinate,above=23mm of ORBP] (TMP) {};
 	\draw (SRBP1.east) edge[visible on=<2->,ptr,in=0,out=30] (TMP);
 
+	% frames
 	\draw[leftbrace] (TL) -- (MAINFUN1) node[midway] (MID) {};
 	\node[lefttext] { \code{main}'s \\[-.4ex] frame };
 
@@ -264,6 +275,7 @@ entry_SYSCALL_64_fastpath+0x23/0xc2(*@\tikz[remember picture,baseline=-.5ex]{\no
 	\draw<7->[leftbrace] (FUN2ABORT) -- (BL) node[midway] (MID) {};
 	\node<7->[lefttext] { so far \\[-.4ex] unused };
 
+	% code
 	\node[left=.15\textwidth of LCEN,align=left] (CODE1) {
 	  \input{code.tex}
 	};
