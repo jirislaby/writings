@@ -1,6 +1,6 @@
 TEX=latex
 
-all: posudek.dvi
+all: posudek.pdf
 pdf: posudek.pdf
 
 posudek.dvi: posudek.tex FORCE
