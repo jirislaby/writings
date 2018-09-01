@@ -1,0 +1,320 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}
+  \frametitle{ELF}
+
+  \heading{Executable and Linkable Format}
+  \begin{itemize}
+    \item Hlavní souborový formát na Linuxu
+    \item Přenositelný, relokovatelný, rozšiřitelný
+  \end{itemize}
+
+\end{frame}
+
+\input{elf_struct.tex}
+
+\mysection{Obsah sekcí}
+
+\begin{frame}
+  \frametitle{Obsah sekcí}
+
+  \begin{itemize}
+    \item Závislý na typu sekce (\code{Shdr->sh_type})
+
+    \pause
+
+    \item Nic (\code{SHT_NULL})
+    \item Pro spuštění (\code{SHT_PROGBITS})
+
+    \pause
+
+    \item Tabulky (\code{SHT_*TAB})
+    \begin{itemize}
+      \item Počet položek: \code{Shdr->sh_size / Shdr->sh_entsize}
+
+      \pause
+
+      \item Symbolů
+      \item Dynamické
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Tabulka řetězců}
+
+  \begin{itemize}
+    \item Typ sekce: \code{Shdr->sh_type == SHT_STRTAB}
+    \item Řetězce odkazované odjinud
+
+    \pause
+
+    \item Uložené jako řetězce ukončené nulou
+    \item Obsah dostaneme z \code{elf_getdata}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad sekce}
+  \begin{center}
+  \begin{tabular}{|r|c|c|c|c|c|c|c|c|c|c|} \hline
+Index & +0 & +1 & +2 & +3 & +4 & +5 & +6 & +7 & +8 & +9 \\ \hline
+ 0 & \code{\\0} & \code{i} & \code{n} & \code{i} & \code{t} & \code{.} &
+  \code{c} & \code{\\0} & \code{c} & \code{r} \\ \hline
+10 & \code{t} & \code{s} & \code{t} & \code{u} & \code{f} & \code{f} &
+  \code{.} & \code{c} & \code{\\0} & \code{_} \\ \hline
+20 & \code{_} & \code{J} & \code{C} & \code{R} & \code{_} & \code{L} &
+  \code{I} & \code{S} & \code{T} & \code{_} \\ \hline
+  \end{tabular}
+  \end{center}
+  \end{block}
+
+  \medskip
+  \pause
+
+  \heading{Demo:} \cmd{readelf -x .strtab -p .strtab}
+
+\end{frame}
+
+\begin{frame}{Tabulka symbolů}
+
+  \begin{itemize}
+    \item Typ sekce: \code{Shdr->sh_type == SHT_SYMTAB} nebo \code{SHT_DYNSYM}
+    \item Dump: \cmd{readelf --syms}
+    \item Tabulka s různými ,,symboly''
+
+    \pause
+
+    \item Symbol -- \code{GElf_Sym}
+    \begin{itemize}[<+->]
+      \item \code{st_name} -- jméno symbolu (offset do \code{Shdr->sh_link})
+      \item \code{st_value} -- hodnota symbolu
+      \item \code{GELF_ST_TYPE(st_info)} -- k čemu se symbol váže
+	(\code{STT_OBJECT}, \code{STT_FUNC}, \code{STT_SECTION},
+	\code{STT_FILE}, \dots)
+      \item \code{st_shndx} (pro \code{STT_SECTION}) -- které sekce se symbol
+	týká (může být i \code{SHN_UNDEF}, \code{SHN_ABS}, \dots)
+    \end{itemize}
+
+    \pause
+
+    \item \code{gelf_getsym(Elf_Data *data, int idx, GElf_Sym *dst)}
+    \begin{itemize}
+      \item \code{data} -- dostaneme z \code{elf_getdata}
+      \item \code{idx} -- x-tý symbol
+      \item \code{dst} -- návratová hodnota
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis symbolů ze sekcí}
+  \begin{enumerate}
+    \item Pro všechny sekce typu \code{SHT_SYMTAB} nebo \code{SHT_DYNSYM}
+    \item Iterujte přes všechny symboly
+    \begin{itemize}
+      \item \code{0 .. Shdr->sh_size / Shdr->sh_entsize}
+    \end{itemize}
+    \item U všech vypište jméno symbolu (\code{elf_strptr})
+    \item Pro typ \code{STT_FUNC} vypište navíc
+    \begin{itemize}
+      \item Adresu (\code{st_value}) a index sekce, ve které je
+	(\code{st_shndx})
+    \end{itemize}
+
+    \item Pro typ \code{STT_OBJECT} vypište navíc
+    \begin{itemize}
+      \item Hodnotu (\code{st_value}) a velikost (\code{st_size})
+    \end{itemize}
+
+    \item Pro typ \code{STT_SECTION} vypište navíc
+    \begin{itemize}
+      \item Hodnotu (\code{st_value}) a index sekce (\code{st_shndx})
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Dynamická tabulka}
+
+  \begin{itemize}
+    \item Typ sekce: \code{Shdr->sh_type == SHT_DYNAMIC}
+    \item Dump: \cmd{readelf --dynamic}
+    \item Tabulka pro spuštění
+
+    \pause
+
+    \item Dynamický symbol -- \code{GElf_Dyn}
+    \begin{itemize}[<+->]
+      \item \code{d_tag} -- druh symbolu (\code{DT_NEEDED}, \code{DT_INIT},
+        \dots)
+      \item \code{d_u.d_ptr} -- hodnota symbolu (ukazatel)
+      \item \code{d_u.d_val} -- hodnota symbolu (ostatní)
+      \begin{itemize}
+	\item Pro jména: offset do sekce \code{Shdr->sh_link}
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+
+    \item \code{gelf_getdyn(Elf_Data *data, int idx, GElf_Dyn *dst)}
+    \begin{itemize}
+      \item \code{data} -- dostaneme z \code{elf_getdata}
+      \item \code{idx} -- x-tý dynamický symbol
+      \item \code{dst} -- návratová hodnota
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis dynamických symbolů}
+  \begin{enumerate}
+    \item Pro všechny sekce typu \code{SHT_DYNAMIC}
+    \item Iterujte přes všechny dynamické symboly
+    \item Pro \code{DT_NEEDED} vypište jméno knihovny (\code{elf_strptr} a
+      \code{d_val})
+    \item Pro \code{DT_INIT} vypište, kde se má začít (\code{d_ptr})
+    \begin{itemize}
+      \item Podívejte se do kódu, kde to je (\cmd{objdump -d})
+    \end{itemize}
+    \item Pro \code{DT_STRSZ} vypište velikost tabulky řetězců (\code{d_val})
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Tabulka relokací}
+
+  \begin{itemize}
+    \item Typ sekce: \code{Shdr->sh_type == SHT_REL} a \code{SHT_RELA}
+    \item Dump: \cmd{readelf -r}
+    \item Tabulka pro linkování -- kde se má co a čím nahradit
+
+    \pause
+
+    \item Symbol relokace -- \code{GElf_Rel} a \code{GElf_Rela}
+    \begin{itemize}[<+->]
+      \item \code{r_offset} -- kde nahrazovat (odkaz do sekce č.\ 
+        \code{Shdr->sh_info})
+      \item \code{GELF_R_TYPE(r_info)} -- typ (\code{R_X86_64_PC32},
+        \code{R_X86_64_32}, \dots)
+      \item \code{GELF_R_SYM(r_info)} -- za co nahrazovat (v sekci č.\ 
+        \code{Shdr->sh_link})
+      \item \code{r_addend} (jen \code{RELA}) -- kolik přičíst k symbolu
+    \end{itemize}
+
+    \pause
+
+    \item \code{gelf_getrel(Elf_Data *data, int idx, GElf_Rel *dst)} a \\
+      \code{gelf_getrela(Elf_Data *data, int idx, GElf_Rela *dst)}
+    \begin{itemize}
+      \item \code{data} -- dostaneme z \code{elf_getdata}
+      \item \code{idx} -- x-tý relokační symbol
+      \item \code{dst} -- návratová hodnota
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis relokací}
+  \begin{enumerate}
+    \item Pro všechny sekce typu \code{SHT_RELA}
+    \item Iterujte přes všechny relokace
+    \item Pro každou vypište
+    \begin{itemize}
+      \item Č.\ sekce, která se bude měnit (\code{Shdr->sh_info})
+      \item Pozici, kde se bude měnit (\code{r_offset})
+      \item Č.\ symbolu, kterého adresa se použije (\code{GELF_R_SYM(r_info)})
+    \end{itemize}
+
+    \item Vyzkoušejte na \file{.o} souboru
+  \end{enumerate}
+
+\end{frame}
+
+\mysection{Programové hlavičky}
+
+\begin{frame}{Programové hlavičky}
+
+  \begin{itemize}
+    \item \cmd{readelf -l}
+    \item Vytvářené linkerem
+    \item Čtené jádrem/interpretem
+    \item Mapování na sekce
+
+    \pause
+
+    \item Předdefinované programové hlavičky:
+    \begin{itemize}
+      \item \code{PT_PHDR}: samotná hlavička
+      \item \code{PT_INTERP}: interpretr (\code{.interp})
+      \item \code{PT_DYNAMIC}: dynamická tabulka (\code{.dynamic})
+      \item \code{PT_LOAD}: data, kód (\code{.text}, \code{.data}, \dots)
+      \item \dots
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Úkol}
+
+  \heading{Výpis programových hlaviček}
+  \begin{enumerate}
+    \item Vypište si programové hlavičky (\cmd{readelf -l})
+    \item Prostudujte, jak se mapují na sekce
+    \item Podívejte se, které sekce jsou pro zápis
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\file{libelf}}{Programové hlavičky}
+
+  \begin{itemize}
+    \item Počet: \code{int elf_getphdrnum(Elf *elf, size_t *dst)}
+    \item Hlavička: \code{GElf_Phdr} (\header{gelf.h})
+    \begin{itemize}
+      \item Získání hlavičky: \\
+	\code{GElf_Phdr *gelf_getphdr(Elf *elf, int idx, GElf_Phdr *dst)}
+      \item \code{p_type}: \code{PT_LOAD}, \code{PT_DYNAMIC}, \code{PT_INTERP},
+        \dots
+      \item \code{p_offset}: offset v souboru
+      \item \code{p_vaddr}: kde bude v paměti
+      \item \code{p_filesz}: velikost v souboru
+      \item \code{p_memsz}: velikost v paměti (po načtení)
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis programových hlaviček}
+  \begin{enumerate}
+    \item Otevřete ELF soubor pro čtení
+    \item Vypište interpretr
+    \begin{itemize}
+      \item Může se hodit \code{elf_rawfile}
+    \end{itemize}
+
+    \item Vypište programové hlavičky
+    \begin{itemize}
+      \item Typ
+      \item Offset v souboru
+      \item Kde bude v paměti
+      \item Velikost v souboru a v paměti
+    \end{itemize}
+
+    \item Přeložte a vyzkoušejte
+    \item Porovnejte s \cmd{readelf -l}
+  \end{enumerate}
+
+\end{frame}

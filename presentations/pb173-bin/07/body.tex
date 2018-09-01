@@ -1,0 +1,445 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\section{Linker skripty}
+
+\begin{frame}
+  \frametitle{Linker skripty}
+
+  \begin{itemize}
+    \item \code{ldscripts}
+    \item Linker se jimi řídí při linkování objektů
+    \begin{itemize}
+      \item Tj.\ vždy se nějaký použije
+    \end{itemize}
+
+    \pause
+
+    \item Udávají
+    \begin{itemize}
+      \item Kde která sekce leží
+      \begin{itemize}
+	\item Např.\ pro embedded, kód musí být na adrese X a data na adrese Y
+      \end{itemize}
+
+      \item Výstupní formát
+      \item Kam skočit po načtení
+      \item A další
+    \end{itemize}
+
+    \pause
+
+    \item Může přidávat i symboly
+    \begin{itemize}
+      \item Např.\ ,,toto'' je adresa začátku sekce Z
+    \end{itemize}
+
+    \item Dokumentace
+    \begin{itemize}
+      \item \cmd{pinfo ld}
+      \item Nebo \url{http://sourceware.org/binutils/docs/ld/}
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Formát skriptu}
+
+  \begin{itemize}
+    \item Textové soubory
+    \item Příkazy
+    \begin{itemize}
+      \item Pozice první instrukce, kterou spustit: \code{ENTRY}
+      \item Výstupní formát: \code{OUTPUT_FORMAT}
+      \item Seznam sekcí a jejich obsah: \code{SECTIONS}
+      \item Verzování: \code{VERSION}
+      \item \dots
+    \end{itemize}
+
+    \pause
+
+    \item Komentáře
+    \begin{itemize}
+      \item \code{/* */} jako v C
+    \end{itemize}
+
+    \pause
+
+    \item Linkeru se předává při linkování
+    \begin{itemize}
+      \item \cmd{gcc -T skript.x ...}
+      \item \cmd{ld -T skript.x ...}
+    \end{itemize}
+
+    \pause
+
+    \item \heading{Demo:} výchozí skript (\cmd{ld --verbose})
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Základní příkazy}
+
+  \begin{itemize}
+    \item \code{ENTRY}
+    \begin{itemize}
+      \item Udává, kam se má skočit po zavedení
+      \item Např.\ \code{ENTRY(main)}
+    \end{itemize}
+
+    \pause
+
+    \item \code{OUTPUT_FORMAT}
+    \begin{itemize}
+      \item Výstupní BFD formát
+      \item \code{OUTPUT_FORMAT("elf64-x86-64")} (popř.\ \code{elf32-i386})
+    \end{itemize}
+
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Základní skript}
+  \begin{enumerate}
+    \item Vytvořte si linker skript
+    \item Bude obsahovat pouze \code{ENTRY} a \code{OUTPUT_FORMAT}
+    \item Vytvořte zdrojový soubor s jednou funkcí
+    \begin{itemize}
+      \item Bude obsahovat nekonečný cyklus
+      \item Jméno bude stejné jako v \code{ENTRY}
+    \end{itemize}
+
+    \item Přeložte a slinkujte skriptem
+    \begin{itemize}
+      \item \cmd{gcc -Wl,--build-id=none -nostdlib -T skript.x ...}
+    \end{itemize}
+
+    \item Podívejte se na rozložení sekcí
+    \begin{itemize}
+      \item Měly by začínat okolo adresy 0
+    \end{itemize}
+
+    \item Spusťte program
+    \begin{itemize}
+      \item Bude fungovat jen pokud \cmd{sysctl vm.mmap_min_addr} je 0
+      \item Pokud není, změňte
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Sekce}
+
+  \begin{itemize}
+    \item Blok \code{SECTIONS \{ ... \}}
+    \item Záznamy typu \code{.vystupni_sekce : \{ soubory(.vstupni_sekce) \}}
+    \begin{itemize}
+      \item \code{soubor} může být \code{*}
+    \end{itemize}
+
+    \pause
+
+    \item \code{/DISCARD/} je speciální výstupní sekce
+    \begin{itemize}
+      \item Obsah se zahodí
+    \end{itemize}
+  \end{itemize}
+
+  \medskip
+  \pause
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+SECTIONS
+{
+  .text   : { *(.text) }
+  .data   : { *(.data) soubor.o(.data.special) }
+  .bss    : { *(.bss) }
+  /DISCARD/ : { *(.debug*) *(.comment*) *(.eh_frame*) }
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Skript se sekcemi}
+  \begin{enumerate}
+    \item Rozšiřte skript, aby výsledek obsahoval pouze sekci \code{.text}
+    \begin{itemize}
+      \item Ostatní zahodíte pomocí \code{/DISCARD/} sekce
+    \end{itemize}
+
+    \item Přeložte
+    \item Ověřte pomocí \cmd{objdump -h}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Sekce -- adresování}
+
+  \begin{itemize}
+    \item Každému bodu ve skriptu lze přiřadit adresu
+    \begin{itemize}
+      \item Aktuální adresa je \code{.} (tečka)
+      \item \code{. = 0x10000;}
+    \end{itemize}
+
+    \pause
+
+    \item Každou sekci lze:
+    \begin{itemize}
+      \item Vložit na nějakou adresu: \code{.sekce 0x10000 : \{ ... \}}
+      \item Zarovnat: \code{.sekce ALIGN(...) : \{ ... \}}
+    \end{itemize}
+
+    \pause
+
+    \item Pro každou adresu lze vložit symbol
+    \begin{itemize}
+      \item \code{symbol = .;}
+      \item V kódu pak \code{extern unsigned long symbol;}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+SECTIONS
+{
+  . = 0x40000;
+  my_start = .;
+  .text : { *(.text) }
+  .data 0x50000 : { *(.data) }
+}
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Skript se sekcemi a adresami}
+  \begin{enumerate}
+    \item Rozšiřte zdrojový soubor o další 2 funkce, tedy:
+    \begin{itemize}
+      \item 1. (původní): s nekonečným cyklem, dejte ji do sekce \code{.text.t2}
+      \item 2.: bude volat \code{extern void my_fun(void)}, v sekci
+        \code{.text.t1}
+      \item 3.: bude volat adresu \code{0x401000}, nastavte \code{ENTRY} na
+        její jméno
+    \end{itemize}
+    \item Rozšiřte skript
+    \begin{itemize}
+      \item Aby všechny sekce začínaly za hranicí \code{0x400000}
+      \begin{itemize}
+	\item \code{. = ...} na začátku bloku \code{SECTIONS}
+      \end{itemize}
+      \item Přidejte novou výstupní sekci \code{.text.t} na adresu \code{0x401000}
+      \begin{itemize}
+	\item Obsah \code{.text.t1}
+	\item Nový symbol \code{my_fun} na aktuální adrese
+	\item Obsah \code{.text.t2} (tedy \code{my_fun} ukazuje na začátek \code{.text.t2})
+      \end{itemize}
+    \end{itemize}
+    \item Přeložte
+    \item Ověřte pomocí \cmd{objdump -h} a \cmd{objdump -t}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\section{Verzování funkcí}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]{Verzování funkcí}
+
+  \heading{Pro zachování zpětné kompatibility knihovních funkcí}
+  \begin{itemize}
+    \item V knihovnách se v průběhu času opravují chyby
+
+    \pause
+
+    \begin{itemize}
+      \item Ale někteří ,,uživatelé'' knihovny na chyby spoléhali
+    \end{itemize}
+
+    \pause
+
+    \item Jak zachovat zpětnou kompatibilitu nějaké funkce?
+
+    \pause
+
+    \item Chceme 2 funkce s týmž názvem, ale s jinou funkcionalitou
+    \begin{itemize}
+      \item Podle verze použité při překladu
+    \end{itemize}
+  \end{itemize}
+
+  \smallskip
+  \pause
+
+  \begin{center}
+    \begin{tabular}{|c|c|} \hline
+      \footnotesize{\textbf{Před opravou chyby}} & \footnotesize{\textbf{Po opravě chyby}} \\ \hline
+      \begin{lstlisting}
+void fun()
+{
+  puts("OLD");
+}
+      \end{lstlisting} &
+      \begin{lstlisting}
+void fun()
+{
+  puts("NEW");
+}
+      \end{lstlisting} \\ \hline
+      \footnotesize{libX v1} & \footnotesize{libX v2} \\ \hline
+    \end{tabular}
+
+    \pause
+    \smallskip
+    \bigskip
+
+    \heading{Řešením jsou linker skripty s verzováním}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Verzování funkcí}
+
+  \begin{itemize}
+    \item Každé funkci lze ve skriptu:
+    \begin{itemize}
+      \item Přiřadit verzi (\code{fun} v1, \code{fun} v2 nebo výchozí)
+      \item Určit její viditelnost
+    \end{itemize}
+
+    \pause
+
+    \item Blok \code{VERSION \{ ... \}}
+
+    \pause
+
+    \item Obsah \code{VERSION} lze předat i samostatně na příkazové řádce
+    \begin{itemize}
+      \item Odpadá nutnost psaní celého linker skriptu
+      \item \cmd{ld --version-script=verze.x ...}
+      \item \cmd{gcc -Wl,--version-script=verze.x ...}
+    \end{itemize}
+
+    \item Zobrazení pomocí \code{readelf -V}
+
+    \pause
+
+    \item Dokumentace
+    \begin{itemize}
+      \item \cmd{pinfo ld}
+      \item \href{http://people.redhat.com/drepper/dsohowto.pdf}{U. Drepper: How To Write Shared Libraries}, kap.\ 3
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Verze ve skriptu}
+
+  \heading{Obsah sekce \code{VERSION} ve skriptech}
+  \begin{itemize}
+    \item Strom verzí -- dědičnost
+    \item Uzly obsahují funkce
+    \item Uzly mohou obsahovat i označení viditelnosti
+    \begin{itemize}
+      \item \code{global:}
+      \item \code{local:}
+    \end{itemize}
+  \end{itemize}
+
+  \pause
+
+  \begin{block}{Příklad}
+    \begin{lstlisting}[aboveskip=2pt,belowskip=2pt]
+VERS_1.1 {
+  global:
+    fun;
+  local:
+    old_fun*;
+};
+
+VERS_1.2 {
+  new_functionality_fun;
+} VERS_1.1; /* inheritance */
+    \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Verze ve zdrojovém souboru}
+
+  \begin{itemize}
+    \item Ve zdrojových souborech je třeba přiřadit verze
+    \item Globální \code{asm} direktiva
+    \begin{itemize}
+      \item Neverzovaná: \code{asm(".symver fun_old1,fun@");}
+      \item Pro určitou verzi: \code{asm(".symver fun_old2,fun@VERS_1");}
+      \item Výchozí: \code{asm(".symver fun_new,fun@@VERS_2");}
+    \end{itemize}
+  \end{itemize}
+
+  \begin{block}{Příklad}
+  \begin{lstlisting}
+void fun_old() {
+  puts("OLD");
+}
+asm(".symver fun_old,fun@");
+
+void fun_new() {
+  puts("NEW");
+}
+asm(".symver fun_new,fun@@VERS_2");
+  \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Verzování}
+  \begin{enumerate}
+    \item Otevřete si \file{pb173-bin/07/}
+    \item Projděte 3 verze knihovny \file{vers\{1,2,3\}.c}
+    \begin{itemize}
+      \item Definuje funkci \code{bubak}
+      \item \code{bubak} v nich má 3 různé sémantiky podle verze
+    \end{itemize}
+    \item Projděte soubor, který ji používá \file{x.c}
+    \begin{itemize}
+      \item Volá funkci \code{bubak}
+      \item (Pro 3.\ verzi předává i parametr)
+    \end{itemize}
+    \item Přeložte
+    \begin{itemize}
+      \item Standardně pomocí \cmd{make}
+    \end{itemize}
+    \item Spusťte \file{x\{1,2,3\}}
+    \item Projděte verze v \file{x\{1,2,3\}} za pomoci \cmd{readelf -V}
+    \item Pokračujte domácím úkolem, částí 2
+  \end{enumerate}
+
+\end{frame}

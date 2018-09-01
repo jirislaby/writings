@@ -1,0 +1,337 @@
+% vim: ai sw=2 spell spelllang=cs
+
+\begin{frame}
+  \frametitle{Komunikace s HW}
+
+  \begin{itemize}
+    \item Obvykle práce ovladačů v jádře
+
+    \pause
+
+    \item Ale často není jádro třeba
+    \begin{itemize}
+      \item Zařízení na sériovém portu
+      \item Skenery, tiskárny a podobná USB zařízení
+      \item I jednoduchá PCI zařízení
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Různé přístupy ke komunikaci s HW}
+
+  \begin{enumerate}
+    \item Jádro HW ovládá a uživatelovi nevystavuje
+    \begin{itemize}
+      \item V Linuxu téměř nic
+    \end{itemize}
+
+    \pause
+
+    \item Jádro zaštiťuje nízkoúrovňovou komunikaci
+    \begin{itemize}
+      \item Zařízení v \file{/dev/} (\file{ttyS*}, \file{ttyUSB*}, \file{lp*})
+      \item Soubory v \file{/sys/} (gadgety)
+    \end{itemize}
+
+    \pause
+
+    \item Jádro obsluhuje jen přerušení
+    \begin{itemize}
+      \item Vrstva UIO
+      \item Dokumentace: \href{http://blackfin.uclinux.org/doku.php?id=auto_generated_kernel_docs:uio-howto}{uio-howto}
+    \end{itemize}
+
+    \pause
+
+    \item Jádro nedělá s HW nic
+    \begin{itemize}
+      \item Uživatel používá instrukce/volání
+      \begin{itemize}
+	\item Získání povolení: \code{ioperm} nebo \code{iopl}
+	\item Přímý přístup: \code{out+in}
+      \end{itemize}
+
+      \item Soubory v \file{/sys/} (PCI)
+      \begin{itemize}
+	\item \code{mmap}
+      \end{itemize}
+
+      \item Knihovny na přímou komunikaci s HW
+      \begin{itemize}
+	\item \file{libusb}, \file{libpciaccess}
+      \end{itemize}
+    \end{itemize}
+  \end{enumerate}
+
+\end{frame}
+
+\mysection{I/O porty}
+
+\begin{frame}{Přístup instrukcemi/voláními}{I/O porty}
+
+  \begin{itemize}
+    \item Porty jsou specifikum některých CPU (včetně \xes)
+    \begin{itemize}
+      \item Samostatná (malá) sběrnice
+      \item Speciální instrukce (\code{in}, \code{out} na \xes)
+      \item Je zde řadič klávesnice, PC spkr, časovače a ovladače přerušení,
+	ladicí port (\code{0x80} $\Rightarrow$ segmentový displej na desce),
+	\dots
+    \end{itemize}
+
+    \pause
+
+    \item Žádost o přístup: \code{ioperm}, \code{iopl}
+    \item Čtení: \code{inX}
+    \item Zápis: \code{outX}, kde X $\in\left\{ \text{\code{b}},\,
+      \text{\code{w}},\, \text{\code{l}} \right\}$ 
+    \item Dokumentace: \cmd{man ioperm} a \cmd{man inb} 
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Zahrajte melodii na PC speaker} (doplňte
+    \file{pb173-bin/11/speaker.c})
+  \begin{enumerate}
+    \item Nastartujte si virtuální stroj (\file{pb173-bin/qemu-start})
+    \item Dopište tělo funkce \code{beep}
+    \begin{itemize}
+      \item Zapište \code{0xb6} na port \code{0x43}
+      \item Zapište \code{div} na port \code{0x42}
+      \item Zapište \code{(div >> 8)} na port \code{0x42}
+      \item Přečtěte port \code{0x61} (obsah spodních 2 bitů zahoďte)
+      \item Zapište přečtenou hodnotu \code{| 0x03} zpět na port \code{0x61}
+    \end{itemize}
+
+    \item Dopište tělo funkce \code{stop_beep}
+    \begin{itemize}
+      \item Přečtěte port \code{0x61}
+      \item Zapište \code{0} na spodní 2 bity portu \code{0x61}
+    \end{itemize}
+
+    \item Po všech zápisech a čteních čekejte alespoň 10 $\mu$s
+    \begin{itemize}
+      \item Máte k dispozici \code{usleep}
+    \end{itemize}
+
+    \item Přidejte do \code{main} před \code{play} volání \code{ioperm}
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\mysection{PCI zařízení}
+
+\input{pci.tex}
+
+\mysection{\code{mmap} pro přímou komunikaci}
+
+\begin{frame}
+  \frametitle{\code{mmap} pro přímou komunikaci s PCI}
+
+  \begin{itemize}
+    \item Každé PCI zařízení může mít:
+    \begin{itemize}
+      \item I/O porty (komunikace viz dříve)
+      \item \emph{Paměť ve fyzickém prostoru}
+      \item Přerušení, DMA, atd. (UIO)
+    \end{itemize}
+
+    \pause
+    \medskip
+
+    \item Soubory \file{/sys/bus/pci/devices/*/resource*}
+    \item Mapují se pomocí \code{mmap}
+    \item Obsah: ve specifikaci konkrétního zařízení
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Komunikace s EDU zařízením}
+  \begin{enumerate}
+    \item Zjistěte číslo EDU karty z výstupu \cmd{lspci}
+    \begin{itemize}
+      \item Má ID \code{0x11e8} v \cmd{qemu}
+      \item Hledáte něco jako \code{01:01.0}
+    \end{itemize}
+
+    \item Mapujte \file{resource0} EDU zařízení
+    \begin{itemize}
+      \item V \file{/sys/bus/pci/devices/...}
+      \item Jen v qemu s \cmd{\-device edu}
+      \item Mapujte jako \code{volatile uint32_t *}
+    \end{itemize}
+
+    \item Vypište, co je na první a druhé pozici
+    \item Zapište nějaké číslo na druhou pozici
+    \item Vypište, co je na druhé pozici
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
+
+\mysection{Knihovny pro přímou komunikaci s HW}
+
+\begin{frame}
+  \frametitle{Knihovny pro přímou komunikaci s HW}
+
+  \begin{itemize}
+    \item Kromě přímého \code{mmap} přístupu existují i knihovny
+    \item \file{libusb}, \file{libpciaccess}
+    \begin{itemize}
+      \item Jsou přenositelné
+      \item Poskytují lepší rozhraní
+      \item Pracují se soubory v \file{/proc} a \file{/sys}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\file{libpciaccess}}
+
+  \begin{itemize}
+    \item \cmd{gcc ... -lpciaccess} (\header{pciaccess.h})
+
+    \pause
+
+    \item Inicializace: \code{pci_system_init}
+    \item Deinicializace: \code{pci_system_cleanup}
+
+    \pause
+    \medskip
+
+    \item Vytvoření iterátoru (\code{struct pci_device_iterator *})
+    \begin{itemize}
+      \item Vím ID: \code{pci_id_match_iterator_create} a
+	\code{struct pci_id_match}
+      \item Vím slot: \code{pci_slot_match_iterator_create} a
+	\code{struct pci_slot_match}
+    \end{itemize}
+
+    \pause
+
+    \item Procházení iterátoru: \code{pci_device_next}
+    \begin{itemize}
+      \item Vrací \code{struct pci_device *} (a \code{NULL} nakonec)
+    \end{itemize}
+
+    \pause
+
+    \item Zničení iterátoru: \code{pci_iterator_destroy}
+  \end{itemize}
+
+  \onslide<3->
+
+  \begin{block}{Struktury \code{pci_id_match} a \code{pci_slot_match}}
+    \begin{tabular}{lp{6em}lp{6em}l}
+      \begin{lstlisting}
+uint32_t vendor_id;
+uint32_t device_id;
+uint32_t subvendor_id;
+uint32_t subdevice_id;
+      \end{lstlisting} &&
+      \begin{lstlisting}
+uint32_t domain;
+uint32_t bus;
+uint32_t dev;
+uint32_t func;
+      \end{lstlisting} &&
+      \begin{lstlisting}
+PCI_MATCH_ANY
+      \end{lstlisting}
+    \end{tabular}
+  \end{block}
+
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Výpis PCI zařízení pomocí \file{libpciaccess}}
+  \begin{enumerate}
+    \item Volejte \code{pci_system_init}
+    \item Vytvořte iterátor
+    \begin{itemize}
+      \item S parametrem \code{NULL}, tj.\ projdi všechny
+    \end{itemize}
+
+    \item Projděte zařízení
+
+    \item Pro každé vypište číslo
+    \begin{itemize}
+      \item Domény
+      \item Sběrnice
+      \item Zařízení
+      \item Funkce
+    \end{itemize}
+
+    \item Spusťte a zkontrolujte s \cmd{lspci -nn}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{\file{libpciaccess} a zařízení}
+
+  \begin{itemize}
+    \item Před další prací je nutné inicializovat \code{struct pci_device}
+    \begin{itemize}
+      \item Pomocí \code{pci_device_probe}
+      \item Potom lze pracovat s dalšími prvky \code{struct pci_device}
+      \begin{itemize}
+        \item \code{vendor_id}, \code{device_id}, \code{irq}, \dots
+      \end{itemize}
+    \end{itemize}
+
+    \pause
+    \medskip
+
+    \item Mapování regionu: \code{pci_device_map_range}
+    \begin{itemize}
+      \item Mapuje region do paměti
+      \item Podobné \code{mmap} regionu z dnešního cvičení
+    \end{itemize}
+
+    \pause
+    \medskip
+
+    \item Konfigurační prostor
+    \begin{itemize}
+      \item Zapisuje BIOS a OS
+      \item Informace o zařízení
+      \item Čtení: \code{pci_device_cfg_read*}
+      \item Zápis: \code{pci_device_cfg_write*}
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}
+  \frametitle{Úkol}
+
+  \heading{Práce s EDU pomocí \file{libpciaccess}}
+  \begin{enumerate}
+    \item Mapujte si 0.\ region
+    \begin{itemize}
+      \item \code{pci_device_map_range}
+      \item Mapujte jako \code{volatile uint32_t *}
+      \item Podobně jako \code{mmap} předtím
+    \end{itemize}
+
+    \item Vypište, co je na první a \emph{třetí} pozici
+    \item Zapište nějaké malé číslo na třetí pozici
+    \item Počkejte, než bude osmá pozice \code{0}
+    \item Vypište, co je na třetí pozici
+    \item Spusťte
+  \end{enumerate}
+
+\end{frame}
