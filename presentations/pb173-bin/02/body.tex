@@ -90,8 +90,8 @@
     \item \url{http://www.antlr3.org/download.html}
     \begin{itemize}
       \item Ukládejte do \file{pb173-bin/02/}
-      \item \textsc{AntlrWorks}: ,,Version 1.5''
-      \item \ant: ,,Complete \ant 3.5.2 Java binaries jar''
+      \item \textsc{AntlrWorks}: \href{http://www.antlr3.org/download/antlrworks-1.5.1.jar}{,,Version 1.5''}
+      \item \ant: \href{http://www.antlr3.org/download/antlr-3.5.2-complete.jar}{,,Complete \ant 3.5.2 Java binaries jar''}
     \end{itemize}
 
     \item Knihovna pro C (\file{libantlr3c} a \file{antlr3c-devel})
@@ -112,6 +112,7 @@
       \item Změňte \file{test_input} a zkuste znovu
     \end{itemize}
 
+  \item Prohlédněte si gramatiku v \textsc{AntlrWorks}
   \end{enumerate}
 
 \end{frame}
@@ -217,11 +218,14 @@ RCUR
 \begin{frame}[fragile]{Formát \ant}
 
   \heading{Formát celého souboru pro \ant}
-  \begin{lstlisting}[language=XML, columns=fullflexible]
+  \begin{lstlisting}[language=, columns=fullflexible,belowskip=0pt]
 grammar Jmeno; // shoda s nazvem souboru
 options {
   language = C; // vystupni jazyk parseru
 }
+  \end{lstlisting}
+  \pause
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt]
 @header {
 #define X	10
   // vlozi se na zacatek generovaneho parseru
@@ -230,7 +234,9 @@ options {
   static void moje_funkce() { ... }
   // vlozi se za hlavicku parseru
 }
-
+  \end{lstlisting}
+  \pause
+  \begin{lstlisting}[language=, columns=fullflexible]
 pravidlo1
   : pravidlo2
   | pravidlo3;
@@ -242,7 +248,7 @@ pravidlo1
 \begin{frame}[fragile]
   \frametitle{Části parseru v \ant}
 
-  \heading{\ant obsahuje obě části v jednom souboru}
+  \heading{\ant obsahuje obě části parseru v jednom souboru}
   \begin{itemize}
     \item 2 typy pravidel
     \begin{itemize}
@@ -262,7 +268,7 @@ pravidlo1
   \onslide<1->
 
   \begin{block}{Příklad}
-  \begin{lstlisting}[language=XML, columns=fullflexible]
+  \begin{lstlisting}[language=, columns=fullflexible]
 /* syntakticka analyza */
 helloWorld
   : AHOJ SVETE
@@ -357,7 +363,7 @@ SVETE : 'Svete' ;
   \end{itemize}
 
   \begin{block}{Příklad}
-  \begin{lstlisting}[language=XML, columns=fullflexible]
+  \begin{lstlisting}[language=, columns=fullflexible]
 p : ID {
     puts("found an ID");
   } ID {
@@ -406,11 +412,11 @@ p : ID {
 
     \item Akce můžou odkazovat předcházející tokeny
     \begin{itemize}
-      \item Implicitně jménem tokenu/pravidla: \code{p : NUMBER \{ \$NUMBER.line; \} ;}
+      \item Implicitně jménem tokenu/pravidla \tikz[remember picture] \node [coordinate] (IMPL) {};
 
       \pause
 
-      \item Nebo pojmenováním: \code{p : n1=NUMBER PLUS n2=NUMBER \{ \$n2.pos; \} ;}
+    \item \tikz[baseline=-.5ex,remember picture,inner sep=0pt,minimum height=0pt] \node (EXPL) {Nebo pojmenováním};
     \end{itemize}
 
   \end{itemize}
@@ -418,19 +424,26 @@ p : ID {
   \onslide<1->
 
   \begin{block}{Příklad}
-  \begin{lstlisting}[language=XML, columns=fullflexible,belowskip=0pt]
+  \begin{lstlisting}[language=, columns=fullflexible,belowskip=0pt]
 helloWorld : x=AHOJ y=SVETE {
       printf("line=\%d col=\%d\n", $x.line, $x.pos);
   \end{lstlisting}
   \onslide<2->
-  \begin{lstlisting}[language=XML, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
-      printf("x=\%s y=\%s whole=\%s\n", $x.text->chars, $y.text->chars, $helloWorld.text->chars);
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
+      printf("whole=\%s x=\%s y=\%s\n", (*@\tikz[remember picture,baseline=-1.8ex,xshift=.7em] \node [coordinate] (EXPLT1) {};@*)$x.text->chars, (*@\tikz[remember picture,baseline=-1.8ex,xshift=.7em] \node [coordinate] (EXPLT2) {};@*)$y.text->chars, (*@\tikz[remember picture,baseline=-1.8ex,xshift=.7em] \node [coordinate] (IMPLT) {};@*)$helloWorld.text->chars);
   \end{lstlisting} %stopzone
   \onslide<1->
-  \begin{lstlisting}[language=XML, columns=fullflexible,aboveskip=0pt]
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt]
   } ;
   \end{lstlisting}
   \end{block}
+
+  \tikzstyle{arr} = [->,semithick,>=stealth']
+  \begin{tikzpicture}[remember picture,overlay]
+    \path<3->[arr] (IMPL) edge[out=355,in=100] (IMPLT);
+    \path<4->[arr] (EXPL.south east) edge[out=270,in=130,shorten < = 1pt] (EXPLT1);
+    \path<4->[arr] (EXPL.south east) edge[out=340,in=110,shorten < = 1pt] (EXPLT2);
+  \end{tikzpicture}
 
 \end{frame}
 
@@ -453,27 +466,73 @@ helloWorld : x=AHOJ y=SVETE {
 \begin{frame}[fragile]
   \frametitle{Předávání hodnot}
 
-  \heading{Každé pravidlo muže akceptovat/vracet hodnotu}
+  \heading{Každé pravidlo může akceptovat/vracet hodnotu}
   \begin{itemize}
     \item Stejně jako funkce
     \item \code{levaStrana[type1 param1, ...] returns [typeR ret] : pravaStrana;}
+
+    \pause
+
     \begin{itemize}
       \item Pak lze v akcích odkazovat na \code{\$param1} typu \code{type1}
+      \pause
       \item Akce \emph{musí} nastavovat \code{\$ret} typu \code{typeR}
     \end{itemize}
   \end{itemize}
 
+  \onslide<1->
   \begin{block}{Příklad}
-  \begin{lstlisting}[language=XML, columns=fullflexible]
+  \begin{lstlisting}[language=, columns=fullflexible,belowskip=0pt]
 translationUnit
+  \end{lstlisting}
+  \begin{onlyenv}<1-2>
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
+        : expr[5] EOF
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{onlyenv}<3->
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
         : expr[5] EOF { printf("I'm done \%d\n", $expr.ret); }
+  \end{lstlisting}
+  \end{onlyenv}
+  \onslide<1->
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
 ;
 
 expr[int par] returns [int ret]
   : n1=NUMBER PLUS n2=NUMBER {
+  \end{lstlisting}
+  \begin{onlyenv}<1>
+  \begin{lstlisting}[showlines,language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
+
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{onlyenv}<2>
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
+          $par * atoi($n1.text->chars) + atoi($n2.text->chars);
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{onlyenv}<3->
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
     $ret = $par * atoi($n1.text->chars) + atoi($n2.text->chars);
+  \end{lstlisting}
+  \end{onlyenv}
+  \onslide<1->
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt]
   }
+  \end{lstlisting}
+  \begin{onlyenv}<1-2>
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
+  | SVETE AHOJ
+  \end{lstlisting}
+  \end{onlyenv}
+  \begin{onlyenv}<3->
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
   | SVETE AHOJ { $ret = 0; }
+  \end{lstlisting}
+  \end{onlyenv}
+  \onslide<1->
+  \begin{lstlisting}[language=, columns=fullflexible,aboveskip=0pt,belowskip=0pt]
   ;
   \end{lstlisting} %stopzone
   \end{block}
@@ -503,10 +562,11 @@ expr[int par] returns [int ret]
 
 \end{frame}
 
+\iffalse
 \begin{frame}[fragile]
   \frametitle{Inicializace/ukončení}
 
-  \heading{Každé pravidlo muže mít inicializace/ukončení}
+  \heading{Každé pravidlo může mít inicializace/ukončení}
   \begin{itemize}
     \item Na konci levé strany pravidla (před dvojtečkou)
     \item Před aplikováním pravidla: \code{@init\{ ... \}}
@@ -520,7 +580,7 @@ expr[int par] returns [int ret]
   \end{itemize}
 
   \begin{block}{Příklad}
-  \begin{lstlisting}[language=XML, columns=fullflexible]
+  \begin{lstlisting}[language=, columns=fullflexible]
 expr[int par] returns [int ret]
 @init{ $ret = 0; }
 @after{ $ret--; }
@@ -532,6 +592,7 @@ expr[int par] returns [int ret]
   \end{block}
 
 \end{frame}
+\fi
 
 %\begin{frame}[fragile]
 %  \frametitle{Tvorba AST}
@@ -561,7 +622,7 @@ expr[int par] returns [int ret]
 %    \end{itemize}
 %  \end{itemize}
 %
-%  \begin{lstlisting}[language=XML, columns=fullflexible]
+%  \begin{lstlisting}[language=, columns=fullflexible]
 %statement
 %  : expression^ ';'! // implicitni strom
 %  | e1=expression '+' e2=expression ';' -> ^(BINARY_OP '+' e1 e2)
