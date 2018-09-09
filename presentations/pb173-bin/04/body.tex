@@ -12,7 +12,7 @@
 
     \item Podpora pro ladicí informace
     \begin{itemize}
-      \item Přespříště
+      \item \iffimuni Přespříště \else V další sekci \fi
     \end{itemize}
 
     \pause
@@ -50,6 +50,7 @@
 
     \item \file{libebl} je nadstavba \file{libelf}
     \begin{itemize}
+      \item Abstraktnější rozhraní
       \item Nemá moc uživatelů
     \end{itemize}
   \end{itemize}
@@ -124,6 +125,7 @@ if (!elf_function(...))
 
     \item Pomocí standardního \code{open} otevřete soubor z příkazové řádky
     \begin{itemize}
+      \item \code{argv[1]}
       \item Pro čtení
     \end{itemize}
 
@@ -136,6 +138,9 @@ if (!elf_function(...))
 
   \begin{itemize}
     \item \file{libelf} pracuje s \emph{file deskriptory}
+
+    \pause
+
     \item Začátek práce
     \begin{itemize}
       \item \code{Elf *elf_begin(int fd, Elf_Cmd cmd, Elf *ref)}
@@ -179,14 +184,21 @@ close(fd);
   \heading{Doplňte načtení souboru zadaného jako parametr}
   \begin{enumerate}
     \item Zavolejte \code{elf_begin}
+
     \item Zavolejte \code{elf_kind}
-      \begin{itemize}
-	\item Ověřte, že soubor je typu \code{ELF_K_ELF}
-	\item Pokud ne, program ukončete s chybou
-      \end{itemize}
+    \begin{itemize}
+      \item Ověřte, že soubor je typu \code{ELF_K_ELF}
+      \item Pokud ne, program ukončete s chybou
+    \end{itemize}
+
     \item Zavolejte \code{elf_end}
     \item Ověřujte návratové hodnoty
+
     \item Přeložte a spusťte
+    \begin{itemize}
+      \item S nějakým ELFem
+      \item S nějakou statickou knihovnou
+    \end{itemize}
   \end{enumerate}
 
 \end{frame}
@@ -328,7 +340,8 @@ int __attribute__((section(".data.my_section"))) x = 3;
 
     \pause
 
-    \item Data: struktura \code{Elf_Data} (obsah probereme příště)
+    \item Data: struktura \code{Elf_Data} (obsah probereme \iffimuni příště\else
+      dále\fi)
     \begin{itemize}
       \item Iterace přes obsah:
 	\code{Elf_Data *elf_getdata(Elf_Scn *scn, Elf_Data *data)}
@@ -383,13 +396,13 @@ while ((scn = elf_nextscn(elf, scn))) {
     \item Iterujte přes sekce (\code{elf_nextscn})
     \item Vypište hlavičku každé sekce (\code{gelf_getshdr})
     \begin{itemize}
-      \item Index (\code{elf_ndxscn})
-      \item Offset do sekce názvů
-      \item Velikost
-      \item Flagy
+      \item Index (\code{elf_ndxscn()})
+      \item Offset do sekce názvů (\code{sh_name})
+      \item Velikost v hexa (\code{sh_}\dots)
+      \item Flagy v hexa (\code{sh_}\dots)
     \end{itemize}
 
-    \item Vypište data každé sekce (\code{elf_getdata})
+    \item Vypište data každé sekce (\code{elf_getdata()})
     \begin{itemize}
       \item Uvažte jen první \code{elf_getdata} (tj.\ neiterujte přes data)
       \item Hexdump prvních 16 bytů obsahu
@@ -413,6 +426,9 @@ while ((scn = elf_nextscn(elf, scn))) {
       \item \code{gelf_getshdr} jako předtím a naplnění
       \item Po naplnění: \code{int gelf_update_shdr(Elf_Scn *scn, GElf_Shdr *src)}
       \item Vytvoření dat: \code{Elf_Data *elf_newdata(Elf_Scn *scn)}
+      \begin{itemize}
+	\item I vícekrát -- sloučí se
+      \end{itemize}
     \end{itemize}
 
     \pause
