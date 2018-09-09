@@ -56,27 +56,23 @@
   \tikzstyle{diee} = [<-, thick, >=stealth', shorten < =1pt]
   \begin{tikzpicture}
     \node [die] (CU) {
-      \textbf{DIE} \\
-      type = compile\_unit \\
+      \textbf{DIE} compile\_unit \\
       name = test.c \\
       comp\_dir = /tmp/test \\
       producer = GCC
     };
     \node [die, below=of CU] (FUN1) {
-      \textbf{DIE} \\
-      type = subprogram \\
+      \textbf{DIE} subprogram \\
       name = main \\
       type = int
     } edge[diee] (CU);
     \node [die, right=of CU] (FUN2) {
-      \textbf{DIE} \\
-      type = subprogram \\
+      \textbf{DIE} subprogram \\
       name = fun \\
       type = int
     } edge[diee] (CU);
-    \node [die, right=1.23cm of FUN1] (TYPE) {
-      \textbf{DIE} \\
-      type = base\_type \\
+    \node [die, right=14mm of FUN1] (TYPE) {
+      \textbf{DIE} base\_type \\
       name = int \\
       size = 4
     } edge[diee] (FUN1)
@@ -187,10 +183,10 @@
   \heading{Inicializace \file{libdwfl}}
   \begin{enumerate}
     \item Nainstalujte si \file{libdw} (a \file{libdwfl})
-    \item Vytvořte si \code{main}
+    \item Pracujte v \file{pb173-bin/06/dw.c}
     \item Definujte si háčky
     \begin{itemize}
-      \item Statická struktura \code{const Dwfl_Callbacks}
+      \item Ve struktuře \code{cb}
       \item \code{.section_address = dwfl_offline_section_address}
       \item \code{.find_debuginfo = dwfl_standard_find_debuginfo}
     \end{itemize}
@@ -223,7 +219,7 @@
   \pause
   \medskip
 
-  \heading{Průchod stromů (jednotlivých Compilation Unit)}
+  \heading{Průchod lesa (jednotlivých Compilation Unit)}
   \begin{itemize}
     \item \code{Dwarf_Die *dwfl_nextcu(...)}
     \begin{itemize}
@@ -320,11 +316,10 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
   \tikzstyle{die} = [draw, thick, rectangle, align=left, font=\footnotesize]
     \begin{tikzpicture}
       \node [die] (CU) {
-	\textbf{DIE} \\
-	\tikz[remember picture,baseline=-.5ex,xshift=-2pt] \node [coordinate] (TYPE2) {};type = compile\_unit \\
+	\textbf{DIE} \tikz[remember picture,baseline=2pt,xshift=-1pt] \node [coordinate] (TYPE2) {};compile\_unit \\
       {\uncover<3->{\tikz[remember picture,baseline=1pt,xshift=0pt] \node [coordinate] (AT2) {};comp\_dir (str) = /tmp/test}} \\
       {\uncover<3->{name (str) = test.c}} \\
-      {\uncover<3->{producer \tikz[remember picture,baseline=2pt] \node [coordinate] (FORM2) {};(str) = \tikz[remember picture,baseline=2pt] \node [coordinate] (HODN2) {};GCC}}
+      {\uncover<3->{producer \tikz[remember picture,baseline=2pt] \node [coordinate,xshift=2mm] (FORM2) {};(str) = \tikz[remember picture,baseline=2pt] \node [coordinate] (HODN2) {};GCC}}
     };
     \end{tikzpicture}
   \end{textblock*}
@@ -333,7 +328,7 @@ while ((die = dwfl_nextcu(dwfl, die, &bias))) { ... }
 
   \tikzstyle{mem} = [->,semithick,>=stealth']
   \begin{tikzpicture}[remember picture,overlay]
-    \path[mem] (TYPE1) edge[out=0,in=170] (TYPE2);
+    \path[mem] (TYPE1) edge[out=0,in=190] (TYPE2);
     \path<3->[mem] (AT1) edge[out=5,in=230] (AT2);
     \path<4->[mem] (FORM1) edge[out=5,in=250] (FORM2);
     \path<5->[mem] (HODN1) edge[out=5,in=250] (HODN2);
@@ -394,10 +389,14 @@ DW_TAG_subprogram
       \item Vrací \code{DW_AT_*} (\code{DW_AT_name} apod.)
     \end{itemize}
 
+    \pause
+
     \item Typ obsahu: \code{dwarf_whatform(Dwarf_Attribute *attr)}
     \begin{itemize}
       \item Vrací \code{DW_FORM_*} (\code{DW_FORM_string} apod.)
     \end{itemize}
+
+    \pause
 
     \item Obsah: \code{dwarf_form*(Dwarf_Attribute *attr)}
     \begin{itemize}
@@ -410,13 +409,19 @@ DW_TAG_subprogram
 \begin{frame}[fragile]
   \frametitle{Atributy DIE -- příklad}
 
-  \begin{lstlisting}
+  \begin{lstlisting}[belowskip=0pt]
 static int dump_die_attr(Dwarf_Attribute *attr, void *ptr)
 {
+  \end{lstlisting}
+  \onslide<2->
+  \begin{lstlisting}[aboveskip=0pt,belowskip=0pt]
   printf("AT=%x FORM=%x\n", dwarf_whatattr(attr), dwarf_whatform(attr));
   if (dwarf_whatform(attr) == DW_FORM_strp)
     printf("  name=%s\n", dwarf_formstring(attr));
   return DWARF_CB_OK;
+  \end{lstlisting}
+  \onslide<1->
+  \begin{lstlisting}[aboveskip=0pt]
 }
 
 static void dump_dwfl(Dwfl *dwfl)
@@ -442,8 +447,8 @@ static void dump_dwfl(Dwfl *dwfl)
       \item O jaký atribut jde (\code{dwarf_whatattr(attr)})
       \item Typ obsahu atributu (\code{dwarf_whatform(attr)})
       \item Adresu, pokud se jedná o typ \code{DW_AT_low_pc}
-      \item Řetězec a typ atributu \code{DW_AT_*}, pokud se jedná o typ hodnoty
-      \code{DW_FORM_string} nebo \code{DW_FORM_strp}
+      \item Řetězec, pokud se jedná o typ obsahu \code{DW_FORM_string} nebo
+	\code{DW_FORM_strp}
     \end{itemize}
     \item V těle cyklu \code{dwfl_nextcu} zavolejte \code{dwarf_getattrs}
     \item Přeložte a spusťte
@@ -488,7 +493,9 @@ static void dump_dwfl(Dwfl *dwfl)
       \item Potom vypisujte v textové podobě
     \end{itemize}
 
+    \iffimuni
     \item Rozšiřte na celý podstrom, nejen první úroveň
+    \fi
     \item Přeložte a spusťte
   \end{enumerate}
 
