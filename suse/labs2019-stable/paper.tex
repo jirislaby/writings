@@ -1,0 +1,93 @@
+% vim: tw=78 ai spell spelllang=en_gb sw=2
+% syntax spell toplevel
+
+\documentclass[10pt]{llncs}
+\usepackage{color}
+\usepackage{colortbl}
+\usepackage{url}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{tikz}
+\usepackage{xspace}
+\pagestyle{plain}
+
+\usetikzlibrary{arrows, positioning, decorations.pathreplacing}
+
+\lstset{language=C,tabsize=2,showstringspaces=false,
+	breaklines=true,breakatwhitespace=true,escapeinside={(*@}{@*)},
+	captionpos=b,basicstyle=\sffamily\small}
+%numbers=left,frame=l
+
+\newcommand{\code}[2][]{\lstinline[columns=fullflexible, #1]$#2$}
+\newcommand{\file}[2][]{\code[language={}, #1]{#2}}
+\newcommand{\commit}[1][]{\texttt{#1}}
+
+\newcommand{\xes}{\texttt{x86}\xspace}
+\newcommand{\xesl}{\texttt{x86\_32}\xspace}
+\newcommand{\xesh}{\texttt{x86\_64}\xspace}
+
+\setcounter{tocdepth}{1}
+
+\begin{document}
+
+\title{Stable Patches and SUSE Trees}
+\author{Jiri~Slaby}
+\institute{Suse Labs \\
+\email{jslaby@suse.cz}}
+
+\maketitle
+
+\begin{abstract}
+  Here, we provide a short summary of the past and current habits of merging
+  stable patches into the SUSE kernel trees. Starting with the sorted series
+  section, the policy undergoes a change, so we will sum up what is happening
+  in SLE15 now and what is our plan for future releases.
+\end{abstract}
+
+\section{Introduction} \label{sec:intro}
+SUSE is maintaining kernels for their products in a git tree. Each product has
+a dedicated branch called after it. Every such branch is based on some picked
+upstream kernel version which is immutable over time. On the top of it, the
+branches contain from tens (master and stable branches) to tens of thousands
+(SLE, Leap) of patches we maintain in them. To be able to apply the patches,
+we also store their list in a file called \file{series.conf}.
+
+In master and stable branches, these patches are placed into
+\file{series.conf} in an order depending on a person who did the backport. The
+patches are divided into so called \emph{sections}. There are sections for
+filesystems, x86, TTY, sound and alike. For tens of patches it is quite
+bearable to maintain the patches in this form. We also used to use this schema
+for SLE.  However, lately, we switched to a \emph{sorted section}.
+
+\paragraph{Sorted section} is a section in \file{series.conf} where all the
+patches are sorted according to their appearance in the upstream kernel. This
+makes lives of developers easier by the order of magnitude. The main reason is
+that there are no interdependencies between patches placed in different
+sections. These dependencies created conflicts when applying patches and also
+made the patches to differ from the upstream ones.
+
+One exception were stable patches. In upstream, for each kernel release, some
+later minor releases with non-intrusive fixes are released. So for example, we
+have 4.12.1, 4.12.2, \dots\ for a released kernel 4.12. These stable releases
+are composed of many patches and we add them in a single commit per file
+manner (like any other patch). For all branches master, stable, SLE, Leap we
+put these stable patches to the very front of the series file. Obviously, this
+creates exactly the same interdependencies from the upstream patches as
+non-sorted sections above.
+
+With 4.12, only 14 stable version were released. After that we add stable
+patches from the upstream stable list and other our tools like git-fixes. All
+these are put to the sorted section, despite they have the same origin and
+reasons as stable patches.
+
+\section{Unwinding} \label{sec:unwinding}
+\section{Unwinding in openSUSE \& SLE} \label{sec:suse_unw}
+\section{Conclusion} \label{sec:concl}
+
+\bibliographystyle{plain}
+\bibliography{paper}
+
+\end{document}
