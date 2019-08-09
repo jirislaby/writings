@@ -44,7 +44,8 @@
   Here, we provide a short summary of the past and current habits of merging
   stable patches into the SUSE kernel trees. Starting with the sorted series
   section, the policy undergoes a change, so we will sum up what is happening
-  in SLE15 and SLE15-SP1 now and what is our plan for future releases.
+  in SLE15 and SLE15-SP1 now and what is our plan for future releases,
+  starting with SLE15-SP2.
 \end{abstract}
 
 \section{Introduction} \label{sec:intro}
@@ -95,37 +96,42 @@ Sorted section is a section in \file{series.conf} where all the patches are
 sorted according to their appearance in the upstream kernel (see Fig.\
 \ref{fig:series_sle15}). This makes lives of developers easier by the order
 of magnitude. One reason are tools we have to maintain series
-file now~\cite{sort_series}. Another main reason is that there are no
-interdependencies between patches which would be placed in different sections
-with the old schema. These dependencies sometimes created large conflicts when
-applying patches.  Therefore, it also made the patches to differ from the
-upstream ones.  This made the situation even worse with more and more patches
-coming (and differing from upstream).
+file automatically now~\cite{sort_series}. Another main reason is that there
+are no interdependencies between patches which would be placed in different
+sections in the old schema. These dependencies were often a source of large
+conflicts when including patches touching the same part of a file. Therefore,
+solving these conflicts also made the patches to necessarily differ from their
+upstream versions. This made the situation even worse with more and more
+patches coming (and differing from upstream) as the probability to touch the
+same place in sources grows.
 
-One exception from this sorted-section rule are stable patches. In upstream,
-for each kernel release, some later minor releases with non-intrusive fixes
-are released. So for example, for a released kernel 4.12, we have 4.12.1,
-4.12.2, etc. These stable releases are composed of many patches and we add
-them in a single-commit-per-file manner (like any other patch). For all
-branches master, stable, SLE, and Leap, we put these stable patches to the
-very front of the series file. And their order is defined by the stable
-upstream.  Obviously, this creates exactly the same interdependencies as
-non-sorted sections schema described earlier. Note that other (non-sorted)
-sections were still left in place even in the new schema. They are used for
-patches which were not accepted upstream yet. One example is
-\file{setuid-dumpable-wrongdir} patch which is present in both stable and
-SLE15 as can be seen in both Figures\ \ref{fig:series_stable} and
-\ref{fig:series_sle15}.
+One exception from this sorted-section rule are still stable patches. In
+upstream, for each kernel release, some later minor releases with
+non-intrusive fixes are released. So for example, for a released kernel 4.12,
+we have 4.12.1, 4.12.2, etc. These stable releases are composed of many
+patches and we add them in a single-commit-per-file manner (like any other
+patch). For all branches master, stable, SLE, and Leap, we put these stable
+patches to the very front of the series file. And their order is defined by
+the stable upstream.  Obviously, this creates exactly the same
+interdependencies as non-sorted sections schema described and used earlier.
 
-Note that stable releases for a particular kernel are not released infinitely.
-SLE15 and SLE15-SP1 is based on 4.12. But only fourteen stable versions were
-released for 4.12. These were put to the SLE15 branch to the front of its
-series file. After that, we only add some patches collected from the upstream
-stable list along with those reported by our tools like
+It is important to note that stable releases for a particular kernel are not
+released infinitely.  SLE15 and SLE15-SP1 are based on 4.12. But only fourteen
+stable versions were released for 4.12. These were put to the SLE15 branch to
+the front of its series file. After that, we only add some patches collected
+from the upstream stable list along with those reported by our tools like
 git-fixes~\cite{git_fixes}.  All these are put to the sorted section, despite
 they have the same origin and reasoning as stable patches from stable releases
 before. In other words, we continue collecting stable patches, but we do put
 them to the sorted section, not to the front of series file.
+
+After studying Figures\ \ref{fig:series_stable} and \ref{fig:series_sle15}, a
+careful reader could notice that other (non-sorted) sections are still left in
+place even in the new schema. They are used for patches which were not
+accepted upstream yet. Sometimes, we also accept such patches, especially
+when they fix security breaches like Meltdown. One example of out-of-tree
+patch is \file{setuid-dumpable-wrongdir} which is present in both stable and
+SLE15 as can be seen in both Figures.
 
 \begin{figure}[bt]
   \begin{center}
@@ -192,15 +198,22 @@ Only these are combined and source code built. Remember that both of them are
 applied first for any flavour (order in series file). If we put patches coming
 from stable into the sorted section, this will no longer be possible.
 
-There are two solutions to this: (a) do not build kernel-vanilla at all, and
-(b) build kernel-vanilla differently from other flavours. As per (a), it is
-unclear whether kernel-vanilla is of any use in the first place. This shall be
-discussed further.
-
-As per (b), kernel-vanilla would be built using upstream stable kernel with the
-stable patches we applied to the sorted section. On the top of it, we would
-apply \file{patches.rpmify}.  Here, we risk build breakage as
-\file{patches.rpmify} might not apply cleanly any more.
+There are at least three solutions to this:
+\begin{enumerate}
+  \item Do not build kernel-vanilla at all. It is unclear whether
+    kernel-vanilla is of any use in the first place.
+  \item Build kernel-vanilla using only patches from \file{patches.rpmify}.
+    That is, apply only build fixes and no stable patches at all. There is a
+    future risk, that the kernel will not build as stable patches usually
+    contain patches supporting newer toolchains like gcc and binutils.
+  \item Build kernel-vanilla differently from other flavours. In this case,
+    kernel-vanilla would be built using upstream stable kernel with the stable
+    patches we applied to the sorted section. On the top of it, we would apply
+    \file{patches.rpmify}.  Here, we risk build breakage as
+    \file{patches.rpmify} might not apply cleanly any more (remember
+    interdependencies).
+\end{enumerate}
+This shall be discussed further in wider audience.
 
 \subsection{Directory for Stable Patches}
 It is only a technicality, but since stable patches are now in the sorted
@@ -211,16 +224,19 @@ patches in \file{patches.suse}. Or not?
 \subsection{Minor Numbering}
 In stable releases, there are special patches (like
 \file{4.12.14-054-Linux-4.12.14.patch} from Fig.\ \ref{fig:series_sle15})
-which only increase a minor release number (here, from 4.12.13 to 4.12.14). We
-are not increasing minor numbers in SLE15 and SLE15-SP1, despite we apply
-stable patches. So we do not necessarily need to increase minor numbers and
-can skip these patches. We can do so only for consistency purposes. This is
-also open to discussion.
+which only increase a minor release number (here, from 4.12.13 to 4.12.14).
+Ddespite we continue applying stable patches in SLE15 and SLE15-SP1, we
+are not increasing minor numbers in SLE15 and SLE15-SP1. There were no
+complains from our customers to our knowledge.  So it seems, we do not
+necessarily need to increase minor numbers and can skip these patches. On the
+other hand, we can apply them for consistency purposes. The same as the other
+things, this is also open to discussion.
 
 \section{Conclusion} \label{sec:concl}
-We proposed adding stable patches to the sorted sections and discussed what it
-brings and what needs to be considered when doing so. There are still open
-questions to be discussed during the presentation.
+We proposed adding stable patches to the sorted section in future releases,
+starting SLE15-SP2. We discussed what it brings and what needs to be
+considered when doing so. There are still open questions to be discussed
+during the presentation.
 
 \bibliographystyle{plain}
 \bibliography{paper}
