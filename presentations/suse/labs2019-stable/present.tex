@@ -1,0 +1,212 @@
+% vim: ai sw=2 spell spelllang=en
+
+\input{class.tex}
+
+\input{../../../templates/header_present.tex}
+
+\usecolortheme[rgb={.298,.745,.32}]{structure}
+
+\tikzset{invisible/.style={opacity=0},
+	visible on/.style={alt={#1{}{invisible}}},
+	alt/.code args={<#1>#2#3}{%
+	\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}} % \pgfkeysalso doesn't change the path
+	},
+}
+
+\newcommand{\objt}{\cmd{objtool}\xspace}
+
+\title{Stable Patches and SUSE Trees}
+\date[18/09/2019, Špindlerův Mlýn]{September 18\textsuperscript{th} 2019 \\ Špindlerův Mlýn}
+
+\author[Jiri~Slaby]{\textbf{Jiri~Slaby}}
+
+\institute{SUSE Labs}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{textblock*}{3.5cm}(\paperwidth-3.5cm-4mm,\paperheight-2cm-4mm)
+    \includegraphics[width=3.5cm]{suse_logo_rgb}
+  \end{textblock*}
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}{Introduction}
+
+  \begin{itemize}[<+->]
+    \item We are using upstream stable trees
+    \item We take them as separate patches
+    \begin{itemize}
+      \item During 12-SP2, starting 4.4.89
+    \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{series.conf in stable}
+
+  \pause
+
+  \begin{lstlisting}[language=,columns=fullflexible]
+# latest standard kernel patches(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (STABLESTART) {};}@*)
+patches.kernel.org/5.2.1-001-crypto-lrw-use-correct-alignmask.patch
+patches.kernel.org/5.2.1-002-crypto-talitos-rename-alternative-.patch
+...
+patches.kernel.org/5.2.6-020-Linux-5.2.6.patch(*@\tikz[remember picture,baseline=.5ex]{\node [coordinate] (STABLEEND) {};}@*)
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}[language=,columns=fullflexible]
+# Bug workarounds for binutils(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SECTIONSTART) {};}@*)
+
+# Scheduler / Core(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SECTION2) {};}@*)
+patches.suse/setuid-dumpable-wrongdir
+...
+# VM/FS patches(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SECTION3) {};}@*)
+patches.suse/vfs-add-super_operations-get_inode_dev
+patches.suse/readahead-request-tunables.patch
+...(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SECTIONEND) {};}@*)
+  \end{lstlisting}
+
+  \onslide<2->
+
+  \tikzstyle{rightbrace} = [-,semithick,decorate,
+          decoration={brace,amplitude=8pt,raise=2mm}]
+  \tikzstyle{sectionarr} = [->,shorten >=2pt,>=stealth',thick,red]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node [right=8.5em of STABLEEND] (STABLEEND2) {};
+    \node (STABLESTART2) at (STABLESTART -| STABLEEND2) {};
+    \draw [rightbrace] (STABLESTART2.north) -- (STABLEEND2) node[midway] (STABLEMID) {};
+
+    \node [right=1.2em of STABLEMID] {Stable patches};
+
+    \node [right=18.5em of SECTIONEND] (SECTIONEND2) {};
+    \node (SECTIONSTART2) at (SECTIONSTART -| SECTIONEND2) {};
+    \draw<3-> [rightbrace] (SECTIONSTART2.north) -- (SECTIONEND2) node[midway] (SECTIONMID) {};
+
+    \node<3-> [right=1.2em of SECTIONMID] (OTHER) {Other patches};
+    \node<4-> [below=0mm of OTHER] (SECTIONS) {in sections}
+      edge [sectionarr,in=0,out=10] (SECTIONSTART)
+      edge [sectionarr,in=350,out=160] (SECTION2)
+      edge [sectionarr,in=340,out=210] (SECTION3);
+  \end{tikzpicture}
+
+  \onslide<5->
+
+  \begin{center}
+    \heading{This will stay unchanged in master and stable!}
+  \end{center}
+
+\end{frame}
+
+\begin{frame}[fragile]{series.conf in SLE15*}
+
+  \pause
+
+  \begin{lstlisting}[language=,columns=fullflexible]
+(*@\tikz[remember picture,baseline=-1.5ex]{\node [coordinate] (STABLETL) {};}@*)# latest standard kernel patches(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (STABLESTART) {};}@*)
+patches.kernel.org/4.12.1-001-driver-core-platform-fix-race.patch
+patches.kernel.org/4.12.1-002-RDMA-uverbs-Check-port-number.patch
+...
+patches.kernel.org/4.12.14-054-Linux-4.12.14.patch(*@\tikz[remember picture,baseline=.5ex]{\node [coordinate] (STABLEPUREEND) {};}@*)
+
+# Non-upstream fixes for stable patches
+patches.suse/mlxsw-spectrum-Forbid-linking-to-devices-fix.patch(*@\tikz[remember picture,baseline=.5ex]{\node [coordinate] (STABLEEND) {};}@*)
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}[language=,columns=fullflexible]
+# sorted patches(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SORTEDSTART) {};}@*)
+patches.drivers/0001-uuid-afs-move-struct-uuid_v1-back-into-afs.patch(*@\tikz[remember picture,baseline=.5ex]{\node [coordinate] (SORTED2) {};}@*)
+patches.drivers/0002-xfs-use-uuid_copy-helper-to-abstract-uuid_t.patch(*@\tikz[remember picture,baseline=.5ex]{\node [coordinate] (SORTED3) {};}@*)
+... over 20000 patches are here, sorted by the upstream appearance(*@\tikz[remember picture,baseline=.5ex]{\node [coordinate] (SORTED4) {};}@*)
+patches.kabi/kabi-fix-s390-vtime-steal-time-exponential.patch
+# end of sorted patches(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SORTEDEND) {};}@*)
+
+  \end{lstlisting}
+
+  \pause
+
+  \begin{lstlisting}[language=,columns=fullflexible]
+# Scheduler / Core(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SECTIONSTART) {};}@*)
+patches.suse/setuid-dumpable-wrongdir
+...(*@\tikz[remember picture,baseline=-.5ex]{\node [coordinate] (SECTIONEND) {};}@*)
+  \end{lstlisting}
+
+  \onslide<2->
+
+  \tikzstyle{rightbrace} = [-,semithick,decorate,
+          decoration={brace,amplitude=8pt,raise=2mm}]
+  \tikzstyle{sectionarr} = [->,shorten >=2pt,>=stealth',thick,red]
+  \tikzstyle{change} = [thick,red]
+  \begin{tikzpicture}[remember picture,overlay]
+    \node [right=2.5em of STABLEEND] (STABLEEND2) {};
+    \node (STABLESTART2) at (STABLESTART -| STABLEEND2) {};
+    \draw [rightbrace] (STABLESTART2.north) -- (STABLEEND2) node[midway] (STABLEMID) {};
+
+    \node [right=1.2em of STABLEMID,align=center] {Stable patches \\ \& \\
+      stable fixes};
+
+    \node [right=18em of SORTEDEND] (SORTEDEND2) {};
+    \node (SORTEDSTART2) at (SORTEDSTART -| SORTEDEND2) {};
+    \draw<3-> [rightbrace] (SORTEDSTART2.north) -- (SORTEDEND2) node[midway] (SORTEDMID) {};
+
+    \node<3-> [right=1.2em of SORTEDMID] {Sorted patches};
+
+    \node [right=13em of SECTIONEND] (SECTIONEND2) {};
+    \node (SECTIONSTART2) at (SECTIONSTART -| SECTIONEND2) {};
+    \draw<4-> [rightbrace] (SECTIONSTART2.north) -- (SECTIONEND2) node[midway] (SECTIONMID) {};
+
+    \node<4-> [right=1.2em of SECTIONMID] (OTHER) {Other patches (in sections)};
+
+    \node<5-> [below right=-2ex and 1ex of SECTIONSTART,thick,draw,fill=gray!30,inner sep=12pt] {\emph{Change} in SLE15-SP2!};
+
+    \node [coordinate,above left=1mm and 1mm of STABLETL] (STABLETL2) {};
+    \node [coordinate,below right=1mm and 7.5em of STABLEPUREEND] (STABLEBR) {};
+    \draw<5-> [change] (STABLETL2) -- (STABLETL2 |- STABLEBR);
+    \draw<5-> [change] (STABLETL2) -- (STABLETL2 -| STABLEBR);
+    \draw<5-> [change] (STABLEBR) -- (STABLETL2 |- STABLEBR);
+    \draw<5-> [change] (STABLEBR) -- (STABLETL2 -| STABLEBR) node[midway] (STABLERIG) {};
+    \draw<5-> [sectionarr,bend left=70] (STABLERIG.south east) to (SORTED2);
+    \draw<5-> [sectionarr,bend left=80,looseness=1.1] (STABLERIG) to (SORTED3);
+    \draw<5-> [sectionarr,in=350,out=0,in looseness=2.5] (STABLERIG.north east) to (SORTED4);
+  \end{tikzpicture}
+
+\end{frame}
+
+\begin{frame}{Motivation}
+
+  \heading{Uses of Call Traces}
+
+  \begin{itemize}
+    \item Debugging purposes
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Conclusion}
+
+  \begin{center} \Large
+    \heading{We are using fast and precise ORC since SLE15\dots}
+
+    \pause
+    \smallskip
+
+    \heading{But beware of bugs!}
+  \end{center}
+
+  \pause
+  \bigskip
+  \medskip
+
+  \begin{center} \huge
+    \heading{Questions?}
+  \end{center}
+
+\end{frame}
+
+\end{document}
