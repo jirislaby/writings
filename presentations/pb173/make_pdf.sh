@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 export NHO
 for dir in $@; do
 	cd $dir
