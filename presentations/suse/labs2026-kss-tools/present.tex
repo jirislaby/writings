@@ -1,0 +1,174 @@
+% vim: ai sw=2 spell spelllang=en
+
+\input{class.tex}
+
+\input{../../../templates/header_present.tex}
+\usepackage{tikzsymbols}
+
+\usecolortheme[rgb={.298,.745,.32}]{structure}
+
+\tikzset{invisible/.style={opacity=0},
+	visible on/.style={alt={#1{}{invisible}}},
+	alt/.code args={<#1>#2#3}{%
+	\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}} % \pgfkeysalso doesn't change the path
+	},
+}
+
+\title{Inside the KSS}
+\subtitle{A Sentinel's Toolkit and Behind}
+\date[XX/05/2026, České Budějovice]{May XX\textsuperscript{th} 2026 \\ České Budějovice}
+
+\author[Jiri~Slaby]{\textbf{Jiri~Slaby}}
+
+\institute{SUSE Labs}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+  \begin{textblock*}{3.5cm}(\paperwidth-3.5cm-4mm,\paperheight-2cm-4mm)
+    \includegraphics[width=3.5cm]{suse_logo_rgb}
+  \end{textblock*}
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}{Introduction}
+
+  \begin{itemize}[<+->]
+    \item Tools to handle \emph{kernel} CVEs
+    \item Is CVE relevant for SUSE?
+      \begin{itemize}[<+->]
+	\item \cmd{CONFIG_} enabled?
+	\item What \cmd{supported.conf} says?
+	\item In \emph{any} branch?
+      \end{itemize}
+    \item If so, who maintains the vulnerable code?
+      \begin{itemize}
+	\item Standalone tool: \cmd{suse-get-maintainers}
+      \end{itemize}
+    \item Power of \cmd{check-kernel-fix}
+    \item Most tools documented in Confluence: \href{https://confluence.suse.com/spaces/labs/pages/1833140703/Kernel+tools}{Kernel tools}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Prerequisites}
+
+  \heading{Most tools assume ENV settings}
+  \begin{itemize}
+    \item \cmd{KSOURCE_GIT}: \url{git://kerncvs.suse.de/kernel-source.git}
+    \item \cmd{LINUX_GIT}: \small\url{https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git}
+    \item \cmd{VULNS_GIT}: \url{https://git.kernel.org/pub/scm/linux/security/vulns.git}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{\cmd{check-kernel-fix}}
+
+  \heading{Power tool to handle CVEs}
+  \begin{itemize}[<+->]
+    \item \cmd{\$KSOURCE_GIT/scripts/check-kernel-fix \[CVE | SHA\]} \\ \pause
+      \begin{lstlisting}[language={}]
+	Security fix for CVE-2023-53687 bsc#1251772 with CVSS 3.3
+	# ... a lot of details ...
+	Experts candidates:  jslaby@suse.com (1) subsystem/role="TTY LAYER AND SERIAL DRIVERS"
+	NO ACTION NEEDED: All relevant branches contain the fix!
+      \end{lstlisting} \pause
+      Or:
+      \begin{lstlisting}[language={}]
+	ACTION NEEDED!
+      \end{lstlisting}
+    \item Reference implementation in Bash
+    \item Python rewrite in progress
+    \item More $\rightarrow$ João Póvoas' talk
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Recap: \cmd{suse-get-maintainers}}
+
+  \begin{itemize}[<+->]
+    \item M. Franc last year
+      \begin{itemize}
+	\item Not recorded \Sadey[][yellow]
+      \end{itemize}
+    \item Find a SUSE maintainer of a kernel file
+    \item Examples
+      \begin{itemize}[<+->]
+	\item \cmd{suse-get-maintainers --path drivers/tty/serial/samsung_tty.c}
+	\item \cmd{suse-get-maintainers --sha 832e231cff47}
+	\item \cmd{suse-get-maintainers --cve CVE-2023-53687}
+	\item \cmd{suse-get-maintainers --diff <(git -C \$KSOURCE_GIT show origin/SLE15-SP7:}\textbackslash \\
+	  \cmd{patches.suse/tty-serial-samsung_tty-Fix-a-memory-leak-in-s3c.patch)}
+	\item \cmd{suse-get-maintainers --grep tty --grep-names-only}
+	\item All about TTY $\rightarrow$ \url{jslaby@suse.com}
+	\item Try \cmd{--json} (and use \cmd{jq} to color/parse it)
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\cmd{suse-get-maintainers}: Data Sources}
+
+  \begin{itemize}[<+->]
+    \item For SHAs/CVEs/diffs: S-O-B, Acked-by, From, etc. lines
+    \begin{itemize}
+      \item Unless \cmd{--only-maintainers}
+    \end{itemize}
+    \item SUSE \file{MAINTAINERS} file (\url{https://kerncvs.suse.de/MAINTAINERS})
+    \begin{itemize}
+      \item Unless \cmd{--skip-suse}
+      \item Edit at: \url{https://gitlab.suse.de/kernel/kbuild}
+    \end{itemize}
+    \item Upstream \file{MAINTAINERS} file (\file{\$LINUX_GIT/MAINTAINERS})
+    \begin{itemize}
+      \item Unless \cmd{--skip-upstream}
+    \end{itemize}
+    \item \file{conf_file_map.sqlite}
+    \begin{itemize}
+      \item Unless \cmd{--no-db}
+      \item More on this later\dots
+    \end{itemize}
+    \item \url{kernel@suse.de}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\cmd{clang-struct}}{Indexed Structures}
+
+  \begin{itemize}[<+->]
+    \item clang-based
+      \begin{itemize}[<+->]
+	\item One config
+      \end{itemize}
+    \item Docker container: \url{https://hub.docker.com/repository/docker/jirislaby/ror-clang-struct}
+      \begin{itemize}[<+->]
+	\item Running on \url{http://kunlun.suse.cz:3000}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+%\begin{frame}{Conclusion}
+%
+%  \begin{center} \Large
+%    \heading{We are using fast and precise ORC since SLE15\dots}
+%
+%    \pause
+%    \smallskip
+%
+%    \heading{But beware of bugs!}
+%  \end{center}
+%
+%  \pause
+%  \bigskip
+%  \medskip
+%
+%  \begin{center} \huge
+%    \heading{Questions?}
+%  \end{center}
+%
+%\end{frame}
+
+\end{document}
