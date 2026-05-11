@@ -94,31 +94,40 @@
 	\item Not recorded \Sadey[][yellow]
       \end{itemize}
     \item Find a SUSE maintainer of a kernel file
-    \item Examples
-      \begin{itemize}[<+->]
-	\item \cmd{suse-get-maintainers --path drivers/tty/serial/samsung_tty.c}
-	\item \cmd{suse-get-maintainers --sha 832e231cff47}
-	\item \cmd{suse-get-maintainers --cve CVE-2023-53687}
-	\item \cmd{suse-get-maintainers --diff <(git -C \$KSOURCE_GIT show origin/SLE15-SP7:}\textbackslash \\
-	  \cmd{patches.suse/tty-serial-samsung_tty-Fix-a-memory-leak-in-s3c.patch)}
-	\item \cmd{suse-get-maintainers --grep tty --grep-names-only}
-	\item All about TTY $\rightarrow$ \url{jslaby@suse.com}
-	\item Try \cmd{--json} (and use \cmd{jq} to color/parse it)
+    \item Availability
+      \begin{itemize}
+	\item \url{https://github.com/SUSE/suse-get-maintainers}
+	\item \href{https://build.opensuse.org/package/show/Kernel:tools/suse-get-maintainers}{\nolinkurl{obs://Kernel:tools}}
       \end{itemize}
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}{\cmd{suse-get-maintainers}: Data Sources}
+\begin{frame}{\cmd{suse-get-maintainers}}{Examples}
 
   \begin{itemize}[<+->]
+    \item \cmd{suse-get-maintainers --path drivers/tty/serial/samsung_tty.c}
+    \item \cmd{suse-get-maintainers --sha 832e231cff47}
+    \item \cmd{suse-get-maintainers --cve CVE-2023-53687}
+    \item \cmd{suse-get-maintainers --diff <(git -C \$KSOURCE_GIT show origin/SLE15-SP7:}\textbackslash \\
+      \file{patches.suse/tty-serial-samsung_tty-Fix-a-memory-leak-in-s3c.patch)}
+    \item \cmd{suse-get-maintainers --grep tty --grep-names-only}
+    \item All about TTY $\rightarrow$ \url{jslaby@suse.com}
+    \item Try \cmd{--json} (and use \cmd{jq} to color/parse it)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\cmd{suse-get-maintainers}}{Data Sources}
+
+  \begin{enumerate}[<+->]
     \item For SHAs/CVEs/diffs: S-O-B, Acked-by, From, etc. lines
     \begin{itemize}
       \item Unless \cmd{--only-maintainers}
     \end{itemize}
     \item SUSE \file{MAINTAINERS} file (\url{https://kerncvs.suse.de/MAINTAINERS})
     \begin{itemize}
-      \item Unless \cmd{--skip-suse}
+      \item Unless \cmd{--skip-suse} \pause
       \item Edit at: \url{https://gitlab.suse.de/kernel/kbuild}
     \end{itemize}
     \item Upstream \file{MAINTAINERS} file (\file{\$LINUX_GIT/MAINTAINERS})
@@ -131,6 +140,99 @@
       \item More on this later\dots
     \end{itemize}
     \item \url{kernel@suse.de}
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{\cmd{file2config}}
+
+  \begin{itemize}[<+->]
+    \item Walks sources and collects data into SQLite database
+      \begin{itemize}[<+->]
+	\item \file{\$KSOURCE_GIT}
+	  \begin{itemize}[<+->]
+	    \item Expanded trees $\rightarrow$ maps
+	    \item \file{supported.conf}
+	  \end{itemize}
+	\item \file{\$LINUX_GIT}
+	\item \url{https://kerncvs.suse.de}
+	  \begin{itemize}
+	    \item \file{branches.conf}, \file{MAINTAINERS}
+	  \end{itemize}
+      \end{itemize}
+    \item Result: \file{conf_file_map.sqlite}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content I.}
+
+  \begin{itemize}[<+->]
+    \item \file{conf_branch_map}
+      \begin{itemize}
+	\item Branch, arch, flavor $\leftrightarrow$ config
+      \end{itemize} \pause
+      {\scriptsize
+      \sql{SELECT * FROM conf_branch_map_view WHERE branch='SL-16.1' AND config='CONFIG_EXT4_FS';}
+      } \\
+      \begin{tabular}{|c|c|c|c|c|c|} \hline
+	id & branch & arch & flavor & config  & value \\ \hline
+	227294 & SL-16.1 & arm64   & default  & CONFIG\_EXT4\_FS & m \\ \hline
+	236008 & SL-16.1 & ppc64le & default  & CONFIG\_EXT4\_FS & m \\ \hline
+	240514 & SL-16.1 & s390x   & default  & CONFIG\_EXT4\_FS & m \\ \hline
+	242557 & SL-16.1 & s390x   & zfcpdump & CONFIG\_EXT4\_FS & n \\ \hline
+	252467 & SL-16.1 & x86\_64  & default & CONFIG\_EXT4\_FS & m \\ \hline
+      \end{tabular}
+
+    \item \file{conf_file_map}
+      \begin{itemize}
+	\item Kernel file path $\leftrightarrow$ config
+      \end{itemize} \pause
+      {\scriptsize
+      \sql{SELECT * FROM conf_file_map_view WHERE branch='SL-16.1' AND path='drivers/tty/tty_io.c';}
+      } \\
+      \begin{tabular}{|c|c|c|c|} \hline
+	id   & branch  &   config   &         path         \\ \hline
+	186750 & SL-16.1 & CONFIG\_TTY & drivers/tty/tty\_io.c \\ \hline
+      \end{tabular}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content II.}
+
+  \begin{itemize}[<+->]
+    \item \file{module_file_map}
+      \begin{itemize}
+	\item Kernel file path $\leftrightarrow$ module
+      \end{itemize}
+    \item \file{module_details_map}
+      \begin{itemize}
+	\item Modules support status in branches (\file{supported.conf})
+      \end{itemize}
+    \item \file{user_file_map}
+    \item \file{ignored_file_branch_map}
+    \item \file{rename_file_version_map}
+    \item Views!
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Uses}
+
+  \begin{itemize}[<+->]
+    \item Used by \cmd{suse-get-maintainers} to find maintainers of files
+    \item \cmd{check-kernel-fix}
+    \item \cmd{git-fixes}
+    \item Planned: \cmd{exportpatch}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\cmd{file2config}}{Client}
+
+  \begin{itemize}[<+->]
+    \item XXX
   \end{itemize}
 
 \end{frame}
