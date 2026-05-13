@@ -16,7 +16,7 @@
 
 \title{Inside the KSS}
 \subtitle{A Sentinel's Toolkit and Behind}
-\date[XX/05/2026, České Budějovice]{May XX\textsuperscript{th} 2026 \\ České Budějovice}
+\date[19/05/2026, České Budějovice]{May 19\textsuperscript{th} 2026 \\ České Budějovice}
 
 \author[Jiri~Slaby]{\textbf{Jiri~Slaby}}
 
@@ -32,6 +32,14 @@
 \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{frame}{Presentation Outline}
+
+  \tableofcontents
+
+\end{frame}
+
+\section{Introduction}
 
 \begin{frame}{Introduction}
 
@@ -64,6 +72,8 @@
 
 \end{frame}
 
+\section{\cmd{check-kernel-fix}}
+
 \begin{frame}[fragile]{\cmd{check-kernel-fix}}
 
   \heading{Power tool to handle CVEs}
@@ -81,10 +91,13 @@
       \end{lstlisting}
     \item Reference implementation in Bash
     \item Python rewrite in progress
-    \item More $\rightarrow$ João Póvoas' talk
+    \item More $\rightarrow$ João Póvoas' talk on Monday
   \end{itemize}
 
 \end{frame}
+
+\section{\cmd{suse-get-maintainers}}
+\frame{\sectionpage}
 
 \begin{frame}{Recap: \cmd{suse-get-maintainers}}
 
@@ -97,7 +110,7 @@
     \item Availability
       \begin{itemize}
 	\item \url{https://github.com/SUSE/suse-get-maintainers}
-	\item \href{https://build.opensuse.org/package/show/Kernel:tools/suse-get-maintainers}{\nolinkurl{obs://Kernel:tools}}
+	\item \href{https://build.opensuse.org/package/show/Kernel:tools/suse-get-maintainers}{\nolinkurl{obs://Kernel:tools/suse-get-maintainers}}
       \end{itemize}
   \end{itemize}
 
@@ -144,6 +157,9 @@
 
 \end{frame}
 
+\section{\cmd{file2config} \& \file{conf\_file\_map.sqlite}}
+\frame{\sectionpage}
+
 \begin{frame}{\cmd{file2config}}
 
   \begin{itemize}[<+->]
@@ -167,90 +183,331 @@
 
 \begin{frame}{\file{conf_file_map.sqlite}}{Content I.}
 
-  \begin{itemize}[<+->]
-    \item \file{conf_branch_map}
-      \begin{itemize}
-	\item Branch, arch, flavor $\leftrightarrow$ config
-      \end{itemize} \pause
-      {\scriptsize
-      \sql{SELECT * FROM conf_branch_map_view WHERE branch='SL-16.1' AND config='CONFIG_EXT4_FS';}
-      } \\
+  \heading{\file{conf_file_map}: Kernel file path $\leftrightarrow$ config}
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT * FROM conf_file_map_view} \\
+      \sqlb{WHERE branch='SL-16.1' AND path='fs/ext4/dir.c';}}
+    \pause
+    \begin{center}
+      \begin{tabular}{|c|c|c|c|} \hline
+	\bf id & \bf branch & \bf config & \bf path \\ \hline
+	192363 & SL-16.1 & CONFIG\_EXT4\_FS & fs/ext4/dir.c \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content II.}
+
+  \heading{\file{conf_branch_map}: Branch, arch, flavor $\leftrightarrow$ config}
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT * FROM conf_branch_map_view} \\
+      \sqlb{WHERE branch='SL-16.1' AND config='CONFIG_EXT4_FS';}}
+    \pause
+    \begin{center}
       \begin{tabular}{|c|c|c|c|c|c|} \hline
-	id & branch & arch & flavor & config  & value \\ \hline
+	\bf id & \bf branch & \bf arch & \bf flavor & \bf config & \bf value \\ \hline
 	227294 & SL-16.1 & arm64   & default  & CONFIG\_EXT4\_FS & m \\ \hline
 	236008 & SL-16.1 & ppc64le & default  & CONFIG\_EXT4\_FS & m \\ \hline
 	240514 & SL-16.1 & s390x   & default  & CONFIG\_EXT4\_FS & m \\ \hline
 	242557 & SL-16.1 & s390x   & zfcpdump & CONFIG\_EXT4\_FS & n \\ \hline
 	252467 & SL-16.1 & x86\_64  & default & CONFIG\_EXT4\_FS & m \\ \hline
       \end{tabular}
-
-    \item \file{conf_file_map}
-      \begin{itemize}
-	\item Kernel file path $\leftrightarrow$ config
-      \end{itemize} \pause
-      {\scriptsize
-      \sql{SELECT * FROM conf_file_map_view WHERE branch='SL-16.1' AND path='drivers/tty/tty_io.c';}
-      } \\
-      \begin{tabular}{|c|c|c|c|} \hline
-	id   & branch  &   config   &         path         \\ \hline
-	186750 & SL-16.1 & CONFIG\_TTY & drivers/tty/tty\_io.c \\ \hline
-      \end{tabular}
-  \end{itemize}
+    \end{center}
+  \end{block}
 
 \end{frame}
 
-\begin{frame}{\file{conf_file_map.sqlite}}{Content II.}
+\begin{frame}{\file{conf_file_map.sqlite}}{Content III.}
 
-  \begin{itemize}[<+->]
-    \item \file{module_file_map}
-      \begin{itemize}
-	\item Kernel file path $\leftrightarrow$ module
-      \end{itemize}
-    \item \file{module_details_map}
-      \begin{itemize}
-	\item Modules support status in branches (\file{supported.conf})
-      \end{itemize}
-    \item \file{user_file_map}
-    \item \file{ignored_file_branch_map}
-    \item \file{rename_file_version_map}
-    \item Views!
-  \end{itemize}
+  \heading{\file{module_file_map}: Kernel file path $\leftrightarrow$ module}
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT * FROM module_file_map_view} \\
+      \sqlb{WHERE branch='SL-16.1' AND module LIKE '\%/ext4';}}
+    \pause
+    \begin{center}
+      \begin{tabular}{|c|c|l|} \hline
+	\bf branch & \bf module & \multicolumn{1}{c|}{\bf path} \\ \hline
+	SL-16.1 & fs/ext4/ext4 & fs/ext4/acl.c \\ \hline
+	SL-16.1 & fs/ext4/ext4 & fs/ext4/balloc.c \\ \hline
+	SL-16.1 & fs/ext4/ext4 & fs/ext4/bitmap.c \\ \hline
+	SL-16.1 & fs/ext4/ext4 & fs/ext4/block\_validity.c \\ \hline
+	SL-16.1 & fs/ext4/ext4 & fs/ext4/crypto.c \\ \hline
+	SL-16.1 & fs/ext4/ext4 & fs/ext4/dir.c \\ \hline
+	\multicolumn{3}{|c|}{\vdots} \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content IV.}
+
+  \heading{\file{module_details_map}: Modules support status in branches (\file{supported.conf})}
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT * FROM module_details_map_view} \\
+      \sqlb{WHERE branch='SL-16.1' AND module LIKE '\%/ext_';}}
+    \pause
+    \begin{center}
+      \begin{tabular}{|c|c|c|c|} \hline
+	\bf id & \bf branch & \bf module & \bf supported \\ \hline
+	119028 & SL-16.1 & fs/ext2/ext2 & -3 \\ \hline
+	119029 & SL-16.1 & fs/ext4/ext4 & 2 \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content V.}
+
+  \heading{\file{rename_file_version_map}: Renames between a version and upstream} \\
+  \heading{Similarity included}
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT * FROM rename_file_version_map_view} \\
+      \sqlb{WHERE version = 0x60400 AND newpath LIKE 'lib/crc/crc-\%';}}
+    \pause
+    \begin{center}
+      \begin{tabular}{|c|c|l|l|} \hline
+	\bf version & \bf similarity & \multicolumn{1}{c|}{\bf oldpath} &
+	  \multicolumn{1}{c|}{\bf newpath} \\ \hline
+	394240 & 98 & lib/crc-ccitt.c & lib/crc/crc-ccitt.c \\ \hline
+	394240 & 100 & lib/crc-itu-t.c & lib/crc/crc-itu-t.c \\ \hline
+	394240 & 78 & lib/crc-t10dif.c & lib/crc/crc-t10dif-main.c \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content VI.}
+
+  \heading{\file{user_file_map}: Who touched a file and how many times in the history}
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT email, SUM(count_no_fixes) FROM user_file_map_view} \\
+      \sqlb{WHERE branch='SL-16.1' AND path='kernel/module/main.c'} \\
+      ~~~~\sqlb{AND count_no_fixes > 0} \\
+      \sqlb{GROUP BY email;}}
+    \pause
+    \begin{center}
+      \begin{tabular}{|l|c|} \hline
+	\multicolumn{1}{|c|}{\bf email} & \bf SUM(count\_no\_fixes) \\ \hline
+	mgorman@suse.de & 7 \\ \hline
+	petr.pavlu@suse.com & 6 \\ \hline
+	agruen@suse.de & 1 \\ \hline
+	jgross@suse.com & 1 \\ \hline
+	mbenes@suse.cz & 1 \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}{\file{conf_file_map.sqlite}}{Content VII.}
+
+  \heading{\file{ignored_file_branch_map}: What files we ignore in branches} \\
+  Esp. for headers -- not handled yet
+
+  \pause
+
+  \begin{block}{\sqlb{SELECT * FROM ignored_file_branch_map_view} \\
+      \sqlb{WHERE branch='SL-16.1' AND path LIKE 'fs/f2fs/\%';}}
+    \pause
+    \begin{center}
+      \begin{tabular}{|c|l|} \hline
+	\bf branch & \multicolumn{1}{c|}{\bf path} \\ \hline
+	SL-16.1 & fs/f2fs/acl.h \\ \hline
+	SL-16.1 & fs/f2fs/f2fs.h \\ \hline
+	SL-16.1 & fs/f2fs/gc.h \\ \hline
+	SL-16.1 & fs/f2fs/iostat.h \\ \hline
+	SL-16.1 & fs/f2fs/node.h \\ \hline
+	SL-16.1 & fs/f2fs/segment.h \\ \hline
+	SL-16.1 & fs/f2fs/xattr.h \\ \hline
+      \end{tabular}
+    \end{center}
+  \end{block}
+
+\end{frame}
+
+\begin{frame}[fragile]{\file{conf_file_map.sqlite}}{Content VIII.}
+
+  \begin{center}
+    \Huge
+    \heading{Views!}
+  \end{center}
+
+  \pause
+
+  \begin{block}{View Illustrated}
+    \begin{lstlisting}[language=sql]
+SELECT * FROM module_file_map_view /* WHERE branch='SL-16.1' AND module LIKE '\%/ext4' */;
+    \end{lstlisting}
+    \pause
+    Executes this:
+    \begin{lstlisting}[language=sql]
+CREATE VIEW module_file_map_view AS
+    SELECT branch.branch, module_dir.dir || '/' || module.module AS module, dir.dir || '/' || file.file AS path
+    FROM module_file_map AS map
+    LEFT JOIN module ON map.module = module.id
+    LEFT JOIN dir AS module_dir ON module.dir = module_dir.id
+    LEFT JOIN branch ON map.branch = branch.id
+    LEFT JOIN file ON map.file = file.id
+    LEFT JOIN dir ON file.dir = dir.id;
+    \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
 \begin{frame}{\file{conf_file_map.sqlite}}{Uses}
 
   \begin{itemize}[<+->]
-    \item Used by \cmd{suse-get-maintainers} to find maintainers of files
+    \item Used by \cmd{suse-get-maintainers}
+      \begin{itemize}
+	\item Maintainers of files if \file{MAINTAINERS} fail
+      \end{itemize}
     \item \cmd{check-kernel-fix}
-    \item \cmd{git-fixes}
+      \begin{itemize}
+	\item Uses most tables
+      \end{itemize}
+    \item \cmd{tracing-fixes}?
     \item Planned: \cmd{exportpatch}
+    \item Availability
+      \begin{itemize}
+	\item \url{https://kerncvs.suse.de/conf_file_map.sqlite}
+	\item Built weekly
+      \end{itemize}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}{\cmd{file2config}}{Client}
 
+  \heading{\cmd{f2c_cli}}
   \begin{itemize}[<+->]
-    \item XXX
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{\cmd{clang-struct}}{Indexed Structures}
-
-  \begin{itemize}[<+->]
-    \item clang-based
-      \begin{itemize}[<+->]
-	\item One config
-      \end{itemize}
-    \item Docker container: \url{https://hub.docker.com/repository/docker/jirislaby/ror-clang-struct}
-      \begin{itemize}[<+->]
-	\item Running on \url{http://kunlun.suse.cz:3000}
+    \item Client to query the database
+    \item Downloads the database if needed
+    \item See \cmd{-h} for details
+    \item Availability
+      \begin{itemize}
+	\item \url{https://github.com/jirislaby/file2config}
+	\item \href{https://build.opensuse.org/package/show/Kernel:tools/file2config}{\nolinkurl{obs://Kernel:tools/file2config}}
       \end{itemize}
   \end{itemize}
 
 \end{frame}
+
+\begin{frame}[fragile]{\cmd{file2config}}{Example}
+
+  \begin{block}{\code{f2c_cli -b SL-16.1 -f fs/ext4/dir.c --json}}
+    \begin{lstlisting}[language=json]
+[ { "query":    { "type": "file",   "value": "fs/ext4/dir.c" },
+    "configs":  [ {
+        "branch":           "SL-16.1",
+        "path":             "fs/ext4/dir.c",
+        "config":           "CONFIG_EXT4_FS",
+        "module":           "ext4",
+        "module_path":      "fs/ext4/ext4",
+        "config_values": {
+          "arm64":   { "default":   "m" },
+          "ppc64le": { "default":   "m" },
+          "s390x":   { "default":   "m",
+                       "zfcpdump":  "n" },
+          "x86_64":  { "default":   "m" }
+        }
+    } ]
+} ]
+      \end{lstlisting}
+  \end{block}
+
+\end{frame}
+
+\section{SlHelpers}
+\frame{\sectionpage}
+
+\begin{frame}{SlHelpers}
+
+  \begin{itemize}[<+->]
+    \item C++ helpers (wrappers) for C libraries and other tools
+    \item RAII, smart pointers, \dots
+    \item Easy to use
+    \item Used by most of the tools above
+    \item Python3 bindings (in progress)
+    \item Availability
+      \begin{itemize}
+	\item \url{https://github.com/jirislaby/slhelpers}
+	\item \href{https://build.opensuse.org/package/show/Kernel:tools/slhelpers}{\nolinkurl{obs://Kernel:tools/slhelpers}}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{SlHelpers}{Libraries}
+
+  \begin{tabular}{@{} p{5cm}p{5cm}p{5cm} @{}}
+    \begin{itemize}
+      \item SlCurl
+      \item SlCVEs
+    \end{itemize} &
+    \begin{itemize}
+      \item SlGit
+      \item SlPCRE2
+    \end{itemize} &
+    \begin{itemize}
+      \item SlSqlite
+    \end{itemize} \\[-.7em]
+    \multicolumn{3}{@{} p{13cm} @{}}{
+    \begin{itemize}
+      \item SlHelpers (Color, Env, Process, Ratelimit, String, \dots)
+      \item SlKernCVS (Branches, Maintainers, RPMConfig, SupportedConf, \dots)
+    \end{itemize} }
+  \end{tabular}
+
+  \begin{block}{Example}
+    \begin{lstlisting}[language=c++]
+using Clr = SlHelpers::Color;
+auto repo = SlGit::Repo::open(*SlHelpers::Env::get("KSOURCE_GIT"));
+Clr(Clr::RED) << repo->commitHead()->tree()->treeEntryByPath("README.md")->catFile(*repo);
+    \end{lstlisting}
+    \begin{lstlisting}[language=python]
+with open(os.path.join(os.environ["KSOURCE_GIT"], "supported.conf")) as f:
+    print(slkerncvs.SupportedConf(f.read()).support_state("fs/ext4/ext4"))
+SupportState.BaseSupported
+    \end{lstlisting}
+
+  \end{block}
+
+\end{frame}
+
+% \section{\cmd{clang-struct}}
+% \frame{\sectionpage}
+%
+% \begin{frame}{\cmd{clang-struct}}{Indexed Structures}
+%
+%   \begin{itemize}[<+->]
+%     \item clang-based
+%       \begin{itemize}[<+->]
+% 	\item One config
+%       \end{itemize}
+%     \item Docker container: \url{https://hub.docker.com/repository/docker/jirislaby/ror-clang-struct}
+%       \begin{itemize}[<+->]
+% 	\item Running on \url{http://kunlun.suse.cz:3000}
+%       \end{itemize}
+%   \end{itemize}
+%
+% \end{frame}
 
 %\begin{frame}{Conclusion}
 %
