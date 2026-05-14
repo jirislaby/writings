@@ -3,7 +3,6 @@
 \input{class.tex}
 
 \input{../../../templates/header_present.tex}
-\usepackage{tikzsymbols}
 
 \usecolortheme[rgb={.298,.745,.32}]{structure}
 
@@ -44,19 +43,27 @@
 \begin{frame}{Introduction}
 
   \begin{itemize}[<+->]
-    \item Tools to handle \emph{kernel} CVEs
+    \item KSS: Kernel Security Sentinel
+      \begin{itemize}[<.->]
+	\item Monitor and handle \emph{kernel} CVEs
+      \end{itemize}
+    \item By-hand (pieces) $\rightarrow$ automated tools (thousands)
     \item Is CVE relevant for SUSE?
-      \begin{itemize}[<+->]
+      \begin{itemize}
 	\item \cmd{CONFIG_} enabled?
-	\item What \cmd{supported.conf} says?
+	\item \cmd{supported.conf}?
 	\item In \emph{any} branch?
       \end{itemize}
     \item If so, who maintains the vulnerable code?
+    \item Power of \cmd{check-kernel-fix}
       \begin{itemize}
 	\item Standalone tool: \cmd{suse-get-maintainers}
       \end{itemize}
-    \item Power of \cmd{check-kernel-fix}
-    \item Most tools documented in Confluence: \href{https://confluence.suse.com/spaces/labs/pages/1833140703/Kernel+tools}{Kernel tools}
+    \item Most tools \emph{documented} in
+      \href{https://confluence.suse.com/spaces/labs/pages/1833140703/Kernel+tools}{\texttt{Confluence/Kernel tools}}
+      \begin{itemize}
+	\item Video and slides from Mirek last year!
+      \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -78,17 +85,21 @@
 
   \heading{Power tool to handle CVEs}
   \begin{itemize}[<+->]
-    \item \cmd{\$KSOURCE_GIT/scripts/check-kernel-fix \[CVE | SHA\]} \\ \pause
-      \begin{lstlisting}[language={}]
-	Security fix for CVE-2023-53687 bsc#1251772 with CVSS 3.3
-	# ... a lot of details ...
-	Experts candidates:  jslaby@suse.com (1) subsystem/role="TTY LAYER AND SERIAL DRIVERS"
-	NO ACTION NEEDED: All relevant branches contain the fix!
-      \end{lstlisting} \pause
-      Or:
-      \begin{lstlisting}[language={}]
-	ACTION NEEDED!
-      \end{lstlisting}
+    \item \cmd{\$KSOURCE_GIT/scripts/check-kernel-fix \[CVE | SHA\]} \\
+      \begin{uncoverenv}<+->
+	\begin{lstlisting}[language={}]
+Security fix for CVE-2023-53687 bsc#1251772 with CVSS 3.3
+# ... a lot of details ...
+Experts candidates:  jslaby@suse.com (1) subsystem/role="TTY LAYER AND SERIAL DRIVERS"
+NO ACTION NEEDED: All relevant branches contain the fix!
+	\end{lstlisting}
+      \end{uncoverenv}
+      \begin{uncoverenv}<+->
+	Or:
+	\begin{lstlisting}[language={}]
+ACTION NEEDED!
+	\end{lstlisting}
+      \end{uncoverenv}
     \item Reference implementation in Bash
     \item Python rewrite in progress
     \item More $\rightarrow$ João Póvoas' talk on Monday
@@ -103,12 +114,9 @@
 
   \begin{itemize}[<+->]
     \item M. Franc last year
-      \begin{itemize}
-	\item Not recorded \Sadey[][yellow]
-      \end{itemize}
     \item Find a SUSE maintainer of a kernel file
     \item Availability
-      \begin{itemize}
+      \begin{itemize}[<.->]
 	\item \url{https://github.com/SUSE/suse-get-maintainers}
 	\item \href{https://build.opensuse.org/package/show/Kernel:tools/suse-get-maintainers}{\nolinkurl{obs://Kernel:tools/suse-get-maintainers}}
       \end{itemize}
@@ -125,7 +133,7 @@
     \item \cmd{suse-get-maintainers --diff <(git -C \$KSOURCE_GIT show origin/SLE15-SP7:}\textbackslash \\
       \file{patches.suse/tty-serial-samsung_tty-Fix-a-memory-leak-in-s3c.patch)}
     \item \cmd{suse-get-maintainers --grep tty --grep-names-only}
-    \item All about TTY $\rightarrow$ \url{jslaby@suse.com}
+    \item<1-> All about TTY $\rightarrow$ \url{jslaby@suse.com}
     \item Try \cmd{--json} (and use \cmd{jq} to color/parse it)
   \end{itemize}
 
@@ -140,7 +148,7 @@
     \end{itemize}
     \item SUSE \file{MAINTAINERS} file (\url{https://kerncvs.suse.de/MAINTAINERS})
     \begin{itemize}
-      \item Unless \cmd{--skip-suse} \pause
+      \item Unless \cmd{--skip-suse}
       \item Edit at: \url{https://gitlab.suse.de/kernel/kbuild}
     \end{itemize}
     \item Upstream \file{MAINTAINERS} file (\file{\$LINUX_GIT/MAINTAINERS})
@@ -150,7 +158,7 @@
     \item \file{conf_file_map.sqlite}
     \begin{itemize}
       \item Unless \cmd{--no-db}
-      \item More on this later\dots
+      \item More on this in a second\dots
     \end{itemize}
     \item \url{kernel@suse.de}
   \end{enumerate}
@@ -163,20 +171,26 @@
 \begin{frame}{\cmd{file2config}}
 
   \begin{itemize}[<+->]
-    \item Walks sources and collects data into SQLite database
-      \begin{itemize}[<+->]
+    \item Collects data from sources
+      \begin{itemize}
 	\item \file{\$KSOURCE_GIT}
-	  \begin{itemize}[<+->]
-	    \item Expanded trees $\rightarrow$ maps
+	  \begin{itemize}[<.->]
+	    \item Expanded trees $\rightarrow$ files, configs, modules, \dots
 	    \item \file{supported.conf}
 	  \end{itemize}
 	\item \file{\$LINUX_GIT}
+	  \begin{itemize}[<.->]
+	    \item \file{MAINTAINERS}
+	  \end{itemize}
 	\item \url{https://kerncvs.suse.de}
-	  \begin{itemize}
+	  \begin{itemize}[<.->]
 	    \item \file{branches.conf}, \file{MAINTAINERS}
 	  \end{itemize}
       \end{itemize}
-    \item Result: \file{conf_file_map.sqlite}
+    \item Stores data into an SQLite database
+      \begin{itemize}[<.->]
+	\item \file{conf_file_map.sqlite}
+      \end{itemize}
   \end{itemize}
 
 \end{frame}
@@ -316,33 +330,33 @@
 
 \end{frame}
 
-\begin{frame}{\file{conf_file_map.sqlite}}{Content VII.}
+% \begin{frame}{\file{conf_file_map.sqlite}}{Content VII.}
+%
+%   \heading{\file{ignored_file_branch_map}: What files we ignore in branches} \\
+%   Esp. for headers -- not handled yet
+%
+%   \pause
+%
+%   \begin{block}{\sqlb{SELECT * FROM ignored_file_branch_map_view} \\
+%       \sqlb{WHERE branch='SL-16.1' AND path LIKE 'fs/f2fs/\%';}}
+%     \pause
+%     \begin{center}
+%       \begin{tabular}{|c|l|} \hline
+% 	\bf branch & \multicolumn{1}{c|}{\bf path} \\ \hline
+% 	SL-16.1 & fs/f2fs/acl.h \\ \hline
+% 	SL-16.1 & fs/f2fs/f2fs.h \\ \hline
+% 	SL-16.1 & fs/f2fs/gc.h \\ \hline
+% 	SL-16.1 & fs/f2fs/iostat.h \\ \hline
+% 	SL-16.1 & fs/f2fs/node.h \\ \hline
+% 	SL-16.1 & fs/f2fs/segment.h \\ \hline
+% 	SL-16.1 & fs/f2fs/xattr.h \\ \hline
+%       \end{tabular}
+%     \end{center}
+%   \end{block}
+%
+% \end{frame}
 
-  \heading{\file{ignored_file_branch_map}: What files we ignore in branches} \\
-  Esp. for headers -- not handled yet
-
-  \pause
-
-  \begin{block}{\sqlb{SELECT * FROM ignored_file_branch_map_view} \\
-      \sqlb{WHERE branch='SL-16.1' AND path LIKE 'fs/f2fs/\%';}}
-    \pause
-    \begin{center}
-      \begin{tabular}{|c|l|} \hline
-	\bf branch & \multicolumn{1}{c|}{\bf path} \\ \hline
-	SL-16.1 & fs/f2fs/acl.h \\ \hline
-	SL-16.1 & fs/f2fs/f2fs.h \\ \hline
-	SL-16.1 & fs/f2fs/gc.h \\ \hline
-	SL-16.1 & fs/f2fs/iostat.h \\ \hline
-	SL-16.1 & fs/f2fs/node.h \\ \hline
-	SL-16.1 & fs/f2fs/segment.h \\ \hline
-	SL-16.1 & fs/f2fs/xattr.h \\ \hline
-      \end{tabular}
-    \end{center}
-  \end{block}
-
-\end{frame}
-
-\begin{frame}[fragile]{\file{conf_file_map.sqlite}}{Content VIII.}
+\begin{frame}[fragile]{\file{conf_file_map.sqlite}}{Views}
 
   \begin{center}
     \Huge
@@ -356,7 +370,7 @@
 SELECT * FROM module_file_map_view /* WHERE branch='SL-16.1' AND module LIKE '\%/ext4' */;
     \end{lstlisting}
     \pause
-    Executes this:
+    Executes \textasciitilde\ this:
     \begin{lstlisting}[language=sql]
 CREATE VIEW module_file_map_view AS
     SELECT branch.branch, module_dir.dir || '/' || module.module AS module, dir.dir || '/' || file.file AS path
@@ -375,17 +389,23 @@ CREATE VIEW module_file_map_view AS
 
   \begin{itemize}[<+->]
     \item Used by \cmd{suse-get-maintainers}
-      \begin{itemize}
+      \begin{itemize}[<.->]
 	\item Maintainers of files if \file{MAINTAINERS} fail
       \end{itemize}
     \item \cmd{check-kernel-fix}
-      \begin{itemize}
-	\item Uses most tables
+      \begin{itemize}[<.->]
+	\item Leverages most tables
       \end{itemize}
-    \item \cmd{tracing-fixes}?
+    \item \cmd{tracking-fixes} (?)
+      \begin{itemize}[<.->]
+	\item Is a fix relevant?
+      \end{itemize}
     \item Planned: \cmd{exportpatch}
+      \begin{itemize}[<.->]
+	\item Renames at least
+      \end{itemize}
     \item Availability
-      \begin{itemize}
+      \begin{itemize}[<.->]
 	\item \url{https://kerncvs.suse.de/conf_file_map.sqlite}
 	\item Built weekly
       \end{itemize}
@@ -401,7 +421,7 @@ CREATE VIEW module_file_map_view AS
     \item Downloads the database if needed
     \item See \cmd{-h} for details
     \item Availability
-      \begin{itemize}
+      \begin{itemize}[<.->]
 	\item \url{https://github.com/jirislaby/file2config}
 	\item \href{https://build.opensuse.org/package/show/Kernel:tools/file2config}{\nolinkurl{obs://Kernel:tools/file2config}}
       \end{itemize}
@@ -412,6 +432,7 @@ CREATE VIEW module_file_map_view AS
 \begin{frame}[fragile]{\cmd{file2config}}{Example}
 
   \begin{block}{\code{f2c_cli -b SL-16.1 -f fs/ext4/dir.c --json}}
+    \pause
     \begin{lstlisting}[language=json]
 [ { "query":    { "type": "file",   "value": "fs/ext4/dir.c" },
     "configs":  [ {
@@ -440,13 +461,13 @@ CREATE VIEW module_file_map_view AS
 \begin{frame}{SlHelpers}
 
   \begin{itemize}[<+->]
-    \item C++ helpers (wrappers) for C libraries and other tools
+    \item \emph{C++20} helpers and wrappers around C libraries
     \item RAII, smart pointers, \dots
     \item Easy to use
-    \item Used by most of the tools above
-    \item Python3 bindings (in progress)
+    \item Used by most of the aforementioned tools
+    \item Python bindings for one
     \item Availability
-      \begin{itemize}
+      \begin{itemize}[<.->]
 	\item \url{https://github.com/jirislaby/slhelpers}
 	\item \href{https://build.opensuse.org/package/show/Kernel:tools/slhelpers}{\nolinkurl{obs://Kernel:tools/slhelpers}}
       \end{itemize}
@@ -471,63 +492,57 @@ CREATE VIEW module_file_map_view AS
     \multicolumn{3}{@{} p{13cm} @{}}{
     \begin{itemize}
       \item SlHelpers (Color, Env, Process, Ratelimit, String, \dots)
-      \item SlKernCVS (Branches, Maintainers, RPMConfig, SupportedConf, \dots)
+      \item SlKernCVS$^{Py}$ (Branches, Maintainers, RPMConfig, SupportedConf, \dots)
     \end{itemize} }
   \end{tabular}
 
-  \begin{block}{Example}
+  \pause
+
+  \begin{block}{Examples: C++ and Python}
+    \pause
     \begin{lstlisting}[language=c++]
 using Clr = SlHelpers::Color;
 auto repo = SlGit::Repo::open(*SlHelpers::Env::get("KSOURCE_GIT"));
 Clr(Clr::RED) << repo->commitHead()->tree()->treeEntryByPath("README.md")->catFile(*repo);
     \end{lstlisting}
     \begin{lstlisting}[language=python]
-with open(os.path.join(os.environ["KSOURCE_GIT"], "supported.conf")) as f:
-    print(slkerncvs.SupportedConf(f.read()).support_state("fs/ext4/ext4"))
-SupportState.BaseSupported
+>>> sorted(slkerncvs.Branches.get_build_branches())
+['SL-16.0', 'SL-16.1', 'SLE11-SP4-LTSS', 'SLE12-SP3-TD', 'SLE12-SP5', 'SLE15-SP4-LTSS', 'SLE15-SP4-RT-LTSS', 'SLE15-SP5-LTSS', 'SLE15-SP5-RT-LTSS', 'SLE15-SP6-LTSS', 'SLE15-SP7', 'SLE15-SP7-RT', 'SUSE-2024', 'SUSE-2024-RT', 'cve/linux-5.14-LTSS', 'fixes/linux-6.4']
     \end{lstlisting}
 
   \end{block}
 
 \end{frame}
 
-% \section{\cmd{clang-struct}}
-% \frame{\sectionpage}
-%
-% \begin{frame}{\cmd{clang-struct}}{Indexed Structures}
-%
-%   \begin{itemize}[<+->]
-%     \item clang-based
-%       \begin{itemize}[<+->]
-% 	\item One config
-%       \end{itemize}
-%     \item Docker container: \url{https://hub.docker.com/repository/docker/jirislaby/ror-clang-struct}
-%       \begin{itemize}[<+->]
-% 	\item Running on \url{http://kunlun.suse.cz:3000}
-%       \end{itemize}
-%   \end{itemize}
-%
-% \end{frame}
+\begin{frame}{Conclusion}
 
-%\begin{frame}{Conclusion}
-%
-%  \begin{center} \Large
-%    \heading{We are using fast and precise ORC since SLE15\dots}
-%
-%    \pause
-%    \smallskip
-%
-%    \heading{But beware of bugs!}
-%  \end{center}
-%
-%  \pause
-%  \bigskip
-%  \medskip
-%
-%  \begin{center} \huge
-%    \heading{Questions?}
-%  \end{center}
-%
-%\end{frame}
+ \begin{center} \Huge
+   \heading{Thank you!} \\[.6em]
+   \heading{Questions?}
+ \end{center}
+
+\end{frame}
+
+\begin{frame}{\cmd{clang-struct}}{Indexed Kernel Structures}
+
+  \begin{itemize}[<+->]
+    \item Indexed kernel structures, their members and \emph{uses}
+    \item Stored in an SQLite database
+    \item clang-based
+      \begin{itemize}[<.->]
+	\item One config = one arch/flavor
+      \end{itemize}
+    \item Availability
+      \begin{itemize}[<.->]
+	\item \url{https://github.com/jirislaby/clang-struct}
+	\item \href{https://build.opensuse.org/package/show/home:jirislaby:nonSCM/clang-struct}{\nolinkurl{obs://home:jirislaby:nonSCM/clang-struct}}
+	\item \href{https://hub.docker.com/repository/docker/jirislaby/ror-clang-struct}{\nolinkurl{docker.io://jirislaby/ror-clang-struct}}
+	  \begin{itemize}[<.->]
+	    \item Running on \url{http://kunlun.suse.cz:3000}
+	  \end{itemize}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
 
 \end{document}
