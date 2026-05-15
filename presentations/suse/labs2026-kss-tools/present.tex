@@ -40,7 +40,40 @@
 
 \section{Introduction}
 
-\begin{frame}{Introduction}
+\begin{frame}[fragile]{Introduction}
+
+  \begin{tikzpicture}[remember picture, overlay,
+    node distance=4mm and 4mm,
+    font=\sffamily\footnotesize,
+    box/.style={draw, rounded corners, fill=blue!5, align=center, line width=0.8pt,
+    inner sep=8pt},
+    arrow/.style={->, >=stealth', thick, line width=1pt, draw=gray!80}
+    ]
+
+    \node[box, fill=red!10, anchor=north east, xshift=-2.4cm, yshift=-1.05cm]
+      at (current page.north east) (cve) {Incoming CVE\\(Hundreds)};
+
+    \node[box, below=of cve, fill=blue!10, align=left] (val) {
+      \begin{tabular}{@{}l@{}}
+	\multicolumn{1}{c}{\textbf{VALIDATION}} \\
+	-- \texttt{CONFIG\_*} \\
+	-- \texttt{supported.conf}
+      \end{tabular}
+    };
+
+    \node[box, below left=8mm and -10mm of val, fill=green!10] (dev) {Developer\\(Manual Fix)};
+    \node[box, below right=8mm and -10mm of val, fill=gray!15] (auto) {Automated\\(Scripted Fix)};
+
+    \node[box, inner sep=12pt, fill=green!30, below=2.9cm of val] (done) {\textbf{HANDLED}};
+
+    \draw[arrow] (cve) -- (val);
+    \draw[arrow] (val.south) -- ++(0,-0.4) -| (dev.north);
+    \draw[arrow] (val.south) -- ++(0,-0.4) -| (auto.north);
+    \draw[arrow] (dev.south) -- ++(0,-0.4) -| (done.north);
+    \draw[arrow] (auto.south) -- ++(0,-0.4) -| (done.north);
+    \draw[-{fast cap}, line width=.8ex, shorten <=6pt, shorten >=6pt] (dev.east) -- (auto.west);
+
+  \end{tikzpicture}
 
   \begin{itemize}[<+->]
     \item KSS: Kernel Security Sentinel
@@ -170,8 +203,19 @@ ACTION NEEDED!
 
 \begin{frame}{\cmd{file2config}}
 
+  \begin{tikzpicture}[remember picture, overlay]
+    \node[anchor=north east, xshift=-0.5cm, yshift=-1cm] at (current page.north east) {
+      \includegraphics[height=.87\textheight]{f2c.jpg}
+    };
+  \end{tikzpicture}
+
   \begin{itemize}[<+->]
-    \item Collects data from sources
+    \item \emph{Motivation:} \cmd{git grep} + \cmd{grep} all over
+      \begin{itemize}[<.->]
+	\item Slow
+	\item Imprecise (file $\rightarrow$ config guesswork)
+      \end{itemize}
+    \item Pre-collects data from sources
       \begin{itemize}
 	\item \file{\$KSOURCE_GIT}
 	  \begin{itemize}[<.->]
@@ -367,7 +411,7 @@ ACTION NEEDED!
 
   \begin{block}{View Illustrated}
     \begin{lstlisting}[language=sql]
-SELECT * FROM module_file_map_view /* WHERE branch='SL-16.1' AND module LIKE '\%/ext4' */;
+SELECT * FROM module_file_map_view /* WHERE branch='SL-16.1' AND module LIKE '%/ext4' */;
     \end{lstlisting}
     \pause
     Executes \textasciitilde\ this:
