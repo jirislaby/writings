@@ -13,8 +13,19 @@
 	},
 }
 
+\tikzset{
+  bnode/.style={draw, rounded corners, fill=blue!5, align=center,
+    line width=0.8pt, inner sep=4pt, font=\ttfamily\scriptsize},
+  barrow/.style={->, >=stealth', thick, draw=gray!80},
+  btool/.style={font=\sffamily\tiny, text=OliveGreen},
+}
+
+\newcommand{\demo}[1]{%
+  \begin{center} \Huge \heading{DEMO} \\[.3em] \Large #1 \end{center}}
+
 \title{Kernel Build}
-\date[20/11/2026, Praha]{Nov 11\textsuperscript{th} 2026 \\ Praha}
+\subtitle{From \texttt{.c} to \texttt{bzImage} (and \texttt{.rpm})}
+\date[20/11/2026, Praha]{Nov 20\textsuperscript{th} 2026 \\ Praha}
 
 \author[Jiří~Slabý]{\textbf{Jiří~Slabý}}
 
@@ -33,13 +44,1218 @@
 
 \begin{frame}{Presentation Outline}
 
-  \tableofcontents
+  \begin{columns}[T]
+    \begin{column}{.5\textwidth}
+      \tableofcontents[sections={1-5}]
+    \end{column}
+    \begin{column}{.5\textwidth}
+      \tableofcontents[sections={6-}]
+    \end{column}
+  \end{columns}
 
 \end{frame}
 
 \section{Introduction}
+\frame{\sectionpage}
 
-\begin{frame}{Introduction}
+\begin{frame}{Whoami}
+
+  \begin{itemize}[<+->]
+    \item SUSE Labs, Core team
+      \begin{itemize}[<.->]
+	\item IRQ, PCI, serial, TTY, \xes
+	\item openSUSE Tumbleweed kernel
+	\item Tools for CVE handling (parsers of Kbuild \& Makefiles)
+      \end{itemize}
+    \item Past
+      \begin{itemize}[<.->]
+	\item Live patching (kGraft), wireless (802.11 a/b/g)
+	\item Teaching at FI MU: C, kernel, binary formats (ELF, DWARF, \dots)
+      \end{itemize}
+    \item Packaging: static analysis, python, C++, \cmd{b4}, \cmd{ccache}, \dots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Labs vs. Real World}
+
+  \begin{columns}[T]
+    \begin{column}{.48\textwidth}
+      \heading{Labs}
+      \begin{itemize}
+	\item Prepared VM \& kernel
+	\item A single module
+	\item \cmd{make}, \cmd{insmod}, \cmd{dmesg}
+	\item A few hundred lines
+      \end{itemize}
+    \end{column}
+    \pause
+    \begin{column}{.48\textwidth}
+      \heading{Real World}
+      \begin{itemize}
+	\item Many architectures, configs, compilers
+	\item The \emph{whole} kernel
+	\item Rebuild after every change
+	\item Debugging crashes from customers
+	\item Shipping to users (packages)
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+  \pause
+  \vspace{2em}
+
+  \begin{center}
+    \heading{Today:} what happens between \cmd{vim foo.c} and a booting kernel
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{The Kernel Tree in Numbers}{Linux 7.3-rc6}
+
+  \begin{center}
+    \begin{tabular}{|l|r|} \hline
+      \bf What & \bf Count \\ \hline
+      Files in git & 96\,889 \\ \hline
+      \file{.c} files & 37\,586 \\ \hline
+      \file{.h} files & 27\,278 \\ \hline
+      \file{Makefile}s and \file{Kbuild}s & 3\,360 \\ \hline
+      \file{Kconfig} files & 1\,955 \\ \hline
+      Config symbols (\file{CONFIG_*}) & 22\,026 \\ \hline
+    \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item Nobody builds \emph{everything} at once
+      \begin{itemize}[<.->]
+	\item One architecture, one configuration
+      \end{itemize}
+    \item $\Rightarrow$ \emph{configuration} is the first step
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Tools Involved}
+
+  \begin{itemize}[<+->]
+    \item \cmd{make} -- drives everything
+      \begin{itemize}[<.->]
+	\item Kbuild: a (huge) set of Makefiles in \file{scripts/}
+	\item You do \emph{not} need to understand them
+      \end{itemize}
+    \item Compiler: \cmd{gcc} or \cmd{clang} (\cmd{LLVM=1})
+    \item Binutils: \cmd{ld}, \cmd{objcopy}, \cmd{nm}, \cmd{readelf}, \dots
+    \item Host tools built on the fly: \cmd{fixdep}, \cmd{kallsyms}, \cmd{modpost},
+      \cmd{objtool}, \cmd{conf}, \dots
+    \item Optional: \cmd{pahole} (BTF), \cmd{openssl} (signing), \cmd{rustc}, \dots
+    \item Minimal versions: \file{Documentation/process/changes.rst}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Basic Invocation}
+
+  \begin{lstlisting}[language=bash]
+make help                       # list of all targets (really useful!)
+make defconfig                  # create .config
+make -j$(nproc)                 # build vmlinux, bzImage and modules
+make -j$(nproc) V=1             # show the full commands
+make O=../build-x86 ...         # build out of the source tree
+make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- ...   # cross build
+make LLVM=1 ...                 # clang + lld + llvm-* tools
+make fs/ext4/                   # build a single directory
+make fs/ext4/dir.o              # ... or a single object (.i, .s, .lst too)
+  \end{lstlisting}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Configuration: Kconfig}
+\frame{\sectionpage}
+
+\begin{frame}{Why Configure?}
+
+  \begin{itemize}[<+->]
+    \item One source tree
+      \begin{itemize}[<.->]
+	\item 20+ architectures
+	\item Phones, servers, routers, cars, mainframes
+      \end{itemize}
+    \item Each option is
+      \begin{itemize}[<.->]
+	\item \cmd{y} -- built in the kernel image (\file{vmlinux})
+	\item \cmd{m} -- built as a module (\file{.ko})
+	\item \cmd{n} -- not built at all
+      \end{itemize}
+    \item Options depend on each other
+      \begin{itemize}[<.->]
+	\item No USB storage without USB
+	\item ext4 needs jbd2
+      \end{itemize}
+    \item Described in \file{Kconfig} files
+      \begin{itemize}[<.->]
+	\item Own language: \file{Documentation/kbuild/kconfig-language.rst}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Kconfig Language}{Real example: \file{fs/ext4/Kconfig}}
+
+  \begin{lstlisting}[language={},basicstyle=\footnotesize\ttfamily,
+    morekeywords={config,tristate,bool,select,depends,on,help,default,if}]
+config EXT4_FS
+	tristate "The Extended 4 (ext4) filesystem"
+	select BUFFER_HEAD
+	select JBD2
+	select CRC16
+	select CRC32
+	select FS_IOMAP
+	select FS_ENCRYPTION_ALGS if FS_ENCRYPTION
+	help
+	  This is the next generation of the ext3 filesystem.
+	  ...
+
+config EXT4_FS_POSIX_ACL
+	bool "Ext4 POSIX Access Control Lists"
+	depends on EXT4_FS
+	select FS_POSIX_ACL
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}{Kconfig Language}{Keywords}
+
+  \begin{itemize}[<+->]
+    \item Types: \cmd{bool}, \cmd{tristate}, \cmd{int}, \cmd{hex}, \cmd{string}
+    \item \cmd{depends on X}
+      \begin{itemize}[<.->]
+	\item Option not visible unless \cmd{X} is set
+	\item \cmd{m} limits dependents to \cmd{m}
+      \end{itemize}
+    \item \cmd{select X}
+      \begin{itemize}[<.->]
+	\item Forces \cmd{X} on, \emph{ignoring} \cmd{X}'s dependencies
+	\item Use for library-like options only
+      \end{itemize}
+    \item \cmd{imply X} -- weak select (user can still say \cmd{n})
+    \item \cmd{default}, \cmd{help}, \cmd{prompt}
+    \item Structure: \cmd{menu}, \cmd{choice}, \cmd{if}, \cmd{source}
+      \begin{itemize}[<.->]
+	\item \file{arch/x86/Kconfig} $\rightarrow$ \cmd{source "fs/Kconfig"}
+	  $\rightarrow$ \cmd{source "fs/ext4/Kconfig"} $\rightarrow$ \dots
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Configuration Targets}
+
+  \begin{itemize}[<+->]
+    \item \heading{Start from something}
+      \begin{itemize}[<.->]
+	\item \cmd{make defconfig} -- arch default (\file{arch/x86/configs/x86_64_defconfig})
+	\item \cmd{make localmodconfig} -- only modules loaded now (\cmd{lsmod})
+	\item \cmd{make allmodconfig}, \cmd{allyesconfig}, \cmd{tinyconfig}, \cmd{randconfig}
+	\item Distro config: \file{/proc/config.gz}, \file{/boot/config-*}
+      \end{itemize}
+    \item \heading{Modify}
+      \begin{itemize}[<.->]
+	\item \cmd{make menuconfig} (ncurses), \cmd{nconfig}, \cmd{xconfig} (Qt)
+	\item \cmd{scripts/config -e EXT4_FS -m USB_STORAGE -d DRM}
+	\item Fragments: \cmd{make defconfig kvm_guest.config}
+      \end{itemize}
+    \item \heading{Update after a kernel upgrade}
+      \begin{itemize}[<.->]
+	\item \cmd{make oldconfig} -- ask for new options
+	\item \cmd{make olddefconfig} -- use defaults for new options
+	\item \cmd{make listnewconfig}
+      \end{itemize}
+    \item \cmd{make savedefconfig} -- minimal \file{defconfig}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Configuration Outputs}
+
+  \begin{itemize}[<+->]
+    \item \file{.config} -- what you edit (via tools)
+      \begin{lstlisting}[language={}]
+CONFIG_EXT4_FS=m
+CONFIG_EXT4_FS_POSIX_ACL=y
+# CONFIG_EXT4_DEBUG is not set
+      \end{lstlisting}
+    \item \cmd{make syncconfig} (run automatically) generates
+      \begin{itemize}[<.->]
+	\item \file{include/config/auto.conf} -- for \emph{make} (Kbuild)
+	\item \file{include/generated/autoconf.h} -- for \emph{C}
+	  \begin{lstlisting}
+#define CONFIG_EXT4_FS_MODULE 1
+#define CONFIG_EXT4_FS_POSIX_ACL 1
+	  \end{lstlisting}
+	\item \file{include/config/EXT4_FS}, \dots -- one (empty) file per symbol
+	  \begin{itemize}
+	    \item Timestamps! More in \emph{Incremental Builds}
+	  \end{itemize}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Configuration}
+
+  \demo{\cmd{defconfig}, \cmd{menuconfig}, \cmd{scripts/config}}
+
+  \begin{lstlisting}[language=bash]
+make defconfig
+make menuconfig                         # search with '/', help with '?'
+scripts/config -m EXT4_FS -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
+make olddefconfig
+diff -u .config.old .config
+  \end{lstlisting}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Kbuild}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]{Kbuild Files}{Real example: \file{fs/ext4/Makefile}}
+
+  \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+obj-$(CONFIG_EXT4_FS) += ext4.o
+
+ext4-y  := balloc.o bitmap.o block_validity.o dir.o ext4_jbd2.o extents.o \
+           ... super.o symlink.o sysfs.o xattr.o xattr_hurd.o ...
+
+ext4-$(CONFIG_EXT4_FS_POSIX_ACL)  += acl.o
+ext4-$(CONFIG_EXT4_FS_SECURITY)   += xattr_security.o
+ext4-$(CONFIG_FS_VERITY)          += verity.o
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item \file{CONFIG_EXT4_FS=y} $\rightarrow$ \cmd{obj-y += ext4.o} $\rightarrow$ into \file{vmlinux}
+    \item \file{CONFIG_EXT4_FS=m} $\rightarrow$ \cmd{obj-m += ext4.o} $\rightarrow$ \file{ext4.ko}
+    \item \file{CONFIG_EXT4_FS} unset $\rightarrow$ \cmd{obj- += ext4.o} $\rightarrow$ ignored
+    \item \cmd{ext4-y} -- \emph{composite} object: \file{ext4.o} is linked from these
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Kbuild Files}{Syntax Summary}
+
+  \begin{itemize}[<+->]
+    \item Named \file{Kbuild} or \file{Makefile} (\file{Kbuild} preferred if both)
+    \item Descending into subdirectories (\file{fs/Makefile})
+      \begin{lstlisting}[language=make]
+obj-$(CONFIG_EXT4_FS)    += ext4/
+obj-$(CONFIG_BTRFS_FS)   += btrfs/
+      \end{lstlisting}
+    \item Flags
+      \begin{lstlisting}[language=make]
+ccflags-y                := -I$(src)/include   # whole directory
+CFLAGS_super.o           := -DDEBUG            # single file
+      \end{lstlisting}
+    \item Not \emph{normal} Makefiles: no rules, only variables
+      \begin{itemize}[<.->]
+	\item Rules live in \file{scripts/Makefile.build}
+	\item Docs: \file{Documentation/kbuild/makefiles.rst}
+      \end{itemize}
+    \item Similar to \file{meson.build}, \file{CMakeLists.txt}: \emph{what}, not \emph{how}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Kbuild}{How It Walks the Tree}
+
+  \begin{itemize}[<+->]
+    \item Top-level \file{Makefile}
+      \begin{itemize}[<.->]
+	\item Includes \file{arch/\$(SRCARCH)/Makefile} (flags, boot targets)
+	\item Starts with top-level dirs: \file{init/}, \file{kernel/}, \file{mm/},
+	  \file{fs/}, \file{drivers/}, \dots
+      \end{itemize}
+    \item For each directory: \cmd{make -f scripts/Makefile.build obj=fs/ext4}
+      \begin{itemize}[<.->]
+	\item Reads \file{fs/ext4/Makefile}
+	\item Compiles \cmd{obj-y} and \cmd{obj-m} objects
+	\item Descends into subdirectories (recursive make)
+	\item Collects \cmd{obj-y} into \file{fs/ext4/built-in.a}
+	\item Records \cmd{obj-m} into \file{modules.order}
+      \end{itemize}
+    \item Parallel (\cmd{-j}) across directories
+  \end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Building and Linking the Kernel}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]{Compiling One Object}
+
+  \heading{\cmd{make V=1 fs/ext4/dir.o} (shortened)}
+  \begin{lstlisting}[language=bash]
+gcc -Wp,-MMD,fs/ext4/.dir.o.d -nostdinc -I./arch/x86/include -I./include \
+  -include ./include/linux/compiler-version.h -include ./include/linux/kconfig.h \
+  -include ./include/linux/compiler_types.h -D__KERNEL__ -std=gnu11 \
+  -fno-strict-aliasing -mno-sse -mno-red-zone -mcmodel=kernel -O2 -g ... \
+  -DKBUILD_MODFILE='"fs/ext4/ext4"' -DKBUILD_BASENAME='"dir"' \
+  -DKBUILD_MODNAME='"ext4"' -DMODULE -c -o fs/ext4/dir.o fs/ext4/dir.c
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item \cmd{-nostdinc} -- no libc, no \file{/usr/include}
+    \item \file{kconfig.h} includes \file{autoconf.h} -- every file sees all
+      \file{CONFIG_*}
+    \item \cmd{-mno-sse} -- no FPU in the kernel
+    \item \cmd{-MMD} -- dependency file (later)
+    \item \cmd{-DMODULE} -- built as \cmd{m}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{From Objects to \file{vmlinux}}
+
+  \begin{itemize}[<+->]
+    \item \file{dir/built-in.a} -- per directory
+      \begin{itemize}[<.->]
+	\item \emph{Thin} archive: references \file{.o} files, no copies
+	\item Historically \file{built-in.o} (\cmd{ld -r}), until 4.13
+      \end{itemize}
+    \item \file{vmlinux.a} -- all top-level \file{built-in.a} together
+    \item \file{vmlinux.o} -- \cmd{ld -r} of everything
+      \begin{itemize}[<.->]
+	\item \cmd{objtool} -- validates stack frames, generates ORC unwind
+	  data, \dots
+	\item \cmd{modpost} -- section mismatches (\file{.init} vs.\ the rest)
+      \end{itemize}
+    \item \file{scripts/link-vmlinux.sh}
+      \begin{itemize}[<.->]
+	\item Links vmlinux \emph{several times}. Why?
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Why Link \file{vmlinux} Several Times?}
+
+  \begin{itemize}[<+->]
+    \item \emph{kallsyms}: the kernel contains its own symbol table
+      \begin{itemize}[<.->]
+	\item Stack traces with function names, \file{/proc/kallsyms}
+      \end{itemize}
+    \item Chicken \& egg
+      \begin{itemize}[<.->]
+	\item Symbol table needs final addresses
+	\item Adding the table moves the addresses
+      \end{itemize}
+    \item The solution
+      \begin{enumerate}[<.->]
+	\setcounter{enumi}{-1}
+	\item Empty table
+	\item \file{.tmp_vmlinux1} $\rightarrow$ table of the right \emph{size}
+	\item \file{.tmp_vmlinux2} $\rightarrow$ table with the right \emph{addresses}
+	\item \file{.tmp_vmlinux3} -- only if something still moved
+	\item Final link with the correct table
+      \end{enumerate}
+    \item BTF is generated from \file{.tmp_vmlinux1} too (later)
+    \item \file{System.map} must match the embedded table (checked)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Linking the Kernel}{The Whole Picture}
+
+  \begin{center}
+  \begin{tikzpicture}[node distance=5mm and 7mm]
+    \node[bnode] (c) {*.c};
+    \node[bnode, below=of c] (o) {*.o};
+    \node[bnode, below=of o] (bi) {built-in.a};
+    \node[bnode, below=of bi] (va) {vmlinux.a};
+
+    \draw[barrow] (c) -- node[btool, right] {gcc -c} (o);
+    \draw[barrow] (o) -- node[btool, right] {ar T} (bi);
+    \draw[barrow] (bi) -- node[btool, right] {ar T} (va);
+
+    \node<2->[bnode, right=18mm of va] (vo) {vmlinux.o};
+    \draw<2->[barrow] (va) -- node[btool, above] {ld -r} node[btool, below] {objtool} (vo);
+
+    \node<3->[bnode, above=of vo] (t1) {.tmp\_vmlinux1};
+    \node<3->[bnode, above=of t1] (t2) {.tmp\_vmlinux2};
+    \node<3->[bnode, above=of t2, dashed] (t3) {.tmp\_vmlinux3};
+    \draw<3->[barrow] (vo) -- node[btool, right] {ld} (t1);
+    \draw<3->[barrow] (t1) -- node[btool, right] {kallsyms} (t2);
+    \draw<3->[barrow, dashed] (t2) -- node[btool, right] {kallsyms} (t3);
+
+    \node<4->[bnode, right=20mm of t1, fill=yellow!20] (btf) {.btf.o};
+    \draw<4->[barrow] (t1) -- node[btool, above] {pahole -J} (btf);
+
+    \node<5->[bnode, right=20mm of t3] (vu) {vmlinux.unstripped};
+    \draw<5->[barrow] (t3) -- node[btool, above] {ld} (vu);
+    \draw<5->[barrow] (btf) -- (vu);
+    \node<5->[bnode, right=of vu, fill=green!20] (vm) {vmlinux};
+    \draw<5->[barrow] (vu) -- node[btool, above] {strip} (vm);
+    \node<5->[bnode, below=of vm] (sm) {System.map};
+    \draw<5->[barrow] (vu) |- (sm);
+  \end{tikzpicture}
+  \end{center}
+
+  \onslide<6->{\footnotesize \file{vmlinux} is a regular ELF executable.
+    But it cannot be booted directly on \xes.}
+
+\end{frame}
+
+\begin{frame}{From \file{vmlinux} to \file{bzImage}}{\xes}
+
+  \begin{columns}[c]
+    \begin{column}{.45\textwidth}
+      \begin{tikzpicture}[node distance=4mm]
+	\node[bnode, fill=green!20] (vm) {vmlinux};
+	\node[bnode, below=of vm] (vb) {compressed/vmlinux.bin};
+	\node[bnode, below=of vb] (gz) {compressed/vmlinux.bin.zst};
+	\node[bnode, below=of gz] (pig) {compressed/piggy.o};
+	\node[bnode, below=of pig] (cv) {compressed/vmlinux};
+	\node[bnode, below=of cv] (bvb) {boot/vmlinux.bin};
+	\node[bnode, right=10mm of bvb] (setup) {boot/setup.bin};
+	\node[bnode, below=of bvb, fill=red!20] (bz) {boot/bzImage};
+
+	\draw[barrow] (vm) -- node[btool, right] {objcopy -O binary} (vb);
+	\draw[barrow] (vb) -- node[btool, right] {zstd / gzip / xz / \dots} (gz);
+	\draw[barrow] (gz) -- node[btool, right] {mkpiggy + as} (pig);
+	\draw[barrow] (pig) -- node[btool, right] {ld + decompressor} (cv);
+	\draw[barrow] (cv) -- node[btool, right] {objcopy} (bvb);
+	\draw[barrow] (bvb) -- node[btool, right] {tools/build} (bz);
+	\draw[barrow] (setup) |- (bz);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{.5\textwidth}
+      \begin{itemize}[<+->]
+	\item \file{arch/x86/boot/}
+	\item Raw binary, compressed
+	\item Wrapped by a \emph{decompressor}
+	  \begin{itemize}[<.->]
+	    \item Own small kernel: decompresses and relocates (KASLR)
+	  \end{itemize}
+	\item \file{setup.bin} -- 16-bit real-mode code
+	  \begin{itemize}[<.->]
+	    \item Header for bootloaders (boot protocol)
+	    \item Also an EFI PE image (EFI stub)
+	  \end{itemize}
+	\item \cmd{make install} copies it to \file{/boot/vmlinuz-*}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]{Booting the Result}
+
+  \begin{itemize}[<+->]
+    \item No need to install, no need to reboot
+    \item QEMU loads \file{bzImage} directly
+      \begin{lstlisting}[language=bash]
+qemu-system-x86_64 -enable-kvm -m 2G -nographic \
+    -kernel arch/x86/boot/bzImage -initrd initrd.img \
+    -append 'console=ttyS0 root=/dev/vda' -drive file=root.img,if=virtio
+      \end{lstlisting}
+    \item Even simpler: \cmd{virtme-ng}
+      \begin{lstlisting}[language=bash]
+vng --build          # configure (minimal for VM) and build
+vng                  # boot it, using the host's root fs (read-only)
+      \end{lstlisting}
+    \item Debug with \cmd{gdb}: add \cmd{-s -S} to QEMU, then
+      \begin{lstlisting}[language=bash]
+gdb vmlinux -ex 'target remote :1234'
+      \end{lstlisting}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Build \& Boot}
+
+  \demo{Building and booting a kernel}
+
+  \begin{lstlisting}[language=bash]
+time make -j$(nproc)
+ls -l vmlinux arch/x86/boot/bzImage
+file vmlinux arch/x86/boot/bzImage
+vng
+  \end{lstlisting}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{ELF and DWARF in a Nutshell}
+\frame{\sectionpage}
+
+\begin{frame}{ELF}
+
+  \begin{columns}[c]
+    \begin{column}{.35\textwidth}
+      \tikzstyle{pre} = [<-,>=stealth',semithick]
+      \tikzstyle{sec} = [draw,semithick,minimum width=3.5cm, minimum height=6mm]
+      \begin{tikzpicture}[node distance=1pt, font=\scriptsize]
+	\node [sec] (HEAD) {ELF header};
+	\node [sec,below=of HEAD] (PRGHDR) {Program Header Table};
+	\node [sec,below=of PRGHDR] (TEXT) {.text};
+	\node [sec,below=of TEXT] (RODATA) {.rodata};
+	\node [sec,below=of RODATA] (DATA) {.data};
+	\node [minimum width=3.5cm,below=of DATA] (MORE) {\dots};
+	\node [sec,below=of MORE] (DEBUG) {.debug\_info, \dots};
+	\node [sec,below=of DEBUG] (SECHDR) {Section Header Table};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{.6\textwidth}
+      \heading{Executable and Linkable Format}
+      \begin{itemize}[<+->]
+	\item Object files, executables, libraries, core dumps
+	\item \file{.o}, \file{.ko}, \file{vmlinux} -- all ELF
+	\item \emph{Sections}: code, data, symbols, relocations, debug info
+	\item Kernel-specific sections
+	  \begin{itemize}[<.->]
+	    \item \file{.init.text} -- freed after boot
+	    \item \file{__ksymtab} -- exported symbols
+	    \item \file{__ex_table} -- exception fixups
+	    \item \file{.modinfo} -- module metadata
+	  \end{itemize}
+	\item Tools: \cmd{readelf}, \cmd{objdump}, \cmd{nm}, \cmd{objcopy}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]{ELF}{Examples}
+
+  \begin{lstlisting}[language=bash]
+readelf -h vmlinux                  # header: type, arch, entry point
+readelf -S fs/ext4/ext4.ko          # sections
+readelf -s fs/ext4/ext4.ko | grep UND   # undefined symbols (from vmlinux)
+objdump -d --no-show-raw-insn fs/ext4/dir.o | less
+nm vmlinux | grep ' T start_kernel'
+grep start_kernel System.map
+modinfo fs/ext4/ext4.ko             # parses .modinfo
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}{DWARF}
+
+  \heading{Debugging information format}
+  \begin{itemize}[<+->]
+    \item Maps machine code back to the source
+      \begin{itemize}[<.->]
+	\item Addresses $\leftrightarrow$ files and lines
+	\item Types, structures, variables, inlined functions, \dots
+      \end{itemize}
+    \item Stored in ELF sections \file{.debug_*}
+    \item \cmd{CONFIG_DEBUG_INFO_DWARF5} (or \cmd{_DWARF4})
+      \begin{itemize}[<.->]
+	\item \emph{Huge}: \file{vmlinux} grows from tens to hundreds of MB
+	\item Slower build
+	\item Distributions ship it separately (\file{-debuginfo} packages)
+      \end{itemize}
+    \item Consumers
+      \begin{itemize}[<.->]
+	\item \cmd{gdb}, \cmd{addr2line}, \cmd{crash} (kernel dumps), \cmd{perf}
+	\item \cmd{scripts/faddr2line}, \cmd{scripts/decode_stacktrace.sh}
+	\item \cmd{pahole} -- and the BTF generation!
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{DWARF}{Examples}
+
+  \heading{Where did it crash?}
+  \begin{lstlisting}[language=bash]
+$ scripts/faddr2line vmlinux ext4_readdir+0x1a7/0x5e0
+ext4_readdir+0x1a7/0x5e0:
+ext4_readdir at fs/ext4/dir.c:178
+  \end{lstlisting}
+
+  \pause
+
+  \heading{What does the structure look like?}
+  \begin{lstlisting}[language=bash]
+$ pahole -C list_head vmlinux
+struct list_head {
+        struct list_head *         next;                 /*     0     8 */
+        struct list_head *         prev;                 /*     8     8 */
+
+        /* size: 16, cachelines: 1, members: 2 */
+        /* last cacheline: 16 bytes */
+};
+  \end{lstlisting}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{BTF and BPF}
+\frame{\sectionpage}
+
+\begin{frame}{BPF}
+
+  \begin{itemize}[<+->]
+    \item Small programs \emph{loaded into} the running kernel
+      \begin{itemize}[<.->]
+	\item No module, no reboot
+	\item \emph{Verifier} proves safety, JIT compiles to native code
+      \end{itemize}
+    \item Attached to hooks
+      \begin{itemize}[<.->]
+	\item kprobes, fentry, tracepoints -- tracing
+	\item XDP, tc -- networking
+	\item LSM -- security
+	\item sched\_ext -- schedulers!
+      \end{itemize}
+    \item Problem: BPF programs read kernel structures
+      \begin{itemize}[<.->]
+	\item Their layout differs per version and config
+	\item Shipping DWARF everywhere is too big
+      \end{itemize}
+    \item[$\Rightarrow$] BTF
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{BTF}
+
+  \heading{BPF Type Format}
+  \begin{itemize}[<+->]
+    \item Compact type information (DWARF: hundreds of MB, BTF: a few MB)
+    \item \cmd{CONFIG_DEBUG_INFO_BTF} (needs \cmd{DEBUG_INFO} and \cmd{pahole})
+    \item Generated during the link (\file{scripts/gen-btf.sh})
+      \begin{enumerate}[<.->]
+	\item \cmd{pahole -J}: DWARF of \file{.tmp_vmlinux1} $\rightarrow$ BTF
+	\item \cmd{resolve_btfids}: kernel-specific fixups, \file{.BTF_ids}
+	\item Linked into \file{vmlinux} as section \file{.BTF}
+      \end{enumerate}
+    \item Modules: \cmd{CONFIG_DEBUG_INFO_BTF_MODULES}
+      \begin{itemize}[<.->]
+	\item \emph{Split} BTF -- only types not in \file{vmlinux}
+	\item \file{.ko} rebuilt when \file{vmlinux} changes
+      \end{itemize}
+    \item Runtime: \file{/sys/kernel/btf/vmlinux}, \file{/sys/kernel/btf/<module>}
+    \item DWARF can then be stripped, BTF stays
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{BTF}{Uses}
+
+  \begin{itemize}[<+->]
+    \item Header with \emph{all} kernel types for BPF programs (CO-RE)
+      \begin{lstlisting}[language=bash]
+bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+      \end{lstlisting}
+    \item Typed tracing without headers or debuginfo
+      \begin{lstlisting}[language=bash]
+bpftrace -e 'fentry:vfs_read { @[comm] = count(); }'
+bpftrace -e 'fentry:ext4_readdir { printf("%s %s\n", comm,
+    str(args.file->f_path.dentry->d_name.name)); }'
+      \end{lstlisting}
+    \item Structure inspection
+      \begin{lstlisting}[language=bash]
+bpftool btf dump file /sys/kernel/btf/vmlinux | grep -A3 "STRUCT 'list_head'"
+pahole list_head        # pahole reads /sys/kernel/btf/vmlinux by default
+      \end{lstlisting}
+  \end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Incremental Builds}
+\frame{\sectionpage}
+
+\begin{frame}{The Problem}
+
+  \begin{itemize}[<+->]
+    \item Full build: minutes to hours
+    \item Change one line $\Rightarrow$ rebuild \emph{only} what is needed
+    \item \cmd{make}: rebuild a target if a prerequisite is newer
+      \begin{itemize}[<.->]
+	\item \cmd{gcc -MMD} gives all included headers
+      \end{itemize}
+    \item But
+      \begin{enumerate}[<.->]
+	\item \emph{Every} file includes \file{autoconf.h}
+	  \begin{itemize}
+	    \item Toggle one option $\Rightarrow$ rebuild everything!?
+	  \end{itemize}
+	\item Changed \emph{flags} (\cmd{ccflags-y}, \cmd{make W=1}, new
+	  compiler) do not change any timestamp
+	  \begin{itemize}
+	    \item $\Rightarrow$ nothing rebuilt!?
+	  \end{itemize}
+      \end{enumerate}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{The Solution: \cmd{fixdep}}
+
+  \begin{itemize}[<+->]
+    \item \file{scripts/basic/fixdep} post-processes \file{.dir.o.d} into \file{.dir.o.cmd}
+      \begin{lstlisting}[language=make]
+savedcmd_fs/ext4/dir.o := gcc -Wp,-MMD,fs/ext4/.dir.o.d -nostdinc ...
+
+deps_fs/ext4/dir.o := \
+  fs/ext4/dir.c \
+    $(wildcard include/config/UNICODE) \
+    $(wildcard include/config/EXT4_FS_ENCRYPTION) \
+  include/linux/fs.h \
+  ...
+      \end{lstlisting}
+    \item[1.] \file{autoconf.h} dependency \emph{replaced} by \file{include/config/<SYMBOL>}
+      \begin{itemize}[<.->]
+	\item Only for symbols the file (or its headers) mention
+	\item \cmd{syncconfig} touches only files of \emph{changed} symbols
+      \end{itemize}
+    \item[2.] \cmd{savedcmd_*} compared to the current command (\cmd{if_changed})
+      \begin{itemize}[<.->]
+	\item Different flags $\Rightarrow$ rebuild
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{What Gets Rebuilt?}
+
+  \begin{itemize}[<+->]
+    \item \heading{\cmd{touch fs/ext4/dir.c}}
+      \begin{itemize}[<.->]
+	\item \file{dir.o} $\rightarrow$ \file{ext4.o} $\rightarrow$ \file{ext4.ko}
+	  (if \cmd{m})
+	\item \file{built-in.a} $\rightarrow$ \file{vmlinux} relink (if \cmd{y})
+      \end{itemize}
+    \item \heading{\cmd{scripts/config -e EXT4_DEBUG}}
+      \begin{itemize}[<.->]
+	\item Only files referencing \file{CONFIG_EXT4_DEBUG}
+      \end{itemize}
+    \item \heading{\cmd{touch include/linux/fs.h}}
+      \begin{itemize}[<.->]
+	\item Thousands of files
+	\item Header hygiene matters!
+      \end{itemize}
+    \item \heading{\cmd{make W=1}} -- different flags $\Rightarrow$ everything
+    \item \heading{Why was it rebuilt?}
+      \begin{itemize}[<.->]
+	\item \cmd{make V=2} prints the reason
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Faster Builds}
+
+  \begin{itemize}[<+->]
+    \item \cmd{make -j\$(nproc)} -- obviously
+    \item Smaller config: \cmd{localmodconfig}, \cmd{vng --build}
+    \item Build only what you touch: \cmd{make fs/ext4/}, \cmd{make M=fs/ext4}
+    \item \cmd{O=} -- separate build dirs per config/arch, one source tree
+    \item \cmd{ccache} -- caches compiler outputs
+      \begin{itemize}[<.->]
+	\item \cmd{make CC='ccache gcc'}
+	\item Helps when switching branches back and forth
+      \end{itemize}
+    \item Distributed: \cmd{icecream}, \cmd{distcc}
+    \item Skip debug info when not needed
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Incremental Builds}
+
+  \demo{What gets rebuilt}
+
+  \begin{lstlisting}[language=bash]
+make -j$(nproc)                       # nothing to do
+touch fs/ext4/dir.c && make V=2 -j$(nproc)
+cat fs/ext4/.dir.o.cmd
+scripts/config -e EXT4_DEBUG && make -j$(nproc)
+ls -l --time-style=full-iso include/config/EXT4_DEBUG include/config/EXT4_FS
+  \end{lstlisting}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Modules}
+\frame{\sectionpage}
+
+\begin{frame}{Kernel Modules}
+
+  \begin{itemize}[<+->]
+    \item \file{.ko} = relocatable ELF (like \file{.o}) + metadata
+    \item Loaded at runtime: \cmd{insmod}, \cmd{modprobe} (+ dependencies)
+      \begin{itemize}[<.->]
+	\item The kernel itself links it (resolves symbols, relocates)
+	\item Only \cmd{EXPORT_SYMBOL()}-ed symbols available
+      \end{itemize}
+    \item \emph{In-tree}: \cmd{obj-m} in the kernel's Kbuild files
+    \item \emph{Out-of-tree}: your own directory
+      \begin{itemize}[<.->]
+	\item Needs a \emph{configured and prepared} kernel tree
+	\item \file{/lib/modules/\$(uname -r)/build}
+	\item Distros: \file{kernel-default-devel}, \file{linux-headers-*}
+      \end{itemize}
+    \item Must match the running kernel
+      \begin{itemize}[<.->]
+	\item \emph{vermagic}: version, SMP, preempt, \dots
+	\item \cmd{CONFIG_MODVERSIONS}: CRC of each exported symbol's type
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Writing Your Own Module}{\file{hello.c}}
+
+  \begin{lstlisting}[basicstyle=\scriptsize\ttfamily]
+// SPDX-License-Identifier: GPL-2.0
+#include <linux/init.h>
+#include <linux/module.h>
+
+static int __init hello_init(void)
+{
+	pr_info("Hello from %s\n", KBUILD_MODNAME);
+	return 0;
+}
+
+static void __exit hello_exit(void)
+{
+	pr_info("Goodbye\n");
+}
+
+module_init(hello_init);
+module_exit(hello_exit);
+MODULE_DESCRIPTION("Hello world module");
+MODULE_LICENSE("GPL");
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Writing Your Own Module}{\file{Kbuild} and \file{Makefile}}
+
+  \begin{columns}[T]
+    \begin{column}{.38\textwidth}
+      \begin{block}{\file{Kbuild}}
+	\begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+obj-m := hello.o
+# composite:
+# hello-y := main.o helpers.o
+	\end{lstlisting}
+      \end{block}
+    \end{column}
+    \begin{column}{.58\textwidth}
+      \pause
+      \begin{block}{\file{Makefile} -- just a wrapper}
+	\begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+KDIR ?= /lib/modules/$(shell uname -r)/build
+
+all:
+	$(MAKE) -C $(KDIR) M=$(CURDIR)
+
+clean:
+	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
+	\end{lstlisting}
+      \end{block}
+    \end{column}
+  \end{columns}
+
+  \pause
+  \vspace{1em}
+
+  \begin{itemize}
+    \item \cmd{-C} -- run the \emph{kernel's} Makefile
+    \item \cmd{M=} -- but build the module in this directory
+    \item Docs: \file{Documentation/kbuild/modules.rst}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Linking a Module}
+
+  \begin{center}
+  \begin{tikzpicture}[node distance=5mm and 9mm]
+    \node[bnode] (c) {hello.c};
+    \node[bnode, right=of c] (o) {hello.o};
+    \node<2->[bnode, below=of o] (modc) {hello.mod.c};
+    \node<2->[bnode, right=of modc] (modo) {hello.mod.o};
+    \node<2->[bnode, left=of modc] (sym) {Module.symvers\\(from kernel)};
+    \node<3->[bnode, right=26mm of o] (ko) {hello.ko};
+    \node<4->[bnode, right=of ko, fill=yellow!20] (kob) {hello.ko\\+.BTF};
+    \node<5->[bnode, right=of kob, fill=green!20] (kos) {hello.ko\\+signature};
+
+    \draw[barrow] (c) -- node[btool, above] {gcc -c} (o);
+    \draw<2->[barrow] (o) -- node[btool, right] {modpost} (modc);
+    \draw<2->[barrow] (sym) -- (modc);
+    \draw<2->[barrow] (modc) -- node[btool, above] {gcc -c} (modo);
+    \draw<3->[barrow] (o) -- node[btool, above] {ld -r} (ko);
+    \draw<3->[barrow] (modo) -- (ko);
+    \draw<4->[barrow] (ko) -- node[btool, above] {pahole} (kob);
+    \draw<5->[barrow] (kob) -- node[btool, above] {sign-file} (kos);
+  \end{tikzpicture}
+  \end{center}
+
+  \begin{itemize}[<+->]
+    \item \cmd{gcc} -- same as for built-in, plus \cmd{-DMODULE}
+    \item \cmd{modpost} -- checks undefined symbols against \file{Module.symvers},
+      generates \file{.mod.c}: vermagic, dependencies, \file{struct module}
+    \item \cmd{ld -r} -- \file{.ko} stays relocatable
+    \item Optional: BTF (split, base = \file{vmlinux})
+    \item Optional: signature (\cmd{CONFIG_MODULE_SIG}) -- at \cmd{modules_install}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Modules}
+
+  \demo{Out-of-tree module}
+
+  \begin{lstlisting}[language=bash]
+make                                  # or: make KDIR=~/linux
+modinfo hello.ko
+readelf -s hello.ko | grep UND
+sudo insmod hello.ko && sudo dmesg | tail -1
+cat /proc/sys/kernel/tainted          # O: out-of-tree, E: unsigned
+sudo rmmod hello
+  \end{lstlisting}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Real-World Kernel Development}
+\frame{\sectionpage}
+
+\begin{frame}{Static Checking}{Find bugs before running}
+
+  \begin{itemize}[<+->]
+    \item Compiler warnings
+      \begin{itemize}[<.->]
+	\item \cmd{make W=1} (or \cmd{W=12}) -- extra warnings
+	\item Build with both \cmd{gcc} and \cmd{clang}, several arches
+      \end{itemize}
+    \item \cmd{make C=1} -- run \cmd{sparse} on rebuilt files
+      \begin{itemize}[<.->]
+	\item \cmd{__user}, \cmd{__iomem}, endianness (\cmd{__le32}), locking annotations
+      \end{itemize}
+    \item \cmd{smatch} -- deeper flow analysis
+    \item \cmd{make coccicheck} -- Coccinelle semantic patches
+    \item \cmd{scripts/checkpatch.pl} -- coding style
+    \item Bots do this for you (after you send)
+      \begin{itemize}[<.->]
+	\item 0-day (Intel), KernelCI, syzbot, \dots
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Dynamic Checking}{Find bugs while running}
+
+  \begin{itemize}[<+->]
+    \item Debug configs: memory and concurrency checkers
+      \begin{itemize}[<.->]
+	\item \cmd{KASAN} -- use-after-free, out-of-bounds
+	\item \cmd{UBSAN} -- undefined behavior
+	\item \cmd{KCSAN} -- data races
+	\item \cmd{PROVE_LOCKING} (lockdep) -- deadlocks, \emph{before} they happen
+	\item \cmd{KFENCE}, \cmd{kmemleak}, \cmd{DEBUG_LIST}, \dots
+      \end{itemize}
+    \item Tests
+      \begin{itemize}[<.->]
+	\item KUnit -- in-kernel unit tests: \cmd{tools/testing/kunit/kunit.py run}
+	\item kselftests -- \cmd{make kselftest}
+	\item LTP, xfstests, blktests, \dots
+      \end{itemize}
+    \item Fuzzing: \cmd{syzkaller} -- thousands of bugs found
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Debugging}
+
+  \begin{itemize}[<+->]
+    \item \cmd{printk()} / \cmd{pr_debug()} + dynamic debug
+      \begin{itemize}[<.->]
+	\item Still the most used debugger
+      \end{itemize}
+    \item Oops/panic decoding: \cmd{scripts/decode_stacktrace.sh},
+      \cmd{faddr2line}
+    \item Tracing
+      \begin{itemize}[<.->]
+	\item \cmd{ftrace} (\file{/sys/kernel/tracing}), \cmd{trace-cmd}
+	\item \cmd{perf}, \cmd{bpftrace}
+      \end{itemize}
+    \item \cmd{gdb} + QEMU (\cmd{-s -S})
+      \begin{itemize}[<.->]
+	\item \cmd{CONFIG_GDB_SCRIPTS}: \cmd{lx-dmesg}, \cmd{lx-ps}, \cmd{lx-symbols}, \dots
+      \end{itemize}
+    \item Post-mortem: \cmd{kdump} $\rightarrow$ \file{vmcore} $\rightarrow$ \cmd{crash}
+      \begin{itemize}[<.->]
+	\item Needs the \emph{exact} \file{vmlinux} with DWARF
+	\item Daily bread for distro kernel engineers
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{How We Do It at SUSE}
+\frame{\sectionpage}
+
+\begin{frame}{Distribution Kernel}
+
+  \begin{itemize}[<+->]
+    \item One kernel for \emph{all} users and hardware
+      \begin{itemize}[<.->]
+	\item Nearly everything as modules (thousands of \file{.ko})
+	\item Several archs: \xesh, arm64, ppc64le, s390x, \dots
+	\item Several \emph{flavors}: \file{default}, \file{rt}, \file{64kb}, \file{kvmsmall}, \dots
+      \end{itemize}
+    \item Reproducible: anyone can rebuild the exact same kernel
+    \item Built in an isolated environment (no network, clean chroot/VM)
+      \begin{itemize}[<.->]
+	\item Open Build Service (OBS): \url{https://build.opensuse.org}
+      \end{itemize}
+    \item Tumbleweed: latest upstream stable + a few patches
+    \item SLE: older base + thousands of backported patches, supported for 10+ years
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{\file{kernel-source.git}}
+
+  \begin{itemize}[<+->]
+    \item \emph{Not} a kernel tree! A tree of \emph{patches}
+      \begin{itemize}[<.->]
+	\item \url{https://github.com/SUSE/kernel-source}
+	\item One branch per product: \file{stable} (Tumbleweed), \file{SL-16.1},
+	  \file{SLE15-SP7}, \dots
+      \end{itemize}
+    \item Content
+      \begin{itemize}[<.->]
+	\item \file{patches.*/} + \file{series.conf} -- patches on top of upstream tarball
+	\item \file{config/<arch>/<flavor>} -- \file{.config} for each build
+	\item \file{supported.conf} -- support status of modules
+	\item \file{rpm/*.spec.in} -- templates of RPM spec files
+	\item \file{scripts/} -- tooling
+      \end{itemize}
+    \item \cmd{scripts/sequence-patch} -- apply patches, get a kernel tree
+    \item \cmd{scripts/tar-up.sh} -- create package sources for OBS
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{From \file{kernel-source.git} to \file{kernel-default.rpm}}
+
+  \begin{center}
+  \begin{tikzpicture}[node distance=6mm and 6mm]
+    \node[bnode] (git) {kernel-source.git};
+    \node[bnode, right=12mm of git] (pkg) {linux-x.y.tar.xz\\patches.*.tar.bz2\\
+      config.tar.bz2\\kernel-default.spec\\\dots};
+    \node<2->[bnode, right=12mm of pkg, fill=yellow!20] (obs) {OBS\\
+      \texttt{rpmbuild}};
+    \node<3->[bnode, right=10mm of obs, fill=green!20] (rpm) {kernel-default\\
+      kernel-default-devel\\kernel-default-debuginfo\\kernel-devel\\kernel-syms\\\dots};
+    \node<4->[bnode, below=10mm of rpm] (qa) {openQA};
+    \node<4->[bnode, left=14mm of qa] (tw) {Tumbleweed\\update};
+
+    \draw[barrow] (git) -- node[btool, above] {tar-up.sh} (pkg);
+    \draw<2->[barrow] (pkg) -- node[btool, above] {osc / push} (obs);
+    \draw<3->[barrow] (obs) -- (rpm);
+    \draw<4->[barrow] (rpm) -- (qa);
+    \draw<4->[barrow] (qa) -- (tw);
+  \end{tikzpicture}
+  \end{center}
+
+  \begin{itemize}[<+(1)->]
+    \item Spec \texttt{\%prep}: unpack tarball, apply patches, copy config
+    \item Spec \texttt{\%build}: \cmd{make olddefconfig}, then \cmd{make} --
+      the same as today!
+    \item Spec \texttt{\%install}: \cmd{make install}, \cmd{modules_install},
+      split debuginfo, sign modules, \dots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{What Is in \file{kernel-default.rpm}?}
+
+  \begin{lstlisting}[language=bash]
+$ rpm -ql kernel-default | grep -v '/kernel/'
+/usr/lib/modules/7.2.8-1-default/System.map
+/usr/lib/modules/7.2.8-1-default/config
+/usr/lib/modules/7.2.8-1-default/modules.order
+/usr/lib/modules/7.2.8-1-default/vmlinuz
+...
+$ rpm -ql kernel-default | grep -c '\.ko'
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item Scriptlets on install: \cmd{depmod}, \cmd{dracut} (initrd), bootloader entry
+    \item \file{kernel-default-devel} -- for out-of-tree modules
+      (\file{/lib/modules/*/build})
+    \item \file{kernel-default-debuginfo} -- \file{vmlinux} with DWARF for \cmd{crash}
+    \item Upstream has packaging targets too
+      \begin{itemize}[<.->]
+	\item \cmd{make binrpm-pkg}, \cmd{rpm-pkg}, \cmd{bindeb-pkg}, \cmd{pacman-pkg}, \cmd{tar-pkg}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Summary}
+\frame{\sectionpage}
+
+\begin{frame}{Summary}
+
+  \begin{enumerate}[<+->]
+    \item \emph{Kconfig} -- what to build ($\rightarrow$ \file{.config})
+    \item \emph{Kbuild} -- how the pieces fit together (\cmd{obj-y}, \cmd{obj-m})
+    \item \emph{Compile} -- \file{.o} $\rightarrow$ \file{built-in.a} $\rightarrow$
+      \file{vmlinux.a}
+    \item \emph{Link} -- \file{vmlinux.o} $\rightarrow$ (kallsyms, BTF) $\rightarrow$
+      \file{vmlinux} $\rightarrow$ \file{bzImage}
+    \item \emph{Modules} -- \file{.o} $\rightarrow$ \cmd{modpost} $\rightarrow$ \file{.ko}
+    \item \emph{Incremental} -- \cmd{fixdep}, \file{include/config/*}, \file{.cmd} files
+    \item \emph{Package} -- \file{kernel-source.git} $\rightarrow$ OBS $\rightarrow$ RPM
+  \end{enumerate}
+
+\end{frame}
+
+\begin{frame}{Resources}
+
+  \begin{itemize}
+    \item \file{Documentation/kbuild/} -- in the kernel tree
+      \begin{itemize}
+	\item \url{https://docs.kernel.org/kbuild/}
+      \end{itemize}
+    \item \url{https://docs.kernel.org/bpf/btf.html}
+    \item \url{https://lwn.net/Kernel/Index/}
+    \item \url{https://kernelnewbies.org}
+    \item \url{https://github.com/arighi/virtme-ng}
+    \item \url{https://github.com/SUSE/kernel-source}
+    \item \url{https://build.opensuse.org/project/show/Kernel:stable}
+  \end{itemize}
 
 \end{frame}
 
