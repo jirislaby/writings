@@ -43,16 +43,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{frame}{Presentation Outline}
-
-  \begin{columns}[T]
-    \begin{column}{.5\textwidth}
-      \tableofcontents[sections={1-5}]
-    \end{column}
-    \begin{column}{.5\textwidth}
-      \tableofcontents[sections={6-}]
-    \end{column}
-  \end{columns}
-
+  \tableofcontents
 \end{frame}
 
 \section{Introduction}
@@ -81,7 +72,7 @@
 
   \begin{columns}[T]
     \begin{column}{.48\textwidth}
-      \heading{Labs}
+      \heading{Linux-Kernel-Labs}
       \begin{itemize}
 	\item Prepared VM \& kernel
 	\item A single module
@@ -89,7 +80,9 @@
 	\item A few hundred lines
       \end{itemize}
     \end{column}
+
     \pause
+
     \begin{column}{.48\textwidth}
       \heading{Real World}
       \begin{itemize}
@@ -106,7 +99,7 @@
   \vspace{2em}
 
   \begin{center}
-    \heading{Today:} what happens between \cmd{vim foo.c} and a booting kernel
+    \heading{Today:} what happens between \cmd{nvim foo.c} and a booting kernel
   \end{center}
 
 \end{frame}
@@ -312,7 +305,7 @@ CONFIG_EXT4_FS_POSIX_ACL=y
   \begin{lstlisting}[language=bash]
 make defconfig
 make menuconfig                         # search with '/', help with '?'
-scripts/config -m EXT4_FS -e DEBUG_INFO_DWARF5 -e DEBUG_INFO_BTF
+scripts/config -m EXT4_FS -e DEBUG_INFO_DWARF5
 make olddefconfig
 diff -u .config.old .config
   \end{lstlisting}
@@ -468,7 +461,7 @@ gcc -Wp,-MMD,fs/ext4/.dir.o.d -nostdinc -I./arch/x86/include -I./include \
 	\item \file{.tmp_vmlinux3} -- only if something still moved
 	\item Final link with the correct table
       \end{enumerate}
-    \item BTF is generated from \file{.tmp_vmlinux1} too (later)
+    %\item BTF is generated from \file{.tmp_vmlinux1} too (later)
     \item \file{System.map} must match the embedded table (checked)
   \end{itemize}
 
@@ -568,11 +561,6 @@ qemu-system-x86_64 -enable-kvm -m 2G -nographic \
     -kernel arch/x86/boot/bzImage -initrd initrd.img \
     -append 'console=ttyS0 root=/dev/vda' -drive file=root.img,if=virtio
       \end{lstlisting}
-    \item Even simpler: \cmd{virtme-ng}
-      \begin{lstlisting}[language=bash]
-vng --build          # configure (minimal for VM) and build
-vng                  # boot it, using the host's root fs (read-only)
-      \end{lstlisting}
     \item Debug with \cmd{gdb}: add \cmd{-s -S} to QEMU, then
       \begin{lstlisting}[language=bash]
 gdb vmlinux -ex 'target remote :1234'
@@ -583,13 +571,12 @@ gdb vmlinux -ex 'target remote :1234'
 
 \begin{frame}[fragile]{Build \& Boot}
 
-  \demo{Building and booting a kernel}
+  \demo{Building a kernel}
 
   \begin{lstlisting}[language=bash]
 time make -j$(nproc)
 ls -l vmlinux arch/x86/boot/bzImage
 file vmlinux arch/x86/boot/bzImage
-vng
   \end{lstlisting}
 
 \end{frame}
@@ -670,7 +657,7 @@ modinfo fs/ext4/ext4.ko             # parses .modinfo
       \begin{itemize}[<.->]
 	\item \cmd{gdb}, \cmd{addr2line}, \cmd{crash} (kernel dumps), \cmd{perf}
 	\item \cmd{scripts/faddr2line}, \cmd{scripts/decode_stacktrace.sh}
-	\item \cmd{pahole} -- and the BTF generation!
+	%\item \cmd{pahole} -- and the BTF generation!
       \end{itemize}
   \end{itemize}
 
@@ -703,78 +690,78 @@ struct list_head {
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
-\section{BTF and BPF}
-\frame{\sectionpage}
-
-\begin{frame}{BPF}
-
-  \begin{itemize}[<+->]
-    \item Small programs \emph{loaded into} the running kernel
-      \begin{itemize}[<.->]
-	\item No module, no reboot
-	\item \emph{Verifier} proves safety, JIT compiles to native code
-      \end{itemize}
-    \item Attached to hooks
-      \begin{itemize}[<.->]
-	\item kprobes, fentry, tracepoints -- tracing
-	\item XDP, tc -- networking
-	\item LSM -- security
-	\item sched\_ext -- schedulers!
-      \end{itemize}
-    \item Problem: BPF programs read kernel structures
-      \begin{itemize}[<.->]
-	\item Their layout differs per version and config
-	\item Shipping DWARF everywhere is too big
-      \end{itemize}
-    \item[$\Rightarrow$] BTF
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}{BTF}
-
-  \heading{BPF Type Format}
-  \begin{itemize}[<+->]
-    \item Compact type information (DWARF: hundreds of MB, BTF: a few MB)
-    \item \cmd{CONFIG_DEBUG_INFO_BTF} (needs \cmd{DEBUG_INFO} and \cmd{pahole})
-    \item Generated during the link (\file{scripts/gen-btf.sh})
-      \begin{enumerate}[<.->]
-	\item \cmd{pahole -J}: DWARF of \file{.tmp_vmlinux1} $\rightarrow$ BTF
-	\item \cmd{resolve_btfids}: kernel-specific fixups, \file{.BTF_ids}
-	\item Linked into \file{vmlinux} as section \file{.BTF}
-      \end{enumerate}
-    \item Modules: \cmd{CONFIG_DEBUG_INFO_BTF_MODULES}
-      \begin{itemize}[<.->]
-	\item \emph{Split} BTF -- only types not in \file{vmlinux}
-	\item \file{.ko} rebuilt when \file{vmlinux} changes
-      \end{itemize}
-    \item Runtime: \file{/sys/kernel/btf/vmlinux}, \file{/sys/kernel/btf/<module>}
-    \item DWARF can then be stripped, BTF stays
-  \end{itemize}
-
-\end{frame}
-
-\begin{frame}[fragile]{BTF}{Uses}
-
-  \begin{itemize}[<+->]
-    \item Header with \emph{all} kernel types for BPF programs (CO-RE)
-      \begin{lstlisting}[language=bash]
-bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
-      \end{lstlisting}
-    \item Typed tracing without headers or debuginfo
-      \begin{lstlisting}[language=bash]
-bpftrace -e 'fentry:vfs_read { @[comm] = count(); }'
-bpftrace -e 'fentry:ext4_readdir { printf("%s %s\n", comm,
-    str(args.file->f_path.dentry->d_name.name)); }'
-      \end{lstlisting}
-    \item Structure inspection
-      \begin{lstlisting}[language=bash]
-bpftool btf dump file /sys/kernel/btf/vmlinux | grep -A3 "STRUCT 'list_head'"
-pahole list_head        # pahole reads /sys/kernel/btf/vmlinux by default
-      \end{lstlisting}
-  \end{itemize}
-
-\end{frame}
+% \section{BTF and BPF}
+% \frame{\sectionpage}
+%
+% \begin{frame}{BPF}
+%
+%   \begin{itemize}[<+->]
+%     \item Small programs \emph{loaded into} the running kernel
+%       \begin{itemize}[<.->]
+% 	\item No module, no reboot
+% 	\item \emph{Verifier} proves safety, JIT compiles to native code
+%       \end{itemize}
+%     \item Attached to hooks
+%       \begin{itemize}[<.->]
+% 	\item kprobes, fentry, tracepoints -- tracing
+% 	\item XDP, tc -- networking
+% 	\item LSM -- security
+% 	\item sched\_ext -- schedulers!
+%       \end{itemize}
+%     \item Problem: BPF programs read kernel structures
+%       \begin{itemize}[<.->]
+% 	\item Their layout differs per version and config
+% 	\item Shipping DWARF everywhere is too big
+%       \end{itemize}
+%     \item[$\Rightarrow$] BTF
+%   \end{itemize}
+%
+% \end{frame}
+%
+% \begin{frame}{BTF}
+%
+%   \heading{BPF Type Format}
+%   \begin{itemize}[<+->]
+%     \item Compact type information (DWARF: hundreds of MB, BTF: a few MB)
+%     \item \cmd{CONFIG_DEBUG_INFO_BTF} (needs \cmd{DEBUG_INFO} and \cmd{pahole})
+%     \item Generated during the link (\file{scripts/gen-btf.sh})
+%       \begin{enumerate}[<.->]
+% 	\item \cmd{pahole -J}: DWARF of \file{.tmp_vmlinux1} $\rightarrow$ BTF
+% 	\item \cmd{resolve_btfids}: kernel-specific fixups, \file{.BTF_ids}
+% 	\item Linked into \file{vmlinux} as section \file{.BTF}
+%       \end{enumerate}
+%     \item Modules: \cmd{CONFIG_DEBUG_INFO_BTF_MODULES}
+%       \begin{itemize}[<.->]
+% 	\item \emph{Split} BTF -- only types not in \file{vmlinux}
+% 	\item \file{.ko} rebuilt when \file{vmlinux} changes
+%       \end{itemize}
+%     \item Runtime: \file{/sys/kernel/btf/vmlinux}, \file{/sys/kernel/btf/<module>}
+%     \item DWARF can then be stripped, BTF stays
+%   \end{itemize}
+%
+% \end{frame}
+%
+% \begin{frame}[fragile]{BTF}{Uses}
+%
+%   \begin{itemize}[<+->]
+%     \item Header with \emph{all} kernel types for BPF programs (CO-RE)
+%       \begin{lstlisting}[language=bash]
+% bpftool btf dump file /sys/kernel/btf/vmlinux format c > vmlinux.h
+%       \end{lstlisting}
+%     \item Typed tracing without headers or debuginfo
+%       \begin{lstlisting}[language=bash]
+% bpftrace -e 'fentry:vfs_read { @[comm] = count(); }'
+% bpftrace -e 'fentry:ext4_readdir { printf("%s %s\n", comm,
+%     str(args.file->f_path.dentry->d_name.name)); }'
+%       \end{lstlisting}
+%     \item Structure inspection
+%       \begin{lstlisting}[language=bash]
+% bpftool btf dump file /sys/kernel/btf/vmlinux | grep -A3 "STRUCT 'list_head'"
+% pahole list_head        # pahole reads /sys/kernel/btf/vmlinux by default
+%       \end{lstlisting}
+%   \end{itemize}
+%
+% \end{frame}
 
 %%%%%%%%%%%%%%%%%%%%%%%
 
@@ -864,7 +851,7 @@ deps_fs/ext4/dir.o := \
 
   \begin{itemize}[<+->]
     \item \cmd{make -j\$(nproc)} -- obviously
-    \item Smaller config: \cmd{localmodconfig}, \cmd{vng --build}
+    \item Smaller config: \cmd{localmodconfig}
     \item Build only what you touch: \cmd{make fs/ext4/}, \cmd{make M=fs/ext4}
     \item \cmd{O=} -- separate build dirs per config/arch, one source tree
     \item \cmd{ccache} -- caches compiler outputs
@@ -911,12 +898,15 @@ ls -l --time-style=full-iso include/config/EXT4_DEBUG include/config/EXT4_FS
       \begin{itemize}[<.->]
 	\item Needs a \emph{configured and prepared} kernel tree
 	\item \file{/lib/modules/\$(uname -r)/build}
-	\item Distros: \file{kernel-default-devel}, \file{linux-headers-*}
+	\item Distros: \file{kernel-devel} + \file{kernel-default-devel}, \file{linux-headers-*}
       \end{itemize}
     \item Must match the running kernel
       \begin{itemize}[<.->]
 	\item \emph{vermagic}: version, SMP, preempt, \dots
 	\item \cmd{CONFIG_MODVERSIONS}: CRC of each exported symbol's type
+	  \begin{itemize}
+	    \item SL
+	  \end{itemize}
       \end{itemize}
   \end{itemize}
 
@@ -948,41 +938,28 @@ MODULE_LICENSE("GPL");
 
 \end{frame}
 
-\begin{frame}[fragile]{Writing Your Own Module}{\file{Kbuild} and \file{Makefile}}
+\begin{frame}[fragile]{Writing Your Own Module}{\file{Makefile}}
 
-  \begin{columns}[T]
-    \begin{column}{.38\textwidth}
-      \begin{block}{\file{Kbuild}}
-	\begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
-obj-m := hello.o
-# composite:
-# hello-y := main.o helpers.o
-	\end{lstlisting}
-      \end{block}
-    \end{column}
-    \begin{column}{.58\textwidth}
-      \pause
-      \begin{block}{\file{Makefile} -- just a wrapper}
-	\begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+  \begin{block}{\file{Makefile} -- just a wrapper}
+    \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
 KDIR ?= /lib/modules/$(shell uname -r)/build
+
+obj-m := hello.o
 
 all:
 	$(MAKE) -C $(KDIR) M=$(CURDIR)
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
-	\end{lstlisting}
-      \end{block}
-    \end{column}
-  \end{columns}
+    \end{lstlisting}
+  \end{block}
 
   \pause
-  \vspace{1em}
 
   \begin{itemize}
     \item \cmd{-C} -- run the \emph{kernel's} Makefile
     \item \cmd{M=} -- but build the module in this directory
-    \item Docs: \file{Documentation/kbuild/modules.rst}
+    \item Docs: \doc{Documentation/kbuild/modules.rst}
   \end{itemize}
 
 \end{frame}
@@ -997,8 +974,7 @@ clean:
     \node<2->[bnode, right=of modc] (modo) {hello.mod.o};
     \node<2->[bnode, left=of modc] (sym) {Module.symvers\\(from kernel)};
     \node<3->[bnode, right=26mm of o] (ko) {hello.ko};
-    \node<4->[bnode, right=of ko, fill=yellow!20] (kob) {hello.ko\\+.BTF};
-    \node<5->[bnode, right=of kob, fill=green!20] (kos) {hello.ko\\+signature};
+    \node<4->[bnode, right=of ko, fill=green!20] (kos) {hello.ko\\+signature};
 
     \draw[barrow] (c) -- node[btool, above] {gcc -c} (o);
     \draw<2->[barrow] (o) -- node[btool, right] {modpost} (modc);
@@ -1006,17 +982,18 @@ clean:
     \draw<2->[barrow] (modc) -- node[btool, above] {gcc -c} (modo);
     \draw<3->[barrow] (o) -- node[btool, above] {ld -r} (ko);
     \draw<3->[barrow] (modo) -- (ko);
-    \draw<4->[barrow] (ko) -- node[btool, above] {pahole} (kob);
-    \draw<5->[barrow] (kob) -- node[btool, above] {sign-file} (kos);
+    \draw<4->[barrow] (ko) -- node[btool, above] {sign-file} (kos);
   \end{tikzpicture}
   \end{center}
 
   \begin{itemize}[<+->]
     \item \cmd{gcc} -- same as for built-in, plus \cmd{-DMODULE}
-    \item \cmd{modpost} -- checks undefined symbols against \file{Module.symvers},
-      generates \file{.mod.c}: vermagic, dependencies, \file{struct module}
+    \item \cmd{modpost}
+      \begin{itemize}
+	\item checks undefined symbols against \file{Module.symvers}
+	\item generates \file{.mod.c}: vermagic, dependencies, \file{struct module}
+      \end{itemize}
     \item \cmd{ld -r} -- \file{.ko} stays relocatable
-    \item Optional: BTF (split, base = \file{vmlinux})
     \item Optional: signature (\cmd{CONFIG_MODULE_SIG}) -- at \cmd{modules_install}
   \end{itemize}
 
@@ -1059,7 +1036,7 @@ sudo rmmod hello
     \item \cmd{scripts/checkpatch.pl} -- coding style
     \item Bots do this for you (after you send)
       \begin{itemize}[<.->]
-	\item 0-day (Intel), KernelCI, syzbot, \dots
+	\item 0-day (Intel), KernelCI, syzbot, Sashiko (AI), \dots
       \end{itemize}
   \end{itemize}
 
@@ -1082,7 +1059,7 @@ sudo rmmod hello
 	\item kselftests -- \cmd{make kselftest}
 	\item LTP, xfstests, blktests, \dots
       \end{itemize}
-    \item Fuzzing: \cmd{syzkaller} -- thousands of bugs found
+    \item Fuzzing: \cmd{syzkaller} -- thousands of bugs found, usually hard to decrypt
   \end{itemize}
 
 \end{frame}
@@ -1131,7 +1108,7 @@ sudo rmmod hello
     \item Reproducible: anyone can rebuild the exact same kernel
     \item Built in an isolated environment (no network, clean chroot/VM)
       \begin{itemize}[<.->]
-	\item Open Build Service (OBS): \url{https://build.opensuse.org}
+	\item Open Build Service (OBS): \url{https://build.opensuse.org/project/subprojects/Kernel}
       \end{itemize}
     \item Tumbleweed: latest upstream stable + a few patches
     \item SLE: older base + thousands of backported patches, supported for 10+ years
@@ -1157,7 +1134,7 @@ sudo rmmod hello
 	\item \file{scripts/} -- tooling
       \end{itemize}
     \item \cmd{scripts/sequence-patch} -- apply patches, get a kernel tree
-    \item \cmd{scripts/tar-up.sh} -- create package sources for OBS
+    \item \cmd{scripts/tar-up} -- create package sources for OBS
   \end{itemize}
 
 \end{frame}
@@ -1176,7 +1153,7 @@ sudo rmmod hello
     \node<4->[bnode, below=10mm of rpm] (qa) {openQA};
     \node<4->[bnode, left=14mm of qa] (tw) {Tumbleweed\\update};
 
-    \draw[barrow] (git) -- node[btool, above] {tar-up.sh} (pkg);
+    \draw[barrow] (git) -- node[btool, above] {tar-up} (pkg);
     \draw<2->[barrow] (pkg) -- node[btool, above] {osc / push} (obs);
     \draw<3->[barrow] (obs) -- (rpm);
     \draw<4->[barrow] (rpm) -- (qa);
@@ -1204,6 +1181,7 @@ $ rpm -ql kernel-default | grep -v '/kernel/'
 /usr/lib/modules/7.2.8-1-default/vmlinuz
 ...
 $ rpm -ql kernel-default | grep -c '\.ko'
+5413
   \end{lstlisting}
 
   \pause
@@ -1212,10 +1190,11 @@ $ rpm -ql kernel-default | grep -c '\.ko'
     \item Scriptlets on install: \cmd{depmod}, \cmd{dracut} (initrd), bootloader entry
     \item \file{kernel-default-devel} -- for out-of-tree modules
       (\file{/lib/modules/*/build})
-    \item \file{kernel-default-debuginfo} -- \file{vmlinux} with DWARF for \cmd{crash}
+    \item \file{kernel-default-debuginfo} -- \file{vmlinux} with DWARF (for \cmd{crash}, \ldots)
     \item Upstream has packaging targets too
       \begin{itemize}[<.->]
 	\item \cmd{make binrpm-pkg}, \cmd{rpm-pkg}, \cmd{bindeb-pkg}, \cmd{pacman-pkg}, \cmd{tar-pkg}
+	\item Do not work well on SUSE
       \end{itemize}
   \end{itemize}
 
@@ -1233,7 +1212,7 @@ $ rpm -ql kernel-default | grep -c '\.ko'
     \item \emph{Kbuild} -- how the pieces fit together (\cmd{obj-y}, \cmd{obj-m})
     \item \emph{Compile} -- \file{.o} $\rightarrow$ \file{built-in.a} $\rightarrow$
       \file{vmlinux.a}
-    \item \emph{Link} -- \file{vmlinux.o} $\rightarrow$ (kallsyms, BTF) $\rightarrow$
+    \item \emph{Link} -- \file{vmlinux.o} $\rightarrow$ (kallsyms) $\rightarrow$
       \file{vmlinux} $\rightarrow$ \file{bzImage}
     \item \emph{Modules} -- \file{.o} $\rightarrow$ \cmd{modpost} $\rightarrow$ \file{.ko}
     \item \emph{Incremental} -- \cmd{fixdep}, \file{include/config/*}, \file{.cmd} files
@@ -1249,10 +1228,9 @@ $ rpm -ql kernel-default | grep -c '\.ko'
       \begin{itemize}
 	\item \url{https://docs.kernel.org/kbuild/}
       \end{itemize}
-    \item \url{https://docs.kernel.org/bpf/btf.html}
+    %\item \url{https://docs.kernel.org/bpf/btf.html}
     \item \url{https://lwn.net/Kernel/Index/}
     \item \url{https://kernelnewbies.org}
-    \item \url{https://github.com/arighi/virtme-ng}
     \item \url{https://github.com/SUSE/kernel-source}
     \item \url{https://build.opensuse.org/project/show/Kernel:stable}
   \end{itemize}
