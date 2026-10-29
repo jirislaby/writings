@@ -56,14 +56,14 @@
       \begin{itemize}[<.->]
 	\item IRQ, PCI, serial, TTY, \xes
 	\item openSUSE Tumbleweed kernel
-	\item Tools for CVE handling (parsers of Kbuild \& Makefiles)
+	\item Tools for CVE handling (parsers of \file{Kbuild} \& \file{Makefile}s)
       \end{itemize}
     \item Past
       \begin{itemize}[<.->]
 	\item Live patching (kGraft), wireless (802.11 a/b/g)
 	\item Teaching at FI MU: C, kernel, binary formats (ELF, DWARF, \dots)
       \end{itemize}
-    \item Packaging: static analysis, python, C++, \cmd{b4}, \cmd{ccache}, \dots
+    \item Packaging: static analysis tools, some C++ and python libs, \cmd{b4}, \cmd{ccache}, \dots
   \end{itemize}
 
 \end{frame}
@@ -99,7 +99,7 @@
   \vspace{2em}
 
   \begin{center}
-    \heading{Today:} what happens between \cmd{nvim foo.c} and a booting kernel
+    \heading{Today:} what happens between \cmd{nvim foo.c} and booting a kernel
   \end{center}
 
 \end{frame}
@@ -138,29 +138,30 @@
 	\item Kbuild: a (huge) set of Makefiles in \file{scripts/}
 	\item You do \emph{not} need to understand them
       \end{itemize}
-    \item Compiler: \cmd{gcc} or \cmd{clang} (\cmd{LLVM=1})
-    \item Binutils: \cmd{ld}, \cmd{objcopy}, \cmd{nm}, \cmd{readelf}, \dots
+    \item Compiler: \cmd{gcc} or \cmd{clang} (\cmd{make LLVM=1})
+    \item Binutils: \cmd{ld}/\cmd{ld.lld}, \cmd{objcopy}, \cmd{nm}, \cmd{readelf}, \dots
     \item Host tools built on the fly: \cmd{fixdep}, \cmd{kallsyms}, \cmd{modpost},
       \cmd{objtool}, \cmd{conf}, \dots
     \item Optional: \cmd{pahole} (BTF), \cmd{openssl} (signing), \cmd{rustc}, \dots
-    \item Minimal versions: \file{Documentation/process/changes.rst}
+    \item Minimal versions: \doc{Documentation/process/changes.rst}
   \end{itemize}
 
 \end{frame}
 
 \begin{frame}[fragile]{Basic Invocation}
 
-  \begin{lstlisting}[language=bash]
-make help                       # list of all targets (really useful!)
-make defconfig                  # create .config
-make -j$(nproc)                 # build vmlinux, bzImage and modules
-make -j$(nproc) V=1             # show the full commands
-make O=../build-x86 ...         # build out of the source tree
-make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- ...   # cross build
-make LLVM=1 ...                 # clang + lld + llvm-* tools
-make fs/ext4/                   # build a single directory
-make fs/ext4/dir.o              # ... or a single object (.i, .s, .lst too)
-  \end{lstlisting}
+  \begin{itemize}[<+->]
+    \item \cmd{make help} -- list of all targets (really useful!)
+    \item \cmd{make defconfig} -- create \file{.config}
+    \item \cmd{make -j\$(nproc)} -- build \file{vmlinux}, \file{bzImage} and modules
+    \item \cmd{make -j\$(nproc) V=1} -- show the full commands
+    \item \cmd{make O=../build-x86} -- build out of the source tree
+    \item \cmd{make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-} -- cross build
+    \item \cmd{make LLVM=1 ...} -- \file{clang} + \file{lld} + \file{llvm-*} tools
+    \item \cmd{make fs/ext4/} -- build a single directory
+    \item \cmd{make fs/ext4/dir.o} -- \ldots\ or a single object (\file{.i},
+      \file{.s}, \file{.lst} too)
+  \end{itemize}
 
 \end{frame}
 
@@ -190,7 +191,7 @@ make fs/ext4/dir.o              # ... or a single object (.i, .s, .lst too)
       \end{itemize}
     \item Described in \file{Kconfig} files
       \begin{itemize}[<.->]
-	\item Own language: \file{Documentation/kbuild/kconfig-language.rst}
+	\item Own language: \doc{Documentation/kbuild/kconfig-language.rst}
       \end{itemize}
   \end{itemize}
 
@@ -211,7 +212,10 @@ config EXT4_FS
 	help
 	  This is the next generation of the ext3 filesystem.
 	  ...
-
+  \end{lstlisting}
+  \pause
+  \begin{lstlisting}[language={},basicstyle=\footnotesize\ttfamily,
+		morekeywords={config,tristate,bool,select,depends,on,help,default,if}]
 config EXT4_FS_POSIX_ACL
 	bool "Ext4 POSIX Access Control Lists"
 	depends on EXT4_FS
@@ -234,12 +238,12 @@ config EXT4_FS_POSIX_ACL
 	\item Forces \cmd{X} on, \emph{ignoring} \cmd{X}'s dependencies
 	\item Use for library-like options only
       \end{itemize}
-    \item \cmd{imply X} -- weak select (user can still say \cmd{n})
+    % \item \cmd{imply X} -- weak select (user can still say \cmd{n})
     \item \cmd{default}, \cmd{help}, \cmd{prompt}
     \item Structure: \cmd{menu}, \cmd{choice}, \cmd{if}, \cmd{source}
       \begin{itemize}[<.->]
-	\item \file{arch/x86/Kconfig} $\rightarrow$ \cmd{source "fs/Kconfig"}
-	  $\rightarrow$ \cmd{source "fs/ext4/Kconfig"} $\rightarrow$ \dots
+	\item \cmd{source "fs/Kconfig"} $\rightarrow$ \cmd{source "fs/ext4/Kconfig"} $\rightarrow$
+	  \dots
       \end{itemize}
   \end{itemize}
 
@@ -249,20 +253,20 @@ config EXT4_FS_POSIX_ACL
 
   \begin{itemize}[<+->]
     \item \heading{Start from something}
-      \begin{itemize}[<.->]
+      \begin{itemize}[<+->]
 	\item \cmd{make defconfig} -- arch default (\file{arch/x86/configs/x86_64_defconfig})
 	\item \cmd{make localmodconfig} -- only modules loaded now (\cmd{lsmod})
 	\item \cmd{make allmodconfig}, \cmd{allyesconfig}, \cmd{tinyconfig}, \cmd{randconfig}
 	\item Distro config: \file{/proc/config.gz}, \file{/boot/config-*}
       \end{itemize}
     \item \heading{Modify}
-      \begin{itemize}[<.->]
+      \begin{itemize}[<+->]
 	\item \cmd{make menuconfig} (ncurses), \cmd{nconfig}, \cmd{xconfig} (Qt)
 	\item \cmd{scripts/config -e EXT4_FS -m USB_STORAGE -d DRM}
 	\item Fragments: \cmd{make defconfig kvm_guest.config}
       \end{itemize}
     \item \heading{Update after a kernel upgrade}
-      \begin{itemize}[<.->]
+      \begin{itemize}[<+->]
 	\item \cmd{make oldconfig} -- ask for new options
 	\item \cmd{make olddefconfig} -- use defaults for new options
 	\item \cmd{make listnewconfig}
@@ -358,7 +362,7 @@ CFLAGS_super.o           := -DDEBUG            # single file
     \item Not \emph{normal} Makefiles: no rules, only variables
       \begin{itemize}[<.->]
 	\item Rules live in \file{scripts/Makefile.build}
-	\item Docs: \file{Documentation/kbuild/makefiles.rst}
+	\item Docs: \doc{Documentation/kbuild/makefiles.rst}
       \end{itemize}
     \item Similar to \file{meson.build}, \file{CMakeLists.txt}: \emph{what}, not \emph{how}
   \end{itemize}
@@ -1224,7 +1228,7 @@ $ rpm -ql kernel-default | grep -c '\.ko'
 \begin{frame}{Resources}
 
   \begin{itemize}
-    \item \file{Documentation/kbuild/} -- in the kernel tree
+    \item \doc{Documentation/kbuild/} -- in the kernel tree
       \begin{itemize}
 	\item \url{https://docs.kernel.org/kbuild/}
       \end{itemize}
