@@ -1,0 +1,135 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Modules}
+\frame{\sectionpage}
+
+\begin{frame}{Kernel Modules}
+
+  \begin{itemize}[<+->]
+    \item \file{.ko} = relocatable ELF (like \file{.o}) + metadata
+    \item Loaded at runtime: \cmd{insmod}, \cmd{modprobe} (+ dependencies)
+      \begin{itemize}[<.->]
+	\item The kernel itself links it (resolves symbols, relocates)
+	\item Only \cmd{EXPORT_SYMBOL()}-ed symbols available
+      \end{itemize}
+    \item \emph{In-tree}: \cmd{obj-m} in the kernel's Kbuild files
+    \item \emph{Out-of-tree}: your own directory
+      \begin{itemize}[<.->]
+	\item Needs a \emph{configured and prepared} kernel tree
+	\item \file{/lib/modules/\$(uname -r)/build}
+	\item Distros: \file{kernel-devel} + \file{kernel-default-devel}, \file{linux-headers-*}
+      \end{itemize}
+    \item Must match the running kernel
+      \begin{itemize}[<.->]
+	\item \emph{vermagic}: version, SMP, preempt, \dots
+	\item \cmd{CONFIG_MODVERSIONS}: CRC of each exported symbol's type
+	  \begin{itemize}
+	    \item SL
+	  \end{itemize}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Writing Your Own Module}{\file{hello.c}}
+
+  \begin{lstlisting}[basicstyle=\scriptsize\ttfamily]
+// SPDX-License-Identifier: GPL-2.0
+#include <linux/init.h>
+#include <linux/module.h>
+
+static int __init hello_init(void)
+{
+	pr_info("Hello from %s\n", KBUILD_MODNAME);
+	return 0;
+}
+
+static void __exit hello_exit(void)
+{
+	pr_info("Goodbye\n");
+}
+
+module_init(hello_init);
+module_exit(hello_exit);
+MODULE_DESCRIPTION("Hello world module");
+MODULE_LICENSE("GPL");
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}[fragile]{Writing Your Own Module}{\file{Makefile}}
+
+  \begin{block}{\file{Makefile} -- just a wrapper}
+    \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+KDIR ?= /lib/modules/$(shell uname -r)/build
+
+obj-m := hello.o
+
+all:
+	$(MAKE) -C $(KDIR) M=$(CURDIR)
+
+clean:
+	$(MAKE) -C $(KDIR) M=$(CURDIR) clean
+    \end{lstlisting}
+  \end{block}
+
+  \pause
+
+  \begin{itemize}
+    \item \cmd{-C} -- run the \emph{kernel's} Makefile
+    \item \cmd{M=} -- but build the module in this directory
+    \item Docs: \doc{Documentation/kbuild/modules.rst}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Linking a Module}
+
+  \begin{center}
+  \begin{tikzpicture}[node distance=5mm and 9mm]
+    \node[bnode] (c) {hello.c};
+    \node[bnode, right=of c] (o) {hello.o};
+    \node<2->[bnode, below=of o] (modc) {hello.mod.c};
+    \node<2->[bnode, right=of modc] (modo) {hello.mod.o};
+    \node<2->[bnode, left=of modc] (sym) {Module.symvers\\(from kernel)};
+    \node<3->[bnode, right=26mm of o] (ko) {hello.ko};
+    \node<4->[bnode, right=of ko, fill=green!20] (kos) {hello.ko\\+signature};
+
+    \draw[barrow] (c) -- node[btool, above] {gcc -c} (o);
+    \draw<2->[barrow] (o) -- node[btool, right] {modpost} (modc);
+    \draw<2->[barrow] (sym) -- (modc);
+    \draw<2->[barrow] (modc) -- node[btool, above] {gcc -c} (modo);
+    \draw<3->[barrow] (o) -- node[btool, above] {ld -r} (ko);
+    \draw<3->[barrow] (modo) -- (ko);
+    \draw<4->[barrow] (ko) -- node[btool, above] {sign-file} (kos);
+  \end{tikzpicture}
+  \end{center}
+
+  \begin{itemize}[<+->]
+    \item \cmd{gcc} -- same as for built-in, plus \cmd{-DMODULE}
+    \item \cmd{modpost}
+      \begin{itemize}
+	\item checks undefined symbols against \file{Module.symvers}
+	\item generates \file{.mod.c}: vermagic, dependencies, \file{struct module}
+      \end{itemize}
+    \item \cmd{ld -r} -- \file{.ko} stays relocatable
+    \item Optional: signature (\cmd{CONFIG_MODULE_SIG}) -- at \cmd{modules_install}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Modules}
+
+  \demo{Out-of-tree module}
+
+  \begin{lstlisting}[language=bash]
+make                                  # or: make KDIR=~/linux
+modinfo hello.ko
+readelf -s hello.ko | grep UND
+sudo insmod hello.ko && sudo dmesg | tail -1
+cat /proc/sys/kernel/tainted          # O: out-of-tree, E: unsigned
+sudo rmmod hello
+  \end{lstlisting}
+
+\end{frame}
+

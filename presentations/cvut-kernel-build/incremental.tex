@@ -1,0 +1,116 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Incremental Builds}
+\frame{\sectionpage}
+
+\begin{frame}{The Problem}
+
+  \begin{itemize}[<+->]
+    \item Full build: minutes to hours
+    \item Change one line $\Rightarrow$ rebuild \emph{only} what is needed
+    \item \cmd{make}: rebuild a target if a prerequisite is newer
+      \begin{itemize}[<.->]
+	\item \cmd{gcc -MMD} gives all included headers
+      \end{itemize}
+    \item But
+      \begin{enumerate}[<.->]
+	\item \emph{Every} file includes \file{autoconf.h}
+	  \begin{itemize}
+	    \item Toggle one option $\Rightarrow$ rebuild everything!?
+	  \end{itemize}
+	\item Changed \emph{flags} (\cmd{ccflags-y}, \cmd{make W=1}, new
+	  compiler) do not change any timestamp
+	  \begin{itemize}
+	    \item $\Rightarrow$ nothing rebuilt!?
+	  \end{itemize}
+      \end{enumerate}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{The Solution: \cmd{fixdep}}
+
+  \begin{itemize}[<+->]
+    \item \file{scripts/basic/fixdep} post-processes \file{.dir.o.d} into \file{.dir.o.cmd}
+      \begin{lstlisting}[language=make]
+savedcmd_fs/ext4/dir.o := gcc -Wp,-MMD,fs/ext4/.dir.o.d -nostdinc ...
+
+deps_fs/ext4/dir.o := \
+  fs/ext4/dir.c \
+    $(wildcard include/config/UNICODE) \
+    $(wildcard include/config/EXT4_FS_ENCRYPTION) \
+  include/linux/fs.h \
+  ...
+      \end{lstlisting}
+    \item[1.] \file{autoconf.h} dependency \emph{replaced} by \file{include/config/<SYMBOL>}
+      \begin{itemize}[<.->]
+	\item Only for symbols the file (or its headers) mention
+	\item \cmd{syncconfig} touches only files of \emph{changed} symbols
+      \end{itemize}
+    \item[2.] \cmd{savedcmd_*} compared to the current command (\cmd{if_changed})
+      \begin{itemize}[<.->]
+	\item Different flags $\Rightarrow$ rebuild
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{What Gets Rebuilt?}
+
+  \begin{itemize}[<+->]
+    \item \heading{\cmd{touch fs/ext4/dir.c}}
+      \begin{itemize}[<.->]
+	\item \file{dir.o} $\rightarrow$ \file{ext4.o} $\rightarrow$ \file{ext4.ko}
+	  (if \cmd{m})
+	\item \file{built-in.a} $\rightarrow$ \file{vmlinux} relink (if \cmd{y})
+      \end{itemize}
+    \item \heading{\cmd{scripts/config -e EXT4_DEBUG}}
+      \begin{itemize}[<.->]
+	\item Only files referencing \file{CONFIG_EXT4_DEBUG}
+      \end{itemize}
+    \item \heading{\cmd{touch include/linux/fs.h}}
+      \begin{itemize}[<.->]
+	\item Thousands of files
+	\item Header hygiene matters!
+      \end{itemize}
+    \item \heading{\cmd{make W=1}} -- different flags $\Rightarrow$ everything
+    \item \heading{Why was it rebuilt?}
+      \begin{itemize}[<.->]
+	\item \cmd{make V=2} prints the reason
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Faster Builds}
+
+  \begin{itemize}[<+->]
+    \item \cmd{make -j\$(nproc)} -- obviously
+    \item Smaller config: \cmd{localmodconfig}
+    \item Build only what you touch: \cmd{make fs/ext4/}, \cmd{make M=fs/ext4}
+    \item \cmd{O=} -- separate build dirs per config/arch, one source tree
+    \item \cmd{ccache} -- caches compiler outputs
+      \begin{itemize}[<.->]
+	\item \cmd{make CC='ccache gcc'}
+	\item Helps when switching branches back and forth
+      \end{itemize}
+    \item Distributed: \cmd{icecream}, \cmd{distcc}
+    \item Skip debug info when not needed
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Incremental Builds}
+
+  \demo{What gets rebuilt}
+
+  \begin{lstlisting}[language=bash]
+make -j$(nproc)                       # nothing to do
+touch fs/ext4/dir.c && make V=2 -j$(nproc)
+cat fs/ext4/.dir.o.cmd
+scripts/config -e EXT4_DEBUG && make -j$(nproc)
+ls -l --time-style=full-iso include/config/EXT4_DEBUG include/config/EXT4_FS
+  \end{lstlisting}
+
+\end{frame}
+

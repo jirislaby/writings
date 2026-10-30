@@ -1,0 +1,75 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Kbuild}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]{Kbuild Files}{Real example: \file{fs/ext4/Makefile}}
+
+  \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+obj-$(CONFIG_EXT4_FS) += ext4.o
+
+ext4-y  := balloc.o bitmap.o block_validity.o dir.o ext4_jbd2.o extents.o \
+           ... super.o symlink.o sysfs.o xattr.o xattr_hurd.o ...
+
+ext4-$(CONFIG_EXT4_FS_POSIX_ACL)  += acl.o
+ext4-$(CONFIG_EXT4_FS_SECURITY)   += xattr_security.o
+ext4-$(CONFIG_FS_VERITY)          += verity.o
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item \file{CONFIG_EXT4_FS=y} $\rightarrow$ \cmd{obj-y += ext4.o} $\rightarrow$ into \file{vmlinux}
+    \item \file{CONFIG_EXT4_FS=m} $\rightarrow$ \cmd{obj-m += ext4.o} $\rightarrow$ \file{ext4.ko}
+    \item \file{CONFIG_EXT4_FS} unset $\rightarrow$ \cmd{obj- += ext4.o} $\rightarrow$ ignored
+    \item \cmd{ext4-y} -- \emph{composite} object: \file{ext4.o} is linked from these
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Kbuild Files}{Syntax Summary}
+
+  \begin{itemize}[<+->]
+    \item Named \file{Kbuild} or \file{Makefile} (\file{Kbuild} preferred if both)
+    \item Descending into subdirectories (\file{fs/Makefile})
+      \begin{lstlisting}[language=make]
+obj-$(CONFIG_EXT4_FS)    += ext4/
+obj-$(CONFIG_BTRFS_FS)   += btrfs/
+      \end{lstlisting}
+    \item Flags
+      \begin{lstlisting}[language=make]
+ccflags-y                := -I$(src)/include   # whole directory
+CFLAGS_super.o           := -DDEBUG            # single file
+      \end{lstlisting}
+    \item Not \emph{normal} Makefiles: no rules, only variables
+      \begin{itemize}[<.->]
+	\item Rules live in \file{scripts/Makefile.build}
+	\item Docs: \doc{Documentation/kbuild/makefiles.rst}
+      \end{itemize}
+    \item Similar to \file{meson.build}, \file{CMakeLists.txt}: \emph{what}, not \emph{how}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Kbuild}{How It Walks the Tree}
+
+  \begin{itemize}[<+->]
+    \item Top-level \file{Makefile}
+      \begin{itemize}[<.->]
+	\item Includes \file{arch/\$(SRCARCH)/Makefile} (flags, boot targets)
+	\item Starts with top-level dirs: \file{init/}, \file{kernel/}, \file{mm/},
+	  \file{fs/}, \file{drivers/}, \dots
+      \end{itemize}
+    \item For each directory: \cmd{make -f scripts/Makefile.build obj=fs/ext4}
+      \begin{itemize}[<.->]
+	\item Reads \file{fs/ext4/Makefile}
+	\item Compiles \cmd{obj-y} and \cmd{obj-m} objects
+	\item Descends into subdirectories (recursive make)
+	\item Collects \cmd{obj-y} into \file{fs/ext4/built-in.a}
+	\item Records \cmd{obj-m} into \file{modules.order}
+      \end{itemize}
+    \item Parallel (\cmd{-j}) across directories
+  \end{itemize}
+
+\end{frame}
+

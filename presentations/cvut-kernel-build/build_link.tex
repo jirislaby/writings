@@ -1,0 +1,194 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Building and Linking the Kernel}
+\frame{\sectionpage}
+
+\begin{frame}[fragile]{Compiling One Object}
+
+  \heading{\cmd{make V=1 fs/ext4/dir.o} (shortened)}
+  \begin{lstlisting}[language=bash]
+gcc -Wp,-MMD,fs/ext4/.dir.o.d -nostdinc -I./arch/x86/include -I./include \
+  -include ./include/linux/compiler-version.h -include ./include/linux/kconfig.h \
+  -include ./include/linux/compiler_types.h -D__KERNEL__ -std=gnu11 \
+  -fno-strict-aliasing -mno-sse -mno-red-zone -mcmodel=kernel -O2 -g ... \
+  -DKBUILD_MODFILE='"fs/ext4/ext4"' -DKBUILD_BASENAME='"dir"' \
+  -DKBUILD_MODNAME='"ext4"' -DMODULE -c -o fs/ext4/dir.o fs/ext4/dir.c
+  \end{lstlisting}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item \cmd{-nostdinc} -- no libc, no \file{/usr/include}
+    \item \file{kconfig.h} includes \file{autoconf.h} -- every file sees all
+      \file{CONFIG_*}
+    \item \cmd{-mno-sse} -- no FPU in the kernel
+    \item \cmd{-MMD} -- dependency file (later)
+    \item \cmd{-DMODULE} -- built as \cmd{m}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{From Objects to \file{vmlinux}}
+
+  \begin{itemize}[<+->]
+    \item \file{dir/built-in.a} -- per directory
+      \begin{itemize}[<.->]
+	\item \emph{Thin} archive: references \file{.o} files, no copies
+	\item Historically \file{built-in.o} (\cmd{ld -r}), until 4.13
+      \end{itemize}
+    \item \file{vmlinux.a} -- all top-level \file{built-in.a} together
+    \item \file{vmlinux.o} -- \cmd{ld -r} of everything
+      \begin{itemize}[<.->]
+	\item \cmd{objtool} -- validates stack frames, generates ORC unwind
+	  data, \dots
+	\item \cmd{modpost} -- section mismatches (\file{.init} vs.\ the rest)
+      \end{itemize}
+    \item \file{scripts/link-vmlinux.sh}
+      \begin{itemize}[<.->]
+	\item Links vmlinux \emph{several times}. Why?
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Why Link \file{vmlinux} Several Times?}
+
+  \begin{itemize}[<+->]
+    \item \emph{kallsyms}: the kernel contains its own symbol table
+      \begin{itemize}[<.->]
+	\item Stack traces with function names, \file{/proc/kallsyms}
+      \end{itemize}
+    \item Chicken \& egg
+      \begin{itemize}[<.->]
+	\item Symbol table needs final addresses
+	\item Adding the table moves the addresses
+      \end{itemize}
+    \item The solution
+      \begin{enumerate}[<.->]
+	\setcounter{enumi}{-1}
+	\item Empty table
+	\item \file{.tmp_vmlinux1} $\rightarrow$ table of the right \emph{size}
+	\item \file{.tmp_vmlinux2} $\rightarrow$ table with the right \emph{addresses}
+	\item \file{.tmp_vmlinux3} -- only if something still moved
+	\item Final link with the correct table
+      \end{enumerate}
+    %\item BTF is generated from \file{.tmp_vmlinux1} too (later)
+    \item \file{System.map} must match the embedded table (checked)
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Linking the Kernel}{The Whole Picture}
+
+  \begin{center}
+  \begin{tikzpicture}[node distance=5mm and 7mm]
+    \node[bnode] (c) {*.c};
+    \node[bnode, below=of c] (o) {*.o};
+    \node[bnode, below=of o] (bi) {built-in.a};
+    \node[bnode, below=of bi] (va) {vmlinux.a};
+
+    \draw[barrow] (c) -- node[btool, right] {gcc -c} (o);
+    \draw[barrow] (o) -- node[btool, right] {ar T} (bi);
+    \draw[barrow] (bi) -- node[btool, right] {ar T} (va);
+
+    \node<2->[bnode, right=18mm of va] (vo) {vmlinux.o};
+    \draw<2->[barrow] (va) -- node[btool, above] {ld -r} node[btool, below] {objtool} (vo);
+
+    \node<3->[bnode, above=of vo] (t1) {.tmp\_vmlinux1};
+    \node<3->[bnode, above=of t1] (t2) {.tmp\_vmlinux2};
+    \node<3->[bnode, above=of t2, dashed] (t3) {.tmp\_vmlinux3};
+    \draw<3->[barrow] (vo) -- node[btool, right] {ld} (t1);
+    \draw<3->[barrow] (t1) -- node[btool, right] {kallsyms} (t2);
+    \draw<3->[barrow, dashed] (t2) -- node[btool, right] {kallsyms} (t3);
+
+    \node<4->[bnode, right=20mm of t1, fill=yellow!20] (btf) {.btf.o};
+    \draw<4->[barrow] (t1) -- node[btool, above] {pahole -J} (btf);
+
+    \node<5->[bnode, right=20mm of t3] (vu) {vmlinux.unstripped};
+    \draw<5->[barrow] (t3) -- node[btool, above] {ld} (vu);
+    \draw<5->[barrow] (btf) -- (vu);
+    \node<5->[bnode, right=of vu, fill=green!20] (vm) {vmlinux};
+    \draw<5->[barrow] (vu) -- node[btool, above] {strip} (vm);
+    \node<5->[bnode, below=of vm] (sm) {System.map};
+    \draw<5->[barrow] (vu) |- (sm);
+  \end{tikzpicture}
+  \end{center}
+
+  \onslide<6->{\footnotesize \file{vmlinux} is a regular ELF executable.
+    But it cannot be booted directly on \xes.}
+
+\end{frame}
+
+\begin{frame}{From \file{vmlinux} to \file{bzImage}}{\xes}
+
+  \begin{columns}[c]
+    \begin{column}{.45\textwidth}
+      \begin{tikzpicture}[node distance=4mm]
+	\node[bnode, fill=green!20] (vm) {vmlinux};
+	\node[bnode, below=of vm] (vb) {compressed/vmlinux.bin};
+	\node[bnode, below=of vb] (gz) {compressed/vmlinux.bin.zst};
+	\node[bnode, below=of gz] (pig) {compressed/piggy.o};
+	\node[bnode, below=of pig] (cv) {compressed/vmlinux};
+	\node[bnode, below=of cv] (bvb) {boot/vmlinux.bin};
+	\node[bnode, right=10mm of bvb] (setup) {boot/setup.bin};
+	\node[bnode, below=of bvb, fill=red!20] (bz) {boot/bzImage};
+
+	\draw[barrow] (vm) -- node[btool, right] {objcopy -O binary} (vb);
+	\draw[barrow] (vb) -- node[btool, right] {zstd / gzip / xz / \dots} (gz);
+	\draw[barrow] (gz) -- node[btool, right] {mkpiggy + as} (pig);
+	\draw[barrow] (pig) -- node[btool, right] {ld + decompressor} (cv);
+	\draw[barrow] (cv) -- node[btool, right] {objcopy} (bvb);
+	\draw[barrow] (bvb) -- node[btool, right] {tools/build} (bz);
+	\draw[barrow] (setup) |- (bz);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{.5\textwidth}
+      \begin{itemize}[<+->]
+	\item \file{arch/x86/boot/}
+	\item Raw binary, compressed
+	\item Wrapped by a \emph{decompressor}
+	  \begin{itemize}[<.->]
+	    \item Own small kernel: decompresses and relocates (KASLR)
+	  \end{itemize}
+	\item \file{setup.bin} -- 16-bit real-mode code
+	  \begin{itemize}[<.->]
+	    \item Header for bootloaders (boot protocol)
+	    \item Also an EFI PE image (EFI stub)
+	  \end{itemize}
+	\item \cmd{make install} copies it to \file{/boot/vmlinuz-*}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]{Booting the Result}
+
+  \begin{itemize}[<+->]
+    \item No need to install, no need to reboot
+    \item QEMU loads \file{bzImage} directly
+      \begin{lstlisting}[language=bash]
+qemu-system-x86_64 -enable-kvm -m 2G -nographic \
+    -kernel arch/x86/boot/bzImage -initrd initrd.img \
+    -append 'console=ttyS0 root=/dev/vda' -drive file=root.img,if=virtio
+      \end{lstlisting}
+    \item Debug with \cmd{gdb}: add \cmd{-s -S} to QEMU, then
+      \begin{lstlisting}[language=bash]
+gdb vmlinux -ex 'target remote :1234'
+      \end{lstlisting}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Build \& Boot}
+
+  \demo{Building a kernel}
+
+  \begin{lstlisting}[language=bash]
+time make -j$(nproc)
+ls -l vmlinux arch/x86/boot/bzImage
+file vmlinux arch/x86/boot/bzImage
+  \end{lstlisting}
+
+\end{frame}
+

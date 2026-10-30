@@ -1,0 +1,182 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Configuration: Kconfig}
+\frame{\sectionpage}
+
+\begin{frame}{Why Configure?}
+
+  \begin{itemize}[<+->]
+    \item One source tree
+      \begin{itemize}[<.->]
+	\item 20+ architectures
+	\item Phones, servers, routers, cars, mainframes
+      \end{itemize}
+    \item Each option is
+      \begin{itemize}[<.->]
+	\item \cmd{y} -- built in the kernel image (\file{vmlinux})
+	\item \cmd{m} -- built as a module (\file{.ko})
+	\item \cmd{n} -- not built at all
+      \end{itemize}
+    \item Options depend on each other
+      \begin{itemize}[<.->]
+	\item No USB storage without USB
+	\item ext4 needs jbd2
+      \end{itemize}
+    \item Described in \file{Kconfig} files
+      \begin{itemize}[<.->]
+	\item Own language: \doc{Documentation/kbuild/kconfig-language.rst}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Kconfig Language}{Real example: \file{fs/ext4/Kconfig}}
+
+  \begin{lstlisting}[language=Kconfig,basicstyle=\footnotesize\ttfamily]
+config EXT4_FS
+    tristate(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KTRISTATE){};}@*) "The Extended 4 (ext4) filesystem"
+    select(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KSELECT){};}@*) BUFFER_HEAD
+    select JBD2
+    select CRC16
+    select CRC32
+    select FS_IOMAP
+    select FS_ENCRYPTION_ALGS if(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KIF){};}@*) FS_ENCRYPTION
+    help(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KHELP){};}@*)
+      This is the next generation of the ext3 filesystem.
+      ...
+  \end{lstlisting}
+  \begin{uncoverenv}<6->
+    \begin{lstlisting}[language=Kconfig,basicstyle=\footnotesize\ttfamily]
+config EXT4_FS_POSIX_ACL
+    bool(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KBOOL){};}@*) "Ext4 POSIX Access Control Lists"
+    depends on(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KDEPENDS){};}@*) EXT4_FS
+    select FS_POSIX_ACL
+    \end{lstlisting}
+  \end{uncoverenv}
+
+  \begin{tikzpicture}[remember picture, overlay, bubshift/.style={yshift=-1.5ex}]
+    \node<2->[bubble, font=\footnotesize, anchor=north east, xshift=-.8em, yshift=-4.0em]
+      (BTYPES) at (current page.north east)
+      {Types: \cmd[language=Kconfig]{bool}, \cmd[language=Kconfig]{tristate},
+	\cmd[language=Kconfig]{int}, \cmd[language=Kconfig]{hex},
+	\cmd[language=Kconfig]{string}
+      };
+
+    \node<3->[bubble, font=\footnotesize, anchor=north east, text width=6cm]
+      (BSELECT) at ([bubshift]BTYPES.south east)
+      {
+	\vspace*{-\topsep+2pt}
+	\setlength{\leftmargini}{1.2em}
+	\begin{itemize}
+	   \item Forces \cmd{X} on, ignoring \cmd{X}'s dependencies
+	   \item Use for library-like options only
+	 \end{itemize}
+      };
+
+    \node<4->[bubble, font=\footnotesize, anchor=north east]
+      (BIF) at ([bubshift]BSELECT.south east)
+      {Condition on a single line};
+
+    \node<5->[bubble, font=\footnotesize, anchor=north east]
+      (BDEFAULT) at ([bubshift]BIF.south east)
+      {\cmd[language=Kconfig]{default}, \cmd[language=Kconfig]{help},
+	\cmd[language=Kconfig]{prompt}
+      };
+
+    \node<7->[bubble, font=\footnotesize, anchor=north east, text width=5.2cm]
+      (BDEPENDS) at ([bubshift]BDEFAULT.south east)
+      {
+	\vspace*{-\topsep+2pt}
+	\setlength{\leftmargini}{1.2em}
+	\begin{itemize}
+	  \item Option not visible unless \cmd{X} is set
+	  \item<8-> \cmd{m} limits dependents to \cmd{m}
+	\end{itemize}
+      };
+
+    \node<9->[bubble, font=\footnotesize, anchor=north east, text width=9.4cm]
+      (BSTRUCT) at ([bubshift]BDEPENDS.south east)
+      {Structure: \cmd[language=Kconfig]{menu}, \cmd[language=Kconfig]{choice},
+	\cmd[language=Kconfig]{if}, \cmd[language=Kconfig]{source}
+	\setlength{\leftmargini}{2em}
+	\begin{itemize}
+	  \item<10-> \cmd[language=Kconfig]{source "fs/Kconfig"} $\rightarrow$
+	    \cmd[language=Kconfig]{source "fs/ext4/Kconfig"} $\rightarrow$ \dots
+	\end{itemize}
+       };
+
+    \draw<2->[kwarrow] (BTYPES.west) to[in=205,out=0,relative] (KTRISTATE);
+    \draw<3->[kwarrow] (BSELECT.west) to[in=160,out=12,relative] (KSELECT);
+    \draw<4->[kwarrow] (BIF.west) to[in=220,out=0,relative] (KIF);
+    \draw<5->[kwarrow] (BDEFAULT.west) to (KHELP);
+    \draw<7->[kwarrow] (BDEPENDS.west) to[in=210,out=0,relative] (KDEPENDS);
+  \end{tikzpicture}
+
+\end{frame}
+
+\begin{frame}{Configuration Targets}
+
+  \begin{itemize}[<+->]
+    \item \heading{Start from something}
+      \begin{itemize}[<+->]
+	\item \cmd{make defconfig} -- arch default (\file{arch/x86/configs/x86_64_defconfig})
+	\item \cmd{make localmodconfig} -- only modules loaded now (\cmd{lsmod})
+	\item \cmd{make allmodconfig}, \cmd{allyesconfig}, \cmd{tinyconfig}, \cmd{randconfig}
+	\item Distro config: \file{/proc/config.gz}, \file{/boot/config-*}
+      \end{itemize}
+    \item \heading{Modify}
+      \begin{itemize}[<+->]
+	\item \cmd{make menuconfig} (ncurses), \cmd{nconfig}, \cmd{xconfig} (Qt)
+	\item \cmd{scripts/config -e EXT4_FS -m USB_STORAGE -d DRM}
+	\item Fragments: \cmd{make defconfig kvm_guest.config}
+      \end{itemize}
+    \item \heading{Update after a kernel upgrade}
+      \begin{itemize}[<+->]
+	\item \cmd{make oldconfig} -- ask for new options
+	\item \cmd{make olddefconfig} -- use defaults for new options
+	\item \cmd{make listnewconfig}
+      \end{itemize}
+    \item \cmd{make savedefconfig} -- minimal \file{defconfig}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Configuration Outputs}
+
+  \begin{itemize}[<+->]
+    \item \file{.config} -- what you edit (via tools)
+      \begin{lstlisting}[language={}]
+CONFIG_EXT4_FS=m
+CONFIG_EXT4_FS_POSIX_ACL=y
+# CONFIG_EXT4_DEBUG is not set
+      \end{lstlisting}
+    \item \cmd{make syncconfig} (run automatically) generates
+      \begin{itemize}[<.->]
+	\item \file{include/config/auto.conf} -- for \emph{make} (Kbuild)
+	\item \file{include/generated/autoconf.h} -- for \emph{C}
+	  \begin{lstlisting}
+#define CONFIG_EXT4_FS_MODULE 1
+#define CONFIG_EXT4_FS_POSIX_ACL 1
+	  \end{lstlisting}
+	\item \file{include/config/EXT4_FS}, \dots -- one (empty) file per symbol
+	  \begin{itemize}
+	    \item Timestamps! More in \emph{Incremental Builds}
+	  \end{itemize}
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Configuration}
+
+  \demo{\cmd{defconfig}, \cmd{menuconfig}, \cmd{scripts/config}}
+
+  \begin{lstlisting}[language=bash]
+make defconfig
+make menuconfig                         # search with '/', help with '?'
+scripts/config -m EXT4_FS -e DEBUG_INFO_DWARF5
+make olddefconfig
+diff -u .config.old .config
+  \end{lstlisting}
+
+\end{frame}

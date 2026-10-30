@@ -1,0 +1,120 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Introduction}
+\frame{\sectionpage}
+
+\begin{frame}{Whoami}
+
+  \begin{itemize}[<+->]
+    \item SUSE Labs, Core team
+      \begin{itemize}[<.->]
+	\item IRQ, PCI, serial, TTY, \xes
+	\item openSUSE Tumbleweed kernel
+	\item Tools for CVE handling (parsers of \file{Kbuild} \& \file{Makefile}s)
+      \end{itemize}
+    \item Past
+      \begin{itemize}[<.->]
+	\item Live patching (kGraft), wireless (802.11 a/b/g)
+	\item Teaching at FI MU: C, kernel, binary formats (ELF, DWARF, \dots)
+      \end{itemize}
+    \item Packaging: static analysis tools, some C++ and python libs, \cmd{b4}, \cmd{ccache}, \dots
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Labs vs. Real World}
+
+  \begin{columns}[T]
+    \begin{column}{.48\textwidth}
+      \heading{Linux-Kernel-Labs}
+      \begin{itemize}
+	\item Prepared VM \& kernel
+	\item A single module
+	\item \cmd{make}, \cmd{insmod}, \cmd{dmesg}
+	\item A few hundred lines
+      \end{itemize}
+    \end{column}
+
+    \pause
+
+    \begin{column}{.48\textwidth}
+      \heading{Real World}
+      \begin{itemize}
+	\item Many architectures, configs, compilers
+	\item The \emph{whole} kernel
+	\item Rebuild after every change
+	\item Debugging crashes from customers
+	\item Shipping to users (packages)
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+  \pause
+  \vspace{2em}
+
+  \begin{center}
+    \heading{Today:} what happens between \cmd{nvim foo.c} and booting a kernel
+  \end{center}
+
+\end{frame}
+
+\begin{frame}{The Kernel Tree in Numbers}{Linux 7.3}
+
+  \begin{center}
+    \begin{tabular}{|l|r|} \hline
+      \bf What & \bf Count \\ \hline
+      Files in git & 96\,080 \\ \hline
+      \file{.c} files & 37\,383 \\ \hline
+      \file{.h} files & 27\,189 \\ \hline
+      \file{Makefile}s and \file{Kbuild}s & 3\,351 \\ \hline
+      \file{Kconfig} files & 1\,943 \\ \hline
+      Config symbols (\file{CONFIG_*}) & 21\,874 \\ \hline
+    \end{tabular}
+  \end{center}
+
+  \pause
+
+  \begin{itemize}[<+->]
+    \item Nobody builds \emph{everything} at once
+      \begin{itemize}[<.->]
+	\item One architecture, one configuration
+      \end{itemize}
+    \item $\Rightarrow$ \emph{configuration} is the first step
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Tools Involved}
+
+  \begin{itemize}[<+->]
+    \item \cmd{make} -- drives everything
+      \begin{itemize}[<.->]
+	\item Kbuild: a (huge) set of Makefiles in \file{scripts/}
+	\item You do \emph{not} need to understand them
+      \end{itemize}
+    \item Compiler: \cmd{gcc} or \cmd{clang} (\cmd{make LLVM=1})
+    \item Binutils: \cmd{ld}/\cmd{ld.lld}, \cmd{objcopy}, \cmd{nm}, \cmd{readelf}, \dots
+    \item Host tools built on the fly: \cmd{fixdep}, \cmd{kallsyms}, \cmd{modpost},
+      \cmd{objtool}, \cmd{conf}, \dots
+    \item Optional: \cmd{pahole} (BTF), \cmd{openssl} (signing), \cmd{rustc}, \dots
+    \item Minimal versions: \doc{Documentation/process/changes.rst}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{Basic Invocation}
+
+  \begin{itemize}[<+->]
+    \item \cmd{make help} -- list of all targets (really useful!)
+    \item \cmd{make defconfig} -- create \file{.config}
+    \item \cmd{make -j\$(nproc)} -- build \file{vmlinux}, \file{bzImage} and modules
+    \item \cmd{make -j\$(nproc) V=1} -- show the full commands
+    \item \cmd{make O=../build-x86} -- build out of the source tree
+    \item \cmd{make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-} -- cross build
+    \item \cmd{make LLVM=1 ...} -- \file{clang} + \file{lld} + \file{llvm-*} tools
+    \item \cmd{make fs/ext4/} -- build a single directory
+    \item \cmd{make fs/ext4/dir.o} -- \ldots\ or a single object (\file{.i},
+      \file{.s}, \file{.lst} too)
+  \end{itemize}
+
+\end{frame}

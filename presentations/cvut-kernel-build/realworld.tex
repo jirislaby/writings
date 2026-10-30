@@ -1,0 +1,77 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{Real-World Kernel Development}
+\frame{\sectionpage}
+
+\begin{frame}{Static Checking}{Find bugs before running}
+
+  \begin{itemize}[<+->]
+    \item Compiler warnings
+      \begin{itemize}[<.->]
+	\item \cmd{make W=1} (or \cmd{W=12}) -- extra warnings
+	\item Build with both \cmd{gcc} and \cmd{clang}, several arches
+      \end{itemize}
+    \item \cmd{make C=1} -- run \cmd{sparse} on rebuilt files
+      \begin{itemize}[<.->]
+	\item \cmd{__user}, \cmd{__iomem}, endianness (\cmd{__le32}), locking annotations
+      \end{itemize}
+    \item \cmd{smatch} -- deeper flow analysis
+    \item \cmd{make coccicheck} -- Coccinelle semantic patches
+    \item \cmd{scripts/checkpatch.pl} -- coding style
+    \item Bots do this for you (after you send)
+      \begin{itemize}[<.->]
+	\item 0-day (Intel), KernelCI, syzbot, Sashiko (AI), \dots
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Dynamic Checking}{Find bugs while running}
+
+  \begin{itemize}[<+->]
+    \item Debug configs: memory and concurrency checkers
+      \begin{itemize}[<.->]
+	\item \cmd{KASAN} -- use-after-free, out-of-bounds
+	\item \cmd{UBSAN} -- undefined behavior
+	\item \cmd{KCSAN} -- data races
+	\item \cmd{PROVE_LOCKING} (lockdep) -- deadlocks, \emph{before} they happen
+	\item \cmd{KFENCE}, \cmd{kmemleak}, \cmd{DEBUG_LIST}, \dots
+      \end{itemize}
+    \item Tests
+      \begin{itemize}[<.->]
+	\item KUnit -- in-kernel unit tests: \cmd{tools/testing/kunit/kunit.py run}
+	\item kselftests -- \cmd{make kselftest}
+	\item LTP, xfstests, blktests, \dots
+      \end{itemize}
+    \item Fuzzing: \cmd{syzkaller} -- thousands of bugs found, usually hard to decrypt
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Debugging}
+
+  \begin{itemize}[<+->]
+    \item \cmd{printk()} / \cmd{pr_debug()} + dynamic debug
+      \begin{itemize}[<.->]
+	\item Still the most used debugger
+      \end{itemize}
+    \item Oops/panic decoding: \cmd{scripts/decode_stacktrace.sh},
+      \cmd{faddr2line}
+    \item Tracing
+      \begin{itemize}[<.->]
+	\item \cmd{ftrace} (\file{/sys/kernel/tracing}), \cmd{trace-cmd}
+	\item \cmd{perf}, \cmd{bpftrace}
+      \end{itemize}
+    \item \cmd{gdb} + QEMU (\cmd{-s -S})
+      \begin{itemize}[<.->]
+	\item \cmd{CONFIG_GDB_SCRIPTS}: \cmd{lx-dmesg}, \cmd{lx-ps}, \cmd{lx-symbols}, \dots
+      \end{itemize}
+    \item Post-mortem: \cmd{kdump} $\rightarrow$ \file{vmcore} $\rightarrow$ \cmd{crash}
+      \begin{itemize}[<.->]
+	\item Needs the \emph{exact} \file{vmlinux} with DWARF
+	\item Daily bread for distro kernel engineers
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+

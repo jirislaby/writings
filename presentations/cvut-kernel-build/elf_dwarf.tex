@@ -1,0 +1,107 @@
+% vim: ai sw=2 spell spelllang=en
+
+\section{ELF and DWARF in a Nutshell}
+\frame{\sectionpage}
+
+\begin{frame}{ELF}
+
+  \begin{columns}[c]
+    \begin{column}{.35\textwidth}
+      \tikzstyle{pre} = [<-,>=stealth',semithick]
+      \tikzstyle{sec} = [draw,semithick,minimum width=3.5cm, minimum height=6mm]
+      \begin{tikzpicture}[node distance=1pt, font=\scriptsize]
+	\node [sec] (HEAD) {ELF header};
+	\node [sec,below=of HEAD] (PRGHDR) {Program Header Table};
+	\node [sec,below=of PRGHDR] (TEXT) {.text};
+	\node [sec,below=of TEXT] (RODATA) {.rodata};
+	\node [sec,below=of RODATA] (DATA) {.data};
+	\node [minimum width=3.5cm,below=of DATA] (MORE) {\dots};
+	\node [sec,below=of MORE] (DEBUG) {.debug\_info, \dots};
+	\node [sec,below=of DEBUG] (SECHDR) {Section Header Table};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{.6\textwidth}
+      \heading{Executable and Linkable Format}
+      \begin{itemize}[<+->]
+	\item Object files, executables, libraries, core dumps
+	\item \file{.o}, \file{.ko}, \file{vmlinux} -- all ELF
+	\item \emph{Sections}: code, data, symbols, relocations, debug info
+	\item Kernel-specific sections
+	  \begin{itemize}[<.->]
+	    \item \file{.init.text} -- freed after boot
+	    \item \file{__ksymtab} -- exported symbols
+	    \item \file{__ex_table} -- exception fixups
+	    \item \file{.modinfo} -- module metadata
+	  \end{itemize}
+	\item Tools: \cmd{readelf}, \cmd{objdump}, \cmd{nm}, \cmd{objcopy}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+
+\end{frame}
+
+\begin{frame}[fragile]{ELF}{Examples}
+
+  \begin{lstlisting}[language=bash]
+readelf -h vmlinux                  # header: type, arch, entry point
+readelf -S fs/ext4/ext4.ko          # sections
+readelf -s fs/ext4/ext4.ko | grep UND   # undefined symbols (from vmlinux)
+objdump -d --no-show-raw-insn fs/ext4/dir.o | less
+nm vmlinux | grep ' T start_kernel'
+grep start_kernel System.map
+modinfo fs/ext4/ext4.ko             # parses .modinfo
+  \end{lstlisting}
+
+\end{frame}
+
+\begin{frame}{DWARF}
+
+  \heading{Debugging information format}
+  \begin{itemize}[<+->]
+    \item Maps machine code back to the source
+      \begin{itemize}[<.->]
+	\item Addresses $\leftrightarrow$ files and lines
+	\item Types, structures, variables, inlined functions, \dots
+      \end{itemize}
+    \item Stored in ELF sections \file{.debug_*}
+    \item \cmd{CONFIG_DEBUG_INFO_DWARF5} (or \cmd{_DWARF4})
+      \begin{itemize}[<.->]
+	\item \emph{Huge}: \file{vmlinux} grows from tens to hundreds of MB
+	\item Slower build
+	\item Distributions ship it separately (\file{-debuginfo} packages)
+      \end{itemize}
+    \item Consumers
+      \begin{itemize}[<.->]
+	\item \cmd{gdb}, \cmd{addr2line}, \cmd{crash} (kernel dumps), \cmd{perf}
+	\item \cmd{scripts/faddr2line}, \cmd{scripts/decode_stacktrace.sh}
+	%\item \cmd{pahole} -- and the BTF generation!
+      \end{itemize}
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}[fragile]{DWARF}{Examples}
+
+  \heading{Where did it crash?}
+  \begin{lstlisting}[language=bash]
+$ scripts/faddr2line vmlinux ext4_readdir+0x1a7/0x5e0
+ext4_readdir+0x1a7/0x5e0:
+ext4_readdir at fs/ext4/dir.c:178
+  \end{lstlisting}
+
+  \pause
+
+  \heading{What does the structure look like?}
+  \begin{lstlisting}[language=bash]
+$ pahole -C list_head vmlinux
+struct list_head {
+        struct list_head *         next;                 /*     0     8 */
+        struct list_head *         prev;                 /*     8     8 */
+
+        /* size: 16, cachelines: 1, members: 2 */
+        /* last cacheline: 16 bytes */
+};
+  \end{lstlisting}
+
+\end{frame}
+
