@@ -18,6 +18,8 @@
     line width=0.8pt, inner sep=4pt, font=\ttfamily\scriptsize},
   barrow/.style={->, >=stealth', thick, draw=gray!80},
   btool/.style={font=\sffamily\tiny, text=OliveGreen},
+  kwarrow/.style={->, thick, >=stealth', shorten <=1pt, shorten >=2pt, draw=blue!55!black},
+  bubble/.style={tl_state, inner sep=4pt},
 }
 
 \newcommand{\demo}[1]{%
@@ -199,53 +201,85 @@
 
 \begin{frame}[fragile]{Kconfig Language}{Real example: \file{fs/ext4/Kconfig}}
 
-  \begin{lstlisting}[language={},basicstyle=\footnotesize\ttfamily,
-    morekeywords={config,tristate,bool,select,depends,on,help,default,if}]
+  \begin{lstlisting}[language=Kconfig,basicstyle=\footnotesize\ttfamily]
 config EXT4_FS
-	tristate "The Extended 4 (ext4) filesystem"
-	select BUFFER_HEAD
-	select JBD2
-	select CRC16
-	select CRC32
-	select FS_IOMAP
-	select FS_ENCRYPTION_ALGS if FS_ENCRYPTION
-	help
-	  This is the next generation of the ext3 filesystem.
-	  ...
+    tristate(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KTRISTATE){};}@*) "The Extended 4 (ext4) filesystem"
+    select(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KSELECT){};}@*) BUFFER_HEAD
+    select JBD2
+    select CRC16
+    select CRC32
+    select FS_IOMAP
+    select FS_ENCRYPTION_ALGS if(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KIF){};}@*) FS_ENCRYPTION
+    help(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KHELP){};}@*)
+      This is the next generation of the ext3 filesystem.
+      ...
   \end{lstlisting}
-  \pause
-  \begin{lstlisting}[language={},basicstyle=\footnotesize\ttfamily,
-		morekeywords={config,tristate,bool,select,depends,on,help,default,if}]
+  \begin{uncoverenv}<6->
+    \begin{lstlisting}[language=Kconfig,basicstyle=\footnotesize\ttfamily]
 config EXT4_FS_POSIX_ACL
-	bool "Ext4 POSIX Access Control Lists"
-	depends on EXT4_FS
-	select FS_POSIX_ACL
-  \end{lstlisting}
+    bool(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KBOOL){};}@*) "Ext4 POSIX Access Control Lists"
+    depends on(*@\tikz[remember picture,baseline=-.5ex]{\node[coordinate](KDEPENDS){};}@*) EXT4_FS
+    select FS_POSIX_ACL
+    \end{lstlisting}
+  \end{uncoverenv}
 
-\end{frame}
+  \begin{tikzpicture}[remember picture, overlay, bubshift/.style={yshift=-1.5ex}]
+    \node<2->[bubble, font=\footnotesize, anchor=north east, xshift=-.8em, yshift=-4.0em]
+      (BTYPES) at (current page.north east)
+      {Types: \cmd[language=Kconfig]{bool}, \cmd[language=Kconfig]{tristate},
+	\cmd[language=Kconfig]{int}, \cmd[language=Kconfig]{hex},
+	\cmd[language=Kconfig]{string}
+      };
 
-\begin{frame}{Kconfig Language}{Keywords}
+    \node<3->[bubble, font=\footnotesize, anchor=north east, text width=6cm]
+      (BSELECT) at ([bubshift]BTYPES.south east)
+      {
+	\vspace*{-\topsep+2pt}
+	\setlength{\leftmargini}{1.2em}
+	\begin{itemize}
+	   \item Forces \cmd{X} on, ignoring \cmd{X}'s dependencies
+	   \item Use for library-like options only
+	 \end{itemize}
+      };
 
-  \begin{itemize}[<+->]
-    \item Types: \cmd{bool}, \cmd{tristate}, \cmd{int}, \cmd{hex}, \cmd{string}
-    \item \cmd{depends on X}
-      \begin{itemize}[<.->]
-	\item Option not visible unless \cmd{X} is set
-	\item \cmd{m} limits dependents to \cmd{m}
-      \end{itemize}
-    \item \cmd{select X}
-      \begin{itemize}[<.->]
-	\item Forces \cmd{X} on, \emph{ignoring} \cmd{X}'s dependencies
-	\item Use for library-like options only
-      \end{itemize}
-    % \item \cmd{imply X} -- weak select (user can still say \cmd{n})
-    \item \cmd{default}, \cmd{help}, \cmd{prompt}
-    \item Structure: \cmd{menu}, \cmd{choice}, \cmd{if}, \cmd{source}
-      \begin{itemize}[<.->]
-	\item \cmd{source "fs/Kconfig"} $\rightarrow$ \cmd{source "fs/ext4/Kconfig"} $\rightarrow$
-	  \dots
-      \end{itemize}
-  \end{itemize}
+    \node<4->[bubble, font=\footnotesize, anchor=north east]
+      (BIF) at ([bubshift]BSELECT.south east)
+      {Condition on a single line};
+
+    \node<5->[bubble, font=\footnotesize, anchor=north east]
+      (BDEFAULT) at ([bubshift]BIF.south east)
+      {\cmd[language=Kconfig]{default}, \cmd[language=Kconfig]{help},
+	\cmd[language=Kconfig]{prompt}
+      };
+
+    \node<7->[bubble, font=\footnotesize, anchor=north east, text width=5.2cm]
+      (BDEPENDS) at ([bubshift]BDEFAULT.south east)
+      {
+	\vspace*{-\topsep+2pt}
+	\setlength{\leftmargini}{1.2em}
+	\begin{itemize}
+	  \item Option not visible unless \cmd{X} is set
+	  \item<8-> \cmd{m} limits dependents to \cmd{m}
+	\end{itemize}
+      };
+
+    \node<9->[bubble, font=\footnotesize, anchor=north east, text width=9.4cm]
+      (BSTRUCT) at ([bubshift]BDEPENDS.south east)
+      {Structure: \cmd[language=Kconfig]{menu}, \cmd[language=Kconfig]{choice},
+	\cmd[language=Kconfig]{if}, \cmd[language=Kconfig]{source}
+	\setlength{\leftmargini}{2em}
+	\begin{itemize}
+	  \item<10-> \cmd[language=Kconfig]{source "fs/Kconfig"} $\rightarrow$
+	    \cmd[language=Kconfig]{source "fs/ext4/Kconfig"} $\rightarrow$ \dots
+	\end{itemize}
+       };
+
+    \draw<2->[kwarrow] (BTYPES.west) to[in=205,out=0,relative] (KTRISTATE);
+    \draw<3->[kwarrow] (BSELECT.west) to[in=160,out=12,relative] (KSELECT);
+    \draw<4->[kwarrow] (BIF.west) to[in=220,out=0,relative] (KIF);
+    \draw<5->[kwarrow] (BDEFAULT.west) to (KHELP);
+    \draw<7->[kwarrow] (BDEPENDS.west) to[in=210,out=0,relative] (KDEPENDS);
+  \end{tikzpicture}
 
 \end{frame}
 
