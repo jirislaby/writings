@@ -7,9 +7,9 @@
 
   \begin{itemize}[<+->]
     \item One kernel for \emph{all} users and hardware
-      \begin{itemize}[<.->]
+      \begin{itemize}
 	\item Nearly everything as modules (thousands of \file{.ko})
-	\item Several archs: \xesh, arm64, ppc64le, s390x, \dots
+	\item Several archs: \xesh, \texttt{arm64}, \texttt{ppc64le}, \texttt{s390x}, \dots
 	\item Several \emph{flavors}: \file{default}, \file{rt}, \file{64kb}, \file{kvmsmall}, \dots
       \end{itemize}
     \item Reproducible: anyone can rebuild the exact same kernel
@@ -27,13 +27,13 @@
 
   \begin{itemize}[<+->]
     \item \emph{Not} a kernel tree! A tree of \emph{patches}
-      \begin{itemize}[<.->]
+      \begin{itemize}
 	\item \url{https://github.com/SUSE/kernel-source}
 	\item One branch per product: \file{stable} (Tumbleweed), \file{SL-16.1},
 	  \file{SLE15-SP7}, \dots
       \end{itemize}
     \item Content
-      \begin{itemize}[<.->]
+      \begin{itemize}
 	\item \file{patches.*/} + \file{series.conf} -- patches on top of upstream tarball
 	\item \file{config/<arch>/<flavor>} -- \file{.config} for each build
 	\item \file{supported.conf} -- support status of modules
@@ -42,6 +42,7 @@
       \end{itemize}
     \item \cmd{scripts/sequence-patch} -- apply patches, get a kernel tree
     \item \cmd{scripts/tar-up} -- create package sources for OBS
+    \item \cmd{scripts/osc_wrapper} -- \texttt{build} or \texttt{upload}
   \end{itemize}
 
 \end{frame}
@@ -50,25 +51,39 @@
 
   \begin{center}
   \begin{tikzpicture}[node distance=6mm and 6mm]
+    \path[use as bounding box] (-1.5, -2.6) rectangle (13.7, 1.2);
+
     \node[bnode] (git) {kernel-source.git};
-    \node[bnode, right=12mm of git] (pkg) {linux-x.y.tar.xz\\patches.*.tar.bz2\\
-      config.tar.bz2\\kernel-default.spec\\\dots};
-    \node<2->[bnode, right=12mm of pkg, fill=yellow!20] (obs) {OBS\\
-      \texttt{rpmbuild}};
-    \node<3->[bnode, right=10mm of obs, fill=green!20] (rpm) {kernel-default\\
-      kernel-default-devel\\kernel-default-debuginfo\\kernel-devel\\kernel-syms\\\dots};
-    \node<4->[bnode, below=10mm of rpm] (qa) {openQA};
-    \node<4->[bnode, left=14mm of qa] (tw) {Tumbleweed\\update};
+    \node[bnode, right=10mm of git, align=left] (pkg) {
+      config.tar.bz2\\
+      kernel-default.spec\\
+      linux-x.y.tar.xz\\
+      patches.*.tar.bz2\\
+      \dots
+    };
+    \node<2->[bnode, right=16mm of pkg, fill=yellow!20] (obs) {
+      OBS\\
+      \texttt{rpmbuild}
+    };
+    \node<6->[bnode, right=10mm of obs, fill=green!20, align=left] (rpm) {
+      kernel-default\\
+      kernel-default-devel\\
+      kernel-default-debuginfo\\
+      kernel-devel\\kernel-syms\\
+      \dots
+    };
+    \node<7->[bnode, below=7mm of rpm] (qa) {openQA};
+    \node<7->[bnode, left=14mm of qa] (tw) {Tumbleweed\\update};
 
     \draw[barrow] (git) -- node[btool, above] {tar-up} (pkg);
-    \draw<2->[barrow] (pkg) -- node[btool, above] {osc / push} (obs);
-    \draw<3->[barrow] (obs) -- (rpm);
-    \draw<4->[barrow] (rpm) -- (qa);
-    \draw<4->[barrow] (qa) -- (tw);
+    \draw<2->[barrow] (pkg) -- node[btool, above] {osc\_wrapper} node[btool, below] {upload} (obs);
+    \draw<6->[barrow] (obs) -- (rpm);
+    \draw<7->[barrow] (rpm) -- node[btool, right] {osc sr} (qa);
+    \draw<7->[barrow] (qa) -- (tw);
   \end{tikzpicture}
   \end{center}
 
-  \begin{itemize}[<+(1)->]
+  \begin{itemize}[<+(2)->]
     \item Spec \texttt{\%prep}: unpack tarball, apply patches, copy config
     \item Spec \texttt{\%build}: \cmd{make olddefconfig}, then \cmd{make} --
       the same as today!
@@ -80,7 +95,8 @@
 
 \begin{frame}[fragile]{What Is in \file{kernel-default.rpm}?}
 
-  \begin{lstlisting}[language=bash]
+  \begin{block}{\file{kernel-default.rpm} Content}
+    \begin{lstlisting}[language=bash]
 $ rpm -ql kernel-default | grep -v '/kernel/'
 /usr/lib/modules/7.2.8-1-default/System.map
 /usr/lib/modules/7.2.8-1-default/config
@@ -89,7 +105,8 @@ $ rpm -ql kernel-default | grep -v '/kernel/'
 ...
 $ rpm -ql kernel-default | grep -c '\.ko'
 5413
-  \end{lstlisting}
+    \end{lstlisting}
+  \end{block}
 
   \pause
 
@@ -106,4 +123,3 @@ $ rpm -ql kernel-default | grep -c '\.ko'
   \end{itemize}
 
 \end{frame}
-

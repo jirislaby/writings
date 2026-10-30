@@ -7,30 +7,18 @@
 
   \begin{columns}[c]
     \begin{column}{.35\textwidth}
-      \tikzstyle{pre} = [<-,>=stealth',semithick]
-      \tikzstyle{sec} = [draw,semithick,minimum width=3.5cm, minimum height=6mm]
-      \begin{tikzpicture}[node distance=1pt, font=\scriptsize]
-	\node [sec] (HEAD) {ELF header};
-	\node [sec,below=of HEAD] (PRGHDR) {Program Header Table};
-	\node [sec,below=of PRGHDR] (TEXT) {.text};
-	\node [sec,below=of TEXT] (RODATA) {.rodata};
-	\node [sec,below=of RODATA] (DATA) {.data};
-	\node [minimum width=3.5cm,below=of DATA] (MORE) {\dots};
-	\node [sec,below=of MORE] (DEBUG) {.debug\_info, \dots};
-	\node [sec,below=of DEBUG] (SECHDR) {Section Header Table};
-      \end{tikzpicture}
+      \input{../pb173-bin/04/ELF_layout}
     \end{column}
     \begin{column}{.6\textwidth}
       \heading{Executable and Linkable Format}
       \begin{itemize}[<+->]
 	\item Object files, executables, libraries, core dumps
 	\item \file{.o}, \file{.ko}, \file{vmlinux} -- all ELF
-	\item \emph{Sections}: code, data, symbols, relocations, debug info
+	\item \emph{Sections}: code, data, symbols, debug info, \dots
 	\item Kernel-specific sections
 	  \begin{itemize}[<.->]
-	    \item \file{.init.text} -- freed after boot
+	    \item \file{.init.\{data,text\}} -- freed after boot
 	    \item \file{__ksymtab} -- exported symbols
-	    \item \file{__ex_table} -- exception fixups
 	    \item \file{.modinfo} -- module metadata
 	  \end{itemize}
 	\item Tools: \cmd{readelf}, \cmd{objdump}, \cmd{nm}, \cmd{objcopy}
@@ -42,15 +30,18 @@
 
 \begin{frame}[fragile]{ELF}{Examples}
 
+  \begin{block}{Common Commands}
   \begin{lstlisting}[language=bash]
-readelf -h vmlinux                  # header: type, arch, entry point
-readelf -S fs/ext4/ext4.ko          # sections
+readelf -h vmlinux                      # header: type, arch, entry point
+readelf -S fs/ext4/ext4.ko              # sections
+readelf -l fs/ext4/ext4.ko              # program headers
 readelf -s fs/ext4/ext4.ko | grep UND   # undefined symbols (from vmlinux)
 objdump -d --no-show-raw-insn fs/ext4/dir.o | less
 nm vmlinux | grep ' T start_kernel'
 grep start_kernel System.map
-modinfo fs/ext4/ext4.ko             # parses .modinfo
+modinfo fs/ext4/ext4.ko                 # parses .modinfo
   \end{lstlisting}
+  \end{block}
 
 \end{frame}
 
@@ -82,17 +73,19 @@ modinfo fs/ext4/ext4.ko             # parses .modinfo
 
 \begin{frame}[fragile]{DWARF}{Examples}
 
-  \heading{Where did it crash?}
-  \begin{lstlisting}[language=bash]
+  \begin{block}{Where did it crash?}
+    \begin{lstlisting}[language=bash]
 $ scripts/faddr2line vmlinux ext4_readdir+0x1a7/0x5e0
 ext4_readdir+0x1a7/0x5e0:
 ext4_readdir at fs/ext4/dir.c:178
-  \end{lstlisting}
+    \end{lstlisting}
+  \end{block}
 
+  \iffalse
   \pause
 
-  \heading{What does the structure look like?}
-  \begin{lstlisting}[language=bash]
+  \begin{block}{What does the structure look like?}
+    \begin{lstlisting}[language=bash]
 $ pahole -C list_head vmlinux
 struct list_head {
         struct list_head *         next;                 /*     0     8 */
@@ -101,7 +94,9 @@ struct list_head {
         /* size: 16, cachelines: 1, members: 2 */
         /* last cacheline: 16 bytes */
 };
-  \end{lstlisting}
+    \end{lstlisting}
+  \end{block}
+  \fi
 
 \end{frame}
 

@@ -5,6 +5,27 @@
 
 \begin{frame}[fragile]{Kbuild Files}{Real example: \file{fs/ext4/Makefile}}
 
+  \begin{columns}
+    \begin{column}{.49\textwidth}
+      \heading{\cmd{Kbuild} (priority over \file{Makefile})}
+      \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+obj-y                   += fs/
+      \end{lstlisting}
+    \end{column}
+
+    \pause
+
+    \begin{column}{.49\textwidth}
+      \heading{\cmd{fs/Makefile}}
+      \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
+obj-$(CONFIG_EXT4_FS)    += ext4/
+      \end{lstlisting}
+    \end{column}
+  \end{columns}
+
+  \pause
+
+  \heading{\cmd{fs/ext4/Makefile}}
   \begin{lstlisting}[language=make,basicstyle=\footnotesize\ttfamily]
 obj-$(CONFIG_EXT4_FS) += ext4.o
 
@@ -13,7 +34,6 @@ ext4-y  := balloc.o bitmap.o block_validity.o dir.o ext4_jbd2.o extents.o \
 
 ext4-$(CONFIG_EXT4_FS_POSIX_ACL)  += acl.o
 ext4-$(CONFIG_EXT4_FS_SECURITY)   += xattr_security.o
-ext4-$(CONFIG_FS_VERITY)          += verity.o
   \end{lstlisting}
 
   \pause
@@ -22,31 +42,16 @@ ext4-$(CONFIG_FS_VERITY)          += verity.o
     \item \file{CONFIG_EXT4_FS=y} $\rightarrow$ \cmd{obj-y += ext4.o} $\rightarrow$ into \file{vmlinux}
     \item \file{CONFIG_EXT4_FS=m} $\rightarrow$ \cmd{obj-m += ext4.o} $\rightarrow$ \file{ext4.ko}
     \item \file{CONFIG_EXT4_FS} unset $\rightarrow$ \cmd{obj- += ext4.o} $\rightarrow$ ignored
-    \item \cmd{ext4-y} -- \emph{composite} object: \file{ext4.o} is linked from these
   \end{itemize}
 
 \end{frame}
 
-\begin{frame}[fragile]{Kbuild Files}{Syntax Summary}
+\begin{frame}{Kbuild Files}{Syntax Summary}
 
   \begin{itemize}[<+->]
-    \item Named \file{Kbuild} or \file{Makefile} (\file{Kbuild} preferred if both)
-    \item Descending into subdirectories (\file{fs/Makefile})
-      \begin{lstlisting}[language=make]
-obj-$(CONFIG_EXT4_FS)    += ext4/
-obj-$(CONFIG_BTRFS_FS)   += btrfs/
-      \end{lstlisting}
-    \item Flags
-      \begin{lstlisting}[language=make]
-ccflags-y                := -I$(src)/include   # whole directory
-CFLAGS_super.o           := -DDEBUG            # single file
-      \end{lstlisting}
     \item Not \emph{normal} Makefiles: no rules, only variables
-      \begin{itemize}[<.->]
-	\item Rules live in \file{scripts/Makefile.build}
-	\item Docs: \doc{Documentation/kbuild/makefiles.rst}
-      \end{itemize}
-    \item Similar to \file{meson.build}, \file{CMakeLists.txt}: \emph{what}, not \emph{how}
+    \item Rules live in \file{scripts/Makefile.build}
+    \item Docs: \doc{Documentation/kbuild/makefiles.rst}
   \end{itemize}
 
 \end{frame}
@@ -54,14 +59,15 @@ CFLAGS_super.o           := -DDEBUG            # single file
 \begin{frame}{Kbuild}{How It Walks the Tree}
 
   \begin{itemize}[<+->]
-    \item Top-level \file{Makefile}
-      \begin{itemize}[<.->]
+    \item Top-level \file{Makefile} + \file{Kbuild}
+      \begin{itemize}[<+->]
 	\item Includes \file{arch/\$(SRCARCH)/Makefile} (flags, boot targets)
 	\item Starts with top-level dirs: \file{init/}, \file{kernel/}, \file{mm/},
 	  \file{fs/}, \file{drivers/}, \dots
       \end{itemize}
-    \item For each directory: \cmd{make -f scripts/Makefile.build obj=fs/ext4}
-      \begin{itemize}[<.->]
+    \item For each directory: \cmd{make -f scripts/Makefile.build obj=<directory>}
+      \begin{itemize}[<+->]
+	\item For \file{<directory>} == \file{fs/ext4/}:
 	\item Reads \file{fs/ext4/Makefile}
 	\item Compiles \cmd{obj-y} and \cmd{obj-m} objects
 	\item Descends into subdirectories (recursive make)
